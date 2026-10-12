@@ -1,0 +1,359 @@
+# 5.1 Custom Tools & Host Injection
+
+> **What you'll learn**
+> - The 6 essentials of a `Tool` subclass: name / description / parameters / execute / requires_confirmation / is_read_only
+> - How to write a description the LLM actually uses (this matters more than the code)
+> - How the host injects, replaces, removes, or allowlists tools
+> - When to pick Tool vs. Skill vs. MCP for a given need
+
+**Custom tools are the best way to let the agent call your business APIs.** Handing the LLM your OpenAPI spec and asking it to craft HTTP requests is fragile; a typed `Tool` subclass is reliable, auditable, and safe.
+
+## The Tool base class
+
+```python
+from abc import ABC, abstractmethod
+from typing import Dict, Any
+from agentao.tools.base import Tool
+
+class MyTool(Tool):
+    @property
+    def name(self) -> str:
+        return "unique_tool_name"          # globally unique
+
+    @property
+    def description(self) -> str:
+        return "One-line description for the LLM — decides whether it calls this tool."
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        """JSON Schema for parameters (passed straight to LLM function calling)."""
+        return {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "..."},
+                "limit": {"type": "integer", "default": 10},
+            },
+            "required": ["query"],
+        }
+
+    @property
+    def requires_confirmation(self) -> bool:
+        return True     # True for writes / network / shell
+
+    @property
+    def is_read_only(self) -> bool:
+        return False    # Pure reads → True; helps the permission engine
+
+    def execute(self, **kwargs) -> str:
+        """Real logic. Return a string — the LLM reads it for its next move."""
+        query = kwargs["query"]
+        limit = kwargs.get("limit", 10)
+        ...
+        return f"Found {len(results)} items: {results}"
+```
+
+**Six essentials**:
+
+| Attribute/method | Required | Purpose |
+|------------------|----------|---------|
+| `name` | ✅ | Globally unique; collisions are overwritten with a warning |
+| `description` | ✅ | **The LLM's only decision input** — say "when to use, what params mean, what comes back" |
+| `parameters` | ✅ | JSON Schema; anything OpenAI function-calling supports |
+| `execute(**kwargs) -> str` | ✅ | Returns a plain string; no dicts, no bytes |
+| `requires_confirmation` | ❌ | True for side-effecting tools → routes through `confirm_tool` |
+| `is_read_only` | ❌ | True for pure reads; permission engine / Plan mode can optimize |
+
+## Why must `execute` return a string?
+
+The tool result is injected into the LLM's message history as a `role:tool` message (OpenAI function calling). Non-string results aren't compatible. Correct pattern:
+
+```python
+def execute(self, **kwargs) -> str:
+    data = call_my_api(kwargs)
+    return json.dumps({
+        "status": "ok",
+        "data": data,
+        "count": len(data),
+    }, ensure_ascii=False)
+```
+
+Large responses (> a few dozen KB) should be **truncated or paginated** first, or they'll blow out the context window.
+
+## Tool-call normalization
+
+Before a tool call is written back into conversation history or executed, Agentao normalizes the model's function-call payload:
+
+- argument strings are parsed and re-emitted as compact JSON when a safe repair is possible
+- near-miss tool names can be repaired to a registered tool name
+- lone UTF-16 surrogate characters are sanitized before outbound assistant/tool messages reach strict provider APIs
+- every assistant `tool_call_id` is answered with a `role:tool` message, including parse errors and loop-protection halts
+
+This is a resilience layer, not a substitute for a clear schema. Keep `parameters` precise, keep descriptions unambiguous, and validate dangerous or business-critical fields inside `execute()` before taking side effects.
+
+## Writing a description the LLM can actually use
+
+This matters more than the code. Bad descriptions cause misuse; good ones teach the LLM when to use, when not to, and how to handle the return.
+
+### ❌ Bad
+
+```python
+description = "Get orders"
+```
+
+The LLM has no idea what an "order" is, whose, what params, or the return shape.
+
+### ✅ Good
+
+```python
+description = """
+Query this tenant's customer orders. Use when the user asks about "my orders",
+"recent order", "order details".
+
+Args:
+- `customer_id` (required): the customer ID from the user's session context
+- `status`: filter by status ("pending" / "shipped" / "delivered" / "all"), default "all"
+- `limit`: max results, default 10, max 50
+
+Returns: JSON with `orders` array; each has id/status/total/created_at.
+
+Rules:
+- Never expose customer_id to the user in your reply
+- If orders is empty, tell the user "no orders found"
+"""
+```
+
+Rule of thumb: **write it to the LLM itself** — "when the user says X, call me."
+
+## Path resolution helpers
+
+The `Tool` base class provides two helpers for path handling:
+
+```python
+class MyFileTool(Tool):
+    def execute(self, path: str, **kw) -> str:
+        # _resolve_path: expands ~; absolute passes through; relative joins working_directory
+        p = self._resolve_path(path)
+        return p.read_text()
+```
+
+`self.working_directory` is auto-bound by Agentao at registration time, so in **multi-instance deployments** each agent's tools resolve paths against that agent's root. Using these helpers (not `Path(raw)`) gives you tenant isolation for free.
+
+## Registering tools
+
+The contract way to inject tools is `Agentao(extra_tools=[...])` at construction or `agent.add_tool(...)` at runtime. Both paths bind `working_directory` / `filesystem` / `shell` and validate reserved names for you.
+
+```python
+from pathlib import Path
+from agentao import Agentao
+from agentao.transport import SdkTransport
+
+agent = Agentao(
+    working_directory=Path("/tmp/session-x"),
+    transport=SdkTransport(),
+    extra_tools=[MyTool()],          # visible from the first chat()
+)
+
+agent.add_tool(AnotherTool())        # visible on the next chat() / arun()
+agent.remove_tool("web_fetch")       # returns True if it existed
+```
+
+Use the low-level registry only when the contract APIs don't fit. `agent.tools.register(...)` skips capability binding and validation, and collision handling is weaker (`replace=False` logs a warning and overwrites):
+
+```python
+my_tool = MyTool()
+my_tool.working_directory = agent.working_directory   # bind explicitly
+agent.tools.register(my_tool)
+```
+
+⚠️ Notes:
+
+- `extra_tools` is code-only: pass already-constructed `Tool` / `AsyncToolBase` instances. It is never loaded from JSON.
+- A same-named `extra_tools` entry replaces a built-in or agent tool intentionally; names must be unique and must not use the reserved `mcp_` prefix.
+- `add_tool(tool)` raises on a name clash unless you pass `replace=True`; `remove_tool(name)` returns `False` for an absent name.
+- `add_tool` / `remove_tool` are for **between turns**. The model's schema is snapshotted once before each `chat()` / `arun()` call and does not change mid-turn.
+
+## Selecting the tool surface
+
+Hosts can also shrink the tools the model sees:
+
+| You want to… | Use |
+|---|---|
+| Add a custom tool, or replace a built-in's implementation | `extra_tools=` / `add_tool(..., replace=True)` |
+| Hide a few inapplicable built-ins | `disable_tools={...}` |
+| Keep only a small set of agentao-owned tools | `enabled_tools={...}` |
+| Strip to only your own tools + MCP | `enabled_tools=set()` plus `extra_tools=[...]` |
+| Mutate the surface mid-session | `add_tool()` / `remove_tool()` between turns |
+
+`disable_tools` and `enabled_tools` are mutually exclusive. `disable_tools` only skips built-ins. `enabled_tools` prunes built-in / agent-path tools while keeping `extra_tools`, MCP tools (`mcp_*`), and plan-only tools.
+
+::: warning Not a security boundary
+These APIs reduce the **schema the model sees**; they are not authorization. If a tool must never run for a tenant, enforce that with the [PermissionEngine](./4-permissions), not only with a tool allowlist.
+:::
+
+## Full example: calling a business API
+
+```python
+"""Your SaaS backend exposes order queries to the agent."""
+import json
+from typing import Dict, Any
+from agentao.tools.base import Tool
+
+class GetCustomerOrdersTool(Tool):
+    def __init__(self, backend_client, tenant_id: str):
+        super().__init__()
+        self.backend = backend_client
+        self.tenant_id = tenant_id      # bound per session
+
+    @property
+    def name(self) -> str:
+        return "get_customer_orders"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Query this tenant's customer orders. "
+            "Use when the user asks about 'my orders', 'order status', etc. "
+            "Args: customer_id (required), status (optional: pending/shipped/delivered/all, default all), "
+            "limit (optional int, max 50, default 10). "
+            "Returns JSON: {status, orders:[{id, status, total, created_at}]}. "
+            "Never expose the internal tenant_id or api tokens in your reply."
+        )
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "customer_id": {"type": "string"},
+                "status": {
+                    "type": "string",
+                    "enum": ["pending", "shipped", "delivered", "all"],
+                    "default": "all",
+                },
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
+            },
+            "required": ["customer_id"],
+        }
+
+    @property
+    def requires_confirmation(self) -> bool:
+        return False    # read-only API, no extra confirm needed
+
+    @property
+    def is_read_only(self) -> bool:
+        return True
+
+    def execute(self, **kwargs) -> str:
+        try:
+            orders = self.backend.list_orders(
+                tenant_id=self.tenant_id,
+                customer_id=kwargs["customer_id"],
+                status=kwargs.get("status", "all"),
+                limit=min(kwargs.get("limit", 10), 50),
+            )
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+        return json.dumps({
+            "status": "ok",
+            "orders": [o.to_dict() for o in orders],
+        }, ensure_ascii=False)
+
+
+# --- In your web handler ---
+def make_agent_for_tenant(tenant, backend):
+    return Agentao(
+        working_directory=Path(f"/tmp/{tenant.id}"),
+        transport=SdkTransport(...),
+        extra_tools=[
+            GetCustomerOrdersTool(backend, tenant.id),
+            CreateRefundTool(backend, tenant.id),
+            SendEmailTool(backend, tenant.id),
+        ],
+    )
+```
+
+## ⚠️ Common pitfalls
+
+::: warning Don't ship without these
+Real production bugs to defend against:
+- ❌ **Raising inside `execute()`** — kills the whole `chat()` call
+- ❌ **Description too vague** — LLM calls the tool everywhere
+- ❌ **Forgetting `requires_confirmation=True`** for side-effecting tools
+- ❌ **No argument bounds** — LLM may pass `limit=99999`
+- ❌ **Oversized responses** — blows the context window
+
+Each pitfall below has the full pattern + the fix.
+:::
+
+### ❌ Raising inside `execute`
+
+```python
+def execute(self, **kwargs) -> str:
+    return self.backend.create_invoice(...)   # what if HTTPError?
+```
+
+An uncaught exception kills the whole `chat()` call. **Catch and return an error string** so the LLM can see it and adapt:
+
+```python
+def execute(self, **kwargs) -> str:
+    try:
+        result = self.backend.create_invoice(...)
+        return json.dumps({"status": "ok", "id": result.id})
+    except BackendError as e:
+        return json.dumps({"status": "error", "message": str(e)})
+```
+
+### ❌ Description too vague
+
+`"Do things with customer data"` — the LLM will call it everywhere. **One tool, one job, one focused description.**
+
+### ❌ Forgetting `requires_confirmation=True`
+
+Writes, refunds, emails, shell, deletes — **anything with side effects** deserves confirmation. Without it you hand the LLM a loaded gun with no safety.
+
+### ❌ No argument bounds
+
+The LLM may pass `limit=99999`. Always clamp in your tool:
+
+```python
+limit = min(max(1, kwargs.get("limit", 10)), 50)
+```
+
+### ❌ Oversized responses
+
+```python
+return json.dumps(all_1000_orders)   # may be 500KB
+```
+
+Blows the context window and slows the LLM. **Truncate, paginate, summarize** and let the LLM fetch the next page if it wants:
+
+```python
+return json.dumps({
+    "status": "ok",
+    "orders": orders[:10],
+    "total_count": len(orders),
+    "has_more": len(orders) > 10,
+    "next_cursor": cursor if len(orders) > 10 else None,
+})
+```
+
+## Tool vs Skill vs MCP: how to pick
+
+| Need | Use |
+|------|-----|
+| Call HTTP API / database / in-memory object | **Tool** (this section) |
+| Teach the LLM "do things our way" | **Skill** ([5.2](./2-skills)) |
+| Integrate an existing third-party tool service (GitHub, filesystem, DB) | **MCP** ([5.3](./3-mcp)) |
+
+Production products usually use all three: tools for business logic, MCP for integrations, skills for style.
+
+## TL;DR
+
+- A Tool returns **a string** (`role:tool` message); never raw dicts/bytes. Bound business data → JSON-stringify and clamp size.
+- The **description** is what the LLM reads to decide *if* and *how* to call. Be specific: when to use, args, return shape, hard rules.
+- Set `requires_confirmation=True` for anything with side effects; set `is_read_only=True` for pure reads (helps PermissionEngine and Plan mode).
+- Inject tools through `extra_tools=` or `add_tool()` so capabilities are bound and names are validated; use `disable_tools` / `enabled_tools` only to reduce the visible schema.
+- Catch exceptions inside `execute()` and return an error string — uncaught exceptions kill the whole `chat()` call.
+- One tool, one focused job. Vague descriptions get called everywhere.
+
+→ Next: [5.2 Skills & Plugins](./2-skills)

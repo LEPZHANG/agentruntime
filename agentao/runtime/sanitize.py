@@ -1,0 +1,362 @@
+"""Outbound-message sanitization for the chat loop.
+
+Two concerns, both about *what we ship back to the API on the next turn*:
+
+1. **Lone UTF-16 surrogates** (U+D800–U+DFFF). Byte-level reasoning models
+   (Kimi K2.5, GLM-5, Qwen via Ollama) occasionally emit these in
+   ``content``, ``reasoning_content``, or ``tool_calls.arguments``. The
+   OpenAI / httpx JSON encoder crashes on them, killing the session.
+   Replace each with U+FFFD (Unicode replacement char).
+
+2. **Non-canonical / invalid JSON in tool_call arguments.** The planner
+   uses repaired args to *execute*, but the original raw string was being
+   serialised verbatim into conversation history — meaning strict API
+   proxies receive malformed JSON next turn, and the model sees its own
+   bad output reflected back unchanged. We re-parse via the repair
+   pipeline and re-emit canonical compact JSON only when repair was
+   needed; clean strict-JSON input is returned verbatim so the
+   conversation-history bytes match what the model emitted (preserves
+   prompt-cache hits). Unparseable args become ``"{}"`` so the next API
+   request still succeeds.
+
+3. **Orphaned tool_calls.** Strict Chat-Completions APIs reject a request
+   in which an assistant ``tool_calls`` entry has no answering
+   ``role: "tool"`` message. The chat loop already backfills placeholders
+   on the paths it controls (doom-loop halt, length truncation), but a
+   turn that dies *between* recording the assistant message and appending
+   the results — most commonly Ctrl+C during a synchronous tool — leaves
+   the call unanswered. Because the orphan stays in history it is re-sent
+   on every later turn, so the session is bricked until ``/new``.
+   :func:`backfill_orphaned_tool_calls` closes that at the turn boundary.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from types import SimpleNamespace
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from .arg_repair import parse_tool_arguments
+from .tool_planning import make_tool_result_message
+
+
+SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
+
+
+def sanitize_surrogates(text: str) -> str:
+    """Replace lone UTF-16 surrogates with U+FFFD. Fast no-op when clean."""
+    if not isinstance(text, str):
+        return text
+    if SURROGATE_RE.search(text) is None:
+        return text
+    return SURROGATE_RE.sub("�", text)
+
+
+def canonicalize_tool_arguments(
+    raw: Any,
+    *,
+    tool_name: str = "?",
+    logger: Optional[Any] = None,
+) -> str:
+    """Round-trip tool-call ``arguments`` through the repair pipeline.
+
+    Returns a wire-valid, surrogate-free, canonical-compact JSON string.
+    On unparseable input returns ``"{}"`` and logs a warning — at this
+    boundary we cannot ship malformed JSON, so degradation beats failure.
+    """
+    # Fast path: surrogate-free strict-JSON object input is returned
+    # verbatim (skips the full repair pipeline). Keeping the wire bytes
+    # identical to what the model emitted preserves prompt-cache hits.
+    # Non-object top-level (``[]``, scalars) falls through to the slow
+    # path so the same ``"{}"`` fallback applies.
+    if isinstance(raw, str) and SURROGATE_RE.search(raw) is None:
+        try:
+            if isinstance(json.loads(raw), dict):
+                return raw
+        except json.JSONDecodeError:
+            pass
+    cleaned_raw = sanitize_surrogates(raw) if isinstance(raw, str) else raw
+    try:
+        # Outbound boundary: enable the bracket-balance tier so a
+        # mid-stream truncation still yields wire-valid JSON instead of
+        # crashing the next API request.
+        parsed, _tags = parse_tool_arguments(
+            cleaned_raw, allow_bracket_balance=True,
+        )
+    except ValueError as exc:
+        if logger is not None:
+            logger.warning(
+                "Outbound tool_call arguments for '%s' unparseable (%s); "
+                "replaced with '{}' to keep session alive",
+                tool_name,
+                exc,
+            )
+        return "{}"
+    # ``ensure_ascii=False`` keeps non-ASCII content as-is (cheaper bytes,
+    # readable logs); surrogates were already stripped so this is safe.
+    try:
+        return json.dumps(parsed, separators=(",", ":"), ensure_ascii=False)
+    except (TypeError, ValueError) as exc:
+        # ``ast.literal_eval`` (the python-literal repair tier) accepts
+        # values like ``bytes`` / ``set`` that JSON cannot encode. Treat
+        # this the same as a parse failure at this boundary: we cannot
+        # ship a TypeError to the next API call.
+        if logger is not None:
+            logger.warning(
+                "Outbound tool_call arguments for '%s' produced non-JSON "
+                "values (%s); replaced with '{}' to keep session alive",
+                tool_name,
+                exc,
+            )
+        return "{}"
+
+
+def _clone_tool_call_with_overrides(
+    tc: Any,
+    *,
+    new_id: Any,
+    new_name: Any,
+    new_args: Any,
+) -> Any:
+    """Build a SimpleNamespace mirror of ``tc`` with overridden fields.
+
+    Used as a fallback for frozen / read-only SDK objects (Pydantic
+    ``model_config={'frozen': True}``) where ``setattr`` is rejected.
+    The proxy preserves common extras (``thought_signature`` at either
+    level) so the manual-construction branch of ``_serialize_tool_call``
+    still emits a faithful history entry.
+    """
+    fn_orig = getattr(tc, "function", None)
+    proxy_fn = SimpleNamespace(name=new_name, arguments=new_args)
+    if fn_orig is not None:
+        for attr in ("thought_signature",):
+            if hasattr(fn_orig, attr):
+                setattr(proxy_fn, attr, getattr(fn_orig, attr))
+    proxy = SimpleNamespace(id=new_id, function=proxy_fn)
+    for attr in ("type", "thought_signature"):
+        if hasattr(tc, attr):
+            setattr(proxy, attr, getattr(tc, attr))
+    return proxy
+
+
+def normalize_tool_calls(
+    tool_calls: Any,
+    *,
+    repair_name_fn: Optional[Callable[[str], Optional[str]]] = None,
+    logger: Optional[Any] = None,
+) -> Tuple[List[Any], bool]:
+    """Surrogate-sanitize and (optionally) name-repair every tool_call.
+
+    Returns ``(cleaned_list, any_changed)``. The returned list contains:
+    - the original SDK object when it was already clean OR when in-place
+      ``setattr`` succeeded (preserves identity for downstream code);
+    - a ``SimpleNamespace`` proxy with the cleaned fields when the SDK
+      object was frozen and ``setattr`` failed.
+
+    Both the conversation-history serializer and ``ToolRunner.execute()``
+    must iterate the returned list, never ``assistant_message.tool_calls``
+    directly — otherwise frozen tool_calls would yield divergent history
+    vs. tool-result IDs/names, which strict OpenAI-compatible APIs reject.
+    """
+    if not tool_calls:
+        return [], False
+    out: List[Any] = []
+    any_changed = False
+    for tc in tool_calls:
+        cleaned, changed = _normalize_one(
+            tc, repair_name_fn=repair_name_fn, logger=logger,
+        )
+        out.append(cleaned)
+        any_changed |= changed
+    return out, any_changed
+
+
+def _normalize_one(
+    tc: Any,
+    *,
+    repair_name_fn: Optional[Callable[[str], Optional[str]]],
+    logger: Optional[Any],
+) -> Tuple[Any, bool]:
+    """Normalize one tool_call. See ``normalize_tool_calls`` for contract."""
+    raw_id = getattr(tc, "id", None)
+    fn = getattr(tc, "function", None)
+    raw_name = getattr(fn, "name", None) if fn is not None else None
+    raw_args = getattr(fn, "arguments", None) if fn is not None else None
+
+    if isinstance(raw_id, str) and raw_id.strip():
+        new_id = sanitize_surrogates(raw_id)
+    else:
+        # Provider returned a missing or empty ``id``. Synthesize the
+        # public-event UUID4 fallback here so the assistant message
+        # ``chat_loop`` is about to serialise into history shares the
+        # exact same id with the planner's downstream tool_result
+        # message — strict Chat Completions APIs reject mismatched
+        # tool_call_id between assistant and tool roles.
+        from . import identity as _identity
+        new_id = _identity.normalize_tool_call_id(raw_id)
+    new_name = sanitize_surrogates(raw_name) if isinstance(raw_name, str) else raw_name
+    new_args = sanitize_surrogates(raw_args) if isinstance(raw_args, str) else raw_args
+
+    if repair_name_fn is not None and isinstance(new_name, str):
+        repaired = repair_name_fn(new_name)
+        if repaired is not None and repaired != new_name:
+            if logger is not None:
+                logger.warning(
+                    "Tool name '%s' repaired to '%s'", new_name, repaired,
+                )
+            new_name = repaired
+
+    id_changed = new_id != raw_id
+    name_changed = isinstance(raw_name, str) and new_name != raw_name
+    args_changed = isinstance(raw_args, str) and new_args is not raw_args
+    if not (id_changed or name_changed or args_changed):
+        return tc, False
+
+    # Try in-place mutation first to preserve object identity. If any
+    # setattr fails (frozen Pydantic, dataclass(frozen=True), slots-only,
+    # validation rejection, …), fall back to a proxy. Catch broadly:
+    # Pydantic v2 raises ``ValidationError`` (a ``ValueError``) on frozen
+    # assignment; dataclasses raise ``FrozenInstanceError`` (an
+    # ``AttributeError``); other SDKs may raise something custom. Any
+    # setattr failure here is recoverable via the proxy path.
+    in_place_ok = True
+    try:
+        if id_changed:
+            tc.id = new_id
+        if fn is not None and name_changed:
+            fn.name = new_name
+        if fn is not None and args_changed:
+            fn.arguments = new_args
+    except Exception:
+        in_place_ok = False
+
+    if in_place_ok:
+        return tc, True
+    return _clone_tool_call_with_overrides(
+        tc, new_id=new_id, new_name=new_name, new_args=new_args,
+    ), True
+
+
+def _sanitize_str_field(d: Dict[str, Any], key: str) -> bool:
+    """If ``d[key]`` is a string with surrogates, replace in place. Returns True
+    iff a substitution happened. Cheap fast-no-op via ``sanitize_surrogates``."""
+    val = d.get(key)
+    if not isinstance(val, str):
+        return False
+    cleaned = sanitize_surrogates(val)
+    if cleaned is val:
+        return False
+    d[key] = cleaned
+    return True
+
+
+def sanitize_assistant_message(msg: Dict[str, Any]) -> bool:
+    """In-place surrogate sanitization of an assistant message dict.
+
+    Walks ``content``, ``reasoning_content``, and each
+    ``tool_calls[*].function.{name,arguments}`` / ``tool_calls[*].id``.
+    Returns True if any field was changed — useful for telemetry.
+    """
+    found = _sanitize_str_field(msg, "content")
+    found |= _sanitize_str_field(msg, "reasoning_content")
+
+    tool_calls = msg.get("tool_calls")
+    if isinstance(tool_calls, list):
+        for tc in tool_calls:
+            if not isinstance(tc, dict):
+                continue
+            found |= _sanitize_str_field(tc, "id")
+            fn = tc.get("function")
+            if isinstance(fn, dict):
+                found |= _sanitize_str_field(fn, "name")
+                found |= _sanitize_str_field(fn, "arguments")
+
+    return found
+
+
+# Wording matters here and is load-bearing. ``ToolRunner.execute`` collects a
+# batch's results in a local list and the runner only extends them into
+# history once the whole batch returns, so an interrupt during tool 3 of 3
+# discards the results of tools 1 and 2 as well — even though those tools
+# *ran*, and their side effects (a file written, a command executed) are
+# real. Asserting "produced no result" would invite the model to re-issue
+# them next turn and double-apply those effects. State the uncertainty
+# instead: the result is unknown, and the model should verify rather than
+# blindly retry.
+#
+# The durable fix is for ``ToolRunner.execute`` to record each completed
+# result into ``agent.messages`` incrementally (or return partials on
+# interrupt) so this placeholder only ever covers calls that truly never
+# ran. That is a deeper change to the batch contract; this wording keeps
+# the honest-history guarantee without over-claiming in the meantime.
+INTERRUPTED_TOOL_CALL_MESSAGE = (
+    "Tool call interrupted: the turn ended before this tool's result was "
+    "recorded. The tool may or may not have run — verify the current state "
+    "before retrying, as re-running may repeat a side effect."
+)
+
+
+def backfill_orphaned_tool_calls(
+    messages: List[Dict[str, Any]],
+    content: str = INTERRUPTED_TOOL_CALL_MESSAGE,
+) -> int:
+    """Answer every unanswered ``tool_calls`` entry in ``messages``.
+
+    Mutates ``messages`` in place, inserting one placeholder
+    ``role: "tool"`` message directly after each assistant message that
+    left a call unanswered — position matters, since strict APIs want
+    the results to follow their request rather than trail the history.
+
+    Idempotent and cheap: with no orphans the list is untouched and 0 is
+    returned, so this is safe to call unconditionally on any turn-ending
+    path. Returns the number of placeholders inserted (useful for
+    telemetry and for asserting the no-op case in tests).
+
+    Name discipline matches the length-truncation path in
+    ``chat_loop/_runner.py``: a call interrupted before its name finished
+    streaming can carry ``name == ""``, which strict proxies reject, and
+    they also reject a name mismatch between the assistant tool_call and
+    its result — so the placeholder name is stamped onto *both* in
+    lock-step.
+    """
+    answered = {
+        m.get("tool_call_id")
+        for m in messages
+        if isinstance(m, dict) and m.get("role") == "tool"
+    }
+
+    out: List[Dict[str, Any]] = []
+    filled = 0
+    for msg in messages:
+        out.append(msg)
+        if not isinstance(msg, dict) or msg.get("role") != "assistant":
+            continue
+        tool_calls = msg.get("tool_calls")
+        if not isinstance(tool_calls, list):
+            continue
+        for tc in tool_calls:
+            if not isinstance(tc, dict):
+                continue
+            call_id = tc.get("id")
+            # A falsy id cannot be answered (``tool_call_id`` must be a
+            # non-empty string); ``normalize_tool_calls`` guarantees one
+            # on every path that reaches history, so this is a guard, not
+            # an expected case.
+            if not call_id or call_id in answered:
+                continue
+            fn = tc.get("function")
+            if not isinstance(fn, dict):
+                fn = {}
+                tc["function"] = fn
+            name = fn.get("name") or "unknown"
+            fn["name"] = name
+            out.append(make_tool_result_message(call_id, name, content))
+            # Guard against the same id appearing in two assistant
+            # messages — answer it once, not once per occurrence.
+            answered.add(call_id)
+            filled += 1
+
+    if filled:
+        messages[:] = out
+    return filled

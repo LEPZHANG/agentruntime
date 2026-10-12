@@ -1,0 +1,731 @@
+"""Context window management: compression, summarization, and memory recall."""
+
+import json
+import re
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+try:
+    import tiktoken as _tiktoken
+    _TIKTOKEN_AVAILABLE = True
+except ImportError:
+    _tiktoken = None
+    _TIKTOKEN_AVAILABLE = False
+
+# Switch to fast len/4 approximation for very large strings (from gemini-cli)
+_FAST_PATH_CHARS = 100_000
+
+
+def _get_tiktoken_encoding(model: str):
+    """Return tiktoken Encoding for model, or None if unsupported/unavailable.
+
+    Mapping:
+      gpt-5* / gpt-4o* / o1* / o3*            -> o200k_base
+      gpt-4* / gpt-3.5* / claude* / deepseek* -> cl100k_base
+      gemini* / unknown                         -> None (CJK heuristic fallback)
+    """
+    if not _TIKTOKEN_AVAILABLE:
+        return None
+    m = model.lower()
+    try:
+        if any(m.startswith(p) for p in ("gpt-5", "gpt-4o", "o1", "o3")):
+            return _tiktoken.get_encoding("o200k_base")
+        if any(m.startswith(p) for p in ("gpt-4", "gpt-3.5", "claude", "deepseek")):
+            return _tiktoken.get_encoding("cl100k_base")
+    except Exception:
+        pass
+    return None
+
+
+def _heuristic_token_count(text: str) -> int:
+    """CJK-aware token estimation (adapted from gemini-cli tokenCalculation.ts).
+
+    Fast path for strings > 100K chars: len/4.
+    Otherwise weighted by character class:
+      ASCII (0-127):    0.25 tokens/char
+      non-ASCII / CJK:  1.3  tokens/char
+
+    The ASCII/CJK split is computed at C speed via ``encode("ascii", "ignore")``
+    — which drops every non-ASCII char, so the encoded byte length is exactly
+    the ASCII-char count — instead of a Python per-character loop. The weights
+    are applied with integer arithmetic (``×100 // 100``) so the result is the
+    exact floor of ``ascii×0.25 + cjk×1.3``: deterministic, and free of the
+    upward drift a running float sum of the inexact ``1.3`` would accumulate.
+    This removes the O(chars) interpreter loop from the no-tiktoken estimation
+    fallback (T1.2).
+    """
+    n = len(text)
+    if n > _FAST_PATH_CHARS:
+        return n // 4
+    ascii_count = len(text.encode("ascii", "ignore"))
+    non_ascii = n - ascii_count
+    return (ascii_count * 25 + non_ascii * 130) // 100
+
+
+class ContextManager:
+    """Manages context window size, compression, and memory recall."""
+
+    DEFAULT_MAX_TOKENS = 200_000
+    COMPRESSION_THRESHOLD = 0.65    # Full LLM compression at 65%
+    MICROCOMPACT_THRESHOLD = 0.55   # Cheap tool-result clearing at 55%
+    KEEP_RECENT_MESSAGES = 20       # Hard cap on verbatim-kept messages
+    CIRCUIT_BREAKER_LIMIT = 3       # Stop auto-compact after N consecutive failures
+    MICROCOMPACT_TOOL_LIMIT = 3_000 # Max chars kept from any old tool result in microcompact
+    MICROCOMPACT_PRESERVE_RECENT = 5  # Keep the most recent N tool results at full fidelity
+    SUMMARY_END_MARKER = "--- END OF CONTEXT SUMMARY ---"  # Closes the summary block
+
+    def __init__(self, llm_client, memory_tool, max_tokens: int = DEFAULT_MAX_TOKENS, memory_manager=None):  # Optional[MemoryManager]
+        """Initialize ContextManager.
+
+        Args:
+            llm_client: LLMClient instance (borrowed from agent)
+            memory_tool: SaveMemoryTool instance (borrowed from agent)
+            max_tokens: Maximum context window tokens (default 200K)
+        """
+        self.llm_client = llm_client
+        self.memory_tool = memory_tool
+        self.max_tokens = max_tokens
+        self.memory_manager = memory_manager
+
+        # Circuit breaker: stop auto-compact after too many consecutive failures
+        self._consecutive_compact_failures: int = 0
+
+        # Stats from the last completed compaction (surfaced via get_usage_stats)
+        self._last_compact_stats: Optional[Dict[str, Any]] = None
+
+        # Tier 1: last real prompt_tokens from API response (updated after each LLM call)
+        self._last_api_prompt_tokens: Optional[int] = None
+        # Length of the message list that produced _last_api_prompt_tokens, so the
+        # hot-path threshold check can reuse the real count for the already-sent
+        # prefix and only locally estimate messages appended since.
+        self._api_anchor_msg_count: Optional[int] = None
+        # Tier 3: cached tiktoken encoding; None = CJK-aware heuristic fallback
+        self._encoding = _get_tiktoken_encoding(self.llm_client.model)
+
+    # -----------------------------------------------------------------------
+    # Token estimation
+    # -----------------------------------------------------------------------
+
+    def record_api_usage(self, prompt_tokens: int, message_count: Optional[int] = None) -> None:
+        """Store real prompt_tokens from the latest API response (Tier 1).
+
+        ``message_count`` is the length of the message list that produced this
+        count (system + history, as sent). When provided it anchors the
+        hot-path threshold estimate so subsequent turns reuse the real count
+        for the already-sent prefix instead of re-encoding the whole history.
+        Omitting it (legacy callers) clears the anchor and forces the full
+        local estimate.
+        """
+        self._last_api_prompt_tokens = prompt_tokens
+        self._api_anchor_msg_count = message_count
+
+    def invalidate_token_anchor(self) -> None:
+        """Drop the Tier-1 anchor after history is mutated in place.
+
+        Both microcompaction and full compression rewrite the already-sent
+        prefix, so the real prompt_tokens no longer describes it; the next API
+        response re-establishes the anchor.
+        """
+        self._last_api_prompt_tokens = None
+        self._api_anchor_msg_count = None
+
+    def _threshold_token_estimate(self, messages: List[Dict[str, Any]]) -> int:
+        """Token count for hot-path threshold checks.
+
+        Reuses the real prompt_tokens from the last API response (Tier 1) for
+        the already-sent prefix and locally estimates only the messages
+        appended since, avoiding a full re-encode of the history every turn.
+        Falls back to a full local estimate when no fresh anchor is available
+        (no API count yet, or right after compaction).
+
+        Note: ``messages[0]`` (the system prompt) lives inside the anchored
+        prefix, but it is rebuilt every turn with volatile content (memory
+        recall, todos, active skills, timestamp). The anchor therefore charges
+        the *previous* turn's system-prompt size for one turn until the next
+        API response re-anchors — a bounded, self-healing accuracy trade-off,
+        not a correctness bug. Do not "fix" it by trusting the anchor harder.
+        """
+        anchor = self._last_api_prompt_tokens
+        n = self._api_anchor_msg_count
+        # Guard the anchor token count: a provider can return a malformed
+        # ``usage`` field (null / non-numeric prompt_tokens). bool is excluded
+        # explicitly since it is an int subclass. (``n`` comes from ``len()``,
+        # so it is always a plain int when set.)
+        if (
+            not isinstance(anchor, int) or isinstance(anchor, bool)
+            or not isinstance(n, int)
+            or n > len(messages)
+        ):
+            return self.estimate_tokens(messages)
+        return anchor + sum(self._count_message_tokens(m) for m in messages[n:])
+
+    def count_tokens_in_text(self, text: str) -> int:
+        """Count tokens via tiktoken; fall back to CJK-aware heuristic."""
+        if self._encoding is not None:
+            try:
+                return len(self._encoding.encode(text, disallowed_special=()))
+            except Exception:
+                pass
+        return _heuristic_token_count(text)
+
+    def _count_message_tokens(self, msg: Dict[str, Any]) -> int:
+        """Return estimated token count for a single message dict."""
+        tokens = 0
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            tokens += self.count_tokens_in_text(content)
+        elif isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    tokens += self.count_tokens_in_text(block.get("text", ""))
+        # reasoning_content is truncated to MAX_REASONING_HISTORY_CHARS before storage
+        rc = msg.get("reasoning_content")
+        if isinstance(rc, str) and rc:
+            tokens += self.count_tokens_in_text(rc)
+        if "tool_calls" in msg:
+            tokens += self.count_tokens_in_text(str(msg["tool_calls"]))
+        return tokens
+
+    def estimate_tokens(self, messages: List[Dict[str, Any]]) -> int:
+        """Count tokens for a list of messages (local estimate).
+
+        Uses tiktoken when available (cl100k_base / o200k_base per model family);
+        falls back to CJK-aware heuristic (ASCII=0.25, non-ASCII=1.3 tok/char).
+        Used in hot-path threshold checks. Signature unchanged for compatibility.
+        """
+        return sum(self._count_message_tokens(m) for m in messages)
+
+    def estimate_tokens_breakdown(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, int]:
+        """Per-component token breakdown (always local estimate).
+
+        Returns dict with keys: system, messages, tools, total.
+        Only called at reporting time, not in hot-path threshold checks.
+        """
+        system_tokens = 0
+        message_tokens = 0
+        for msg in messages:
+            count = self._count_message_tokens(msg)
+            if msg.get("role") == "system":
+                system_tokens += count
+            else:
+                message_tokens += count
+        tools_tokens = 0
+        if tools is not None:
+            try:
+                tools_str = json.dumps(tools)
+            except Exception:
+                tools_str = str(tools)
+            tools_tokens = self.count_tokens_in_text(tools_str)
+        total = system_tokens + message_tokens + tools_tokens
+        return {
+            "system": system_tokens,
+            "messages": message_tokens,
+            "tools": tools_tokens,
+            "total": total,
+        }
+
+    # -----------------------------------------------------------------------
+    # Threshold checks
+    # -----------------------------------------------------------------------
+
+    def needs_compression(
+        self, messages: List[Dict[str, Any]], tokens: Optional[int] = None
+    ) -> bool:
+        """Return True when full LLM compression is needed (>= 65%).
+
+        ``tokens`` lets the caller pass a pre-computed
+        :meth:`_threshold_token_estimate` so the same per-iteration estimate
+        feeds both this and :meth:`needs_microcompaction` instead of being
+        computed twice (T1.3). Omit it to estimate locally.
+        """
+        est = tokens if tokens is not None else self._threshold_token_estimate(messages)
+        return est > self.max_tokens * self.COMPRESSION_THRESHOLD
+
+    def needs_microcompaction(
+        self, messages: List[Dict[str, Any]], tokens: Optional[int] = None
+    ) -> bool:
+        """Return True when cheap tool-result clearing is warranted (55-65%).
+
+        See :meth:`needs_compression` for the ``tokens`` pre-computation hook.
+        """
+        est = tokens if tokens is not None else self._threshold_token_estimate(messages)
+        return (
+            est > self.max_tokens * self.MICROCOMPACT_THRESHOLD
+            and est <= self.max_tokens * self.COMPRESSION_THRESHOLD
+        )
+
+    # -----------------------------------------------------------------------
+    # Microcompaction — cheap pass, no LLM call
+    # -----------------------------------------------------------------------
+
+    # Fraction of MICROCOMPACT_TOOL_LIMIT kept from the start of old tool results.
+    # 20% head (command invoked, initial output) + 80% tail (errors, final results).
+    MICROCOMPACT_HEAD_RATIO = 0.2
+
+    def microcompact_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Truncate large tool results without calling the LLM.
+
+        Keeps the most recent MICROCOMPACT_PRESERVE_RECENT tool results at full
+        fidelity; older ones exceeding MICROCOMPACT_TOOL_LIMIT are shortened using
+        a head+tail strategy: 20% from the start (command context) and 80% from
+        the end (errors and final output tend to appear last).
+        Returns a new list; does not mutate the original.
+        """
+        tool_indices = [i for i, m in enumerate(messages) if m.get("role") == "tool"]
+        preserve = set(tool_indices[-self.MICROCOMPACT_PRESERVE_RECENT:])
+
+        head_chars = int(self.MICROCOMPACT_TOOL_LIMIT * self.MICROCOMPACT_HEAD_RATIO)
+        tail_chars = self.MICROCOMPACT_TOOL_LIMIT - head_chars
+
+        result = []
+        mutated = 0
+        for i, msg in enumerate(messages):
+            if msg.get("role") == "tool" and i not in preserve:
+                content = msg.get("content", "")
+                if isinstance(content, str) and len(content) > self.MICROCOMPACT_TOOL_LIMIT:
+                    msg = dict(msg)
+                    omitted = len(content) - self.MICROCOMPACT_TOOL_LIMIT
+                    msg["content"] = (
+                        content[:head_chars]
+                        + f"\n[… {omitted:,} chars omitted by microcompact …]\n"
+                        + content[len(content) - tail_chars:]
+                    )
+                    mutated += 1
+            result.append(msg)
+
+        if mutated:
+            try:
+                self.llm_client.logger.info(
+                    f"Microcompaction: truncated {mutated} large tool result(s)"
+                )
+            except Exception:
+                pass
+        return result
+
+    # -----------------------------------------------------------------------
+    # Full compression
+    # -----------------------------------------------------------------------
+
+    def compress_messages(
+        self,
+        messages: List[Dict[str, Any]],
+        is_auto: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Compress conversation history using partial compaction + structured summarization.
+
+        Algorithm:
+          1. Apply microcompact pass (strip oversized tool results cheaply)
+          2. Partial compaction: keep last N messages verbatim (never more than
+             KEEP_RECENT_MESSAGES or 60% of total, whichever is smaller)
+          3. Advance split point to next 'user' boundary (tool_use/tool_result safety)
+          4. Extract recently read file paths from the to-summarize window
+          5. Call LLM with structured 9-section prompt to summarize old messages
+          6. Save summary to memory
+          7. Build result: [boundary_marker, summary, file_hint?, pinned…, recent…]
+
+        Circuit breaker: after CIRCUIT_BREAKER_LIMIT consecutive failures this
+        method returns messages unchanged and logs a warning.
+
+        Args:
+            messages: Current conversation messages (without system prompt)
+            is_auto: True for threshold-triggered compression, False for manual
+
+        Returns:
+            Compressed messages list
+        """
+        # --- Circuit breaker ------------------------------------------------
+        if self._consecutive_compact_failures >= self.CIRCUIT_BREAKER_LIMIT:
+            try:
+                self.llm_client.logger.warning(
+                    f"Compact circuit breaker open "
+                    f"({self._consecutive_compact_failures} consecutive failures) — skipping"
+                )
+            except Exception:
+                pass
+            return messages
+
+        if len(messages) < 5:
+            return messages
+
+        # --- Step 1: microcompact (free) ------------------------------------
+        messages = self.microcompact_messages(messages)
+
+        # --- Step 2: partial compaction split -------------------------------
+        # Keep at most KEEP_RECENT_MESSAGES, but no more than 60% of total
+        keep_count = min(
+            self.KEEP_RECENT_MESSAGES,
+            max(4, int(len(messages) * 0.60)),
+        )
+        split_index = len(messages) - keep_count
+
+        # Advance to next 'user' boundary to avoid orphaned tool results
+        while split_index < len(messages) - 1 and messages[split_index].get("role") != "user":
+            split_index += 1
+
+        if messages[split_index].get("role") != "user":
+            return messages  # no safe split point found
+
+        to_summarize = messages[:split_index]
+        to_keep = messages[split_index:]
+
+        if not to_summarize:
+            return messages
+
+        # --- Step 3: extract pinned messages --------------------------------
+        pinned = [
+            m for m in to_summarize
+            if isinstance(m.get("content"), str) and m["content"].startswith("[PIN]")
+        ]
+
+        # --- Step 4: extract recently read files ----------------------------
+        recently_read = self._extract_recently_read_files(to_summarize)
+
+        # --- Step 4b: crystallize from raw user messages --------------------
+        # Run *before* summarization so the rule-based extractor sees
+        # authentic user text, never the LLM's narration of it. Best-effort —
+        # must never break the compaction pipeline.
+        if self.memory_manager is not None:
+            try:
+                self.memory_manager.crystallize_user_messages(to_summarize)
+            except Exception:
+                pass
+
+        # --- Step 5: LLM summarization --------------------------------------
+        pre_tokens = self.estimate_tokens(messages)
+        summary = self._summarize_messages(to_summarize)
+        if not summary:
+            self._consecutive_compact_failures += 1
+            return messages  # graceful degradation
+
+        self._consecutive_compact_failures = 0  # reset on success
+
+        # --- Step 6: save session summary to SQLite --------------------------
+        if self.memory_manager is not None:
+            try:
+                self.memory_manager.save_session_summary(
+                    summary=summary,
+                    tokens_before=pre_tokens,
+                    messages_summarized=len(to_summarize),
+                )
+            except Exception:
+                pass
+
+        # --- Step 7: assemble result ----------------------------------------
+        boundary_msg = {
+            "role": "system",
+            "content": (
+                f"[Compact Boundary | tokens_before={pre_tokens} | "
+                f"messages_summarized={len(to_summarize)} | "
+                f"messages_kept={len(to_keep)} | "
+                f"timestamp={datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
+                f"auto={is_auto}]"
+            ),
+        }
+
+        summary_msg = {
+            "role": "system",
+            "content": (
+                f"[Conversation Summary]\n{summary}\n"
+                f"{self.SUMMARY_END_MARKER}\n"
+                "(The above is historical context. Resume from the live messages "
+                "below; do not re-execute already-completed work.)"
+            ),
+        }
+
+        file_hint_msgs: List[Dict[str, Any]] = []
+        if recently_read:
+            file_list = "\n".join(f"  - {p}" for p in recently_read)
+            file_hint_msgs.append({
+                "role": "system",
+                "content": (
+                    "[Files accessed before this summary — re-read if details are needed:\n"
+                    f"{file_list}\n]"
+                ),
+            })
+
+        result = [boundary_msg, summary_msg] + file_hint_msgs + pinned + to_keep
+
+        post_tokens = self.estimate_tokens(result)
+        self._last_compact_stats = {
+            "timestamp": datetime.now().isoformat(),
+            "pre_compact_tokens": pre_tokens,
+            "post_compact_tokens": post_tokens,
+            "messages_summarized": len(to_summarize),
+            "messages_kept": len(to_keep),
+            "is_auto": is_auto,
+            "recently_read_files": recently_read,
+        }
+        try:
+            self.llm_client.logger.info(
+                f"Compression complete: {pre_tokens} → {post_tokens} tokens, "
+                f"{len(to_summarize)} messages summarized, {len(to_keep)} kept"
+            )
+        except Exception:
+            pass
+
+        return result
+
+    # -----------------------------------------------------------------------
+    # Recently read file extraction
+    # -----------------------------------------------------------------------
+
+    def _extract_recently_read_files(self, messages: List[Dict[str, Any]]) -> List[str]:
+        """Extract file paths from read_file tool calls in the given messages."""
+        seen: set = set()
+        result: List[str] = []
+
+        for msg in messages:
+            if msg.get("role") != "assistant":
+                continue
+            tool_calls = msg.get("tool_calls", [])
+            if not tool_calls:
+                continue
+            for tc in tool_calls:
+                # Handle both dict (serialized) and object forms
+                if isinstance(tc, dict):
+                    func = tc.get("function", {})
+                    name = func.get("name", "")
+                    raw_args = func.get("arguments", "{}")
+                else:
+                    func = getattr(tc, "function", None)
+                    name = getattr(func, "name", "") if func else ""
+                    raw_args = getattr(func, "arguments", "{}") if func else "{}"
+
+                if name != "read_file":
+                    continue
+                try:
+                    args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                    path = args.get("path") or args.get("file_path", "")
+                    if path and path not in seen:
+                        seen.add(path)
+                        result.append(path)
+                except Exception:
+                    pass
+
+        return result[-10:]  # most recent 10
+
+    # -----------------------------------------------------------------------
+    # Structured 9-section summarization
+    # -----------------------------------------------------------------------
+
+    _HIGH_FIDELITY_TOOLS = {"write_file", "replace", "edit_file"}
+    _TOOL_RESULT_TRUNCATION = 200
+    _HIGH_FIDELITY_TRUNCATION = 1_000
+
+    _SUMMARIZE_SYSTEM_PROMPT = (
+        "You are a conversation summarization assistant. Your task is to produce a "
+        "detailed, structured summary of the conversation history provided below.\n\n"
+        "CRITICAL: Do NOT call any tools. Respond with plain text only.\n\n"
+        "Step 1 — write your private analysis inside <analysis> tags: walk through "
+        "every message chronologically, identify all user requests, decisions made, "
+        "files touched, code snippets, error messages, and the precise state of work "
+        "at the end of the conversation.\n\n"
+        "Step 2 — write the final summary inside <summary> tags with EXACTLY these "
+        "9 sections (use the ## headings verbatim):\n\n"
+        "## 1. Primary Request and Intent\n"
+        "Every explicit goal, requirement, or task the user stated.\n\n"
+        "## 2. Key Technical Concepts\n"
+        "Frameworks, libraries, languages, APIs, patterns used or discussed.\n\n"
+        "## 3. Files and Code Sections\n"
+        "Every file examined, created, or modified. For each: filename, what changed, "
+        "and key code snippets (function names, class names, important lines). "
+        "Be thorough — this section is critical for seamless continuation.\n\n"
+        "## 4. Errors and Fixes\n"
+        "Every error encountered and how it was resolved. Quote error messages verbatim.\n\n"
+        "## 5. Problem Solving\n"
+        "Approaches tried, decisions made, and why. Both solved and unresolved issues.\n\n"
+        "## 6. User Messages\n"
+        "All non-trivial user messages (quote short ones exactly; paraphrase long ones).\n\n"
+        "## 7. Pending Tasks\n"
+        "Work explicitly requested but not yet completed.\n\n"
+        "## 8. Current Work\n"
+        "The precise state of work at the moment this summary was created: what was "
+        "being done, which file, which function, which step. Be as specific as possible.\n\n"
+        "## 9. Next Step\n"
+        "The single most logical next action, directly aligned with the user's latest request.\n\n"
+        "Sections 3, 4, and 8 are the most important — prioritize completeness there."
+    )
+
+    def _summarize_messages(self, messages: List[Dict[str, Any]]) -> str:
+        """Call LLM to produce a structured 9-section summary.
+
+        Uses an <analysis> thinking block (stripped from output) followed by
+        a <summary> block for the final result.
+
+        Returns:
+            Formatted summary text, or empty string on failure.
+        """
+        try:
+            to_summarize = [
+                m for m in messages
+                if not (
+                    isinstance(m.get("content"), str)
+                    and m["content"].startswith("[PIN]")
+                )
+            ]
+            formatted = self._format_for_summary(to_summarize)
+            recall_messages = [
+                {"role": "system", "content": self._SUMMARIZE_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Summarize this conversation:\n\n{formatted}"},
+            ]
+            response = self.llm_client.chat(messages=recall_messages, tools=None)
+            raw = response.choices[0].message.content or ""
+            return self._format_summary(raw)
+        except Exception as e:
+            try:
+                self.llm_client.logger.warning(f"Summarization failed: {e}")
+            except Exception:
+                pass
+            return ""
+
+    @staticmethod
+    def _format_summary(raw: str) -> str:
+        """Strip <analysis> block and unwrap <summary> tags."""
+        # Remove analysis scratchpad
+        raw = re.sub(r"<analysis>.*?</analysis>", "", raw, flags=re.DOTALL).strip()
+        # Unwrap <summary>…</summary> if present
+        m = re.search(r"<summary>(.*?)</summary>", raw, re.DOTALL)
+        if m:
+            raw = m.group(1).strip()
+        return raw
+
+    def _format_for_summary(self, messages: List[Dict[str, Any]]) -> str:
+        """Format messages as readable text for the summarization prompt."""
+        lines = []
+        for msg in messages:
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            if isinstance(content, list):
+                content = " ".join(
+                    b.get("text", "")
+                    for b in content
+                    if isinstance(b, dict) and b.get("type") == "text"
+                )
+            if (
+                isinstance(content, str)
+                and content.startswith("[Conversation Summary]")
+                and self.SUMMARY_END_MARKER in content
+            ):
+                # Strip a prior summary's end-marker + framing note on rehydration
+                # so it doesn't accumulate when an old summary is re-summarized.
+                # Anchored on the summary prefix so an unrelated message that merely
+                # contains the marker substring is never truncated.
+                content = content.split(self.SUMMARY_END_MARKER)[0].rstrip()
+            if role == "tool":
+                tool_name = msg.get("name", "")
+                limit = (
+                    self._HIGH_FIDELITY_TRUNCATION
+                    if tool_name in self._HIGH_FIDELITY_TOOLS
+                    else self._TOOL_RESULT_TRUNCATION
+                )
+                lines.append(f"[Tool Result - {tool_name}]: {str(content)[:limit]}")
+            elif content:
+                lines.append(f"[{role.upper()}]: {str(content)[:500]}")
+        return "\n".join(lines)
+
+    # -----------------------------------------------------------------------
+    # Usage stats
+    # -----------------------------------------------------------------------
+
+    def get_usage_stats(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Return context window usage statistics with token breakdown.
+
+        Args:
+            messages: Full message list (including system if present).
+            tools: Optional serialized tools schema for breakdown reporting.
+
+        Returns:
+            Dict with estimated_tokens, token_count_source ("api"/"local"),
+            token_breakdown (system/messages/tools/total), max_tokens,
+            usage_percent, message_count, circuit_breaker_failures,
+            and (if available) last_compact metadata.
+        """
+        breakdown = self.estimate_tokens_breakdown(messages, tools=tools)
+        # Tier 1: prefer real count from last API response
+        if self._last_api_prompt_tokens is not None:
+            estimated = self._last_api_prompt_tokens
+            source = "api"
+        else:
+            estimated = breakdown["total"]
+            source = "local"
+        usage_percent = (estimated / self.max_tokens * 100) if self.max_tokens > 0 else 0.0
+        stats: Dict[str, Any] = {
+            "estimated_tokens": estimated,
+            "token_count_source": source,
+            "max_tokens": self.max_tokens,
+            "usage_percent": round(usage_percent, 1),
+            "message_count": len(messages),
+            "token_breakdown": breakdown,
+            "circuit_breaker_failures": self._consecutive_compact_failures,
+        }
+        if self._last_compact_stats:
+            stats["last_compact"] = self._last_compact_stats
+        return stats
+
+
+# Patterns whose presence means "context/prompt overflow" — the conversation is
+# too long for the model and we should compress and retry. Covers the major
+# OpenAI-compatible / Anthropic / Google / xAI / Bedrock / OpenRouter / local
+# backends. Example error strings are kept inline so the table is auditable.
+# Borrowed structure from pi-mono ai/utils/overflow.ts (two-tier positive + guard).
+_OVERFLOW_PATTERNS = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"prompt is too long",  # Anthropic: "prompt is too long: 213462 tokens > 200000 maximum"
+        r"request_too_large",  # Anthropic 413 byte-size overflow
+        r"exceeds the context window",  # OpenAI (Completions & Responses)
+        r"maximum context length",  # OpenAI/LiteLLM/OpenRouter: "...of N tokens", "...is N tokens", "(N)" — broad; guard below filters throttling
+        r"context[_ ]length[_ ]exceeded",  # generic OpenAI-compatible code
+        r"input is too long for requested model",  # Amazon Bedrock
+        r"input token count.*exceeds the maximum",  # Google (Gemini)
+        r"maximum prompt length is \d+",  # xAI (Grok)
+        r"reduce the length",  # Groq: "reduce the length of the messages or completion" (broad; guard filters rate limits)
+        r"exceeds (?:the )?maximum allowed input length of [\d,]+ tokens?",  # OpenRouter/Poolside
+        r"is longer than the model'?s context length",  # Together AI
+        r"too large for model with \d+ maximum context length",  # Mistral
+        r"exceeds the available context size",  # llama.cpp server
+        r"greater than the context length",  # LM Studio
+        r"exceeded model token limit",  # Kimi For Coding
+        r"prompt too long; exceeded (?:max )?context length",  # Ollama
+        r"too many tokens",  # generic fallback (guarded below)
+        r"token limit exceeded",  # generic fallback
+        r"tokens > ",  # Anthropic-style "X tokens > Y maximum"
+        r"range of input length",  # Alibaba/DashScope-style
+        r"internalerror\.algo\.invalidparameter",  # Alibaba/DashScope overflow code
+    )
+]
+
+# Guard patterns — if any of these match, the error is NOT an overflow even when
+# a positive pattern also matches (e.g. Bedrock formats throttling as
+# "ThrottlingException: Too many tokens, please wait..." which would otherwise
+# hit the "too many tokens" fallback). Checked first, short-circuits to False.
+_NON_OVERFLOW_PATTERNS = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"throttling",  # AWS Bedrock / generic throttling
+        r"rate limit",  # generic rate limiting
+        r"too many requests",  # HTTP 429
+        r"service unavailable",  # 503
+    )
+]
+
+
+def is_context_too_long_error(exc: Exception) -> bool:
+    """Return True if the exception is a 'prompt too long' / context overflow API error.
+
+    Two-tier match: a negative guard (rate-limit / throttling / 429 / 503) is
+    checked first so a fallback overflow phrase can't misclassify a transient
+    error as overflow and trigger a destructive history compaction.
+    """
+    msg = str(exc)
+    if any(pat.search(msg) for pat in _NON_OVERFLOW_PATTERNS):
+        return False
+    return any(pat.search(msg) for pat in _OVERFLOW_PATTERNS)

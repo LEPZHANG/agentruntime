@@ -1,0 +1,622 @@
+"""Declarative permission rule engine for tool execution control.
+
+The hardline shell-safety scanner that pre-empts unrecoverable
+operations lives in :mod:`agentao.permissions_hardline`; this module
+imports its single entry point :func:`hardline_check` and wraps any
+non-``None`` return into a DENY decision before rule evaluation.
+"""
+
+import copy
+import re
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from urllib.parse import urlparse
+
+from .permissions_hardline import hardline_check
+
+if TYPE_CHECKING:
+    from .host.models import ActivePermissions
+
+
+class PermissionDecision(Enum):
+    ALLOW = "allow"
+    DENY = "deny"
+    ASK = "ask"
+
+
+# Maps the rule "action" string (allow/deny/ask) to the decision enum.
+# Unknown actions fall through to ASK — the safe-by-default behavior the
+# engine has always had.
+_ACTION_TO_DECISION: Dict[str, PermissionDecision] = {
+    "allow": PermissionDecision.ALLOW,
+    "deny": PermissionDecision.DENY,
+    "ask": PermissionDecision.ASK,
+}
+
+# Stable policy-source prefixes for ``PermissionDecisionDetail.reason``.
+# Hosts and audit displays may rely on these prefixes; they are part of
+# the public event contract once a ``PermissionDecisionEvent`` is emitted
+# with the ``reason`` field. The ``hardline`` prefix lives in
+# :mod:`.permissions_hardline` (re-exported as ``REASON_HARDLINE``).
+_REASON_MODE_PRESET = "mode-preset"
+_REASON_USER_RULE = "user-rule"
+# Pre-check tier for spec-injected deny rules. Evaluated after
+# hardline but before every other source so a per-run deny cannot be
+# shadowed by a user/project ``allow:*`` or a preset ``allow:*``.
+_REASON_INJECTED = "injected"
+
+
+class PermissionDecisionDetail:
+    """Structured outcome of one permission evaluation.
+
+    Carries enough information for the runtime to build a public
+    :class:`PermissionDecisionEvent` without coupling the
+    :class:`PermissionEngine` directly to event delivery. ``decision``
+    is the existing enum; ``matched_rule`` is a JSON-safe shallow copy
+    of the rule that matched (or ``None`` for the no-rule fallback);
+    ``reason`` is a stable, redactable string the projection layer can
+    surface to hosts.
+    """
+
+    __slots__ = ("decision", "matched_rule", "reason")
+
+    def __init__(
+        self,
+        decision: PermissionDecision,
+        matched_rule: Optional[Dict[str, Any]] = None,
+        reason: Optional[str] = None,
+    ) -> None:
+        self.decision = decision
+        self.matched_rule = matched_rule
+        self.reason = reason
+
+
+class PermissionMode(Enum):
+    READ_ONLY = "read-only"
+    WORKSPACE_WRITE = "workspace-write"
+    FULL_ACCESS = "full-access"
+    PLAN = "plan"  # Internal: read-only writes, safe shell commands allowed
+
+
+def _extract_domain(url: str) -> Optional[str]:
+    """Extract and normalize the hostname from a URL for domain matching.
+
+    Returns lowercase hostname (no port), or None if parsing fails.
+    Handles missing scheme by prepending https://.
+    """
+    if not url:
+        return None
+    # urlparse needs a scheme to correctly identify the hostname
+    if "://" not in url:
+        url = "https://" + url
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname  # lowercase, no port, no userinfo
+        return hostname if hostname else None
+    except Exception:
+        return None
+
+
+# Shell-rc and credential-file writes via redirection / mover utilities.
+# Mode-scoped to ``workspace-write`` and emits ASK — installers (Homebrew,
+# pyenv, rustup) and devops scripts legitimately edit these files.
+# ``full-access`` deliberately doesn't carry this rule: that mode promises
+# literal full access, and disk-wipe-class attacks already trip the hardline
+# floor.
+#
+# Known coverage gap (a ``bashlex`` pass would close it): variable
+# indirection (``dst=~/.bashrc; echo X > "$dst"``), process-substitution
+# wrappers, and literal expanded paths (``/Users/<u>/.bashrc``) that need
+# user enumeration to detect.
+_SHELL_SENSITIVE_FILE_RE = (
+    r"(?:~|\$HOME|\$\{HOME\})/"
+    r"\.(?:bashrc|zshrc|profile|bash_profile|zprofile|netrc|pgpass|npmrc|pypirc)"
+    # Strict terminator — ``\b`` would match ``~/.bashrc.bak`` and
+    # ``~/.bashrc-old`` because ``c`` ↔ ``.``/``-`` is a word boundary.
+    r"(?=\s|[;|&)>'\"<]|$)"
+)
+
+_SHELL_SENSITIVE_WRITE_RE = "(?:" + "|".join([
+    # Redirect (``>``, ``>>``, optional space). ``re.search`` finds the ``>``
+    # anywhere in the command, so an FD prefix like ``2>`` is handled
+    # without an explicit token here.
+    rf">>?\s*{_SHELL_SENSITIVE_FILE_RE}",
+    rf"\btee\b(?:\s+-\S+)*\s+{_SHELL_SENSITIVE_FILE_RE}",
+    rf"\b(?:cp|mv)\b(?:\s+-\S+)*\s+\S+\s+{_SHELL_SENSITIVE_FILE_RE}",
+    # Require the literal ``-i`` / ``-i.bak`` token before the file. Lazy
+    # ``\S+`` quantifiers let the engine backtrack to the trailing file.
+    rf"\bsed\b(?:\s+\S+)*?\s+-i(?:\.\S+)?(?:\s+\S+)*?\s+{_SHELL_SENSITIVE_FILE_RE}",
+]) + ")"
+
+
+def _domain_matches(hostname: str, patterns: List[str]) -> bool:
+    """Check if hostname matches any pattern in the list.
+
+    Pattern semantics:
+    - Leading dot (e.g. ".github.com"): suffix match — matches
+      "github.com" and "api.github.com" but not "notgithub.com".
+    - No leading dot (e.g. "r.jina.ai"): exact match only.
+    """
+    for pattern in patterns:
+        pattern_lower = pattern.lower()
+        if pattern_lower.startswith("."):
+            # Suffix match: ".github.com" matches "github.com" and "x.github.com"
+            bare = pattern_lower[1:]  # "github.com"
+            if hostname == bare or hostname.endswith(pattern_lower):
+                return True
+        else:
+            # Exact match
+            if hostname == pattern_lower:
+                return True
+    return False
+
+
+# Preset rule lists for each mode. Evaluated after project/user JSON rules.
+_PRESET_RULES: Dict[str, List[Dict[str, Any]]] = {
+    "read-only": [],  # ToolRunner handles this via is_read_only check; no extra rules needed
+    "workspace-write": [
+        {"tool": "write_file", "action": "allow"},
+        {"tool": "replace", "action": "allow"},
+        {
+            "tool": "run_shell_command",
+            "args": {
+                # Allowlist of genuinely read-only shell commands.
+                # Rules:
+                #  - No shell operators (&&, ||, ;, |, $(...), backticks,
+                #    redirects, newlines) so command smuggling is impossible.
+                #  - git: only subcommands that cannot mutate state. Excluded:
+                #    branch/tag/remote (accept -D/-d/add flags), push, reset,
+                #    clean, checkout. Allowed: status, log, diff, show,
+                #    stash list, shortlog, describe, blame, ls-files, ls-tree,
+                #    rev-parse, config --get*.
+                #  - find excluded (find . -delete is destructive).
+                #  - ls, cat, echo, pwd, which, file, head, tail, wc, diff,
+                #    grep, du, df, ps, env are safe read-only metadata commands.
+                # Use \b (word boundary) so bare commands like `ls` or `env`
+                # match in addition to commands with arguments like `ls -la`.
+                "command": (
+                    r"^("
+                    r"git (status|log|diff|show|stash list"
+                    r"|shortlog|describe|blame|ls-files|ls-tree|rev-parse|config --get)"
+                    r"|ls\b|cat\b|echo\b|pwd\b|which\b|file\b|head\b|tail\b"
+                    r"|wc\b|diff\b|grep\b|du\b|df\b|ps\b|env\b"
+                    r")"
+                    r"(?:[^;&|`$<>\n\r])*$"
+                )
+            },
+            "action": "allow",
+        },
+        {
+            "tool": "run_shell_command",
+            "args": {"command": r"rm\s+-rf|sudo\s|mkfs|dd\s+if="},
+            "action": "deny",
+        },
+        # ASK — not DENY — so installers/devops scripts can proceed with
+        # operator confirmation. Inspectable via ``active_permissions()`` so
+        # a host UI can render "shell-rc writes will prompt" without
+        # reverse-engineering the engine.
+        {
+            "tool": "run_shell_command",
+            "args": {"command": _SHELL_SENSITIVE_WRITE_RE},
+            "action": "ask",
+        },
+        {"tool": "run_shell_command", "action": "ask"},
+        # Domain-tiered web_fetch: allowlist auto-allows, blocklist auto-denies, rest asks
+        {
+            "tool": "web_fetch",
+            "domain": {"allowlist": [".github.com", ".docs.python.org", ".wikipedia.org", "r.jina.ai", ".pypi.org", ".readthedocs.io"]},
+            "action": "allow",
+        },
+        {
+            "tool": "web_fetch",
+            "domain": {"blocklist": ["localhost", "127.0.0.1", "0.0.0.0", "169.254.169.254", ".internal", ".local", "::1"]},
+            "action": "deny",
+        },
+        {"tool": "web_fetch", "action": "ask"},
+        {"tool": "web_search", "action": "ask"},
+    ],
+    "full-access": [
+        {"tool": "*", "action": "allow"},
+    ],
+    # Plan mode: allows safe read-only shell commands (diff, git diff, ls, cat, grep, …)
+    # but denies all file-write and session-mutation operations. Use this instead of
+    # "read-only" so that the ToolRunner does not short-circuit via is_read_only and
+    # shell analysis can still run.
+    "plan": [
+        {"tool": "plan_save", "action": "allow"},
+        {"tool": "plan_finalize", "action": "allow"},
+        {"tool": "write_file", "action": "deny"},
+        {"tool": "replace", "action": "deny"},
+        # Deny memory writes and task mutations — plan mode is research-only.
+        {"tool": "save_memory", "action": "deny"},
+        {"tool": "todo_write", "action": "deny"},
+        {
+            "tool": "run_shell_command",
+            "args": {
+                "command": (
+                    r"^("
+                    r"git (status|log|diff|show|stash list"
+                    r"|shortlog|describe|blame|ls-files|ls-tree|rev-parse|config --get)"
+                    r"|ls\b|cat\b|echo\b|pwd\b|which\b|file\b|head\b|tail\b"
+                    r"|wc\b|diff\b|grep\b|du\b|df\b|ps\b|env\b"
+                    r")"
+                    r"(?:[^;&|`$<>\n\r])*$"
+                )
+            },
+            "action": "allow",
+        },
+        {"tool": "run_shell_command", "args": {"command": r"rm\s+-rf|sudo\s|mkfs|dd\s+if="}, "action": "deny"},
+        {"tool": "run_shell_command", "action": "deny"},
+        # Domain-tiered web_fetch (same as workspace-write)
+        {
+            "tool": "web_fetch",
+            "domain": {"allowlist": [".github.com", ".docs.python.org", ".wikipedia.org", "r.jina.ai", ".pypi.org", ".readthedocs.io"]},
+            "action": "allow",
+        },
+        {
+            "tool": "web_fetch",
+            "domain": {"blocklist": ["localhost", "127.0.0.1", "0.0.0.0", "169.254.169.254", ".internal", ".local", "::1"]},
+            "action": "deny",
+        },
+        {"tool": "web_fetch", "action": "ask"},
+        {"tool": "web_search", "action": "ask"},
+    ],
+}
+
+
+class PermissionEngine:
+    """Evaluates permission rules to decide tool execution policy.
+
+    Rules are sourced from the user scope (``<user_root>/permissions.json``).
+    Hosts may inject additional policy via :meth:`add_loaded_source`.
+
+    Project-scope ``.agentao/permissions.json`` is intentionally NOT
+    loaded: a checked-in rule could grant the agent capabilities the
+    user never approved (e.g. ``{"tool": "*", "action": "allow"}``
+    inside a cloned repo would defeat the entire user policy because
+    the engine returns on the first matching rule). Permissions are a
+    user/host concern, not a cwd concern — the same model OS
+    permissions and IDE workspace-trust use. If such a file exists, it
+    is ignored with a warning.
+
+    **Two construction modes.** First-party callers pre-load rules via
+    :func:`agentao.embedding.permission_loader.load_permission_rules`
+    and pass them explicitly with ``rules=`` / ``loaded_sources=``; the
+    engine then performs **no disk I/O** of its own. Legacy callers
+    that pass only ``project_root`` / ``user_root`` still work — the
+    engine lazy-delegates to the embedding loader to fill in the
+    rules — but the file I/O is no longer part of this module.
+
+    Rule format::
+
+        {
+            "rules": [
+                {"tool": "run_shell_command", "args": {"command": "^git "}, "action": "allow"},
+                {"tool": "write_file", "action": "ask"},
+                {"tool": "run_shell_command", "args": {"command": "rm -rf"}, "action": "deny"}
+            ]
+        }
+
+    When no rule matches a tool call, ``decide()`` returns ``None`` and the
+    caller falls back to the tool's own ``requires_confirmation`` attribute.
+    """
+
+    def __init__(
+        self,
+        *,
+        project_root: Path,
+        user_root: Optional[Path] = None,
+        rules: Optional[List[Dict[str, Any]]] = None,
+        loaded_sources: Optional[List[str]] = None,
+        enable_hardline: bool = True,
+    ):
+        """Initialize the permission engine.
+
+        Args:
+            project_root: Project directory. Used (a) to detect and
+                warn on a stray ``<project_root>/.agentao/permissions.json``
+                on the legacy auto-load path, and (b) as a label
+                attribute on the engine. Required so the warning's
+                path is self-explanatory.
+            user_root: Optional user-scope directory whose
+                ``<user_root>/permissions.json`` is loaded on the
+                legacy auto-load path. Ignored when ``rules=`` is
+                passed (the caller has already loaded). ``None`` on
+                the auto-load path skips the user-scope read.
+            rules: Pre-loaded rule list. When provided (the
+                recommended path), the engine treats it as the sole
+                file-source rule list and does **not** read disk.
+                Pair with ``loaded_sources`` so
+                :meth:`active_permissions` reports correct provenance.
+                Use :func:`agentao.embedding.permission_loader.load_permission_rules`
+                to produce both values.
+            loaded_sources: Source labels (e.g. ``"user:/path/to/permissions.json"``)
+                that match ``rules``. Defaults to an empty list when
+                ``rules`` is provided without explicit sources.
+            enable_hardline: When ``True`` (the default), a small set
+                of *unrecoverable* operations (rm -rf /, mkfs, dd to
+                raw block devices, fork bombs, shutdown / reboot, …)
+                are denied before any rule is consulted — including
+                ``full-access``. Embedded hosts that take policy
+                responsibility themselves (typically because Agentao
+                is sandboxed in a container or the host has its own
+                deny pipeline) can pass ``False`` to make
+                ``full-access`` literally mean full access.
+        """
+        if project_root is None:
+            raise TypeError(
+                "PermissionEngine requires a project_root keyword argument."
+            )
+        self._user_root: Optional[Path] = user_root
+        self._enable_hardline: bool = enable_hardline
+        self._mode_rules: List[Dict[str, Any]] = []
+        self.active_mode: PermissionMode = PermissionMode.WORKSPACE_WRITE
+        # ``injected:*`` entries are appended by hosts via
+        # :meth:`add_loaded_source`. Preset source is composed
+        # dynamically from ``active_mode`` so a mode switch is
+        # reflected without re-reading disk.
+        self._injected_sources: List[str] = []
+        # Cached :class:`ActivePermissions` projection. Invalidated by
+        # mode switches and source-list mutations so the permission
+        # decision hot path can call ``active_permissions()`` cheaply.
+        self._active_cache: Optional["ActivePermissions"] = None
+
+        if rules is not None:
+            self.rules: List[Dict[str, Any]] = list(rules)
+            self._file_sources: List[str] = list(loaded_sources or [])
+        else:
+            # Lazy import: avoid module-load dep on agentao.embedding.
+            from .embedding.permission_loader import load_permission_rules
+            self.rules, self._file_sources = load_permission_rules(
+                project_root=project_root, user_root=user_root,
+            )
+
+        # Spec-injected deny rules — see :meth:`add_run_rules`. Spec
+        # allow rules join ``self.rules`` and follow the standard
+        # per-mode ordering instead.
+        self._run_scope_rules: List[Dict[str, Any]] = []
+
+        self._mode_rules = _PRESET_RULES[self.active_mode.value]
+
+    def set_mode(self, mode: PermissionMode) -> None:
+        """Switch the active permission preset. Mode rules are evaluated after project/user rules."""
+        self.active_mode = mode
+        self._mode_rules = _PRESET_RULES[mode.value]
+        self._active_cache = None
+
+    def add_run_rules(
+        self,
+        *,
+        allow: Optional[List[Dict[str, Any]]] = None,
+        deny: Optional[List[Dict[str, Any]]] = None,
+        source: str = "run-spec",
+    ) -> None:
+        """Inject per-run permission rules.
+
+        ``deny`` rules go into the pre-check tier
+        (:attr:`_run_scope_rules`) evaluated after hardline but before
+        any other source in every mode, so a per-run restriction
+        cannot be shadowed by a project/user ``allow:*`` or a preset
+        ``allow:*``. ``allow`` rules append to the standard user-rule
+        list and follow the engine's existing per-mode ordering —
+        they do **not** create a new priority tier.
+
+        Both lists must already be in engine dict shape; the caller
+        injects the ``action`` field (see
+        :meth:`agentao.cli.run_models.RunPermissionRule.to_engine_dict`).
+
+        Provenance is recorded once under ``"injected:<source>"``
+        (default ``"injected:run-spec"``).
+        """
+        if deny:
+            self._run_scope_rules.extend(deny)
+        if allow:
+            self.rules.extend(allow)
+        if allow or deny:
+            self.add_loaded_source(f"injected:{source}")
+            self._active_cache = None
+
+    def add_loaded_source(self, label: str) -> None:
+        """Record an injected policy source label (``injected:<name>``).
+
+        Hosts that layer policy on top of file/preset sources call this
+        so :meth:`active_permissions` reports a complete provenance
+        list. Duplicate labels are coalesced.
+        """
+        if not isinstance(label, str) or not label:
+            return
+        if label not in self._injected_sources:
+            self._injected_sources.append(label)
+            self._active_cache = None
+
+    def decide(self, tool_name: str, tool_args: Dict[str, Any]) -> Optional[PermissionDecision]:
+        """Evaluate rules for a tool call.
+
+        Evaluation order (first match wins):
+          - full-access / plan mode: mode preset rules run first (can't be overridden)
+          - all other modes: user JSON rules → mode preset rules
+
+        Returns:
+            PermissionDecision.ALLOW / DENY / ASK for the first matching rule,
+            or None if no rule matches.
+        """
+        detail = self.decide_detail(tool_name, tool_args)
+        return detail.decision if detail is not None else None
+
+    def decide_detail(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+    ) -> Optional[PermissionDecisionDetail]:
+        """Same evaluation as :meth:`decide`, plus the matched rule.
+
+        Returns ``None`` when no rule matches (the runtime falls back to
+        the tool's own ``requires_confirmation`` attribute). The
+        ``reason`` field is a short, stable, **policy-source-tagged**
+        string suitable for projection into a public event ``reason``
+        field. Source prefixes:
+
+        - ``hardline:<description>`` — opt-out floor refused the call
+        - ``mode-preset:<rule_tool>`` — preset rule matched
+        - ``user-rule:<rule_tool>`` — user JSON rule matched
+        """
+        # Hardline pre-check runs before mode/preset/user-rule routing
+        # so a ``full-access`` ``allow:*`` rule cannot silently shadow
+        # it. When the host has disabled the floor the caller has
+        # accepted policy responsibility — fall through.
+        if self._enable_hardline:
+            reason = hardline_check(tool_name, tool_args)
+            if reason is not None:
+                return PermissionDecisionDetail(
+                    PermissionDecision.DENY,
+                    matched_rule=None,
+                    reason=reason,
+                )
+
+        # ``full-access`` / ``plan`` modes evaluate preset rules first
+        # so a stray user rule cannot shadow the mode's promise; every
+        # other mode evaluates user rules first so they can override.
+        # ``_run_scope_rules`` (spec deny) always evaluates first so a
+        # per-run restriction cannot be shadowed by any other source.
+        if self.active_mode in (PermissionMode.FULL_ACCESS, PermissionMode.PLAN):
+            sources: List[Tuple[List[Dict[str, Any]], str]] = [
+                (self._run_scope_rules, f"{_REASON_INJECTED}:run-spec"),
+                (self._mode_rules, _REASON_MODE_PRESET),
+                (self.rules, _REASON_USER_RULE),
+            ]
+        else:
+            sources = [
+                (self._run_scope_rules, f"{_REASON_INJECTED}:run-spec"),
+                (self.rules, _REASON_USER_RULE),
+                (self._mode_rules, _REASON_MODE_PRESET),
+            ]
+        for rules, source in sources:
+            for rule in rules:
+                if not self._matches(rule, tool_name, tool_args):
+                    continue
+                action = rule.get("action", "ask").lower()
+                decision = _ACTION_TO_DECISION.get(action, PermissionDecision.ASK)
+                return PermissionDecisionDetail(
+                    decision,
+                    matched_rule=rule,
+                    reason=f"{source}:{rule.get('tool', '*')}",
+                )
+        return None
+
+    def _matches(self, rule: Dict[str, Any], tool_name: str, tool_args: Dict[str, Any]) -> bool:
+        rule_tool = rule.get("tool", "*")
+        if rule_tool != "*" and not self._match_pattern(rule_tool, tool_name):
+            return False
+        # Domain-based matching (for web_fetch and similar URL tools)
+        domain_spec = rule.get("domain")
+        if domain_spec is not None:
+            url_arg = domain_spec.get("url_arg", "url")
+            raw_url = str(tool_args.get(url_arg, ""))
+            hostname = _extract_domain(raw_url)
+            if hostname is None:
+                return False  # unparseable URL never matches a domain rule
+            allowlist = domain_spec.get("allowlist")
+            blocklist = domain_spec.get("blocklist")
+            if allowlist and _domain_matches(hostname, allowlist):
+                return True
+            if blocklist and _domain_matches(hostname, blocklist):
+                return True
+            return False  # domain rule present but no match
+        # Regex-based arg matching
+        for arg_key, arg_pattern in rule.get("args", {}).items():
+            arg_value = str(tool_args.get(arg_key, ""))
+            try:
+                if not re.search(arg_pattern, arg_value):
+                    return False
+            except re.error:
+                if arg_pattern != arg_value:
+                    return False
+        return True
+
+    def _match_pattern(self, pattern: str, value: str) -> bool:
+        try:
+            return bool(re.fullmatch(pattern, value))
+        except re.error:
+            return pattern == value
+
+    def active_permissions(self) -> "ActivePermissions":
+        """Return a JSON-safe :class:`ActivePermissions` snapshot.
+
+        The result is cached and invalidated by :meth:`set_mode` and
+        :meth:`add_loaded_source`. Permission decisions may invoke this
+        on the tool execution hot path, so the implementation must not
+        re-read disk on every call.
+
+        Source order: preset first, then custom rules — i.e. the same
+        order :meth:`decide` evaluates them. ``rules`` is a deep copy so
+        callers cannot mutate the engine's internal state through the
+        returned snapshot.
+        """
+        if self._active_cache is not None:
+            return self._active_cache
+        # Lazy import to keep ``agentao.permissions`` free of a hard
+        # dependency on the harness package at module-load time.
+        from .host.models import ActivePermissions
+        loaded_sources = [f"preset:{self.active_mode.value}"]
+        loaded_sources.extend(self._file_sources)
+        loaded_sources.extend(self._injected_sources)
+        # Dedupe defensively while preserving order.
+        seen: set = set()
+        deduped = [s for s in loaded_sources if not (s in seen or seen.add(s))]
+        # Mirror :meth:`decide`'s rule-evaluation order. Spec deny
+        # (``_run_scope_rules``) always sits in front because it
+        # pre-checks every mode after hardline.
+        if self.active_mode in (PermissionMode.FULL_ACCESS, PermissionMode.PLAN):
+            ordered_rules = (
+                self._run_scope_rules + self._mode_rules + self.rules
+            )
+        else:
+            ordered_rules = (
+                self._run_scope_rules + self.rules + self._mode_rules
+            )
+        snapshot = ActivePermissions(
+            mode=self.active_mode.value,  # type: ignore[arg-type]
+            rules=copy.deepcopy(ordered_rules),
+            loaded_sources=deduped,
+        )
+        self._active_cache = snapshot
+        return snapshot
+
+    def get_rules_display(self) -> str:
+        """Return a human-readable summary of loaded rules and active mode."""
+        symbols = {"allow": "✓ ALLOW", "deny": "✗ DENY", "ask": "? ASK"}
+        lines = [f"Permission Mode: {self.active_mode.value}"]
+        lines.append(f"Preset rules: {len(self._mode_rules)} | Custom rules: {len(self.rules)}\n")
+
+        if self.rules:
+            order_note = "evaluated after mode preset" if self.active_mode in (PermissionMode.FULL_ACCESS, PermissionMode.PLAN) else "evaluated before presets"
+            lines.append(f"Custom Rules ({len(self.rules)} total, {order_note}):\n")
+            for i, rule in enumerate(self.rules, 1):
+                tool = rule.get("tool", "*")
+                action = rule.get("action", "ask").lower()
+                args = rule.get("args", {})
+                label = symbols.get(action, f"? {action.upper()}")
+                line = f"  {i}. [{label}] {tool}"
+                domain = rule.get("domain")
+                if domain:
+                    if "allowlist" in domain:
+                        line += f"\n        domain allowlist: {', '.join(domain['allowlist'])}"
+                    if "blocklist" in domain:
+                        line += f"\n        domain blocklist: {', '.join(domain['blocklist'])}"
+                if args:
+                    for k, v in args.items():
+                        line += f"\n        {k}: {v}"
+                lines.append(line)
+        else:
+            lines.append(
+                "No custom rules. Create ~/.agentao/permissions.json to add rules.\n"
+                "(Project-scope .agentao/permissions.json is no longer honored.)\n\n"
+                "Example:\n"
+                '  {"rules": [\n'
+                '    {"tool": "run_shell_command", "args": {"command": "^git "}, "action": "allow"},\n'
+                '    {"tool": "write_file", "action": "ask"},\n'
+                '    {"tool": "*", "action": "ask"}\n'
+                "  ]}"
+            )
+        return "\n".join(lines)

@@ -1,0 +1,792 @@
+"""``AgentToolWrapper`` — wraps an agent definition as a callable Tool.
+
+The largest piece of the sub-agent system: turns a YAML-style agent
+definition (name + description + system prompt + scoped tools + max
+turns) into something the parent LLM can invoke via OpenAI function
+calling. The wrapper's ``execute`` decides sync vs background dispatch,
+builds the parent-context block, scopes the sub-agent's ToolRegistry,
+spawns a fresh :class:`Agentao` for the sub-task, and emits public
+``SubagentLifecycleEvent`` pairs so hosts can observe lineage.
+
+Kept as a single file because the public surface is one class — the
+sub-helpers (parent-context builder, sync runner, background launcher,
+prefixed step callback) all read closures over the same constructor-
+captured callbacks and would just leak that state across files if
+extracted.
+"""
+
+from __future__ import annotations
+
+import threading
+import time
+import uuid
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from ...cancellation import AgentCancelledError, CancellationToken
+from ...tools.base import RegistrableTool, Tool, ToolRegistry
+from ..bg_store import BackgroundTaskStore
+from ._complete import CompleteTaskTool, TaskComplete
+from ._progress import SubagentProgress
+
+
+# Human-readable renderings of the ``TurnOutcome.incomplete_reason`` closed
+# vocabulary. The parent LLM reads these, so they say what happened in plain
+# terms rather than echoing the wire token.
+_INCOMPLETE_DETAILS: Dict[str, str] = {
+    "no_output": "it produced no output",
+    "reasoning_only": "it produced only reasoning, with no answer",
+    "length_truncated": "its answer was cut off by the model's output-length limit",
+    "doom_loop": "it was halted after repeating the same tool call",
+    "llm_error": "the LLM API call failed",
+}
+
+# Sentinel reason for budget exhaustion. Not part of the ``incomplete_reason``
+# vocabulary — ``max_iterations`` is a separate axis by design — so it gets its
+# own key rather than being smuggled into that closed set.
+_MAX_ITERATIONS_REASON = "max_iterations"
+
+
+@dataclass(frozen=True)
+class _IncompleteOutcome:
+    """Why a sub-agent stopped short. ``reason`` is machine-readable."""
+
+    reason: str
+    detail: str
+
+
+# Harness-authored turn text. None of these is sub-agent output, so none may
+# be presented to the parent LLM as the child's "partial result" — doing so
+# would attribute the harness's own notice to the sub-agent. The empty-turn
+# placeholder is imported lazily (see ``_format_result``); these two are the
+# max-iterations and LLM-error notices from ``chat_loop/_runner.py``.
+_HARNESS_NOTICE_PREFIXES = ("[LLM API error:",)
+_HARNESS_NOTICE_EXACT = ("Maximum tool call iterations reached.",)
+
+
+def _is_harness_notice(text: Optional[str]) -> bool:
+    """True if ``text`` is agentao's own notice rather than model output.
+
+    Used to decide what may be shown to the parent LLM as a sub-agent's
+    "partial result". ``[No response]``, ``[LLM API error: …]`` and
+    "Maximum tool call iterations reached." are all strings the harness
+    authored on the child's behalf; labelling them as the child's partial
+    work would attribute the harness's words to the sub-agent — the exact
+    misreporting this whole path exists to stop.
+    """
+    # Deferred: ``agentao.runtime`` imports ``agentao.agents`` for
+    # ``TaskComplete``, so a module-level import here is a cycle.
+    from ...runtime.chat_loop._runner import EMPTY_RESPONSE_PLACEHOLDER
+
+    body = (text or "").strip()
+    if not body:
+        return True
+    if body == EMPTY_RESPONSE_PLACEHOLDER or body in _HARNESS_NOTICE_EXACT:
+        return True
+    return body.startswith(_HARNESS_NOTICE_PREFIXES)
+
+
+def _find_task_complete_result(sub_agent: Any) -> Optional[str]:
+    """Return the payload of the sub-agent's ``complete_task`` call, if any.
+
+    ``CompleteTaskTool.execute`` raises ``TaskComplete``, but
+    ``ToolExecutor._execute_one`` catches it and turns it into an ordinary
+    tool result (``runtime/tool_executor.py:339``) — so it never propagates
+    out of ``chat()`` and cannot be detected with ``except``. The durable
+    signal is the tool result it leaves in the child's history.
+
+    Returns the last such payload (``None`` if the tool was never called),
+    which is both the "the agent declared itself done" flag and the answer
+    it meant to hand back.
+    """
+    messages = getattr(sub_agent, "messages", None) or []
+    for msg in reversed(messages):
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("role") == "tool" and msg.get("name") == "complete_task":
+            content = msg.get("content")
+            return content if isinstance(content, str) else ""
+    return None
+
+
+def _classify_subagent_outcome(
+    *,
+    outcome: Any,
+    task_complete: bool,
+    max_iterations_hit: bool,
+    max_turns: int,
+) -> Optional[_IncompleteOutcome]:
+    """Decide whether a finished sub-agent run actually answered.
+
+    Returns ``None`` when the run produced a real answer — the common
+    case — and an :class:`_IncompleteOutcome` otherwise. Mirrors the
+    top-level ``TurnOutcome`` contract (PR #126) one level down: a
+    sub-agent that never answered must not be reported to the parent
+    LLM, or to a host watching ``SubagentLifecycleEvent``, as a success.
+
+    ``task_complete`` wins over everything: the sub-agent called
+    ``complete_task``, which is an explicit "I am done" signal, and the
+    turn-level classification of the call that carried it is irrelevant.
+    """
+    if task_complete:
+        return None
+    if max_iterations_hit:
+        return _IncompleteOutcome(
+            _MAX_ITERATIONS_REASON,
+            f"it used its entire {max_turns}-turn budget without finishing",
+        )
+    if outcome is None:
+        # No ``last_turn`` to read (a stubbed or older agent object).
+        # Absence of evidence is not evidence of failure.
+        return None
+    if getattr(outcome, "is_answer", False):
+        return None
+
+    reason = getattr(outcome, "incomplete_reason", None)
+    if reason:
+        detail = _INCOMPLETE_DETAILS.get(reason, f"it stopped early ({reason})")
+        return _IncompleteOutcome(reason, detail)
+
+    status = getattr(outcome, "status", None)
+    if status == "cancelled":
+        return _IncompleteOutcome("cancelled", "it was cancelled")
+    if status == "error":
+        return _IncompleteOutcome("error", "it ended with an error")
+    # ``is_answer`` false with no reason and no bad status shouldn't happen;
+    # report it honestly rather than papering over it as success.
+    return _IncompleteOutcome("unknown", "it did not produce a complete answer")
+
+
+class AgentToolWrapper(Tool):
+    """Wraps an agent definition as a callable Tool for the parent LLM."""
+
+    # How many recent parent messages to inject as context for sub-agents
+    PARENT_CONTEXT_MESSAGES = 10
+
+    @property
+    def is_read_only(self) -> bool:
+        # The wrapper itself is always allowed; readonly enforcement is propagated
+        # into the sub-agent's own ToolRunner via readonly_mode_getter.
+        return True
+
+    def __init__(
+        self,
+        definition: Dict[str, Any],
+        all_tools: Dict[str, RegistrableTool],
+        llm_config_getter: Callable[[], Dict[str, Any]],
+        working_directory: Path,
+        bg_store: Optional[BackgroundTaskStore] = None,
+        confirmation_callback: Optional[Callable] = None,
+        step_callback: Optional[Callable] = None,
+        output_callback: Optional[Callable] = None,
+        tool_complete_callback: Optional[Callable] = None,
+        ask_user_callback: Optional[Callable] = None,
+        max_context_tokens: Optional[int] = None,
+        parent_messages_getter: Optional[Callable[[], List[Dict[str, Any]]]] = None,
+        cancellation_token_getter: Optional[Callable] = None,
+        readonly_mode_getter: Callable[[], bool] = lambda: False,
+        permission_mode_getter: Optional[Callable] = None,
+        permission_user_root_getter: Optional[Callable] = None,
+        sandbox_policy: Optional[Any] = None,
+        subagent_emitter: Optional[Any] = None,
+    ):
+        self._definition = definition
+        self._all_tools = all_tools
+        # Live getter so a runtime ``session/set_model`` (model /
+        # maxTokens) is reflected in sub-agents launched afterwards.
+        self._llm_config_getter = llm_config_getter
+        # Sub-agent runs in the same working directory as its parent. Frozen at
+        # construction; matches the static-value idiom used for sandbox_policy.
+        self._working_directory = working_directory
+        self._bg_store = bg_store
+        self._confirmation_callback = confirmation_callback
+        self._step_callback = step_callback
+        self._output_callback = output_callback
+        self._tool_complete_callback = tool_complete_callback
+        self._ask_user_callback = ask_user_callback
+        self._max_context_tokens = max_context_tokens
+        self._parent_messages_getter = parent_messages_getter
+        self._cancellation_token_getter = cancellation_token_getter
+        self._readonly_mode_getter = readonly_mode_getter
+        self._permission_mode_getter = permission_mode_getter
+        self._permission_user_root_getter = permission_user_root_getter
+        self._sandbox_policy = sandbox_policy
+        # Public host emitter for sub-agent lineage events. ``None``
+        # for hosts that haven't wired the emitter; the call sites
+        # short-circuit when the emitter is missing.
+        self._subagent_emitter = subagent_emitter
+        # Set by ToolRunner just before execute() to propagate the per-turn token
+        self._cancellation_token: Optional[Any] = None
+
+    @property
+    def name(self) -> str:
+        return f"agent_{self._definition['name'].replace('-', '_')}"
+
+    @property
+    def description(self) -> str:
+        return self._definition["description"]
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        # Hide ``run_in_background`` from the LLM when the bg subsystem is disabled.
+        properties: Dict[str, Any] = {
+            "task": {
+                "type": "string",
+                "description": "Task description to delegate to this agent",
+            },
+        }
+        if self._bg_store is not None:
+            properties["run_in_background"] = {
+                "type": "boolean",
+                "description": (
+                    "Run the agent asynchronously (fire-and-forget). "
+                    "Returns immediately with an agent_id. "
+                    "Use check_background_agent to poll for the result. "
+                    "Useful for long-running tasks that should not block."
+                ),
+            }
+        return {
+            "type": "object",
+            "properties": properties,
+            "required": ["task"],
+        }
+
+    # ------------------------------------------------------------------
+    # Public execute — dispatches sync vs background
+    # ------------------------------------------------------------------
+
+    # Sentinel tool names used to signal sub-agent lifecycle to the step callback
+    _AGENT_START = "__agent_start__"
+    _AGENT_END   = "__agent_end__"
+
+    def execute(self, task: str, run_in_background: bool = False) -> str:
+        parent_context = self._build_parent_context()
+
+        # Resolve the current cancellation token: prefer the one injected by
+        # ToolRunner (set just before this call), fall back to the getter.
+        token = self._cancellation_token or (
+            self._cancellation_token_getter() if self._cancellation_token_getter else None
+        )
+        # Reset per-call injected token so it doesn't linger across calls.
+        self._cancellation_token = None
+
+        if run_in_background:
+            if self._bg_store is None:
+                # Schema-level removal of ``run_in_background`` in
+                # ``parameters`` keeps this unreachable for well-behaved
+                # LLMs. Reaching it means a replay / hand-crafted call
+                # is asking for a disabled feature — surface it loudly
+                # rather than silently rewriting to sync execution.
+                raise ValueError(
+                    "run_in_background=True but background-agent store "
+                    "is disabled (bg_store=None) on this runtime."
+                )
+            return self._launch_background(task, parent_context)
+
+        agent_name = self._definition["name"]
+        max_turns  = self._definition.get("max_turns", 15)
+
+        # Signal sub-agent start to the CLI
+        if self._step_callback:
+            self._step_callback(
+                self._AGENT_START,
+                SubagentProgress(agent_name=agent_name, state="running",
+                                 task=task[:80], max_turns=max_turns),
+            )
+
+        # ``task`` is user-supplied free-form text (and may carry the
+        # parent's tool output, secrets, or sensitive instructions);
+        # ``redact_summary`` in the projection layer only flattens
+        # whitespace, so the public ``SubagentLifecycleEvent`` would
+        # otherwise leak the first 80 chars of that input verbatim.
+        # Use a generic non-sensitive label — hosts have ``agent_name``
+        # via the parent ``tool_name`` and can correlate via the
+        # ``child_task_id`` already on the envelope.
+        task_summary = f"sub-agent: {agent_name}"
+        subagent_ctx = self._spawn_subagent_event(task_summary)
+
+        try:
+            result, stats = self._run_sync(
+                task, parent_context, cancellation_token=token,
+            )
+        except AgentCancelledError:
+            self._terminal_subagent_event(subagent_ctx, "cancelled", task_summary)
+            raise
+        except Exception as exc:
+            self._terminal_subagent_event(
+                subagent_ctx, "failed", task_summary, error_type=type(exc).__name__,
+            )
+            raise
+
+        incomplete = stats.get("incomplete")
+
+        # Signal sub-agent end to the CLI
+        if self._step_callback:
+            self._step_callback(
+                self._AGENT_END,
+                SubagentProgress(
+                    agent_name=agent_name,
+                    state="completed" if incomplete is None else "failed",
+                    task=task[:80],
+                    max_turns=max_turns,
+                    turns=stats["turns"],
+                    tool_calls=stats["tool_calls"],
+                    tokens=stats["tokens"],
+                    duration_ms=stats["duration_ms"],
+                    error=None if incomplete is None else incomplete.detail,
+                ),
+            )
+
+        if incomplete is None:
+            self._terminal_subagent_event(subagent_ctx, "completed", task_summary)
+        else:
+            # The run did not raise, but it did not answer either. Reporting
+            # ``completed`` here would make the public host contract state
+            # something untrue; the phase vocabulary already has the value
+            # this deserves.
+            self._terminal_subagent_event(
+                subagent_ctx,
+                "failed",
+                task_summary,
+                error_type=f"incomplete:{incomplete.reason}",
+            )
+        return self._format_result(result, stats)
+
+    # ------------------------------------------------------------------
+    # Public-event helpers
+    # ------------------------------------------------------------------
+
+    def _spawn_subagent_event(
+        self,
+        task_summary: str,
+        *,
+        parent_task_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        if self._subagent_emitter is None:
+            return None
+        try:
+            return self._subagent_emitter.spawned(
+                task_summary=task_summary, parent_task_id=parent_task_id,
+            )
+        except Exception:
+            return None
+
+    def _terminal_subagent_event(
+        self,
+        ctx: Optional[Dict[str, Any]],
+        phase: str,
+        task_summary: str,
+        *,
+        error_type: Optional[str] = None,
+    ) -> None:
+        if self._subagent_emitter is None or ctx is None:
+            return
+        try:
+            if phase == "completed":
+                self._subagent_emitter.completed(ctx=ctx, task_summary=task_summary)
+            elif phase == "cancelled":
+                self._subagent_emitter.cancelled(ctx=ctx, task_summary=task_summary)
+            else:  # "failed"
+                self._subagent_emitter.failed(
+                    ctx=ctx, task_summary=task_summary, error_type=error_type,
+                )
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # Parent context injection
+    # ------------------------------------------------------------------
+
+    def _build_parent_context(self) -> str:
+        """Summarise the last N parent messages as a context block."""
+        if not self._parent_messages_getter:
+            return ""
+        try:
+            msgs = self._parent_messages_getter()
+        except Exception:
+            return ""
+        if not msgs:
+            return ""
+
+        recent = msgs[-self.PARENT_CONTEXT_MESSAGES:]
+        lines: List[str] = []
+        for m in recent:
+            role = m.get("role", "unknown")
+            content = m.get("content", "")
+            if isinstance(content, list):
+                content = " ".join(
+                    b.get("text", "") for b in content
+                    if isinstance(b, dict) and b.get("type") == "text"
+                )
+            if role == "tool":
+                name = m.get("name", "tool")
+                lines.append(f"[tool/{name}]: {str(content)[:300]}")
+            elif role in ("user", "assistant") and content:
+                lines.append(f"[{role}]: {str(content)[:400]}")
+            elif role == "assistant" and m.get("tool_calls"):
+                tc_names = []
+                for tc in m["tool_calls"]:
+                    if isinstance(tc, dict):
+                        tc_names.append(tc.get("function", {}).get("name", "?"))
+                    else:
+                        tc_names.append(getattr(getattr(tc, "function", None), "name", "?"))
+                lines.append(f"[assistant called: {', '.join(tc_names)}]")
+
+        if not lines:
+            return ""
+        return "[Parent conversation context (last {} messages)]\n{}\n".format(
+            len(recent), "\n".join(lines)
+        )
+
+    # ------------------------------------------------------------------
+    # Synchronous execution core
+    # ------------------------------------------------------------------
+
+    def _run_sync(
+        self, task: str, parent_context: str = "", suppress_output: bool = False,
+        cancellation_token: Optional[Any] = None,
+    ) -> Tuple[str, Dict[str, Any]]:
+        """Create and run a sub-agent. Returns (result, stats).
+
+        Args:
+            suppress_output: When True (used for background agents), all live
+                display callbacks are suppressed so the background thread does
+                not interleave output with the foreground session.
+        """
+        from ...agent import Agentao
+        from ...skills import SkillManager
+
+        # Build scoped ToolRegistry
+        scoped_registry = ToolRegistry()
+        tool_whitelist = self._definition.get("tools")
+        for tname, tool in self._all_tools.items():
+            if tool_whitelist is None or tname in tool_whitelist:
+                scoped_registry.register(tool)
+        scoped_registry.register(CompleteTaskTool())
+
+        defn_model: Optional[str] = self._definition.get("model")
+        defn_temperature: Optional[float] = self._definition.get("temperature")
+
+        # Inherit the parent's *current* LLM config — a mid-run
+        # ``session/set_model`` must reach sub-agents launched afterwards.
+        live_cfg = self._llm_config_getter()
+        if defn_model and "/" in defn_model:
+            _, model_name = defn_model.split("/", 1)
+        else:
+            model_name = defn_model or live_cfg.get("model")
+        api_key = live_cfg["api_key"]
+        base_url = live_cfg.get("base_url")
+
+        temperature = (
+            defn_temperature if defn_temperature is not None
+            else live_cfg.get("temperature")
+        )
+        # Inherit the parent's temperature-omission state, but only when the
+        # sub-agent isn't pinning its own temperature (an explicit definition
+        # temperature means "send this value").
+        omit_temperature = (
+            False if defn_temperature is not None
+            else bool(live_cfg.get("omit_temperature", False))
+        )
+        max_tokens = live_cfg.get("max_tokens")
+        # Inherit the parent's request-body passthrough (extra_body) so a
+        # host-set reasoning_effort / provider-mandatory field reaches
+        # sub-agent LLM calls too — None when unset.
+        extra_body = live_cfg.get("extra_body")
+
+        max_turns = self._definition.get("max_turns", 15)
+        agent_name = self._definition["name"]
+        step_cb = None if suppress_output else self._make_prefixed_step_callback(max_turns)
+
+        # Background agents: pass None so tool_runner auto-approves (no stdin reads
+        # from background threads, which would corrupt the terminal raw mode).
+        # Foreground agents: wrap the callback to prepend "[agent_name]" to the
+        # tool_name so the user knows which sub-agent is requesting permission.
+        if suppress_output or not self._confirmation_callback:
+            confirm_cb = None
+        else:
+            _parent_cb = self._confirmation_callback
+            def confirm_cb(tool_name: str, tool_desc: str, tool_args: dict) -> bool:
+                return _parent_cb(f"[{agent_name}] {tool_name}", tool_desc, tool_args)
+
+        sub_agent = Agentao(
+            api_key=api_key,
+            base_url=base_url,
+            model=model_name,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            extra_body=extra_body,
+            working_directory=self._working_directory,
+            sandbox_policy=self._sandbox_policy,
+            # Inherit the parent's background-task store so the
+            # sub-agent's ``ToolRunner`` registry actually contains
+            # ``check_background_agent`` / ``cancel_background_agent``;
+            # otherwise scoped_registry exposes them to the LLM but
+            # execution fails with "Tool not found".
+            bg_store=self._bg_store,
+            confirmation_callback=confirm_cb,
+            step_callback=step_cb,
+            output_callback=None if suppress_output else self._output_callback,
+            tool_complete_callback=None if suppress_output else self._tool_complete_callback,
+            ask_user_callback=None if suppress_output else self._ask_user_callback,
+            max_context_tokens=self._max_context_tokens or 200_000,
+            # thinking_callback intentionally omitted for sub-agents
+        )
+
+        sub_agent.llm.omit_temperature = omit_temperature
+        sub_agent.tools = scoped_registry
+        sub_agent.project_instructions = self._definition.get("system_instructions")
+        sub_agent.skill_manager = SkillManager(skills_dir="/nonexistent")
+        sub_agent.agent_manager = None  # prevent recursive spawning
+        if self._readonly_mode_getter():
+            sub_agent.tool_runner.set_readonly_mode(True)
+        if self._permission_mode_getter:
+            mode = self._permission_mode_getter()
+            if mode is not None:
+                from ...embedding.permission_loader import load_permission_rules
+                from ...permissions import PermissionEngine
+                # Anchor the sub-agent's permission engine to the parent's
+                # working directory so the same project rules apply, and
+                # pass through the parent's ``user_root`` so user-scope
+                # rules in ``~/.agentao/permissions.json`` aren't silently
+                # dropped — losing them was a permission bypass.
+                user_root = (
+                    self._permission_user_root_getter()
+                    if self._permission_user_root_getter is not None
+                    else None
+                )
+                rules, loaded_sources = load_permission_rules(
+                    project_root=sub_agent.working_directory,
+                    user_root=user_root,
+                )
+                engine = PermissionEngine(
+                    project_root=sub_agent.working_directory,
+                    user_root=user_root,
+                    rules=rules,
+                    loaded_sources=loaded_sources,
+                )
+                engine.set_mode(mode)
+                sub_agent.tool_runner._permission_engine = engine
+
+        # Prepend parent context to the task
+        if parent_context:
+            full_task = f"{parent_context}\n[Your Task]\n{task}"
+        else:
+            full_task = task
+
+        # ``max_iterations`` exhaustion is a deliberately separate axis from
+        # ``incomplete_reason`` (see runtime/chat_loop/_runner.py:85) and rides
+        # a transport flag that only ``NonInteractiveTransport`` carries — the
+        # sub-agent has no such transport. Since sub-agents are handed a
+        # *smaller* budget than the parent, cap exhaustion is their most likely
+        # way to stop short, so record it here rather than let it read as
+        # success. The prior handler's decision is preserved verbatim.
+        max_iter_hit = {"hit": False}
+        _prior_on_max_iter = getattr(sub_agent.transport, "on_max_iterations", None)
+
+        def _note_max_iterations(max_iterations, pending):
+            max_iter_hit["hit"] = True
+            if callable(_prior_on_max_iter):
+                return _prior_on_max_iter(max_iterations, pending)
+            return {"action": "stop"}
+
+        try:
+            sub_agent.transport.on_max_iterations = _note_max_iterations
+        except Exception:
+            # Read-only / slotted transport: lose the signal rather than the run.
+            pass
+
+        t0 = time.monotonic()
+        task_complete = False
+        try:
+            # Foreground sub-agents share the parent's cancellation token so
+            # Ctrl+C propagates into nested chat() loops (Gemini CLI pattern).
+            # Background agents always receive None (fire-and-forget).
+            result = sub_agent.chat(
+                full_task,
+                max_iterations=max_turns,
+                cancellation_token=cancellation_token,
+            )
+        except TaskComplete as tc:
+            # Defensive only: ``ToolExecutor`` converts ``TaskComplete`` into
+            # a tool result, so it does not reach here from the normal path.
+            # The real detection is the history scan below.
+            result = tc.result
+            task_complete = True
+
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+        # An explicit completion signal from the sub-agent: it called
+        # ``complete_task``. That is the agent declaring it is done, so the
+        # turn-level classification does not apply — do not second-guess it.
+        completed_payload = _find_task_complete_result(sub_agent)
+        if completed_payload is not None:
+            task_complete = True
+            # ``complete_task`` is documented as *the* way a sub-agent
+            # returns its answer, but the loop keeps running after the tool
+            # call and the child often has nothing left to say — leaving
+            # ``chat()`` to return the empty-turn placeholder. Prefer the
+            # payload the agent explicitly handed back over that placeholder,
+            # otherwise the real answer is dropped on the floor.
+            if _is_harness_notice(result) and completed_payload.strip():
+                result = completed_payload
+
+        # Collect stats from executed sub-agent
+        turns = sum(1 for m in sub_agent.messages if m.get("role") == "assistant")
+        tool_calls = sum(1 for m in sub_agent.messages if m.get("role") == "tool")
+        approx_tokens = sub_agent.context_manager.estimate_tokens(sub_agent.messages)
+
+        stats = {
+            "agent_name": self._definition["name"],
+            "turns": turns,
+            "tool_calls": tool_calls,
+            "tokens": approx_tokens,
+            "duration_ms": elapsed_ms,
+            "incomplete": _classify_subagent_outcome(
+                outcome=getattr(sub_agent, "last_turn", None),
+                task_complete=task_complete,
+                max_iterations_hit=max_iter_hit["hit"],
+                max_turns=max_turns,
+            ),
+        }
+        return result, stats
+
+    @staticmethod
+    def _format_result(result: str, stats: Dict[str, Any]) -> str:
+        """Render the sub-agent's result for the parent LLM.
+
+        A stats footer on its own reads as an affirmative productivity
+        signal, so when the sub-agent stopped short it has to be said
+        plainly *before* the text — otherwise ``[No response]`` plus
+        "8 turns, 12 tool calls" invites the parent to treat a non-answer
+        as a finished piece of work.
+        """
+        name = stats["agent_name"]
+        footer = (
+            f"[{name}: {stats['turns']} turns, {stats['tool_calls']} tool calls, "
+            f"~{stats['tokens']:,} tokens, {stats['duration_ms']}ms]"
+        )
+
+        note = stats.get("incomplete")
+        if not note:
+            return f"{result}\n\n{footer}"
+
+        header = f"[{name} did not finish: {note.detail}]"
+        # Only genuine sub-agent output earns the "Partial result" label —
+        # ``[No response]``, ``[LLM API error: …]`` and the max-iterations
+        # notice are all harness-authored, and presenting them as the
+        # child's work is the misattribution this guard exists to prevent.
+        if not _is_harness_notice(result):
+            return f"{header}\nPartial result:\n{result}\n\n{footer}"
+        return f"{header}\n\n{footer}"
+
+    # ------------------------------------------------------------------
+    # Background (async) execution
+    # ------------------------------------------------------------------
+
+    def _launch_background(self, task: str, parent_context: str) -> str:
+        agent_id = uuid.uuid4().hex[:8]
+        agent_name = self._definition["name"]
+        self._bg_store.register(agent_id, agent_name, task[:80])
+
+        token = CancellationToken()
+        self._bg_store.register_token(agent_id, token)
+
+        # Generic non-sensitive label — see the foreground spawn site
+        # for the redaction-boundary rationale. ``task`` is intentionally
+        # NOT included on the public event.
+        task_summary = f"sub-agent: {agent_name}"
+        subagent_ctx = self._spawn_subagent_event(task_summary, parent_task_id=agent_id)
+
+        def _run():
+            if not self._bg_store.mark_running(agent_id):
+                # Pending-cancel race: the agent was cancelled before
+                # the worker started running. ``spawned`` already fired
+                # outside this thread, so without an explicit terminal
+                # event host subscribers would see a child task that
+                # never completes. Emit ``cancelled`` so the lifecycle
+                # pair is closed.
+                self._terminal_subagent_event(subagent_ctx, "cancelled", task_summary)
+                return
+            try:
+                result, stats = self._run_sync(
+                    task, parent_context,
+                    suppress_output=True,
+                    cancellation_token=token,
+                )
+                formatted = self._format_result(result, stats)
+                # Not raising is not the same as finishing. The result text
+                # is still stored either way — a partial answer is useful —
+                # but the status and the public event must say what actually
+                # happened, or ``check_background_agent`` and any host
+                # subscriber both read a non-answer as a success.
+                incomplete = stats.get("incomplete")
+                self._bg_store.update(
+                    agent_id,
+                    status="completed" if incomplete is None else "failed",
+                    result=formatted,
+                    error=None if incomplete is None else incomplete.detail,
+                    # The record must say *which* kind of "failed" this is.
+                    # Without it every reader has to guess from the presence
+                    # of `result`, and the CLI guessed wrong — it printed the
+                    # error and discarded the work.
+                    incomplete_reason=None if incomplete is None else incomplete.reason,
+                    turns=stats["turns"], tool_calls=stats["tool_calls"],
+                    tokens=stats["tokens"], duration_ms=stats["duration_ms"],
+                )
+                if incomplete is None:
+                    self._terminal_subagent_event(
+                        subagent_ctx, "completed", task_summary,
+                    )
+                else:
+                    self._terminal_subagent_event(
+                        subagent_ctx, "failed", task_summary,
+                        error_type=f"incomplete:{incomplete.reason}",
+                    )
+            except AgentCancelledError:
+                self._bg_store.update(agent_id, status="cancelled")
+                self._terminal_subagent_event(subagent_ctx, "cancelled", task_summary)
+            except Exception as exc:
+                self._bg_store.update(agent_id, status="failed", error=str(exc))
+                self._terminal_subagent_event(
+                    subagent_ctx, "failed", task_summary,
+                    error_type=type(exc).__name__,
+                )
+            finally:
+                self._bg_store.unregister_token(agent_id)
+
+        # Background agents run silently: suppress_output=True ensures no callbacks
+        # fire on the background thread, preventing interleaving with foreground output.
+        t = threading.Thread(target=_run, daemon=True, name=f"bg-agent-{agent_id}")
+        t.start()
+
+        return (
+            f"Background agent '{agent_name}' started (ID: {agent_id}). "
+            f"Task: {task[:80]}{'…' if len(task) > 80 else ''}. "
+            f"Use check_background_agent(agent_id='{agent_id}') to get the result."
+        )
+
+    # ------------------------------------------------------------------
+    # Progress callback with turn counter
+    # ------------------------------------------------------------------
+
+    def _make_prefixed_step_callback(
+        self, max_turns: int
+    ) -> Optional[Callable]:
+        parent_cb = self._step_callback
+        if not parent_cb:
+            return None
+        agent_name = self._definition["name"]
+        turn_counter = [0]  # mutable cell
+
+        def prefixed(tool_name: Optional[str], tool_args: dict) -> None:
+            if tool_name is None:
+                # Called before each LLM iteration — increment turn counter
+                turn_counter[0] += 1
+                parent_cb(None, tool_args)  # keep the "Thinking…" reset
+            else:
+                label = f"[{agent_name} {turn_counter[0]}/{max_turns}] {tool_name}"
+                parent_cb(label, tool_args)
+
+        return prefixed

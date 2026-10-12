@@ -1,0 +1,507 @@
+"""Per-server subprocess handle for ACP client.
+
+Each configured ACP server gets one :class:`ACPProcessHandle` that owns the
+``subprocess.Popen`` instance and tracks the runtime state machine.
+
+This module handles **only** process lifecycle (start / stop / restart) and
+stderr consumption.  JSON-RPC framing, handshake, and request routing are
+layered on top in Issues 03–04.
+"""
+
+from __future__ import annotations
+
+import collections
+import io
+import logging
+import queue
+import subprocess
+import sys
+import threading
+from typing import Callable, Iterator, List, Optional
+
+from ..capabilities.process import build_child_env, kill_process_tree
+from .models import AcpProcessInfo, AcpServerConfig, ServerState
+
+# Default capacity for the stderr ring buffer (number of lines).
+_STDERR_RING_CAPACITY = 200
+
+# Grace period (seconds) to wait for the subprocess to exit on its own after
+# we close its stdin. The ACP server's read loop returns on stdin EOF and runs
+# its shutdown ``finally`` (persist each session, disconnect MCP) on that path,
+# so we give it this long before escalating to SIGTERM/SIGKILL.
+_GRACEFUL_STOP_TIMEOUT = 5.0
+# After the graceful window, SIGTERM the server (child-scoped) and wait this
+# long before escalating to a whole-tree SIGKILL.
+_TERMINATE_STOP_TIMEOUT = 5.0
+# Final reap window after force-killing the process tree.
+_KILL_STOP_TIMEOUT = 2.0
+
+# Hard cap on a single stdout frame (one newline-delimited JSON-RPC line). A
+# malicious/buggy server can emit a gigantic line with no newline; the naive
+# ``for line in stdout`` (``readline``) would buffer the whole thing (GB in RAM)
+# before Python ever saw it. Frames larger than this are dropped whole — far
+# above any legitimate ACP message. See docs/design/acp-client-audit.md AC5.
+_MAX_FRAME_BYTES = 16 * 1024 * 1024
+# Slice size for the bounded reader's ``read1()`` calls — keeps line-at-a-time
+# streaming latency while never pulling more than this into memory per read.
+_STDOUT_READ_CHUNK = 64 * 1024
+
+logger = logging.getLogger("agentao.acp_client")
+
+
+def _read_bounded_lines(
+    stream: io.BufferedIOBase,
+    max_bytes: int,
+    *,
+    on_oversize: Callable[[int], None],
+    read_size: int = _STDOUT_READ_CHUNK,
+) -> Iterator[bytes]:
+    """Yield newline-terminated frames (``bytes``, incl. the trailing ``\\n``).
+
+    Reads *stream* (a binary file object) in bounded ``read_size`` slices via
+    ``read1`` — so a server that streams one line and waits still sees it
+    delivered promptly, exactly like ``for line in stream`` — and reassembles
+    frames across slices. When a single frame grows past *max_bytes* without a
+    terminating newline, the rest of that frame (up to the next newline) is
+    discarded and its total size reported via *on_oversize(nbytes)*.
+
+    Dropping (not truncating) is deliberate: a truncated line is not valid
+    JSON-RPC, so the client will time out the pending request normally rather
+    than mis-parse a corrupted frame. Peak memory is bounded to
+    ``max_bytes + read_size``.
+    """
+    read = getattr(stream, "read1", None) or stream.read
+    buf = bytearray()
+    dropping = False
+    dropped = 0
+    while True:
+        chunk = read(read_size)
+        if not chunk:
+            break
+        pos = 0
+        n = len(chunk)
+        while pos < n:
+            nl = chunk.find(b"\n", pos)
+            if nl == -1:
+                seg_len = n - pos
+                if dropping:
+                    dropped += seg_len
+                elif len(buf) + seg_len > max_bytes:
+                    # Overflow with no terminator yet — start dropping this frame.
+                    dropped = len(buf) + seg_len
+                    buf.clear()
+                    dropping = True
+                else:
+                    buf += chunk[pos:]
+                break
+            # A newline terminates the current frame at index ``nl``. Count the
+            # newline itself in the dropped total so the reported size matches the
+            # cap comparison (which uses ``nl + 1 - pos``) — otherwise a frame of
+            # exactly ``max_bytes`` content + newline reports the impossible
+            # "``max_bytes`` bytes > ``max_bytes`` cap".
+            if dropping:
+                dropped += nl + 1 - pos
+                on_oversize(dropped)
+                dropping = False
+                dropped = 0
+            elif len(buf) + (nl + 1 - pos) > max_bytes:
+                # The completed frame is itself oversized — drop it whole.
+                on_oversize(len(buf) + (nl + 1 - pos))
+                buf.clear()
+            else:
+                buf += chunk[pos:nl + 1]
+                yield bytes(buf)
+                buf.clear()
+            pos = nl + 1
+    # EOF: report a still-open oversized frame, or emit a final line that had no
+    # trailing newline (matching ``for line in stream`` semantics).
+    if dropping:
+        if dropped:
+            on_oversize(dropped)
+    elif buf:
+        yield bytes(buf)
+
+
+class ACPProcessHandle:
+    """Manages the lifecycle of a single ACP server subprocess.
+
+    The handle owns:
+    - The ``Popen`` object (and therefore stdin/stdout/stderr pipes).
+    - A background thread that drains stderr so the subprocess never blocks.
+    - The :class:`AcpProcessInfo` snapshot visible to the CLI.
+
+    Thread safety: all state mutations go through :meth:`_set_state` which is
+    guarded by ``_lock``.  Public methods (``start``, ``stop``, ``restart``)
+    acquire the lock at the entry point.
+    """
+
+    def __init__(self, name: str, config: AcpServerConfig) -> None:
+        self.name = name
+        self.config = config
+        self.info = AcpProcessInfo()
+        self._proc: Optional[subprocess.Popen] = None
+        self._stderr_thread: Optional[threading.Thread] = None
+        self._lock = threading.Lock()
+        # Bounded ring buffer that keeps the most recent stderr lines.
+        self._stderr_ring: collections.deque = collections.deque(
+            maxlen=_STDERR_RING_CAPACITY
+        )
+        # Stdout routing: one feeder per process lifetime puts raw lines here;
+        # the current ACPClient subscribes its own queue via subscribe_stdout().
+        self._stdout_subscriber: Optional[queue.Queue] = None
+        self._subscriber_lock = threading.Lock()
+        # When a feeder thread reaches EOF with no current subscriber it parks
+        # the proc reference here.  subscribe_stdout() checks this and delivers
+        # the EOF sentinel immediately so fast-crash clients don't hang.
+        self._stdout_eof_pending: Optional[subprocess.Popen] = None
+
+    # ------------------------------------------------------------------
+    # State helpers
+    # ------------------------------------------------------------------
+
+    def _set_state(self, state: ServerState, error: Optional[str] = None) -> None:
+        """Transition to *state*, optionally recording an error."""
+        self.info.state = state
+        if error is not None:
+            self.info.last_error = error
+        self.info.touch()
+
+    @property
+    def state(self) -> ServerState:
+        return self.info.state
+
+    @property
+    def pid(self) -> Optional[int]:
+        return self.info.pid
+
+    @property
+    def stdin(self):
+        """Raw stdin pipe of the subprocess (used by JSON-RPC layer)."""
+        return self._proc.stdin if self._proc else None
+
+    @property
+    def stdout(self):
+        """Raw stdout pipe of the subprocess (used by JSON-RPC layer)."""
+        return self._proc.stdout if self._proc else None
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def start(self) -> None:
+        """Launch the server subprocess.
+
+        Idempotent: if the process is already running, this is a no-op.
+        After a successful ``start`` the state is ``STARTING``.  The caller
+        (or Issue 03) is responsible for advancing to ``INITIALIZING`` /
+        ``READY`` once the ACP handshake completes.
+
+        Raises:
+            RuntimeError: If the process fails to start (state → ``FAILED``).
+        """
+        with self._lock:
+            if self._proc is not None and self._proc.poll() is None:
+                # Already running — no-op.
+                return
+
+            self._set_state(ServerState.STARTING)
+
+            # An ACP server is a third-party binary spawned from config —
+            # the same trust position as an MCP server, so it gets the same
+            # scrubbed base environment. Its own ``env`` block is applied
+            # after the drop, so a server that genuinely needs a provider
+            # key can still be given one explicitly.
+            env = build_child_env(self.config.env)
+
+            popen_kwargs = dict(
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=self.config.cwd,
+                env=env,
+            )
+            # Lead our own process group / session so a force-stop can reap the
+            # *whole* tree (see ``kill_process_tree``): an ACP server that spawns
+            # its own MCP/shell grandchildren must not orphan them when we
+            # SIGKILL an unresponsive parent. This is also REQUIRED for the
+            # whole-tree kill in ``_stop_unlocked`` (``kill_process_tree`` ->
+            # ``killpg``) to target the child's group rather than agentao's own.
+            # Mirrors ``run_captured``.
+            if sys.platform == "win32":
+                popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+            else:
+                popen_kwargs["start_new_session"] = True
+
+            try:
+                self._proc = subprocess.Popen(
+                    [self.config.command, *self.config.args],
+                    **popen_kwargs,
+                )
+            except Exception as exc:
+                self._set_state(ServerState.FAILED, str(exc))
+                raise RuntimeError(
+                    f"acp server '{self.name}': failed to start: {exc}"
+                ) from exc
+
+            self.info.pid = self._proc.pid
+
+            # Drain stderr in background so the child never blocks on a full
+            # pipe buffer.
+            self._stderr_thread = threading.Thread(
+                target=self._drain_stderr,
+                name=f"acp-stderr-{self.name}",
+                daemon=True,
+            )
+            self._stderr_thread.start()
+
+            # One feeder per process lifetime: reads stdout and routes each
+            # line to whoever is currently subscribed via subscribe_stdout().
+            # This guarantees only one consumer is ever attached to the pipe.
+            feeder = threading.Thread(
+                target=self._feed_stdout,
+                args=(self._proc,),
+                name=f"acp-feeder-{self.name}",
+                daemon=True,
+            )
+            feeder.start()
+
+            # Check for immediate crash (e.g. bad executable path resolved
+            # by the OS but the binary exits instantly).
+            try:
+                self._proc.wait(timeout=0.05)
+            except subprocess.TimeoutExpired:
+                pass  # Still running — good.
+            else:
+                rc = self._proc.returncode
+                self._set_state(
+                    ServerState.FAILED,
+                    f"process exited immediately with code {rc}",
+                )
+                raise RuntimeError(
+                    f"acp server '{self.name}': process exited immediately "
+                    f"with code {rc}"
+                )
+
+            self.info.touch()
+            logger.info(
+                "acp server '%s' started (pid %d)", self.name, self._proc.pid
+            )
+
+    def stop(self) -> None:
+        """Gracefully stop the subprocess.
+
+        Closes stdin first so an ACP server can persist its sessions and exit
+        on EOF, waits up to ``_GRACEFUL_STOP_TIMEOUT`` s, then escalates to a
+        child-scoped SIGTERM and finally a whole-process-tree SIGKILL (so an
+        unresponsive server can't orphan its MCP/shell grandchildren).
+        Idempotent.
+        """
+        with self._lock:
+            self._stop_unlocked()
+
+    def _stop_unlocked(self) -> None:
+        """Inner stop without lock (called from ``stop`` and ``restart``)."""
+        if self._proc is None:
+            self._set_state(ServerState.STOPPED)
+            return
+
+        if self._proc.poll() is not None:
+            # Already exited.
+            self._set_state(ServerState.STOPPED)
+            self._cleanup_proc()
+            return
+
+        self._set_state(ServerState.STOPPING)
+
+        # 1. Close stdin to send EOF. The ACP server's read loop returns on
+        #    EOF and runs its shutdown ``finally`` — cancel active turns,
+        #    drain handlers, then ``close_all`` which persists each session
+        #    and disconnects MCP. This graceful path is the ONLY one on which
+        #    a server-side session is saved, so give it a chance before we
+        #    resort to signals (a SIGTERM the server doesn't catch would kill
+        #    it before any of that runs). It also lets the server reap its own
+        #    grandchildren (MCP/shell), which ``terminate()`` here cannot.
+        try:
+            stdin = self._proc.stdin
+            if stdin is not None and not stdin.closed:
+                stdin.close()
+        except Exception:
+            pass  # already closed / broken pipe — fall through to wait
+
+        try:
+            self._proc.wait(timeout=_GRACEFUL_STOP_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            # 2. Graceful EOF exit didn't take — escalate. SIGTERM the server
+            #    itself first (child-scoped) so a server that traps SIGTERM can
+            #    still run its own shutdown and reap its grandchildren cleanly.
+            logger.warning(
+                "acp server '%s' did not exit %.0f s after stdin close — terminating",
+                self.name,
+                _GRACEFUL_STOP_TIMEOUT,
+            )
+            survived_sigterm = False
+            try:
+                self._proc.terminate()
+                self._proc.wait(timeout=_TERMINATE_STOP_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                survived_sigterm = True
+            except Exception as exc:
+                logger.error(
+                    "acp server '%s': error during stop: %s", self.name, exc
+                )
+            if survived_sigterm:
+                logger.warning(
+                    "acp server '%s' did not stop within %.0f s — "
+                    "killing process tree",
+                    self.name, _TERMINATE_STOP_TIMEOUT,
+                )
+            # 3. Force-reap the WHOLE tree — not just the direct child — on
+            #    every escalation path. A server that SURVIVES SIGTERM is killed
+            #    outright; one that DIES on SIGTERM may have exited without
+            #    reaping its own MCP/shell grandchildren (the default SIGTERM
+            #    disposition just terminates), and ``terminate()`` is
+            #    child-scoped, so those grandchildren would otherwise orphan.
+            #    ``kill_process_tree`` signals the process group
+            #    (``start_new_session`` at spawn made the child its leader): a
+            #    surviving grandchild keeps the group id reserved so the kill
+            #    reaches it, and if the server already cleaned up the group is
+            #    empty and this is a harmless no-op.
+            kill_process_tree(self._proc)
+            try:
+                self._proc.wait(timeout=_KILL_STOP_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                pass
+        except Exception as exc:
+            logger.error(
+                "acp server '%s': error during stop: %s", self.name, exc
+            )
+
+        self._set_state(ServerState.STOPPED)
+        self._cleanup_proc()
+
+    def restart(self) -> None:
+        """Stop (if running) then start a fresh subprocess."""
+        with self._lock:
+            self._stop_unlocked()
+        # start() acquires its own lock.
+        self.start()
+
+    # ------------------------------------------------------------------
+    # Stdout subscription (used by ACPClient)
+    # ------------------------------------------------------------------
+
+    def subscribe_stdout(self, q: "queue.Queue[Optional[bytes]]") -> None:
+        """Route stdout lines to *q* until :meth:`unsubscribe_stdout` is called."""
+        with self._subscriber_lock:
+            self._stdout_subscriber = q
+            # If the feeder already reached EOF for the current process without
+            # a subscriber present, deliver the sentinel immediately so the
+            # caller's read loop doesn't block until an RPC timeout.
+            if self._stdout_eof_pending is not None and (
+                self._stdout_eof_pending is self._proc or self._proc is None
+            ):
+                self._stdout_eof_pending = None
+                q.put(None)
+
+    def unsubscribe_stdout(self, q: "queue.Queue[Optional[bytes]]") -> None:
+        """Stop routing to *q*. No-op if *q* is not the current subscriber."""
+        with self._subscriber_lock:
+            if self._stdout_subscriber is q:
+                self._stdout_subscriber = None
+
+    def _feed_stdout(self, proc: subprocess.Popen) -> None:
+        """Daemon thread: read stdout of *proc* and route lines to subscriber.
+
+        Captures *proc* by argument so the feeder keeps reading from the
+        correct pipe even after ``self._proc`` is reassigned during restart.
+        Sends ``None`` (EOF sentinel) to the active subscriber when stdout
+        closes so ``ACPClient._read_loop`` can exit cleanly.
+        """
+        stdout = proc.stdout
+        if stdout is None:
+            return
+
+        def _on_oversize(nbytes: int) -> None:
+            logger.warning(
+                "acp server '%s': dropped an oversized stdout frame "
+                "(%d bytes > %d cap) — a valid JSON-RPC message is never this "
+                "large; a pending request on it may time out",
+                self.name, nbytes, _MAX_FRAME_BYTES,
+            )
+
+        last_sub = None
+        try:
+            for raw_line in _read_bounded_lines(
+                stdout, _MAX_FRAME_BYTES, on_oversize=_on_oversize
+            ):
+                with self._subscriber_lock:
+                    sub = self._stdout_subscriber
+                # Only route to subscriber if this feeder's process is still
+                # the active one.  After a restart self._proc points to the new
+                # Popen, so proc is self._proc becomes False and stale output
+                # from the old process is never injected into the new client.
+                if sub is not None and proc is self._proc:
+                    sub.put(raw_line)
+                    last_sub = sub
+        except Exception:
+            pass
+        # Deliver the EOF sentinel so ACPClient._read_loop exits promptly.
+        with self._subscriber_lock:
+            current_sub = self._stdout_subscriber
+            if last_sub is not None:
+                # Send only to the subscriber that received data from this
+                # process; a new client after restart must not get a spurious
+                # EOF that would break its handshake.
+                if last_sub is current_sub:
+                    last_sub.put(None)
+            elif current_sub is not None:
+                # No lines delivered (process died before writing anything).
+                # Send EOF only when no restart has taken place.
+                if proc is self._proc or self._proc is None:
+                    current_sub.put(None)
+            else:
+                # No subscriber at all when feeder exited.  Park the proc so
+                # subscribe_stdout() can deliver the sentinel to the next
+                # caller instead of letting it block until an RPC timeout.
+                if proc is self._proc or self._proc is None:
+                    self._stdout_eof_pending = proc
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _cleanup_proc(self) -> None:
+        """Release references to the old process and stderr thread."""
+        self.info.pid = None
+        self._proc = None
+        self._stderr_thread = None
+        with self._subscriber_lock:
+            self._stdout_eof_pending = None
+
+    def get_stderr_tail(self, n: int = 50) -> List[str]:
+        """Return the last *n* lines captured from the server's stderr.
+
+        Thread-safe.  Returns an empty list if the process has never been
+        started or no stderr output has been produced.
+        """
+        lines = list(self._stderr_ring)
+        return lines[-n:] if len(lines) > n else lines
+
+    def _drain_stderr(self) -> None:
+        """Read stderr line-by-line until EOF.  Runs in a daemon thread."""
+        proc = self._proc
+        if proc is None or proc.stderr is None:
+            return
+        try:
+            for raw_line in proc.stderr:
+                line = (
+                    raw_line.decode("utf-8", errors="replace").rstrip()
+                    if isinstance(raw_line, bytes)
+                    else raw_line.rstrip()
+                )
+                if line:
+                    self._stderr_ring.append(line)
+                    logger.debug("acp[%s] stderr: %s", self.name, line)
+        except Exception:
+            # Process gone or pipe broken — expected during teardown.
+            pass

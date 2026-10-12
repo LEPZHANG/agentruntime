@@ -1,0 +1,77 @@
+# Python-generated files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+
+# ChatAgent specific
+.chatagent_memory.json
+.agentao_memory.json
+chatagent.log
+*.log
+*.log.*
+.chatagent/
+.agentao/
+.claude/
+workspace/
+
+# Integration examples (ship code, ignore build/runtime artifacts)
+examples/**/__pycache__/
+examples/**/.env
+examples/**/node_modules/
+examples/**/.venv/
+examples/**/dist/
+examples/**/out/
+examples/**/*.egg-info/
+examples/**/runs/
+examples/**/workspaces/
+examples/**/data/
+examples/**/agentao.log
+examples/**/*.db
+
+# Un-ignore authored skill definitions (the blanket `.agentao/` above hides them)
+!examples/**/.agentao/
+!examples/**/.agentao/skills/
+!examples/**/.agentao/skills/**
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary development files
+scratch_*.py
+HIDDEN_*.md
+*_DRAFT.md
+*.tmp

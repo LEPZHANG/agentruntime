@@ -1,0 +1,121 @@
+[project]
+name = "agentao"
+dynamic = ["version"]
+description = "A governed agent runtime for local-first, private-first, embeddable AI agents."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Bo Jin"}]
+keywords = ["agent", "cli", "llm", "openai", "mcp", "tools"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+dependencies = [
+    # Core: minimum needed to construct Agentao() and call chat() against
+    # an OpenAI-compatible endpoint. CLI / web-fetch / Chinese tokenization
+    # are opt-in extras.
+    "openai>=1.0.0",
+    "httpx>=0.25.0",
+    "pydantic>=2",
+    "pyyaml>=6.0.3",
+    "mcp>=1.26.0",
+    "python-dotenv>=1.0.0",
+    # Required at runtime by agentao/skills/registry.py for cross-process
+    # locking. Lazy-imported, but kept in core because any host that
+    # activates skills will trip ImportError otherwise.
+    "filelock>=1.4.0",
+    # ``agentao run`` spec templating — render_spec uses Jinja2 with
+    # StrictUndefined for ``prompt`` / ``instructions`` substitution.
+    "jinja2>=3.0.0",
+    "socksio>=1.0.0",
+]
+
+[project.optional-dependencies]
+# CLI surface — `agentao` console script + interactive UI
+cli       = ["rich>=13.0.0", "prompt-toolkit>=3.0.52", "readchar>=4.2.1", "pygments>=2.16.0"]
+# Web fetch tool — HTML parsing
+web       = ["beautifulsoup4>=4.12.0"]
+# Chinese-text tokenization for memory keyword retrieval
+i18n      = ["jieba>=0.42.1"]
+crawl4ai  = ["crawl4ai>=0.8.0"]
+tokenizer = ["tiktoken>=0.7.0"]
+full      = ["agentao[cli,web,i18n,crawl4ai,tokenizer]"]
+
+[project.urls]
+Homepage = "https://github.com/jin-bo/agentao"
+Repository = "https://github.com/jin-bo/agentao"
+"Bug Tracker" = "https://github.com/jin-bo/agentao/issues"
+
+[project.scripts]
+agentao = "agentao.cli:entrypoint"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "agentao/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+exclude = [
+    "workspace", "docs", "developer-guide", "examples", "agentao.log", "main.py", "run.sh", "AGENTAO.md", ".agentao",
+]
+force-include = {"skills/skill-creator" = "skills/skill-creator", "agentao/py.typed" = "agentao/py.typed"}
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    ".agentao",
+    ".claude",
+    ".github",
+    ".pytest_cache",
+    ".venv",
+    "agentao.log",
+    "developer-guide",
+    "dist",
+    "docs",
+    "examples",
+    "main.py",
+    "run.sh",
+    "tests",
+    "workspace",
+    "AGENTAO.md",
+    "CLAUDE.md",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short -m 'not slow'"
+markers = [
+    "slow: tests that build / install / boot subprocess venvs (P0.7 clean-install smoke)",
+]
+
+[dependency-groups]
+dev = [
+    "build>=1.2.2",
+    "pytest>=9.0.2",
+    "twine>=6.1.0",
+    "mypy>=1.13.0",
+    "packaging>=25.0",
+]
+
+[tool.mypy]
+# P0.4 typing gate — strict only on the public host boundary; the rest of
+# the codebase is untouched until separate items raise its bar.
+python_version = "3.10"
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["agentao.host.*"]
+strict = true
+warn_unused_ignores = true
+disallow_any_explicit = false
+

@@ -1,0 +1,688 @@
+"""Tests for the ACP ``session/new`` handler (Issue 04).
+
+Uses a fake agent factory so we don't pull the LLM stack or need
+``OPENAI_API_KEY`` at test time. The factory receives the same kwargs the
+default factory does, so the test double also validates that the handler
+passes the expected arguments.
+
+Test doubles (:class:`FakeAgent`, :class:`ExplodingAgent`, factory
+helpers) live in :mod:`tests.support.acp_agents`; the server builders
+live in :mod:`tests.support.acp_server`.
+"""
+
+from __future__ import annotations
+
+import io
+import json
+from pathlib import Path
+
+import pytest
+
+from agentao.acp import initialize as acp_initialize
+from agentao.acp import session_new as acp_session_new
+from agentao.acp.models import AcpSessionState
+from agentao.acp.protocol import (
+    ACP_PROTOCOL_VERSION,
+    INTERNAL_ERROR,
+    INVALID_PARAMS,
+    METHOD_INITIALIZE,
+    METHOD_SESSION_NEW,
+    SERVER_NOT_INITIALIZED,
+)
+from agentao.acp.server import AcpServer
+from agentao.acp.session_manager import DuplicateSessionError
+from agentao.acp.transport import ACPTransport
+from agentao.permissions import PermissionMode
+
+from .support.acp_agents import (
+    ExplodingAgent,
+    FakeAgent,
+    make_failing_factory,
+    make_recording_factory,
+)
+from .support.acp_server import make_initialized_server, make_server
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+_FULL_CLIENT_CAPABILITIES = {
+    "fs": {"readTextFile": True, "writeTextFile": True},
+    "terminal": True,
+}
+
+
+@pytest.fixture
+def server():
+    return make_server()
+
+
+@pytest.fixture
+def initialized_server():
+    return make_initialized_server(client_capabilities=_FULL_CLIENT_CAPABILITIES)
+
+
+@pytest.fixture
+def abs_tmp_dir(tmp_path) -> str:
+    return str(tmp_path)
+
+
+def _minimal_params(cwd: str) -> dict:
+    return {"cwd": cwd, "mcpServers": []}
+
+
+# ---------------------------------------------------------------------------
+# Pre-initialize guard
+# ---------------------------------------------------------------------------
+
+def test_session_new_before_initialize_raises_server_not_initialized(server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+
+    from agentao.acp.server import JsonRpcHandlerError
+    with pytest.raises(JsonRpcHandlerError) as exc_info:
+        acp_session_new.handle_session_new(
+            server, _minimal_params(abs_tmp_dir), agent_factory=factory
+        )
+
+    assert exc_info.value.code == SERVER_NOT_INITIALIZED
+    assert "initialize" in exc_info.value.message.lower()
+
+
+def test_pre_initialize_error_over_wire(server, abs_tmp_dir):
+    """End-to-end: JsonRpcHandlerError must map to its specific code on the wire."""
+    factory, _ = make_recording_factory()
+    acp_session_new.register(server, agent_factory=factory)
+    acp_initialize.register(server)
+
+    stdin = io.StringIO(
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": METHOD_SESSION_NEW,
+                "params": _minimal_params(abs_tmp_dir),
+            }
+        )
+        + "\n"
+    )
+    server._in = stdin
+    stdout = io.StringIO()
+    server._out = stdout
+    server.run()
+
+    response = json.loads(stdout.getvalue().strip())
+    assert "error" in response
+    assert response["error"]["code"] == SERVER_NOT_INITIALIZED
+
+
+# ---------------------------------------------------------------------------
+# Happy path
+# ---------------------------------------------------------------------------
+
+def test_happy_path_returns_session_id(initialized_server, abs_tmp_dir):
+    factory, calls = make_recording_factory()
+
+    result = acp_session_new.handle_session_new(
+        initialized_server, _minimal_params(abs_tmp_dir), agent_factory=factory
+    )
+
+    assert "sessionId" in result
+    assert isinstance(result["sessionId"], str)
+    assert result["sessionId"].startswith("sess_")
+    assert len(result["sessionId"]) > len("sess_")
+    # Factory was called exactly once.
+    assert len(calls) == 1
+
+
+def test_happy_path_registers_session_in_manager(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+
+    result = acp_session_new.handle_session_new(
+        initialized_server, _minimal_params(abs_tmp_dir), agent_factory=factory
+    )
+
+    session_id = result["sessionId"]
+    assert session_id in initialized_server.sessions
+    state = initialized_server.sessions.require(session_id)
+    assert isinstance(state, AcpSessionState)
+    assert state.session_id == session_id
+    assert state.cwd == Path(abs_tmp_dir)
+
+
+def test_session_state_has_acp_transport_bound_to_session(initialized_server, abs_tmp_dir):
+    factory, calls = make_recording_factory()
+
+    result = acp_session_new.handle_session_new(
+        initialized_server, _minimal_params(abs_tmp_dir), agent_factory=factory
+    )
+
+    session_id = result["sessionId"]
+    transport = calls[0]["transport"]
+    assert isinstance(transport, ACPTransport)
+    assert transport._session_id == session_id
+    assert transport._server is initialized_server
+
+
+def test_session_state_captures_client_capabilities_snapshot(initialized_server, abs_tmp_dir):
+    factory, calls = make_recording_factory()
+
+    acp_session_new.handle_session_new(
+        initialized_server, _minimal_params(abs_tmp_dir), agent_factory=factory
+    )
+
+    # Factory received the same capabilities the handshake recorded.
+    assert calls[0]["client_capabilities"] == initialized_server.state.client_capabilities
+
+
+def test_capabilities_snapshot_is_independent_of_server_state(initialized_server, abs_tmp_dir):
+    """Mutating server.state after session creation must not leak into the session."""
+    factory, _ = make_recording_factory()
+
+    result = acp_session_new.handle_session_new(
+        initialized_server, _minimal_params(abs_tmp_dir), agent_factory=factory
+    )
+    session_id = result["sessionId"]
+
+    initialized_server.state.client_capabilities["terminal"] = False
+    initialized_server.state.client_capabilities["mutated_later"] = True
+
+    state = initialized_server.sessions.require(session_id)
+    assert state.client_capabilities.get("terminal") is True
+    assert "mutated_later" not in state.client_capabilities
+
+
+def test_factory_receives_permission_engine(initialized_server, abs_tmp_dir):
+    from agentao.permissions import PermissionEngine
+
+    factory, calls = make_recording_factory()
+
+    acp_session_new.handle_session_new(
+        initialized_server, _minimal_params(abs_tmp_dir), agent_factory=factory
+    )
+
+    engine = calls[0]["permission_engine"]
+    assert isinstance(engine, PermissionEngine)
+
+
+def test_multiple_sessions_have_unique_ids(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+
+    ids = {
+        acp_session_new.handle_session_new(
+            initialized_server, _minimal_params(abs_tmp_dir), agent_factory=factory
+        )["sessionId"]
+        for _ in range(10)
+    }
+
+    assert len(ids) == 10  # all unique
+    assert all(i.startswith("sess_") for i in ids)
+    assert len(initialized_server.sessions) == 10
+
+
+# ---------------------------------------------------------------------------
+# cwd validation
+# ---------------------------------------------------------------------------
+
+def test_cwd_missing_raises(initialized_server):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError):
+        acp_session_new.handle_session_new(
+            initialized_server, {"mcpServers": []}, agent_factory=factory
+        )
+
+
+def test_cwd_non_string_raises(initialized_server):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError):
+        acp_session_new.handle_session_new(
+            initialized_server, {"cwd": 42, "mcpServers": []}, agent_factory=factory
+        )
+
+
+def test_cwd_empty_string_raises(initialized_server):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError):
+        acp_session_new.handle_session_new(
+            initialized_server, {"cwd": "", "mcpServers": []}, agent_factory=factory
+        )
+
+
+def test_cwd_relative_path_raises(initialized_server):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="absolute"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {"cwd": "relative/path", "mcpServers": []},
+            agent_factory=factory,
+        )
+
+
+def test_cwd_nonexistent_raises(initialized_server):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="does not exist"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {"cwd": "/definitely/not/a/real/path/xyz123", "mcpServers": []},
+            agent_factory=factory,
+        )
+
+
+def test_cwd_that_is_a_file_raises(initialized_server, tmp_path):
+    file_path = tmp_path / "foo.txt"
+    file_path.write_text("hi", encoding="utf-8")
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="not a directory"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {"cwd": str(file_path), "mcpServers": []},
+            agent_factory=factory,
+        )
+
+
+# ---------------------------------------------------------------------------
+# mcpServers parsing
+# ---------------------------------------------------------------------------
+
+def test_empty_mcp_servers_list_is_accepted(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    result = acp_session_new.handle_session_new(
+        initialized_server, {"cwd": abs_tmp_dir, "mcpServers": []}, agent_factory=factory
+    )
+    assert "sessionId" in result
+
+
+def test_mcp_servers_missing_raises(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="mcpServers"):
+        acp_session_new.handle_session_new(
+            initialized_server, {"cwd": abs_tmp_dir}, agent_factory=factory
+        )
+
+
+def test_mcp_servers_non_list_raises(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="array"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {"cwd": abs_tmp_dir, "mcpServers": {}},
+            agent_factory=factory,
+        )
+
+
+def test_mcp_servers_stdio_entry_accepted(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    params = {
+        "cwd": abs_tmp_dir,
+        "mcpServers": [
+            {
+                "name": "fs",
+                "command": "/usr/local/bin/mcp-fs",
+                "args": ["--root", "/tmp"],
+                "env": [{"name": "LOG_LEVEL", "value": "info"}],
+            }
+        ],
+    }
+    result = acp_session_new.handle_session_new(
+        initialized_server, params, agent_factory=factory
+    )
+    assert "sessionId" in result
+
+
+def test_mcp_servers_http_entry_accepted(initialized_server, abs_tmp_dir):
+    """``type: "http"`` (Streamable HTTP) is accepted at parse time.
+
+    The agent advertises ``mcpCapabilities.http: true`` because
+    :class:`agentao.mcp.client.McpClient` now dispatches http through
+    ``streamable_http_client``. It shares the sse url/headers shape.
+    """
+    factory, _ = make_recording_factory()
+    result = acp_session_new.handle_session_new(
+        initialized_server,
+        {
+            "cwd": abs_tmp_dir,
+            "mcpServers": [
+                {
+                    "type": "http",
+                    "name": "remote",
+                    "url": "https://mcp.example.com/mcp",
+                    "headers": [{"name": "Authorization", "value": "Bearer abc"}],
+                }
+            ],
+        },
+        agent_factory=factory,
+    )
+    assert "sessionId" in result
+
+
+def test_mcp_servers_sse_entry_accepted(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    params = {
+        "cwd": abs_tmp_dir,
+        "mcpServers": [
+            {
+                "type": "sse",
+                "name": "streaming",
+                "url": "https://mcp.example.com/sse",
+                "headers": [],
+            }
+        ],
+    }
+    result = acp_session_new.handle_session_new(
+        initialized_server, params, agent_factory=factory
+    )
+    assert "sessionId" in result
+
+
+def test_mcp_servers_entry_missing_name_raises(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="name"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {"cwd": abs_tmp_dir, "mcpServers": [{"command": "/bin/true"}]},
+            agent_factory=factory,
+        )
+
+
+def test_mcp_servers_stdio_missing_command_raises(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="command"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {"cwd": abs_tmp_dir, "mcpServers": [{"name": "fs"}]},
+            agent_factory=factory,
+        )
+
+
+def test_mcp_servers_unknown_transport_type_raises(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="type"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {
+                "cwd": abs_tmp_dir,
+                "mcpServers": [{"type": "websocket", "name": "foo", "url": "wss://..."}],
+            },
+            agent_factory=factory,
+        )
+
+
+def test_mcp_servers_sse_missing_url_raises(initialized_server, abs_tmp_dir):
+    """SSE entries still need a non-empty url field.
+
+    ``type: "http"`` shares this same url check (both URL transports go
+    through the ``else`` branch in ``_parse_mcp_servers``); this test
+    exercises the shape failure for the sse transport.
+    """
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="url"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {"cwd": abs_tmp_dir, "mcpServers": [{"type": "sse", "name": "remote"}]},
+            agent_factory=factory,
+        )
+
+
+def test_mcp_servers_env_not_list_raises(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="env"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {
+                "cwd": abs_tmp_dir,
+                "mcpServers": [
+                    {
+                        "name": "fs",
+                        "command": "/bin/true",
+                        "env": {"LOG": "info"},  # dict — wrong shape
+                    }
+                ],
+            },
+            agent_factory=factory,
+        )
+
+
+def test_mcp_servers_env_item_missing_value_raises(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="value"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {
+                "cwd": abs_tmp_dir,
+                "mcpServers": [
+                    {
+                        "name": "fs",
+                        "command": "/bin/true",
+                        "env": [{"name": "LOG"}],  # missing value
+                    }
+                ],
+            },
+            agent_factory=factory,
+        )
+
+
+def test_mcp_servers_args_not_strings_raises(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    with pytest.raises(TypeError, match="args"):
+        acp_session_new.handle_session_new(
+            initialized_server,
+            {
+                "cwd": abs_tmp_dir,
+                "mcpServers": [
+                    {"name": "fs", "command": "/bin/true", "args": [1, 2, 3]}
+                ],
+            },
+            agent_factory=factory,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Factory failure — cleanup
+# ---------------------------------------------------------------------------
+
+def test_factory_failure_surfaces_and_does_not_register(initialized_server, abs_tmp_dir):
+    factory = make_failing_factory(RuntimeError("no LLM available"))
+
+    with pytest.raises(RuntimeError, match="no LLM available"):
+        acp_session_new.handle_session_new(
+            initialized_server, _minimal_params(abs_tmp_dir), agent_factory=factory
+        )
+
+    # No partial session leaked into the registry.
+    assert len(initialized_server.sessions) == 0
+
+
+def test_factory_failure_over_wire_returns_internal_error(initialized_server, abs_tmp_dir):
+    """Generic exception from the factory → -32603 INTERNAL_ERROR."""
+    factory = make_failing_factory(RuntimeError("boom"))
+    acp_session_new.register(initialized_server, agent_factory=factory)
+
+    stdin = io.StringIO(
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 7,
+                "method": METHOD_SESSION_NEW,
+                "params": _minimal_params(abs_tmp_dir),
+            }
+        )
+        + "\n"
+    )
+    stdout = io.StringIO()
+    initialized_server._in = stdin
+    initialized_server._out = stdout
+    initialized_server.run()
+
+    response = json.loads(stdout.getvalue().strip())
+    assert "error" in response
+    # Handler didn't raise JsonRpcHandlerError or TypeError, so it's mapped
+    # to INTERNAL_ERROR.
+    assert response["error"]["code"] == INTERNAL_ERROR
+
+
+# ---------------------------------------------------------------------------
+# Registration / dispatcher wiring
+# ---------------------------------------------------------------------------
+
+def test_register_wires_handler_into_dispatcher(initialized_server, abs_tmp_dir):
+    factory, _ = make_recording_factory()
+    acp_session_new.register(initialized_server, agent_factory=factory)
+
+    stdin = io.StringIO(
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 99,
+                "method": METHOD_SESSION_NEW,
+                "params": _minimal_params(abs_tmp_dir),
+            }
+        )
+        + "\n"
+    )
+    stdout = io.StringIO()
+    initialized_server._in = stdin
+    initialized_server._out = stdout
+    initialized_server.run()
+
+    response = json.loads(stdout.getvalue().strip())
+    assert response["id"] == 99
+    assert "result" in response
+    assert response["result"]["sessionId"].startswith("sess_")
+
+
+def test_bad_params_over_wire_return_invalid_params(initialized_server):
+    factory, _ = make_recording_factory()
+    acp_session_new.register(initialized_server, agent_factory=factory)
+
+    stdin = io.StringIO(
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": METHOD_SESSION_NEW,
+                "params": {"cwd": "relative", "mcpServers": []},
+            }
+        )
+        + "\n"
+    )
+    stdout = io.StringIO()
+    initialized_server._in = stdin
+    initialized_server._out = stdout
+    initialized_server.run()
+
+    response = json.loads(stdout.getvalue().strip())
+    assert response["error"]["code"] == INVALID_PARAMS
+
+
+# ---------------------------------------------------------------------------
+# Session id generation
+# ---------------------------------------------------------------------------
+
+def test_generate_session_id_format():
+    sid = acp_session_new._generate_session_id()
+    assert sid.startswith("sess_")
+    assert len(sid) == len("sess_") + 32  # 32 hex chars
+
+
+def test_generate_session_id_is_unique():
+    ids = {acp_session_new._generate_session_id() for _ in range(1000)}
+    assert len(ids) == 1000
+
+
+# ---------------------------------------------------------------------------
+# Harness session id binding
+# ---------------------------------------------------------------------------
+
+def test_session_new_assigns_session_id_to_agent(initialized_server, abs_tmp_dir):
+    """The agent's ``_session_id`` must reflect the persisted ACP session
+    id, not the construction-time UUID4 fallback. Hosts that subscribe
+    via ``agent.events(session_id=<ACP id>)`` rely on this binding —
+    without it harness lifecycle events carry an unrelated UUID and the
+    session-filtered iterator drops every event for the session.
+    """
+    factory, calls = make_recording_factory()
+
+    result = acp_session_new.handle_session_new(
+        initialized_server, _minimal_params(abs_tmp_dir), agent_factory=factory
+    )
+    session_id = result["sessionId"]
+    state = initialized_server.sessions.require(session_id)
+
+    assert state.agent._session_id == session_id
+    # Same agent instance is the one the factory yielded.
+    assert state.agent is calls[0]["transport"]._server.sessions.require(
+        session_id
+    ).agent
+
+
+# ---------------------------------------------------------------------------
+# Session modes (G4) — typed SessionModeState on the session/new response
+# ---------------------------------------------------------------------------
+
+class _StubEngine:
+    """Minimal permission-engine stand-in exposing ``active_mode``."""
+
+    def __init__(self, mode: PermissionMode = PermissionMode.WORKSPACE_WRITE) -> None:
+        self.active_mode = mode
+
+
+def _moded_factory(mode: PermissionMode = PermissionMode.WORKSPACE_WRITE):
+    """Agent factory whose agent carries a permission engine in ``mode``."""
+
+    def factory(**kwargs):
+        agent = FakeAgent()
+        agent.permission_engine = _StubEngine(mode)  # type: ignore[attr-defined]
+        return agent
+
+    return factory
+
+
+_EXPECTED_MODE_IDS = ["read-only", "workspace-write", "full-access", "plan"]
+
+
+def test_session_new_advertises_typed_modes(initialized_server, abs_tmp_dir):
+    result = acp_session_new.handle_session_new(
+        initialized_server,
+        _minimal_params(abs_tmp_dir),
+        agent_factory=_moded_factory(PermissionMode.WORKSPACE_WRITE),
+    )
+    modes = result["modes"]
+    assert modes["currentModeId"] == "workspace-write"
+    assert [m["id"] for m in modes["availableModes"]] == _EXPECTED_MODE_IDS
+    # Every advertised mode carries id + name (+ description here).
+    for m in modes["availableModes"]:
+        assert set(m) >= {"id", "name", "description"}
+
+
+def test_session_new_current_mode_reflects_engine(initialized_server, abs_tmp_dir):
+    result = acp_session_new.handle_session_new(
+        initialized_server,
+        _minimal_params(abs_tmp_dir),
+        agent_factory=_moded_factory(PermissionMode.READ_ONLY),
+    )
+    assert result["modes"]["currentModeId"] == "read-only"
+
+
+def test_session_new_omits_modes_without_engine(initialized_server, abs_tmp_dir):
+    # The recording factory yields a FakeAgent with no permission_engine.
+    factory, _ = make_recording_factory()
+    result = acp_session_new.handle_session_new(
+        initialized_server, _minimal_params(abs_tmp_dir), agent_factory=factory
+    )
+    assert "modes" not in result
+
+
+def test_session_modes_helper_none_without_engine():
+    state = AcpSessionState(session_id="x")
+    state.agent = FakeAgent()  # type: ignore[assignment]
+    assert acp_session_new._session_modes(state) is None
+
+
+def test_session_modes_helper_shape():
+    state = AcpSessionState(session_id="x")
+    agent = FakeAgent()
+    agent.permission_engine = _StubEngine(PermissionMode.FULL_ACCESS)  # type: ignore[attr-defined]
+    state.agent = agent  # type: ignore[assignment]
+    modes = acp_session_new._session_modes(state)
+    assert modes["currentModeId"] == "full-access"
+    assert [m["id"] for m in modes["availableModes"]] == _EXPECTED_MODE_IDS

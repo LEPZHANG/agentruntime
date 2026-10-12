@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitepress'
 import { withMermaid } from 'vitepress-plugin-mermaid'
 
-// Bilingual (ZH/EN) developer guide for Agentao harness embedding.
+// Bilingual (ZH/EN) developer guide for Arbiter harness embedding.
 // Route layout:
 //   /            → language picker (index.md)
 //   /zh/...      → 简体中文
@@ -39,10 +39,10 @@ const zhSidebar = [
     collapsed: false,
     items: [
       { text: '概述', link: '/zh/part-1/' },
-      { text: '1.1 Agentao 是什么', link: '/zh/part-1/1-what-is-agentao' },
+      { text: '1.1 Arbiter 是什么', link: '/zh/part-1/1-what-is-arbiter' },
       { text: '1.2 核心概念', link: '/zh/part-1/2-core-concepts' },
       { text: '1.3 两种集成模式', link: '/zh/part-1/3-integration-modes' },
-      { text: '1.4 5 分钟 Hello Agentao', link: '/zh/part-1/4-hello-agentao' },
+      { text: '1.4 5 分钟 Hello Arbiter', link: '/zh/part-1/4-hello-arbiter' },
       { text: '1.5 运行环境要求', link: '/zh/part-1/5-requirements' },
     ],
   },
@@ -66,7 +66,7 @@ const zhSidebar = [
     items: [
       { text: '概述', link: '/zh/part-3/' },
       { text: '3.1 ACP 协议速览', link: '/zh/part-3/1-acp-tour' },
-      { text: '3.2 Agentao 作为 ACP Server', link: '/zh/part-3/2-agentao-as-server' },
+      { text: '3.2 Arbiter 作为 ACP Server', link: '/zh/part-3/2-arbiter-as-server' },
       { text: '3.3 宿主作为 ACP 客户端架构', link: '/zh/part-3/3-host-client-architecture' },
       { text: '3.4 反向调用外部 ACP Agent', link: '/zh/part-3/4-reverse-acp-call' },
       { text: '3.5 Zed / IDE 集成', link: '/zh/part-3/5-zed-ide-integration' },
@@ -178,10 +178,10 @@ const enSidebar = [
     collapsed: false,
     items: [
       { text: 'Overview', link: '/en/part-1/' },
-      { text: '1.1 What is Agentao', link: '/en/part-1/1-what-is-agentao' },
+      { text: '1.1 What is Arbiter', link: '/en/part-1/1-what-is-arbiter' },
       { text: '1.2 Core Concepts', link: '/en/part-1/2-core-concepts' },
       { text: '1.3 Integration Modes', link: '/en/part-1/3-integration-modes' },
-      { text: '1.4 Hello Agentao in 5 min', link: '/en/part-1/4-hello-agentao' },
+      { text: '1.4 Hello Arbiter in 5 min', link: '/en/part-1/4-hello-arbiter' },
       { text: '1.5 Requirements', link: '/en/part-1/5-requirements' },
     ],
   },
@@ -205,7 +205,7 @@ const enSidebar = [
     items: [
       { text: 'Overview', link: '/en/part-3/' },
       { text: '3.1 ACP Protocol Tour', link: '/en/part-3/1-acp-tour' },
-      { text: '3.2 Agentao as an ACP Server', link: '/en/part-3/2-agentao-as-server' },
+      { text: '3.2 Arbiter as an ACP Server', link: '/en/part-3/2-arbiter-as-server' },
       { text: '3.3 Host as ACP Client', link: '/en/part-3/3-host-client-architecture' },
       { text: '3.4 Reverse ACP Call', link: '/en/part-3/4-reverse-acp-call' },
       { text: '3.5 Zed / IDE Integration', link: '/en/part-3/5-zed-ide-integration' },
@@ -286,10 +286,10 @@ const enSidebar = [
 ]
 
 export default withMermaid(defineConfig({
-  title: 'Agentao Developer Guide',
-  description: 'Embed the Agentao harness into your application',
+  title: 'Arbiter Developer Guide',
+  description: 'Embed the Arbiter harness into your application',
   // Served from custom domain agentao.cn at the root. Override with DOCS_BASE only
-  // if deploying to a subpath (e.g. a GitHub Pages project site under /agentao/).
+  // if deploying to a subpath (e.g. a GitHub Pages project site under /arbiter/).
   base: process.env.DOCS_BASE || '/',
   cleanUrls: true,
   lastUpdated: true,
@@ -316,8 +316,8 @@ export default withMermaid(defineConfig({
       label: '简体中文',
       lang: 'zh-CN',
       link: '/zh/',
-      title: 'Agentao 应用开发者指南',
-      description: '把 Agentao Harness 嵌入你的应用',
+      title: 'Arbiter 应用开发者指南',
+      description: '把 Arbiter Harness 嵌入你的应用',
       themeConfig: {
         nav: [
           { text: '首页', link: '/zh/' },
@@ -352,8 +352,8 @@ export default withMermaid(defineConfig({
       label: 'English',
       lang: 'en-US',
       link: '/en/',
-      title: 'Agentao Developer Guide',
-      description: 'Embed the Agentao harness into your application',
+      title: 'Arbiter Developer Guide',
+      description: 'Embed the Arbiter harness into your application',
       themeConfig: {
         nav: [
           { text: 'Home', link: '/en/' },

@@ -1,9 +1,9 @@
 # Fix: sub-agent construction missing `working_directory`
 
 > **Status: IMPLEMENTED.** Landed in the working tree (2026-06-04). Production changes:
-> `agentao/agents/tools/_wrapper.py` (added `from pathlib import Path`; new required
-> `working_directory: Path` param after `llm_config_getter`; threaded into the `Agentao(...)`
-> call in `_run_sync`) and `agentao/agents/manager.py::create_agent_tools` (passes
+> `arbiter/agents/tools/_wrapper.py` (added `from pathlib import Path`; new required
+> `working_directory: Path` param after `llm_config_getter`; threaded into the `Arbiter(...)`
+> call in `_run_sync`) and `arbiter/agents/manager.py::create_agent_tools` (passes
 > `working_directory=self.project_root`). Regression test
 > `tests/test_agent_subsystems_optional.py::test_sub_agent_construction_inherits_working_directory`
 > plus two updated direct-construction tests; full suite green (2938 passed). Codex review: clean.
@@ -12,26 +12,26 @@
 ## Context
 
 When a parent agent spawns a sub-agent (e.g. `data-analyst`), `AgentToolWrapper._run_sync`
-constructs `Agentao(...)` at `agentao/agents/tools/_wrapper.py:361` **without** passing
+constructs `Arbiter(...)` at `arbiter/agents/tools/_wrapper.py:361` **without** passing
 `working_directory`. Since 0.3.0 `working_directory` is a required keyword-only parameter
-(`agentao/agent.py:73`, after `*`, no default). Therefore every sub-agent invocation raises:
+(`arbiter/agent.py:73`, after `*`, no default). Therefore every sub-agent invocation raises:
 
 ```
-TypeError: Agentao.__init__() missing required keyword argument: 'working_directory'
+TypeError: Arbiter.__init__() missing required keyword argument: 'working_directory'
 ```
 
 The sub-agent should run in the **same** working directory as its parent.
 
 ## Why it stayed latent (verified)
 
-- **conftest does not mask it.** `tests/conftest.py:40-46` monkeypatches `Agentao.__init__`,
+- **conftest does not mask it.** `tests/conftest.py:40-46` monkeypatches `Arbiter.__init__`,
   but only to backfill LLM credentials — it then calls the *real* `_orig_init`, which still
   requires `working_directory`.
 - **No test reaches construction.** The sub-agent test files only assert on schema
   (`tests/test_agent_subsystems_optional.py` builds a wrapper and reads `.parameters`) or on
   event emission (`tests/test_host_subagent_events.py:180` uses `AgentToolWrapper.__new__(...)`
   to bypass `__init__` and drives `_spawn_subagent_event` / `_terminal_subagent_event`
-  directly). None call `.execute()` / `_run_sync`, the only path that constructs `Agentao`.
+  directly). None call `.execute()` / `_run_sync`, the only path that constructs `Arbiter`.
 
 ## Design decision: static value, sourced from `AgentManager.project_root`
 
@@ -67,10 +67,10 @@ Two choices, both settled:
 - `agent.py:545` — `self._register_agent_tools()` runs **during construction**, delegating to
   `register_agent_tools(self)` (`agent.py:980` → `tooling/agent_tools.py:20`). Sub-agent tools
   are already on `agent.tools` once the constructor returns — callers never register them by hand.
-- `agent.py:870` — public `working_directory` property exists on `Agentao`.
+- `agent.py:870` — public `working_directory` property exists on `Arbiter`.
 - `manager.py:25` — `self.project_root = (project_root or Path.cwd()).expanduser().resolve()`.
 - `manager.py:144` / `:172` — `create_agent_tools` constructs each `AgentToolWrapper(...)`.
-- `_wrapper.py:361` — `Agentao(...)` kwargs omit `working_directory` (the *only* construction
+- `_wrapper.py:361` — `Arbiter(...)` kwargs omit `working_directory` (the *only* construction
   site in `agents/`; only reads `sub_agent.working_directory` at lines 406/410). Both
   foreground and background spawns route here — `_launch_background` (line 467) calls
   `_run_sync` (line 492).
@@ -79,7 +79,7 @@ Two choices, both settled:
 
 ## Approach (static value, 2 production files)
 
-1. **`agentao/agents/tools/_wrapper.py::__init__`** — add a required `working_directory: Path`
+1. **`arbiter/agents/tools/_wrapper.py::__init__`** — add a required `working_directory: Path`
    parameter, store as `self._working_directory`. **Position matters:** the current signature
    (`_wrapper.py:44-63`) has only three no-default parameters (`definition`, `all_tools`,
    `llm_config_getter`) before the first defaulted one (`bg_store=None`); everything from
@@ -93,8 +93,8 @@ Two choices, both settled:
    annotation is fine at def time — but a test resolves it eagerly (see Test impact). **Add
    `from pathlib import Path` to the top of `_wrapper.py`** as part of this edit.
 2. **`_wrapper.py::_run_sync`** — pass `working_directory=self._working_directory` into the
-   `Agentao(...)` call at line 361.
-3. **`agentao/agents/manager.py::create_agent_tools`** (line 172) — pass
+   `Arbiter(...)` call at line 361.
+3. **`arbiter/agents/manager.py::create_agent_tools`** (line 172) — pass
    `working_directory=self.project_root` into `AgentToolWrapper(...)`. **No new parameter** on
    `create_agent_tools`, and `tooling/agent_tools.py` is untouched.
 
@@ -128,20 +128,20 @@ the constructed sub-agent is a local inside `_run_sync` and never returned, and 
 `.execute()` for real would run a full LLM turn (network).
 
 **Order matters — build the real parent *before* patching.** The patch target
-(`agentao.agent.Agentao`) is the same symbol the parent is built from, so patching first turns
+(`arbiter.agent.Arbiter`) is the same symbol the parent is built from, so patching first turns
 the parent into the recorder too. The sequence:
 
-1. **Build the real parent first.** `Agentao(working_directory=tmp_path,
+1. **Build the real parent first.** `Arbiter(working_directory=tmp_path,
    enable_builtin_agents=True)`. The constructor registers sub-agent tools (`agent.py:545`); do
    **not** call `register_agent_tools` by hand. `enable_builtin_agents` defaults to `False`
    (`agent.py:94`), so without it the manager loads **zero** definitions and there is no
-   sub-agent tool to invoke (alternatively, drop a definition in `tmp_path/.agentao/agents/*.md`).
+   sub-agent tool to invoke (alternatively, drop a definition in `tmp_path/.arbiter/agents/*.md`).
 2. **Fetch the sub-agent tool** off `agent.tools` and keep a handle to it.
-3. **Now patch `agentao.agent.Agentao`** with a recorder that captures construction kwargs and
-   raises a sentinel (so the turn never runs). `Agentao` is imported *locally* inside
-   `_run_sync` (`from ...agent import Agentao`, line 309), so the local rebind picks up the
-   patch on the *next* call — patch `agentao.agent.Agentao`, **not**
-   `agentao.agents.tools._wrapper.Agentao`, which doesn't exist at module scope.
+3. **Now patch `arbiter.agent.Arbiter`** with a recorder that captures construction kwargs and
+   raises a sentinel (so the turn never runs). `Arbiter` is imported *locally* inside
+   `_run_sync` (`from ...agent import Arbiter`, line 309), so the local rebind picks up the
+   patch on the *next* call — patch `arbiter.agent.Arbiter`, **not**
+   `arbiter.agents.tools._wrapper.Arbiter`, which doesn't exist at module scope.
 4. **Call the tool's `.execute(task="x")`** and assert the recorder captured
    `working_directory == tmp_path` (and that no `TypeError` is raised).
 

@@ -1,4 +1,4 @@
-"""Issue #12 — ``Agentao.arun()`` bridges sync chat into async hosts."""
+"""Issue #12 — ``Arbiter.arun()`` bridges sync chat into async hosts."""
 
 from __future__ import annotations
 
@@ -8,16 +8,16 @@ from unittest.mock import MagicMock, Mock, patch
 
 
 def _make_agent(tmp_path):
-    with patch("agentao.agent.LLMClient") as mock_llm_cls, \
-         patch("agentao.tooling.mcp_tools.load_mcp_config", return_value={}), \
-         patch("agentao.tooling.mcp_tools.McpClientManager"):
+    with patch("arbiter.agent.LLMClient") as mock_llm_cls, \
+         patch("arbiter.tooling.mcp_tools.load_mcp_config", return_value={}), \
+         patch("arbiter.tooling.mcp_tools.McpClientManager"):
         mock_llm = Mock()
         mock_llm.logger = Mock()
         mock_llm.model = "gpt-test"
         mock_llm_cls.return_value = mock_llm
 
-        from agentao.agent import Agentao
-        return Agentao(working_directory=tmp_path)
+        from arbiter.agent import Arbiter
+        return Arbiter(working_directory=tmp_path)
 
 
 def test_arun_dispatches_to_chat(tmp_path):

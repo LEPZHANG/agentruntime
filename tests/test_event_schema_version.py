@@ -19,9 +19,9 @@ from typing import Any, Dict, List, Tuple
 
 import pytest
 
-from agentao.acp.protocol import METHOD_SESSION_UPDATE
-from agentao.acp.transport import ACPTransport
-from agentao.transport.events import AgentEvent, EventType
+from arbiter.acp.protocol import METHOD_SESSION_UPDATE
+from arbiter.acp.transport import ACPTransport
+from arbiter.transport.events import AgentEvent, EventType
 
 
 # ---------------------------------------------------------------------------

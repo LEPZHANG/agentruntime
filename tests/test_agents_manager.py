@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from agentao.agents.manager import AgentManager
+from arbiter.agents.manager import AgentManager
 
 
 # ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ def test_builtin_agent_definition_fields():
 
 def test_project_agents_loaded(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     _write_agent(agents_dir, "my-agent.md", {"name": "my-agent", "description": "Custom agent"})
     m = AgentManager()
     assert "my-agent" in m.list_agents()
@@ -67,7 +67,7 @@ def test_project_agents_loaded(tmp_path, monkeypatch):
 
 def test_project_agent_overrides_builtin(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     _write_agent(agents_dir, "generalist.md",
                  {"name": "generalist", "description": "My custom generalist"},
                  body="Custom instructions.")
@@ -81,7 +81,7 @@ def test_project_agent_overrides_builtin(tmp_path, monkeypatch):
 
 def test_parse_frontmatter_full_metadata(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     _write_agent(agents_dir, "full.md", {
         "name": "full-agent",
         "description": "Full metadata agent",
@@ -102,7 +102,7 @@ def test_parse_frontmatter_full_metadata(tmp_path, monkeypatch):
 
 def test_parse_body_as_system_instructions(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     _write_agent(agents_dir, "agent.md",
                  {"name": "body-agent", "description": "Has body"},
                  body="You are a specialist. Follow these rules.")
@@ -112,7 +112,7 @@ def test_parse_body_as_system_instructions(tmp_path, monkeypatch):
 
 def test_temperature_default_none(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     _write_agent(agents_dir, "a.md", {"name": "no-temp", "description": "No temp"})
     m = AgentManager()
     assert m.definitions["no-temp"]["temperature"] is None
@@ -120,7 +120,7 @@ def test_temperature_default_none(tmp_path, monkeypatch):
 
 def test_model_default_none(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     _write_agent(agents_dir, "a.md", {"name": "no-model", "description": "No model"})
     m = AgentManager()
     assert m.definitions["no-model"]["model"] is None
@@ -128,7 +128,7 @@ def test_model_default_none(tmp_path, monkeypatch):
 
 def test_max_turns_default(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     _write_agent(agents_dir, "a.md", {"name": "default-turns", "description": "x"})
     m = AgentManager()
     assert m.definitions["default-turns"]["max_turns"] == 15
@@ -136,7 +136,7 @@ def test_max_turns_default(tmp_path, monkeypatch):
 
 def test_tools_none_means_all(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     _write_agent(agents_dir, "a.md", {"name": "all-tools", "description": "x"})
     m = AgentManager()
     assert m.definitions["all-tools"]["tools"] is None
@@ -144,7 +144,7 @@ def test_tools_none_means_all(tmp_path, monkeypatch):
 
 def test_tools_string_parsed_as_list(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     _write_agent(agents_dir, "a.md", {"name": "limited", "description": "x", "tools": "read_file, glob, grep"})
     m = AgentManager()
     tools = m.definitions["limited"]["tools"]
@@ -184,7 +184,7 @@ def test_get_agent_definition_missing_returns_none():
 
 def test_malformed_yaml_skipped_gracefully(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     agents_dir.mkdir(parents=True)
     (agents_dir / "bad.md").write_text("---\n: broken: yaml: [\n---\nbody\n", encoding="utf-8")
     _write_agent(agents_dir, "good.md", {"name": "good-agent", "description": "OK"})
@@ -195,14 +195,14 @@ def test_malformed_yaml_skipped_gracefully(tmp_path, monkeypatch):
 
 def test_nonexistent_project_agents_dir_graceful(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    # No .agentao/agents dir
+    # No .arbiter/agents dir
     m = AgentManager()  # must not raise
     assert m.definitions == {}
 
 
 def test_missing_name_falls_back_to_filename(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    agents_dir = tmp_path / ".agentao" / "agents"
+    agents_dir = tmp_path / ".arbiter" / "agents"
     agents_dir.mkdir(parents=True)
     # No name in frontmatter
     (agents_dir / "my-agent.md").write_text(

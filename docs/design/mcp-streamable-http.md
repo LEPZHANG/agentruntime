@@ -8,13 +8,13 @@ maintainer's **2026-07-01 decision (D2)**, a bare `url` *defaults* to Streamable
 HTTP (SSE is opt-in via `type: "sse"`) — a deliberate **breaking change**; see
 §3 D2 and §10.
 
-Verified against `main`@`8266de1` (2026-07-19): `agentao/mcp/config.py:61`
+Verified against `main`@`8266de1` (2026-07-19): `arbiter/mcp/config.py:61`
 (`_KNOWN_TRANSPORTS`), `:166` (`resolve_transport`), `:216` (bare-`url` → `http`
-inference); ACP gates at `agentao/acp/schema.py:50` (capability advertisement
+inference); ACP gates at `arbiter/acp/schema.py:50` (capability advertisement
 `{"http": True, "sse": True}`), `:174` (`Literal["stdio", "sse", "http"]`),
-`agentao/acp/session_new.py:226`, `agentao/acp/mcp_translate.py:218,243`.
+`arbiter/acp/session_new.py:226`, `arbiter/acp/mcp_translate.py:218,243`.
 
-**Audience:** Agentao maintainers; the DeepChat/TensorChat ACP integration owner.
+**Audience:** Arbiter maintainers; the DeepChat/TensorChat ACP integration owner.
 
 **Companion:** `mcp-streamable-http.zh.md`.
 
@@ -35,9 +35,9 @@ installed `mcp` package, not recalled. No intuition mappings.
 
 ## 1. Background — how transport is chosen today
 
-`McpClient` (`agentao/mcp/client.py`) recognizes exactly two transports, and it
+`McpClient` (`arbiter/mcp/client.py`) recognizes exactly two transports, and it
 infers them **structurally** from which config key is present — there is no
-explicit transport selector in native `.agentao/mcp.json`:
+explicit transport selector in native `.arbiter/mcp.json`:
 
 ```python
 # client.py:152-158
@@ -87,7 +87,7 @@ the client up to the same vocabulary and connects the wire.
 
 The MCP spec **deprecated the HTTP+SSE transport** (2024-11-05) in favor of
 **Streamable HTTP** (2025-03-26). New remote MCP servers ship Streamable HTTP;
-many expose *only* it. Agentao can currently reach them only if they also keep a
+many expose *only* it. Arbiter can currently reach them only if they also keep a
 legacy SSE endpoint. The client dependency is already present —
 `mcp.client.streamable_http.streamablehttp_client` ships in the pinned
 `mcp>=1.26.0` SDK — so this is a wiring task, not a new dependency.
@@ -96,7 +96,7 @@ legacy SSE endpoint. The client dependency is already present —
 
 ### D1 — Transport selector is an explicit `type` field
 
-Native `.agentao/mcp.json` gains an optional `type` per server:
+Native `.arbiter/mcp.json` gains an optional `type` per server:
 `"stdio" | "sse" | "http"`. Accept `"streamable-http"`, `"streamable_http"`,
 `"streamablehttp"` as case-insensitive aliases that normalize to `"http"`.
 
@@ -116,7 +116,7 @@ Streamable HTTP.
 **Why:** the MCP spec deprecated HTTP+SSE in favor of Streamable HTTP; new
 servers ship http-first (Cursor already made a bare `url` mean Streamable HTTP).
 Defaulting to the live transport is what most new configs will want and keeps
-agentao aligned with the spec's direction rather than pinned to a deprecated
+arbiter aligned with the spec's direction rather than pinned to a deprecated
 transport.
 
 **Accepted cost — this is a breaking change.** Every existing bare-`url` config
@@ -133,7 +133,7 @@ rule). Two mitigations keep the break **loud, not silent**:
 2. **Release-note migration line (§10).**
 
 **Alternative considered and rejected — auto-fallback** (try Streamable HTTP,
-fall back to SSE on 405/404). Rejected: it contradicts agentao's
+fall back to SSE on 405/404). Rejected: it contradicts arbiter's
 explicit-over-magic posture — the very preflight this design reuses is an
 *allow-list*, deliberately not content-sniffing (`client.py:113-119`).
 Auto-fallback also makes `transport_type` nondeterministic (breaks `/mcp list`
@@ -209,7 +209,7 @@ Resolution table (`resolve_transport`):
 `headers`, `timeout`, `trust`) — only the client factory differs. That symmetry
 is what lets §5 share almost all code.
 
-## 5. Client changes (`agentao/mcp/client.py`)
+## 5. Client changes (`arbiter/mcp/client.py`)
 
 ### 5.1 Imports — use the **canonical** client, not the deprecated alias
 
@@ -232,7 +232,7 @@ exactly what the deprecated wrapper did internally.
 
 The SDK is already imported eagerly at module top (`from mcp.client.sse import
 sse_client`, line 14); Streamable HTTP is the same package, so no new lazy-load
-concern — `agentao.mcp/__init__.py`'s PEP-562 gate already defers the whole SDK
+concern — `arbiter.mcp/__init__.py`'s PEP-562 gate already defers the whole SDK
 until `McpClientManager` is first touched.
 
 ### 5.2 `transport_type` and dispatch → delegate to `resolve_transport`
@@ -446,7 +446,7 @@ cf. the "comment lies" watch-items in `project_hermes_pull_review_20260629`).
    docstring at 63-69 and the dropped-branch comment at 233-237 (the `else` now
    only catches genuinely unknown types).
 
-## 7. CLI change (`agentao/cli/commands/mcp.py`)
+## 7. CLI change (`arbiter/cli/commands/mcp.py`)
 
 `/mcp add` currently writes `{"url": endpoint}` for any `http(s)://` endpoint
 (53-54) — always SSE. Flip the flag-less URL default to Streamable HTTP (to
@@ -547,7 +547,7 @@ Verify the merged tree runs green before merge (cf. "never merge red CI").
 
 **Migration line (release notes / CHANGELOG):** *"MCP: a bare `url` server now
 defaults to the Streamable HTTP transport. If your server is a legacy SSE
-endpoint, add `\"type\": \"sse\"` to its entry in `.agentao/mcp.json`. Streamable
+endpoint, add `\"type\": \"sse\"` to its entry in `.arbiter/mcp.json`. Streamable
 HTTP is the spec's replacement for the now-deprecated HTTP+SSE transport."* The
 §5.7 connect-failure hint surfaces the same fix in-context for anyone who misses
 the note.
@@ -568,15 +568,15 @@ the note.
 
 | File | Change |
 |---|---|
-| `agentao/mcp/config.py` | `resolve_transport()` (fail-closed) + `McpTransportConfigError`; `type` in `McpServerConfig` docstring; timeout-doc wording |
-| `agentao/mcp/client.py` | import (canonical `streamable_http_client` + `create_mcp_http_client`); `transport_type` (swallow-to-`unknown`)/`connect` → `resolve_transport`; `_connect_streamable_http` (3-tuple, `terminate_on_close=False`); `_prepare_url_connect` helper; §5.7 gated hint |
-| `agentao/acp/initialize.py` | `mcpCapabilities.http = True` + docstrings |
-| `agentao/acp/session_new.py` | parser accepts `http` + docstring |
-| `agentao/acp/mcp_translate.py` | translate `http`, **stamp `type` both ways** + docstrings |
-| `agentao/acp/schema.py` | `mcpCapabilities` default + `AcpMcpServer.type` `Literal` gains `http` + docstring |
+| `arbiter/mcp/config.py` | `resolve_transport()` (fail-closed) + `McpTransportConfigError`; `type` in `McpServerConfig` docstring; timeout-doc wording |
+| `arbiter/mcp/client.py` | import (canonical `streamable_http_client` + `create_mcp_http_client`); `transport_type` (swallow-to-`unknown`)/`connect` → `resolve_transport`; `_connect_streamable_http` (3-tuple, `terminate_on_close=False`); `_prepare_url_connect` helper; §5.7 gated hint |
+| `arbiter/acp/initialize.py` | `mcpCapabilities.http = True` + docstrings |
+| `arbiter/acp/session_new.py` | parser accepts `http` + docstring |
+| `arbiter/acp/mcp_translate.py` | translate `http`, **stamp `type` both ways** + docstrings |
+| `arbiter/acp/schema.py` | `mcpCapabilities` default + `AcpMcpServer.type` `Literal` gains `http` + docstring |
 | `docs/schema/host.acp.v1.json` | regenerated snapshot (`type` enum + capability default) |
-| `agentao/cli/commands/mcp.py` | `/mcp add [--http|--sse]` (flag before/after name; bare URL → no `type`) |
-| `agentao/cli/help_text.py` | authoritative `/help` `/mcp add` line |
+| `arbiter/cli/commands/mcp.py` | `/mcp add [--http|--sse]` (flag before/after name; bare URL → no `type`) |
+| `arbiter/cli/help_text.py` | authoritative `/help` `/mcp add` line |
 | `docs/reference/configuration.md` | Streamable HTTP transport row + timeout note |
 | `CLAUDE.md` | MCP transport line |
 | `tests/test_mcp_streamable_http.py` (new) + `test_mcp_connect_timeouts.py` + 4 ACP tests | see §9 |
@@ -599,7 +599,7 @@ be separate commits within it.
       `terminate_on_close`; the deprecated `streamablehttp_client` alias emits a
       `DeprecationWarning` (use the canonical) — `uv run python -c "import inspect,mcp.client.streamable_http as m; print(inspect.signature(m.streamable_http_client))"`.
 
-### Stage 1 — `agentao/mcp/config.py` (foundation, no in-tree deps)
+### Stage 1 — `arbiter/mcp/config.py` (foundation, no in-tree deps)
 
 - [ ] Add `class McpTransportConfigError(ValueError)`.
 - [ ] Add `resolve_transport(config, *, return_source=False) -> str`
@@ -615,7 +615,7 @@ be separate commits within it.
 - [ ] Reword the `resolve_timeouts` docstring (100-103): "handed to the SSE
       transport" → "handed to the URL transport (SSE or Streamable HTTP)".
 
-### Stage 2 — `agentao/mcp/client.py`
+### Stage 2 — `arbiter/mcp/client.py`
 
 - [ ] `from mcp.client.streamable_http import create_mcp_http_client,
       streamable_http_client` (top, by the `sse_client` import at 14) — the
@@ -650,7 +650,7 @@ be separate commits within it.
       `cfg = {"url": url, "type": transport_type}` — **stamp both** (§6.3); update
       the module docstring (63-69) and the dropped-branch comment (233-237).
 
-### Stage 4 — CLI `agentao/cli/commands/mcp.py`
+### Stage 4 — CLI `arbiter/cli/commands/mcp.py`
 
 - [ ] `/mcp add` (41-69): parse a `--sse`/`--http` flag accepted **before or
       after the name**; flag-less URL → **bare `{"url": endpoint}`** (inferred,
@@ -695,7 +695,7 @@ be separate commits within it.
 - [ ] Full suite green: `uv run python -m pytest tests/ -q`.
 - [ ] Targeted: `uv run python -m pytest tests/test_mcp_*.py tests/test_acp_*.py -q`.
 - [ ] No stale claims survive:
-      `grep -rn "streamable_http_client\|http is not supported\|only supports.*sse\|mcpCapabilities.*http.*[Ff]alse" agentao/`
+      `grep -rn "streamable_http_client\|http is not supported\|only supports.*sse\|mcpCapabilities.*http.*[Ff]alse" arbiter/`
       returns only intended matches (comments now describing history, none
       asserting current behavior).
 - [ ] No lying docstrings: the three ACP files no longer say `http` is rejected.

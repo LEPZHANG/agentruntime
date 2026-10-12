@@ -1,7 +1,7 @@
 # Host FS policy: path-domain write boundary over the single chokepoint (incl. shell)
 
 > Status: **design proposal**, sourced from **two** independent embedding hosts' requirements (a
-> knowledge-base host and a multi-room chat host, both embedding `Agentao(...)`). Tracks a boundary
+> knowledge-base host and a multi-room chat host, both embedding `Arbiter(...)`). Tracks a boundary
 > both hosts are currently forced to re-implement, and proposes it as a host-contract primitive.
 > Split into **(a) path-domain generalization /
 > (b) hot-swappable lifecycle / (c) shell enforcement** — each landable independently;
@@ -12,13 +12,13 @@
 > checkpoint (§16.1) promotes it. Note: part (c) maps to a roadmap **non-goal / P2** item — see (c).
 >
 > **Update — host-side interim path found (covers *one* facet), priority *lowered*:** the
-> **within-cwd immutable carve-out** (KB host's facet) is satisfiable **today**, zero agentao change,
-> by injecting a policy-checking `FileSystem` capability (`Agentao(filesystem=...)`) that tests a
+> **within-cwd immutable carve-out** (KB host's facet) is satisfiable **today**, zero arbiter change,
+> by injecting a policy-checking `FileSystem` capability (`Arbiter(filesystem=...)`) that tests a
 > **leaf-dereferenced effective target** — see *Interim adoption path*. **But the external-root facet
 > (chahua) is NOT** wrapper-satisfiable for native `write_file`: the built-in tools run a single-root
 > `PathPolicy` pre-check *before* the capability (`file_ops.py:197,368`), so a write to a root outside
 > cwd is rejected upstream of the wrapper — it needs either a host `extra_tool` or the option-2
-> gate-pushdown (an agentao change). That makes building
+> gate-pushdown (an arbiter change). That makes building
 > `fs_policy=` / `set_fs_policy` as new first-class API **further demand-gated, not now**: promote
 > only on (i) a **third** host copy-pasting the wrapper, (ii) the wrapper **breaking** because
 > `FileSystem` / `_bind_and_register` internals shift, or (iii) a genuine **(c)** (shell) need — the
@@ -39,7 +39,7 @@ files), **and/or** that additional roots *outside* cwd are writable (a chat host
 is part (c), which maps to a roadmap **P2** item and may never ship, so until then shell stays a host
 concern (snapshot sentinel / OS sandbox the host already runs).
 
-agentao already has the two right primitives, but neither is generalized or wired for this:
+arbiter already has the two right primitives, but neither is generalized or wired for this:
 
 - `security/path_policy.py` — single-root containment only.
 - `sandbox/` — single writable subtree (`_RW1`), no immutable subset, disabled by default,
@@ -47,7 +47,7 @@ agentao already has the two right primitives, but neither is generalized or wire
 
 So every embedding host re-implements the boundary in its own code (per-path regex deny-rules +
 per-turn snapshot diffs + a `set_mode` workaround for non-removable run-rules). This proposal asks
-agentao to provide the boundary as an embedding-face primitive.
+arbiter to provide the boundary as an embedding-face primitive.
 
 ## Motivating hosts — two facets of the same gap
 
@@ -131,7 +131,7 @@ This changes (a)'s contract, so state it explicitly. Two options:
    into it. **Recommended** — it's the only option that matches the
    "single chokepoint" language the rest of this doc uses. (MCP tools still bypass — they don't use
    `agent.filesystem` — so the closed-allow-set claim must always be scoped to "writes through the
-   agentao filesystem capability," never "any tool.")
+   arbiter filesystem capability," never "any tool.")
 
 ### Augment, not replace — and what `fs_policy` never gates (read before copying the examples)
 
@@ -139,13 +139,13 @@ This changes (a)'s contract, so state it explicitly. Two options:
   declares *additional* roots — typically *outside* the cwd; it does **not** replace the cwd. A host
   never has to re-list its own cwd to let the agent write its working area, and forgetting to would
   otherwise be a silent footgun.
-- **agentao's own persistence is outside `fs_policy`'s scope entirely.** `PathPolicy` is applied
+- **arbiter's own persistence is outside `fs_policy`'s scope entirely.** `PathPolicy` is applied
   only in the write *tools*: `PathPolicy.for_tool(...)` appears solely at `tools/file_ops.py:197,368`
   and `tools/shell.py:230` (grep-verified — those are its only call sites). `MemoryManager`
-  (`memory/manager.py`) and `session.py` import no `PathPolicy` and write `.agentao/memory.db` /
+  (`memory/manager.py`) and `session.py` import no `PathPolicy` and write `.arbiter/memory.db` /
   `sessions/` through direct sqlite/file I/O that never reaches the chokepoint — so `fs_policy` can
   neither protect nor break those under any semantics. (This corrects a tempting misread: declaring
-  `writable=[share, tasks]` does **not** endanger the guest's `.agentao/` persistence. The thing a
+  `writable=[share, tasks]` does **not** endanger the guest's `.arbiter/` persistence. The thing a
   *replace* allow-list would have broken is the guest writing scratch files into its cwd via
   `write_file` — and augment semantics keeps that working.)
 
@@ -196,7 +196,7 @@ that hole:
   today's single-root `PathPolicy`; the classic check-vs-write symlink-swap window is neither
   widened nor narrowed by allowing declared external roots.
 - **Relative root entries resolve against `working_directory`, canonicalized at construction.** The
-  KB example uses `immutable=["raw", "AGENTAO.md"]` (relative) while `writable` may name external
+  KB example uses `immutable=["raw", "ARBITER.md"]` (relative) while `writable` may name external
   *absolute* roots — so relative-vs-absolute semantics must be pinned, not left to `Path` defaults.
   Rule: a relative `writable`/`immutable` entry joins to `working_directory` (matching
   `_resolve_for_write`'s existing relative-join-to-`project_root`, `path_policy.py:119-120`), **not**
@@ -216,14 +216,14 @@ Proposed construction kwarg on `embedding/factory.build_from_environment`:
 agent = build_from_environment(
     working_directory=kb,                              # implicitly writable
     fs_policy=FsPolicy(
-        immutable=["raw", "AGENTAO.md", "SCHEMA.md"],  # everything else under cwd stays writable
+        immutable=["raw", "ARBITER.md", "SCHEMA.md"],  # everything else under cwd stays writable
     ),
 )
 
 # Multi-room chat host (chahua) — additional external roots (writable facet):
 agent = build_from_environment(
     working_directory=room / "guests" / name,           # implicitly writable: guest's own area,
-                                                         # .agentao/ persistence, scratch via write_file
+                                                         # .arbiter/ persistence, scratch via write_file
     fs_policy=FsPolicy(
         writable=[room / "share", room / "tasks"],       # ADDED roots, outside the guest cwd
     ),
@@ -242,7 +242,7 @@ become writable, not just the active one. If "only the active task is writable" 
 requirement, declare the active-task artifacts dir specifically and use (b) to swap the policy on
 retarget. The parent-root option trades active-only precision for policy stability; the host picks.
 
-**Deliverable:** every write through the agentao `FileSystem` capability enforces `FsPolicy` at one
+**Deliverable:** every write through the arbiter `FileSystem` capability enforces `FsPolicy` at one
 chokepoint (per "Where the chokepoint actually is": option 2 — enforce in `agent.filesystem` — is
 what makes this hold for injected `extra_tools`, not just built-ins; MCP tools stay out of scope) —
 the host never has to know per-tool arg names or write regexes. Retires **both** the knowledge-base
@@ -288,8 +288,8 @@ room host's `./task` pattern, see (a)'s trade-off) keeps a static policy and doe
 
 The enforcement point this proposal wants — option 2 in *Where the chokepoint actually is*, a
 policy-checking `FileSystem` capability — is **already an injectable host-contract surface today**:
-`Agentao(filesystem=...)` (`agent.py:87`) is bound onto every tool by `_bind_and_register`
-(`registry.py:78`). A host can inject a wrapper with no agentao change:
+`Arbiter(filesystem=...)` (`agent.py:87`) is bound onto every tool by `_bind_and_register`
+(`registry.py:78`). A host can inject a wrapper with no arbiter change:
 
 > **Scope, stated up front — the wrapper can only *restrict*, never *expand*.** The built-in
 > `write_file` / `replace` run their own single-root `PathPolicy.for_tool(...).contain_file(...)`
@@ -298,14 +298,14 @@ policy-checking `FileSystem` capability — is **already an injectable host-cont
 > - **Within-cwd immutable carve-out (KB host): fully works.** `cwd/raw/secret` is inside cwd → it
 >   *passes* the built-in pre-check → reaches the wrapper → the wrapper denies it. Carving read-only
 >   subpaths out of an already-writable cwd is exactly "restrict within what's allowed." ✅ zero
->   agentao change, native `write_file`.
+>   arbiter change, native `write_file`.
 > - **External roots outside cwd (chahua): does NOT work for native `write_file`.** `./task/x →
 >   <room>/tasks/...` resolves outside cwd → the built-in pre-check **rejects it upstream**, before
 >   the wrapper ever runs. The wrapper cannot *allow* what the pre-check already denied. The host's
 >   only options are (a) route external writes through an `extra_tool` (chahua already has
 >   `TaskWriteArtifactTool`) whose `self.filesystem` is the wrapper — which makes that bypass
 >   *policy-gated* but does **not** retire it and does **not** make native `write_file` reach external
->   roots; or (b) the option-2 gate-pushdown, which is an agentao code change. So the external-root
+>   roots; or (b) the option-2 gate-pushdown, which is an arbiter code change. So the external-root
 >   facet is **not** "zero-change host-satisfiable" — only the immutable facet is.
 
 ```python
@@ -357,7 +357,7 @@ class PolicyFileSystem:
 agent = build_from_environment(
     working_directory=kb,
     filesystem=PolicyFileSystem(LocalFileSystem(), kb,
-        _Rule(writable=(), immutable=(kb / "raw", kb / "AGENTAO.md"))),
+        _Rule(writable=(), immutable=(kb / "raw", kb / "ARBITER.md"))),
 )
 ```
 
@@ -384,7 +384,7 @@ basis is the **leaf-dereferenced effective target** tested with `is_relative_to`
 (`_effective_target` above). This *does* re-implement ~6 lines of `PathPolicy`'s resolve logic
 host-side — which is exactly the security-critical part, and exactly why a correct
 multi-root + immutable predicate **cannot** be composed from the single-root primitive today (see
-*The agentao-side helper…* below). The host still does not re-derive the algorithm from scratch, but
+*The arbiter-side helper…* below). The host still does not re-derive the algorithm from scratch, but
 "reuse `contain_file` and you're safe" was wrong — say so.
 
 **Hot-swap works — but only by mutating the shared instance, never by replacing it.**
@@ -411,7 +411,7 @@ The two facets are **not** equally host-satisfiable, so they get different recom
 - **External roots (chahua):** **not** zero-change host-satisfiable for native tools — the built-in
   single-root pre-check (`file_ops.py:197,368`) sits upstream of the wrapper. The host can only get
   it by (a) keeping an `extra_tool` (now wrapper-gated, but not retired) or (b) the option-2
-  gate-pushdown — an agentao code change. So this facet **retains a genuine agentao-shaped kernel**:
+  gate-pushdown — an arbiter code change. So this facet **retains a genuine arbiter-shaped kernel**:
   making the built-in write tools honor a declared multi-root policy (i.e. slice (a)'s gate-pushdown)
   is the *only* way to retire the bypass and let native `write_file` reach external roots.
 
@@ -426,7 +426,7 @@ Honest recommendation: **do not build the `fs_policy=` lifecycle API now.** Ship
 for the immutable facet; treat the external-root gate-pushdown as the first slice worth building when
 chahua (or a third host) actually needs native external writes rather than a gated `extra_tool`.
 
-### The agentao-side helper that makes the wrapper *correct*, not just shorter
+### The arbiter-side helper that makes the wrapper *correct*, not just shorter
 
 Because the single-root `contain_file` cannot serve as a multi-root membership predicate (above),
 every host wrapper must hand-write `_effective_target` — security-critical resolve logic that a
@@ -495,18 +495,18 @@ interim wrapper alone covers only the immutable facet — see *Interim adoption 
 out-of-bounds writes) gains a **new** boundary from (c), not a simplification — its scan stays for
 its own purpose. Do not assume every host with a post-turn diff wants (c).
 
-## Why this belongs in agentao (boundary rationale)
+## Why this belongs in arbiter (boundary rationale)
 
 "Where a write may land" is a deterministic security boundary, and `PathPolicy` is already
-agentao's primitive for exactly that family. This is the natural generalization of an existing
+arbiter's primitive for exactly that family. This is the natural generalization of an existing
 host-contract primitive (`project_root: Path` → a declared `writable`/`immutable` root set) plus
-wiring to an existing one (`sandbox/`) — **not** a new product concern, and it asks agentao to learn
+wiring to an existing one (`sandbox/`) — **not** a new product concern, and it asks arbiter to learn
 **zero** host-domain semantics. Two independent hosts already re-implement it from opposite
 directions (within-root subdivision and external multi-root), which is the demand evidence the
 roadmap's P1 gating asks for. Shell enforcement specifically *cannot* live host-side without
-re-creating a sandbox agentao already owns. Every embedding host inherits the benefit.
+re-creating a sandbox arbiter already owns. Every embedding host inherits the benefit.
 
-## What stays host-side (out of scope for agentao)
+## What stays host-side (out of scope for arbiter)
 
 - **Which** paths are writable/immutable — host policy, declared via `FsPolicy`, not built in.
 - Domain gates (e.g. post-write frontmatter / dead-link checks, ingest snapshot gates) — business
@@ -521,11 +521,11 @@ re-creating a sandbox agentao already owns. Every embedding host inherits the be
 
 ## Suggested sequencing
 
-0. **Now — host-side, zero agentao change (immutable facet only):** inject the `PolicyFileSystem`
+0. **Now — host-side, zero arbiter change (immutable facet only):** inject the `PolicyFileSystem`
    wrapper (see *Interim adoption path*) for the **within-cwd read-only carve-out** (KB host). The
    wrapper must test a **leaf-dereferenced effective target** (not single-root `contain_file` per
    root — that is fail-open for the immutable carve). This deletes the KB host's regex deny-rule
-   layer and `set_mode` workaround without waiting for any agentao change. **The external-root facet
+   layer and `set_mode` workaround without waiting for any arbiter change. **The external-root facet
    (chahua) does *not* unblock here** — the built-in single-root pre-check rejects out-of-cwd writes
    upstream of the wrapper; chahua keeps a (now wrapper-gated) `extra_tool` until step 1.
 0.5 **Land `PathPolicy.contain_any(raw, writable, immutable)`** — small, no new API surface, but it

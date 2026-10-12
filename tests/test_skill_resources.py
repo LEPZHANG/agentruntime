@@ -2,7 +2,7 @@
 """Test skill resource loading."""
 
 from pathlib import Path
-from agentao.skills import SkillManager
+from arbiter.skills import SkillManager
 
 
 def test_skill_resources():

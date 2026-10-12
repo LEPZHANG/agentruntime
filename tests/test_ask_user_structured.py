@@ -14,12 +14,12 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import ValidationError
 
-from agentao.acp.protocol import METHOD_ASK_USER
-from agentao.acp.schema import AcpAskUserParams
-from agentao.acp.transport import ACPTransport
-from agentao.cli.transport import _resolve_option_selection
-from agentao.tools.ask_user import AskUserTool
-from agentao.transport.sdk import SdkTransport, invoke_ask_user_callback
+from arbiter.acp.protocol import METHOD_ASK_USER
+from arbiter.acp.schema import AcpAskUserParams
+from arbiter.acp.transport import ACPTransport
+from arbiter.cli.transport import _resolve_option_selection
+from arbiter.tools.ask_user import AskUserTool
+from arbiter.transport.sdk import SdkTransport, invoke_ask_user_callback
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ class TestCliAskUserPrompt:
         return SimpleNamespace(current_status=None)
 
     def test_allow_custom_false_reprompts_until_valid(self, monkeypatch) -> None:
-        from agentao.cli import transport as cli_transport
+        from arbiter.cli import transport as cli_transport
 
         responses = iter(["banana", "9", "2"])  # invalid custom, out-of-range, then valid
         monkeypatch.setattr(cli_transport.console, "input", lambda *a, **k: next(responses))
@@ -184,7 +184,7 @@ class TestCliAskUserPrompt:
         assert result == "b"
 
     def test_allow_custom_true_accepts_free_form(self, monkeypatch) -> None:
-        from agentao.cli import transport as cli_transport
+        from arbiter.cli import transport as cli_transport
 
         monkeypatch.setattr(cli_transport.console, "input", lambda *a, **k: "my custom")
         result = cli_transport.ask_user(
@@ -193,7 +193,7 @@ class TestCliAskUserPrompt:
         assert result == "my custom"
 
     def test_plain_question_returns_text(self, monkeypatch) -> None:
-        from agentao.cli import transport as cli_transport
+        from arbiter.cli import transport as cli_transport
 
         monkeypatch.setattr(cli_transport.console, "input", lambda *a, **k: "  hello  ")
         assert cli_transport.ask_user(self._stub_cli(), "Q?") == "hello"
@@ -280,8 +280,8 @@ class TestAcpTransportWireShape:
 
 class TestReplayAdapterForwarding:
     def _adapter(self, inner, tmp_path):
-        from agentao.replay.adapter import ReplayAdapter
-        from agentao.replay.recorder import ReplayRecorder
+        from arbiter.replay.adapter import ReplayAdapter
+        from arbiter.replay.recorder import ReplayRecorder
 
         rec = ReplayRecorder.create("sess", tmp_path)
         return ReplayAdapter(inner, rec), rec

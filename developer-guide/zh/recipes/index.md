@@ -10,7 +10,7 @@
 
 ### …不知道该用 Tool、Skill、MCP、Permission 还是 Hook
 
-→ **[第 5 部分 · 扩展 Agent 行为](/zh/part-5/)** — 先用“按任务阅读”表判断：业务 API 用 Tool，LLM 侧操作规范用 Skill / AGENTAO.md，现成外部服务用 MCP，安全边界用 Permission，生命周期拦截 / 审计 / 续轮用 Hook。
+→ **[第 5 部分 · 扩展 Agent 行为](/zh/part-5/)** — 先用“按任务阅读”表判断：业务 API 用 Tool，LLM 侧操作规范用 Skill / ARBITER.md，现成外部服务用 MCP，安全边界用 Permission，生命周期拦截 / 审计 / 续轮用 Hook。
 
 ### …在生命周期点审计、拦截或给 Stop 续轮
 
@@ -48,7 +48,7 @@
 
 → **[6.3 网络与 SSRF 防护](/zh/part-6/3-network-ssrf)** — 默认黑名单覆盖范围、`.github.com`（后缀）vs `github.com`（精确）规则、禁重定向模式。**不要禁用默认黑名单**——只能扩。
 
-### …用 Node / Go / Rust / IDE 驱动 Agentao
+### …用 Node / Go / Rust / IDE 驱动 Arbiter
 
 → **[第 3 部分 · ACP 协议](/zh/part-3/)** — 先看 [3.1 60 秒快速尝鲜](/zh/part-3/1-acp-tour#60-秒快速尝鲜)，再看 [3.3 宿主作为 ACP Client 的典型架构](/zh/part-3/3-host-client-architecture)（含 TS + Go 骨架）。
 
@@ -60,15 +60,15 @@
 
 → **[6.8 容器化、灰度与回滚](/zh/part-6/8-deployment)** — 多阶段 Dockerfile（用 `uv` 构建、runtime 只装 venv）、`StatefulSet` + PVC + `sessionAffinity` 做粘性会话、按维度灰度。
 
-### …让我的宿主代码跨 Agentao 版本不断（审计流水线 / 可观测）
+### …让我的宿主代码跨 Arbiter 版本不断（审计流水线 / 可观测）
 
-→ **[4.7 嵌入式 Harness 合约](/zh/part-4/7-host-contract)** —— `agentao.host` 是**稳定的**、附 schema 快照的宿主 API。审计 / SIEM / 计费用 `agent.events()`（异步 pull 迭代器），策略快照 UI 用 `agent.active_permissions()`。**不要在生产代码里直接用内部 `AgentEvent`**。
+→ **[4.7 嵌入式 Harness 合约](/zh/part-4/7-host-contract)** —— `arbiter.host` 是**稳定的**、附 schema 快照的宿主 API。审计 / SIEM / 计费用 `agent.events()`（异步 pull 迭代器），策略快照 UI 用 `agent.active_permissions()`。**不要在生产代码里直接用内部 `AgentEvent`**。
 
 两个可直接跑的入口：[`examples/host_events.py`](https://github.com/jin-bo/agentao/blob/main/examples/host_events.py)（~50 行，打到 stdout）和 [`examples/host_audit_pipeline.py`](https://github.com/jin-bo/agentao/blob/main/examples/host_audit_pipeline.py)（完整 SQLite 审计循环）。
 
-### …在 Jupyter Notebook 里嵌入 Agentao
+### …在 Jupyter Notebook 里嵌入 Arbiter
 
-→ **[`examples/jupyter-session/`](https://github.com/jin-bo/agentao/tree/main/examples/jupyter-session)** —— 每个 kernel 一个 `Agentao`，`agent.events()` 驱动 `IPython.display`。带一个能直接打开的 `session.ipynb` 和过测试的烟雾套件。配 **[1.3 两种集成模式](/zh/part-1/3-integration-modes)** 看进程内 SDK 背景。
+→ **[`examples/jupyter-session/`](https://github.com/jin-bo/agentao/tree/main/examples/jupyter-session)** —— 每个 kernel 一个 `Arbiter`，`agent.events()` 驱动 `IPython.display`。带一个能直接打开的 `session.ipynb` 和过测试的烟雾套件。配 **[1.3 两种集成模式](/zh/part-1/3-integration-modes)** 看进程内 SDK 背景。
 
 ### …做一个 Slack 或微信机器人
 
@@ -78,9 +78,9 @@
 
 → **[`examples/pytest-fixture/`](https://github.com/jin-bo/agentao/tree/main/examples/pytest-fixture)** 提供可直接 drop-in 的 `agent` / `agent_with_reply` / `fake_llm_client` fixture。密闭、不需要 `OPENAI_API_KEY`。配 [附录 F.8](/zh/appendix/f-faq#f-8-开发与测试) 看断言模式。
 
-### …把 Agentao 的 IO 面（FS / shell / MCP / memory）替换成自己的后端
+### …把 Arbiter 的 IO 面（FS / shell / MCP / memory）替换成自己的后端
 
-→ **[2.2 能力协议](/zh/part-2/2-constructor-reference#第-3-档-高级注入)** 列了四个 host→Agentao 注入槽（`filesystem` / `shell` / `mcp_registry` / `memory_manager`）以及每个的绑定时机。**TL;DR**：从 `agentao.host.protocols` 导入 Protocol，把实现传给 `Agentao(...)` 构造器——传 `None` 是回退到本地默认，**不是**禁用。可运行端到端形态：**[`examples/protocol-injection/`](https://github.com/jin-bo/agentao/tree/main/examples/protocol-injection)** 用四个小适配器替换全部槽位，并用 6 条 smoke 测试断言每个槽位被实际调用（无需 API key）。
+→ **[2.2 能力协议](/zh/part-2/2-constructor-reference#第-3-档-高级注入)** 列了四个 host→Arbiter 注入槽（`filesystem` / `shell` / `mcp_registry` / `memory_manager`）以及每个的绑定时机。**TL;DR**：从 `arbiter.host.protocols` 导入 Protocol，把实现传给 `Arbiter(...)` 构造器——传 `None` 是回退到本地默认，**不是**禁用。可运行端到端形态：**[`examples/protocol-injection/`](https://github.com/jin-bo/agentao/tree/main/examples/protocol-injection)** 用四个小适配器替换全部槽位，并用 6 条 smoke 测试断言每个槽位被实际调用（无需 API key）。
 
 ## 没找到你的任务？
 

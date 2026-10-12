@@ -47,7 +47,7 @@ What it does:
 
 - Sets `context_manager.max_tokens` for **this session**
 - Affects when auto-compaction triggers (compaction fires before approaching this number)
-- Resets on restart — to make it persistent, set the `AGENTAO_CONTEXT_TOKENS` environment variable (see [10. Configuration Reference](./10-config-reference))
+- Resets on restart — to make it persistent, set the `ARBITER_CONTEXT_TOKENS` environment variable (see [10. Configuration Reference](./10-config-reference))
 
 Minimum: 1,000. Below that the CLI refuses.
 
@@ -98,7 +98,7 @@ When to use it:
 Edge cases:
 
 - Fewer than 5 messages → `Not enough conversation history to compact yet.` (nothing to summarize).
-- If compaction can't make progress — circuit breaker open, no safe split point, or the summarization LLM call failed — you get `Compaction made no change …` and history is left untouched (check `agentao.log`).
+- If compaction can't make progress — circuit breaker open, no safe split point, or the summarization LLM call failed — you get `Compaction made no change …` and history is left untouched (check `arbiter.log`).
 - Same lossiness as auto-compaction: anything not in the summary or in re-injected files is gone from the agent's perspective.
 
 ## `/status` quick-reference (full content in chapter 1)
@@ -111,7 +111,7 @@ Edge cases:
 |------|--------------------|
 | Conversation summary shows huge message count | Consider `/clear` to rotate |
 | Permission Mode is `full-access` | Consider stepping back to `workspace-write` |
-| Loaded sources lists unexpected paths | Audit `~/.agentao/permissions.json` and the built-in preset |
+| Loaded sources lists unexpected paths | Audit `~/.arbiter/permissions.json` and the built-in preset |
 | Markdown rendering OFF and you wanted it ON | `/markdown` toggles |
 | Task List shows pending items | Agent has open todos — ask it to continue |
 | ACP servers `0/N running` | Servers crashed or never started — `/acp status` to investigate |
@@ -154,5 +154,5 @@ The context manager is `agent.context_manager`. Embedding hosts can read `cm.get
 :::
 
 ::: tip Authoritative help
-Command syntax: `/help`. `/context` body: [`agentao/cli/commands/context.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands/context.py). `/compact` body: [`agentao/cli/commands/compact.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands/compact.py). Compaction logic: [`agentao/context_manager.py`](https://github.com/jin-bo/agentao/blob/main/agentao/context_manager.py).
+Command syntax: `/help`. `/context` body: [`arbiter/cli/commands/context.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands/context.py). `/compact` body: [`arbiter/cli/commands/compact.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands/compact.py). Compaction logic: [`arbiter/context_manager.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/context_manager.py).
 :::

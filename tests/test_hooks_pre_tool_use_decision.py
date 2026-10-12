@@ -15,14 +15,14 @@ import logging
 from types import SimpleNamespace
 from typing import Any, Dict, List
 
-from agentao.host.models import PermissionDecisionEvent, ToolLifecycleEvent
-from agentao.host.projection import HostPermissionEmitter, HostToolEmitter
-from agentao.permissions import PermissionEngine
-from agentao.plugins.hooks import ClaudeHookPayloadAdapter, PluginHookDispatcher
-from agentao.plugins.models import ParsedHookRule
-from agentao.runtime.tool_planning import ToolCallDecision
-from agentao.runtime.tool_runner import ToolRunner
-from agentao.tools import Tool, ToolRegistry
+from arbiter.host.models import PermissionDecisionEvent, ToolLifecycleEvent
+from arbiter.host.projection import HostPermissionEmitter, HostToolEmitter
+from arbiter.permissions import PermissionEngine
+from arbiter.plugins.hooks import ClaudeHookPayloadAdapter, PluginHookDispatcher
+from arbiter.plugins.models import ParsedHookRule
+from arbiter.runtime.tool_planning import ToolCallDecision
+from arbiter.runtime.tool_runner import ToolRunner
+from arbiter.tools import Tool, ToolRegistry
 
 
 # ---------------------------------------------------------------------------

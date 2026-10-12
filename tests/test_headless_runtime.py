@@ -33,7 +33,7 @@ from unittest import mock
 
 import pytest
 
-from agentao.acp_client import (
+from arbiter.acp_client import (
     AcpClientConfig,
     AcpClientError,
     AcpConfigError,
@@ -44,8 +44,8 @@ from agentao.acp_client import (
     ServerStatus,
     classify_process_death,
 )
-from agentao.acp_client.manager import AcpServerNotFound, ACPManager
-from agentao.acp_client.models import ServerState
+from arbiter.acp_client.manager import AcpServerNotFound, ACPManager
+from arbiter.acp_client.models import ServerState
 
 from .support.acp_client import make_interaction_mock_manager as _make_mgr
 
@@ -502,7 +502,7 @@ class TestLastErrorStore:
                     return fixed if tz is timezone.utc else datetime.now(tz)
 
             with mock.patch(
-                "agentao.acp_client.manager.recovery.datetime", _FixedDatetime
+                "arbiter.acp_client.manager.recovery.datetime", _FixedDatetime
             ):
                 with pytest.raises(AcpClientError):
                     mgr.send_prompt(
@@ -776,9 +776,9 @@ class TestLegacyConfigRejection:
         """Loading through ``load_acp_client_config`` — the path the
         real CLI uses — must also fail, not just ``from_dict``."""
         import json
-        from agentao.acp_client import load_acp_client_config
+        from arbiter.acp_client import load_acp_client_config
 
-        acp_dir = tmp_path / ".agentao"
+        acp_dir = tmp_path / ".arbiter"
         acp_dir.mkdir()
         acp_path = acp_dir / "acp.json"
         acp_path.write_text(json.dumps({
@@ -1036,7 +1036,7 @@ class TestRecoveryState:
         as ``send_prompt`` / ``prompt_once``. Without handshake
         accounting inside ``connect_server`` itself, callers could
         retry this public API forever and never flip to fatal."""
-        from agentao.acp_client.client import ACPClient
+        from arbiter.acp_client.client import ACPClient
 
         def _boom(self, *a, **kw):
             raise AcpClientError(
@@ -1071,7 +1071,7 @@ class TestRecoveryState:
         (per Appendix D.3) instead, so embedders can distinguish
         handshake-phase RPC failures from steady-state RPC failures
         without any attribute mutation on the exception."""
-        from agentao.acp_client.client import ACPClient
+        from arbiter.acp_client.client import ACPClient
 
         def _boom(self, *a, **kw):
             raise AcpRpcError(rpc_code=-32603, rpc_message="boom")
@@ -1113,7 +1113,7 @@ class TestRecoveryState:
            "was the handshake failure a timeout vs. a disconnect?"
            becomes unanswerable inside a handshake branch.
         """
-        from agentao.acp_client.client import ACPClient
+        from arbiter.acp_client.client import ACPClient
 
         def _boom(self, *a, **kw):
             raise AcpClientError(
@@ -1149,7 +1149,7 @@ class TestRecoveryState:
         failures must feed the handshake-fail streak. Otherwise a
         warmed server with a persistently failing ``session/new``
         bypasses the documented sticky-fatal recovery path."""
-        from agentao.acp_client.client import ACPClient
+        from arbiter.acp_client.client import ACPClient
 
         mgr = _make_mgr(tmp_path)
         try:
@@ -1231,7 +1231,7 @@ class TestRecoveryState:
         regression specifically exercises the
         ``ensure_connected`` / ``prompt_once`` re-session path, where
         the fix has to live."""
-        from agentao.acp_client.client import ACPClient
+        from arbiter.acp_client.client import ACPClient
 
         mgr = _make_mgr(tmp_path)
         try:
@@ -1285,7 +1285,7 @@ class TestRecoveryState:
         directly and failures bypassed the handshake classification
         (no ``details["phase"]``, no ``underlying_code``, no fatal
         accounting)."""
-        from agentao.acp_client.client import ACPClient
+        from arbiter.acp_client.client import ACPClient
 
         mgr = _make_mgr(tmp_path)
         try:

@@ -5,7 +5,7 @@
 > - When to ask the user vs. auto-stop vs. inject "summarize and finish"
 > - Sane production defaults
 
-`max_iterations` (default 100) is the **circuit breaker** against infinite loops. If the agent keeps calling tools for 100 rounds without producing a final reply, Agentao invokes `transport.on_max_iterations(count, messages)` to ask you what to do.
+`max_iterations` (default 100) is the **circuit breaker** against infinite loops. If the agent keeps calling tools for 100 rounds without producing a final reply, Arbiter invokes `transport.on_max_iterations(count, messages)` to ask you what to do.
 
 ## Interface
 
@@ -173,7 +173,7 @@ def no_text_progress(messages, window=30):
 ## Composed example
 
 ```python
-from agentao.transport import SdkTransport
+from arbiter.transport import SdkTransport
 
 def make_smart_bailout(user_notify):
     _retries = {"count": 0}

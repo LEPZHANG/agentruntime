@@ -1,6 +1,6 @@
 # Memory Management
 
-Agentao 使用 SQLite 作为唯一的持久化后端，管理三类不同性质的数据，并将其以结构化方式注入每轮系统提示词。
+Arbiter 使用 SQLite 作为唯一的持久化后端，管理三类不同性质的数据，并将其以结构化方式注入每轮系统提示词。
 
 ---
 
@@ -10,10 +10,10 @@ Agentao 使用 SQLite 作为唯一的持久化后端，管理三类不同性质�
 
 | 数据库 | 路径 | 内容 |
 |--------|------|------|
-| 项目库 | `.agentao/memory.db` | 项目级持久记忆 + 全部会话摘要 |
-| 用户库 | `<home>/.agentao/memory.db` | 跨项目用户级持久记忆 |
+| 项目库 | `.arbiter/memory.db` | 项目级持久记忆 + 全部会话摘要 |
+| 用户库 | `<home>/.arbiter/memory.db` | 跨项目用户级持久记忆 |
 
-两个文件在首次启动时自动创建。`.agentao/` 目录已添加至 `.gitignore`。
+两个文件在首次启动时自动创建。`.arbiter/` 目录已添加至 `.gitignore`。
 
 ### SQLite 表结构
 
@@ -214,7 +214,7 @@ AI: [调用 save_memory，key 相同时自动覆盖]
 ### 记忆未出现在提示词中
 
 1. 运行 `/memory status` 确认条目存在且未被软删除
-2. 检查 `.agentao/memory.db` 是否可写（权限问题时回退到 `:memory:`）
+2. 检查 `.arbiter/memory.db` 是否可写（权限问题时回退到 `:memory:`）
 3. 如果条目存在但评分过低，尝试增加相关 tags 重新保存
 
 ### `/memory delete` 没有删除条目

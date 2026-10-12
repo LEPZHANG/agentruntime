@@ -8,7 +8,7 @@
 
 ## 实现
 
-**文件**: `agentao/runtime/chat_loop/_runner.py::ChatLoopRunner.run()`
+**文件**: `arbiter/runtime/chat_loop/_runner.py::ChatLoopRunner.run()`
 
 每个 turn 开始时构造 reminder，前置到该 turn 的用户消息：
 
@@ -32,7 +32,7 @@ Current Date/Time: 2026-02-11 14:40:58 (Wednesday)
 
 ## 为什么不放进系统提示词
 
-系统提示词的**稳定前缀**（identity、operational guidelines、`<memory-stable>` 等）被刻意维持成逐 turn **逐字节相同**，好让 provider 的 prompt cache 能复用它（见 `agentao/prompts/builder.py::_build_sections()`）。
+系统提示词的**稳定前缀**（identity、operational guidelines、`<memory-stable>` 等）被刻意维持成逐 turn **逐字节相同**，好让 provider 的 prompt cache 能复用它（见 `arbiter/prompts/builder.py::_build_sections()`）。
 
 时间每秒都在变。把它放进前缀，等于每个 turn 都让缓存失效——为了一行字，付掉整个前缀的缓存收益。放在用户消息里，前缀保持稳定，日期照样每 turn 刷新。
 
@@ -55,6 +55,6 @@ Current Date/Time: 2026-02-11 14:40:58 (Wednesday)
 
 ## 相关
 
-- `agentao/runtime/chat_loop/_runner.py` —— 注入点
-- `agentao/prompts/builder.py` —— 系统提示词分段与缓存边界
+- `arbiter/runtime/chat_loop/_runner.py` —— 注入点
+- `arbiter/prompts/builder.py` —— 系统提示词分段与缓存边界
 - `tests/test_date_in_prompt.py` —— 双向断言

@@ -2,7 +2,7 @@
 
 ## Problem
 
-There is no supported way to launch Agentao as an ACP server from the command line.
+There is no supported way to launch Arbiter as an ACP server from the command line.
 
 ## Scope
 
@@ -18,7 +18,7 @@ There is no supported way to launch Agentao as an ACP server from the command li
 
 ## Acceptance Criteria
 
-- [ ] `agentao --acp --stdio` starts a valid ACP server
+- [ ] `arbiter --acp --stdio` starts a valid ACP server
 - [ ] Stdout contains only ACP protocol messages
 - [ ] Shutdown cleans up MCP connections and session runtimes
 

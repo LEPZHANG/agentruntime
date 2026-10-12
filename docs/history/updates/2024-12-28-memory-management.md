@@ -2,7 +2,7 @@
 
 ## 概述
 
-为 Agentao 添加完整的 memory 管理功能，包括搜索、删除、清空和标签过滤。
+为 Arbiter 添加完整的 memory 管理功能，包括搜索、删除、清空和标签过滤。
 
 ## 新功能
 
@@ -73,20 +73,20 @@ def clear_all_memories(self) -> int
 
 ### 修改的文件
 
-1. **agentao/tools/memory.py**
+1. **arbiter/tools/memory.py**
    - 添加 4 个辅助方法到 `SaveMemoryTool`
    - 添加 4 个新工具类
    - 约 +250 行代码
 
-2. **agentao/tools/__init__.py**
+2. **arbiter/tools/__init__.py**
    - 导出新的 memory 工具类
    - 更新 `__all__` 列表
 
-3. **agentao/agent.py**
+3. **arbiter/agent.py**
    - 导入新工具
    - 在 `_register_tools()` 中注册新工具
 
-4. **agentao/cli/commands.py**
+4. **arbiter/cli/commands.py**
    - 重写 `show_memories()` 方法支持子命令
    - 更新 `/memory` 命令处理逻辑
    - 更新欢迎消息和帮助文档
@@ -184,7 +184,7 @@ AI：[调用 delete_memory] 已删除
                 ↓                        ↓
             直接操作 ←──────────────→ SaveMemoryTool
                                          ↓
-                                .agentao_memory.json
+                                .arbiter_memory.json
 ```
 
 ### 确认机制
@@ -198,7 +198,7 @@ AI：[调用 delete_memory] 已删除
 ✅ **完全兼容**
 - 原有的 `save_memory` 工具功能不变
 - 原有的 `/memory` 命令行为不变（等同于 `/memory list`）
-- 现有的 `.agentao_memory.json` 格式保持不变
+- 现有的 `.arbiter_memory.json` 格式保持不变
 
 ## 性能影响
 
@@ -224,7 +224,7 @@ AI：[调用 delete_memory] 已删除
 
 ## 总结
 
-此次更新为 Agentao 带来了完整的 memory 管理能力，用户可以：
+此次更新为 Arbiter 带来了完整的 memory 管理能力，用户可以：
 
 ✅ 通过 CLI 命令直接管理 memory
 ✅ 让 AI 自动管理 memory

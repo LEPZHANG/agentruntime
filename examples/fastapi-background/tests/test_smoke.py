@@ -17,7 +17,7 @@ from app.main import create_app
 
 
 def _make_fake_llm():
-    """Stand-in LLMClient — only the attributes Agentao reads at construction."""
+    """Stand-in LLMClient — only the attributes Arbiter reads at construction."""
     fake = MagicMock()
     fake.logger = MagicMock()
     fake.model = "fake-model"
@@ -40,7 +40,7 @@ def _fake_llm_response(content: str = "hello from fake llm"):
 
 @pytest.fixture
 def app_with_fake_llm():
-    """Return a TestClient where ``Agentao._llm_call`` returns a 1-shot reply.
+    """Return a TestClient where ``Arbiter._llm_call`` returns a 1-shot reply.
 
     The chat loop calls ``agent._llm_call(...)``; replacing that method
     on the class is the smallest seam that yields a deterministic turn
@@ -49,7 +49,7 @@ def app_with_fake_llm():
     is covered by the test.
     """
     with patch(
-        "agentao.agent.Agentao._llm_call",
+        "arbiter.agent.Arbiter._llm_call",
         lambda self, msgs, tools, token: _fake_llm_response(),
     ):
         app = create_app(llm_client_factory=_make_fake_llm)
@@ -106,7 +106,7 @@ def test_cancel_reports_cancelled_status() -> None:
         time.sleep(5.0)
         return _fake_llm_response()
 
-    with patch("agentao.agent.Agentao._llm_call", _slow_llm_call):
+    with patch("arbiter.agent.Arbiter._llm_call", _slow_llm_call):
         app = create_app(llm_client_factory=_make_fake_llm)
         with TestClient(app) as client:
             post = client.post("/run", json={"prompt": "stalled"})

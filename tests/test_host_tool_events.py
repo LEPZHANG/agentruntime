@@ -19,13 +19,13 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-from agentao.cancellation import CancellationToken
-from agentao.host.events import EventStream
-from agentao.host.models import ToolLifecycleEvent
-from agentao.host.projection import HostToolEmitter
-from agentao.runtime.tool_executor import ToolExecutor
-from agentao.runtime.tool_planning import ToolCallDecision
-from agentao.tools import AsyncToolBase, Tool
+from arbiter.cancellation import CancellationToken
+from arbiter.host.events import EventStream
+from arbiter.host.models import ToolLifecycleEvent
+from arbiter.host.projection import HostToolEmitter
+from arbiter.runtime.tool_executor import ToolExecutor
+from arbiter.runtime.tool_planning import ToolCallDecision
+from arbiter.tools import AsyncToolBase, Tool
 
 from tests.support.host_events import NullTransport, make_plan
 
@@ -333,7 +333,7 @@ def test_planner_normalizes_missing_tool_call_id_so_events_still_fire(missing_id
     :func:`identity.normalize_tool_call_id` and stores it on the plan,
     so the executor emits a correlated pair of events with a stable
     UUID4 fallback string."""
-    from agentao.runtime.tool_planning import ToolCallPlanner
+    from arbiter.runtime.tool_planning import ToolCallPlanner
 
     h = _Harness()
     executor = _make_executor(h.emitter)

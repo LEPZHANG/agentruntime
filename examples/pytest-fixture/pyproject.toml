@@ -1,10 +1,10 @@
 [project]
-name = "agentao-example-pytest-fixture"
+name = "arbiter-example-pytest-fixture"
 version = "0.1.0"
-description = "Drop-in pytest fixture: one Agentao per test, fake LLM, no API key."
+description = "Drop-in pytest fixture: one Arbiter per test, fake LLM, no API key."
 requires-python = ">=3.10"
 dependencies = [
-    "agentao",
+    "arbiter",
 ]
 
 [project.optional-dependencies]
@@ -13,7 +13,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-agentao = { path = "../..", editable = true }
+arbiter = { path = "../..", editable = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -3,7 +3,7 @@
 **状态:** 评审记录。2026-06-01 起草。**实现暂缓 —— 当前不建议做。** 有效决策是
 **Part A**(用 `project_instructions`)。**Part B** 是保留的*最小*规格,**仅当** §A.4 的重启
 条件满足时才落地。本文档**没有任何**场景建议实现完整的多槽 profile。
-**读者:** agentao 维护者,以及把 agentao 嵌入多智能体协作界面的 host 集成方。
+**读者:** arbiter 维护者,以及把 arbiter 嵌入多智能体协作界面的 host 集成方。
 **对应英文:** `system-prompt-profile.md`。
 **相关:** `metacognitive-boundary.zh.md`(同一套 schema + 默认 + host-override 模式,
 **同样已 deferred**)、`host-tool-injection.zh.md` / `host-tool-allowlist.zh.md`
@@ -25,20 +25,20 @@
 
 一个下游嵌入方(chahua)呈现为**群聊**,但实质是「**人类指导下、多个智能体协作完成真实任务**」。
 它的 agent 应作为协作者行事 —— 做完自己负责的那一片,然后交还人类指挥者或交棒同伴 —— 而不是
-单个 agent 独占任务、跑到完成。agentao 的默认系统提示编码的是后者,最尖锐的一句在
-`build_operational_guidelines`(`agentao/prompts/sections.py`,Task Completion 块):
+单个 agent 独占任务、跑到完成。arbiter 的默认系统提示编码的是后者,最尖锐的一句在
+`build_operational_guidelines`(`arbiter/prompts/sections.py`,Task Completion 块):
 *"Work autonomously until the task is fully resolved before yielding back to the user."*
 
 ## A.2 反向评审 —— 需要改代码吗?→ 不需要,至少现在不
 
 **结论:不需要。** 这本质是一个下游的需求。三条 grep 实锤理由:
 
-1. **agentao 已有一等的 host prompt 注入面:`project_instructions`。** 它是构造参数
-   (`Agentao.__init__`,`agent.py:84`),逐字注入系统提示**最顶部**
+1. **arbiter 已有一等的 host prompt 注入面:`project_instructions`。** 它是构造参数
+   (`Arbiter.__init__`,`agent.py:84`),逐字注入系统提示**最顶部**
    (`SystemPromptBuilder._build_sections`,`builder.py:85-90`,排在
-   `=== Agent Instructions ===` 之前);host 传非空值即**短路 AGENTAO.md 磁盘读**
-   (`agent.py:476-479`)。`agentao run`(`cli/run.py:491`)和子 agent
-   (`agents/tools/_wrapper.py:385`)都已在用。chahua **今天、零 agentao 改动**就能在那里注入
+   `=== Agent Instructions ===` 之前);host 传非空值即**短路 ARBITER.md 磁盘读**
+   (`agent.py:476-479`)。`arbiter run`(`cli/run.py:491`)和子 agent
+   (`agents/tools/_wrapper.py:385`)都已在用。chahua **今天、零 arbiter 改动**就能在那里注入
    协作人格。harness-vs-host 边界测试预言的正是这个:有价值的内核已作为 host-contract 原语存在。
 
 2. **它撞上一份已 deferred 的决策。** `metacognitive-boundary.zh.md` 是同一套
@@ -46,7 +46,7 @@
    (per-host default tuning 明确 deferred)。为一个下游就实现 prompt profile,与那次
    demand-gating 的理由直接矛盾(gap ≠ need)。
 
-3. **成本/受益严重不对称。** 改代码会引入永久公共面,而(在过度设计版里)会改变所有 agentao
+3. **成本/受益严重不对称。** 改代码会引入永久公共面,而(在过度设计版里)会改变所有 arbiter
    用户的默认 prompt —— 全为一个下游买单,而我们从没验证过便宜的路会失败。最初的计划自己写的就是
    「先廉价验证方向」。
 
@@ -57,7 +57,7 @@
 ## A.3 建议路径(现在就做)
 
 chahua 把协作人格写进 `project_instructions` —— 经
-`build_from_environment(project_instructions=…)` 或它自己的 `AGENTAO.md`。零 agentao 改动、
+`build_from_environment(project_instructions=…)` 或它自己的 `ARBITER.md`。零 arbiter 改动、
 零发版、零回归。顶部文本示例:
 
 > You are one participant in a human-guided, multi-agent team. Complete the slice you
@@ -105,7 +105,7 @@ Completion 的自主语气 —— 它埋在单体 `build_operational_guidelines`
 3. **构造期接线** —— 与现有 `working_directory` 路径完全一致:`working_directory` 是 keyword-only
    参数(`agent.py:52,73`),存在 agent 上、组装时读取;host 经
    `build_from_environment(working_directory=…)` 传入,落到 `embedding/factory.py:215-224` 的
-   `Agentao(**kwargs)`。按同样方式加
+   `Arbiter(**kwargs)`。按同样方式加
    `prompt_profile: Optional[SystemPromptProfile] = None`(keyword-only,存
    `self._prompt_profile`,`_build_sections` 读取);host 经
    `build_from_environment(…, prompt_profile=…)` 通过既有的 `kwargs.update(overrides)`
@@ -142,7 +142,7 @@ Completion 的自主语气 —— 它埋在单体 `build_operational_guidelines`
 
 ## 附录 A —— 现有提示词各段原文(参考)
 
-照搬自 `agentao/prompts/sections.py`,**2026-07-25 重新同步**(见文首「修订」说明),便于无需打开
+照搬自 `arbiter/prompts/sections.py`,**2026-07-25 重新同步**(见文首「修订」说明),便于无需打开
 源码即可评审。`{working_directory}` 是唯一的运行时占位符。**仅** A.7 的 **Task Completion** 子段是
 Part B 的覆盖目标;其余全部强制。**原文为实际注入的英文,保持不译。**
 
@@ -156,7 +156,7 @@ Part B 的覆盖目标;其余全部强制。**原文为实际注入的英文,保
 ### A.1 `identity` —— `sections.py:17-25`
 
 ```text
-You are Agentao, a knowledge-work agent whose default scope spans four equally weighted domains: Research, Data analysis, Project orchestration, and Coding. Coding is one capability of four, not the single axis.
+You are Arbiter, a knowledge-work agent whose default scope spans four equally weighted domains: Research, Data analysis, Project orchestration, and Coding. Coding is one capability of four, not the single axis.
 
 Current Working Directory: {working_directory}
 ```
@@ -310,17 +310,17 @@ When working with tool results, write down any important information you might n
 Part A/B 的引用截至 `main`@`e49b0c2`(2026-06-01);`sections.py` 行号已于 2026-07-25 重新同步。
 
 - 无条件 stable-prefix 注入 —— `SystemPromptBuilder._build_sections`,
-  `agentao/prompts/builder.py:95-103`。
+  `arbiter/prompts/builder.py:95-103`。
 - `project_instructions` 注入点 —— `_build_sections`,`builder.py:85-90`;参数
-  `Agentao.__init__`,`agent.py:84`;AGENTAO.md 短路,`agent.py:476-479`。
+  `Arbiter.__init__`,`agent.py:84`;ARBITER.md 短路,`agent.py:476-479`。
 - `project_instructions` 在用 —— `cli/run.py:491`、`agents/tools/_wrapper.py:385`。
-- 各段文本 —— `agentao/prompts/sections.py`(逐段行号见附录 A)。
+- 各段文本 —— `arbiter/prompts/sections.py`(逐段行号见附录 A)。
 - 提示词文本护栏 —— `tests/test_system_prompt_sections.py`(稳定前缀标记顺序、四域 identity、
   工具名真实性)与 `tests/test_reliability_prompt.py`(七条规则按短语 + 1–7 编号)。两者锁的都是
   *整段 prompt* 的子串,而非 section 归属 —— 这正是 A.7 → Reliability #3 的搬迁无需改测试的原因。
-- 组装入口 —— `Agentao._build_system_prompt`,`agent.py:982` →
+- 组装入口 —— `Arbiter._build_system_prompt`,`agent.py:982` →
   `SystemPromptBuilder(self).build()`。
-- 构造期注入先例 —— `Agentao.__init__` keyword-only 块,`agent.py:52,73`;host 构造
+- 构造期注入先例 —— `Arbiter.__init__` keyword-only 块,`agent.py:52,73`;host 构造
   `embedding/factory.py:215-224`(`kwargs.update(overrides)` 在 `:222`)。
 - 已 deferred 的同款决策 —— `docs/design/metacognitive-boundary.zh.md`(状态:Implementation
   deferred)。

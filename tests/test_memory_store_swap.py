@@ -11,9 +11,9 @@ from __future__ import annotations
 import json
 from typing import Dict, List, Optional
 
-from agentao.capabilities import MemoryStore  # re-export
-from agentao.memory import MemoryManager, SaveMemoryRequest
-from agentao.memory.models import (
+from arbiter.capabilities import MemoryStore  # re-export
+from arbiter.memory import MemoryManager, SaveMemoryRequest
+from arbiter.memory.models import (
     MemoryRecord,
     MemoryReviewItem,
     SessionSummaryRecord,

@@ -114,10 +114,10 @@ After `create`, the new skill is auto-loaded and immediately available — `/ski
 
 ## Installing skills from GitHub
 
-Above the slash commands, Agentao ships a top-level shell subcommand for managing skills sourced from public repos. This runs **outside** the REPL — at your shell prompt, not after the `>`.
+Above the slash commands, Arbiter ships a top-level shell subcommand for managing skills sourced from public repos. This runs **outside** the REPL — at your shell prompt, not after the `>`.
 
 ```bash
-agentao skill install owner/repo[:path][@ref]
+arbiter skill install owner/repo[:path][@ref]
 ```
 
 The ref format:
@@ -132,13 +132,13 @@ The ref format:
 Scope:
 
 ```bash
-agentao skill install anthropics/skills:document-skills/pdf --scope global
-agentao skill install myorg/internal-skills:billing      --scope project
+arbiter skill install anthropics/skills:document-skills/pdf --scope global
+arbiter skill install myorg/internal-skills:billing      --scope project
 ```
 
 | Scope | Installs to | When to use |
 |-------|-------------|-------------|
-| `global` | `~/.agentao/skills/` | Personal, cross-project |
+| `global` | `~/.arbiter/skills/` | Personal, cross-project |
 | `project` | `<cwd>/skills/` | Team-shared, checked into the repo |
 
 If `--scope` is omitted, the CLI auto-detects (project if a `skills/` directory exists in cwd, else global).
@@ -148,15 +148,15 @@ If `--scope` is omitted, the CLI auto-detects (project if a `skills/` directory 
 ### The other three subcommands
 
 ```bash
-agentao skill list                  # everything Agentao knows about
-agentao skill list --installed      # only the ones managed by 'skill install'
-agentao skill list --json           # machine-readable
+arbiter skill list                  # everything Arbiter knows about
+arbiter skill list --installed      # only the ones managed by 'skill install'
+arbiter skill list --json           # machine-readable
 
-agentao skill remove pdf            # uninstall by name
-agentao skill remove pdf --scope global
+arbiter skill remove pdf            # uninstall by name
+arbiter skill remove pdf --scope global
 
-agentao skill update pdf            # check for updates and pull if newer
-agentao skill update --all          # check every managed skill across scopes
+arbiter skill update pdf            # check for updates and pull if newer
+arbiter skill update --all          # check every managed skill across scopes
 ```
 
 `update` only acts on skills with `source_type` ≠ `manual` — i.e. ones that were installed via `skill install`. Hand-written skills are left alone.
@@ -166,7 +166,7 @@ agentao skill update --all          # check every managed skill across scopes
 Installing puts the SKILL.md on disk; an already-running CLI session won't see it until you tell it to. Two options:
 
 - **In a running session**: `/skills reload` — re-scans the skills directories
-- **Otherwise**: restart `agentao` — the next launch picks it up
+- **Otherwise**: restart `arbiter` — the next launch picks it up
 
 Once visible, the skill behaves exactly like a hand-written one: `/skills activate <name>` to pull it into the prompt, or let the agent self-activate when the description matches.
 
@@ -175,7 +175,7 @@ Once visible, the skill behaves exactly like a hand-written one: `/skills activa
 - **GitHub rate limits hit fast on unauthenticated calls** — set `GITHUB_TOKEN` in your env if you're installing several at once
 - **`@ref` pinning is your friend** — without it, you re-resolve the latest default branch on every `update`, which can yank changes into your environment unannounced
 - **`skill install` doesn't activate** — it only puts files on disk. `/skills activate` (or self-activation) is still a separate step
-- **Two scopes can shadow** — a `global` skill named `pdf` and a `project` skill named `pdf` both exist; project wins. Use `agentao skill list` to see what's authoritative
+- **Two scopes can shadow** — a `global` skill named `pdf` and a `project` skill named `pdf` both exist; project wins. Use `arbiter skill list` to see what's authoritative
 
 ## Skill gallery in this repo
 
@@ -190,12 +190,12 @@ The repo ships a small gallery under [`examples/skills/`](https://github.com/jin
 **Install** by copy or symlink (these are not on GitHub via `skill install` — they live in this repo):
 
 ```bash
-# Globally (any project you launch agentao from sees them)
-cp -R examples/skills/ocr ~/.agentao/skills/
+# Globally (any project you launch arbiter from sees them)
+cp -R examples/skills/ocr ~/.arbiter/skills/
 
 # Or scoped to one project
-cp -R examples/skills/zootopia-ppt /path/to/your/project/.agentao/skills/
-cp -R examples/skills/pro-ppt      /path/to/your/project/.agentao/skills/
+cp -R examples/skills/zootopia-ppt /path/to/your/project/.arbiter/skills/
+cp -R examples/skills/pro-ppt      /path/to/your/project/.arbiter/skills/
 
 # The PPT skills ship a requirements.txt — install Python deps once
 # (ocr needs none: its script carries PEP 723 inline metadata for `uv run`)
@@ -216,9 +216,9 @@ The full gallery README — including the embedded-harness perspective on host-c
 |------|---------|
 | `skills/<name>/SKILL.md` | The skill itself (frontmatter + body) |
 | `skills/<name>/references/*.md` | On-demand references the skill body links to |
-| `~/.agentao/skills/<name>/` | Same layout, global scope (managed installs) |
-| `~/.agentao/skills/registry.json` · `<cwd>/skills/registry.json` | Tracks managed installs (source ref, version, install scope) |
-| `.agentao/skills_config.json` (project) | Persistent enable/disable state — see [10. Configuration Reference](./10-config-reference) |
+| `~/.arbiter/skills/<name>/` | Same layout, global scope (managed installs) |
+| `~/.arbiter/skills/registry.json` · `<cwd>/skills/registry.json` | Tracks managed installs (source ref, version, install scope) |
+| `.arbiter/skills_config.json` (project) | Persistent enable/disable state — see [10. Configuration Reference](./10-config-reference) |
 | [`examples/skills/`](https://github.com/jin-bo/agentao/tree/main/examples/skills) | Repo-shipped gallery (copy into one of the locations above) |
 
 ## Where to go next
@@ -232,9 +232,9 @@ The full gallery README — including the embedded-harness perspective on host-c
 ---
 
 ::: info Where this fits
-The skill manager is `agentao.skills.manager.SkillManager`, exposed on the agent as `agent.skill_manager`. Embedding hosts can `activate_skill()` / `deactivate_skill()` / read `available_skills` directly. The SKILL.md format is identical across CLI and embedded paths.
+The skill manager is `arbiter.skills.manager.SkillManager`, exposed on the agent as `agent.skill_manager`. Embedding hosts can `activate_skill()` / `deactivate_skill()` / read `available_skills` directly. The SKILL.md format is identical across CLI and embedded paths.
 :::
 
 ::: tip Authoritative help
-Command syntax: `/help`. Skill listing: [`agentao/cli/ui.py:list_skills`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/ui.py). Crystallize logic: [`agentao/cli/commands_ext/crystallize.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands_ext/crystallize.py). Skill manager: [`agentao/skills/manager.py`](https://github.com/jin-bo/agentao/blob/main/agentao/skills/manager.py).
+Command syntax: `/help`. Skill listing: [`arbiter/cli/ui.py:list_skills`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/ui.py). Crystallize logic: [`arbiter/cli/commands_ext/crystallize.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands_ext/crystallize.py). Skill manager: [`arbiter/skills/manager.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/skills/manager.py).
 :::

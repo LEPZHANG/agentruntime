@@ -20,10 +20,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from agentao import Agentao
-from agentao.cancellation import AgentCancelledError
-from agentao.runtime.sanitize import backfill_orphaned_tool_calls
-from agentao.tools.base import Tool
+from arbiter import Arbiter
+from arbiter.cancellation import AgentCancelledError
+from arbiter.runtime.sanitize import backfill_orphaned_tool_calls
+from arbiter.tools.base import Tool
 
 
 # ---------------------------------------------------------------------------
@@ -31,8 +31,8 @@ from agentao.tools.base import Tool
 # ---------------------------------------------------------------------------
 
 
-def _make_agent() -> Agentao:
-    return Agentao(
+def _make_agent() -> Arbiter:
+    return Arbiter(
         api_key="test-key",
         base_url="https://example.test/v1",
         model="test-model",

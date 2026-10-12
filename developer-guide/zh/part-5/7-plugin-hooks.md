@@ -25,12 +25,12 @@ Hooks 在回答**另一个问题**：
 控制平面是"agent 已经在做某件事了；运行时把这一刻**暴露给你**，你决定是放行、阻断、还是改写"。
 :::
 
-关于格式：Agentao 的 hook 系统**对齐 Claude Code 的 `hooks.json` 格式**——在 Agentao 写的 hook 规则 Claude Code 可以直接读，反向也成立。两个例外是 `Stop` 和 `PreCompact`，它们沿用 Claude Code 的 flat snake_case 顶层 schema，而不是 Agentao 的 `{event, data}` 信封（见 `CLAUDE_FLAT_EVENTS`）。
+关于格式：Arbiter 的 hook 系统**对齐 Claude Code 的 `hooks.json` 格式**——在 Arbiter 写的 hook 规则 Claude Code 可以直接读，反向也成立。两个例外是 `Stop` 和 `PreCompact`，它们沿用 Claude Code 的 flat snake_case 顶层 schema，而不是 Arbiter 的 `{event, data}` 信封（见 `CLAUDE_FLAT_EVENTS`）。
 
 ::: warning 本章是**规则作者**视角
 你会学到怎么写一条 hook 规则、它何时跑、能输出什么。
 
-宿主侧的 hooks list / disable / hot-reload API **故意不暴露**——那部分不在 [4.7 嵌入式 Harness 合约](/zh/part-4/7-host-contract#4-7-8-不在-合约里的东西) 里。如果你在做 SaaS 平台、想给租户提供"管理 hook 开关"的能力，目前的答案是：在自己的 plugin 装载层做，**不要**绕到 `agentao.host` 里去找 API。
+宿主侧的 hooks list / disable / hot-reload API **故意不暴露**——那部分不在 [4.7 嵌入式 Harness 合约](/zh/part-4/7-host-contract#4-7-8-不在-合约里的东西) 里。如果你在做 SaaS 平台、想给租户提供"管理 hook 开关"的能力，目前的答案是：在自己的 plugin 装载层做，**不要**绕到 `arbiter.host` 里去找 API。
 :::
 
 ## 5.7.2 八个事件一览
@@ -46,7 +46,7 @@ Hooks 在回答**另一个问题**：
 | `Stop` | turn 退出（含 `final_response` / `max_iterations` / `doom_loop`） | `force_continue` 再来一轮 / `suppress_output` / `system_message` |
 | `PreCompact` | 上下文压缩之前（`microcompact` / `full` / `minimal_history`） | **观察**——记录、报警，不能拦截或改写 |
 
-来源：`agentao/plugins/models.py` 中的 `SUPPORTED_HOOK_EVENTS`。
+来源：`arbiter/plugins/models.py` 中的 `SUPPORTED_HOOK_EVENTS`。
 
 ::: info `Stop` 是控制点，`PreCompact` 是观测点
 Phase B 落地之后，`Stop` 上的 hook 可以让 chat-loop **再发起一轮 LLM**（通过 `force_continue` + `follow_up_message`）——这是真正的**控制信号**，会改变 turn 走向。
@@ -123,7 +123,7 @@ Hook type 'prompt' is not supported for event 'Stop' — skipped.
 { "matcher": { "tool_name": "Bash" } }
 ```
 
-注意 `Bash` 是 Claude Code 的工具名；Agentao 内部叫 `run_shell_command`。运行时通过 [`ToolAliasResolver`](https://github.com/jin-bo/agentao/blob/main/agentao/plugins/hooks.py) 把这两个名字**双向打通**——你写 `Bash` 或 `run_shell_command` 都能匹配同一个工具。
+注意 `Bash` 是 Claude Code 的工具名；Arbiter 内部叫 `run_shell_command`。运行时通过 [`ToolAliasResolver`](https://github.com/jin-bo/agentao/blob/main/arbiter/plugins/hooks.py) 把这两个名字**双向打通**——你写 `Bash` 或 `run_shell_command` 都能匹配同一个工具。
 
 `matcher` 的字符串值支持 glob（`*`、`?`）和**整串 regex**（写成 `^...$` 形式会按 regex 解释）。`null` matcher 匹配该事件的所有调用。
 
@@ -278,7 +278,7 @@ async for ev in agent.events_async():
 
 Hook 调度也会被 replay 子系统记录。默认捕获 hook 元数据（事件名、规则数、outcome）；hook 的 `output_preview` 字段（command stdout 的预览）默认被截断。
 
-如果你需要在 replay 里看到完整 stdout，把 `.agentao/settings.json` 里的开关打开：
+如果你需要在 replay 里看到完整 stdout，把 `.arbiter/settings.json` 里的开关打开：
 
 ```json
 {

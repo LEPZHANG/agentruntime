@@ -1,7 +1,7 @@
 ---
 name: kanban-tasks
 description: >
-  使用 agentao-kanban 看板进行任务管理（拆任务 / 状态流转 / 后台服务 / 看产物）。
+  使用 arbiter-kanban 看板进行任务管理（拆任务 / 状态流转 / 后台服务 / 看产物）。
   本技能负责：① 初始化 .kanban/ 项目 ② 把需求拆成原子卡片入板
   ③ 推动状态流转 INBOX → READY → DOING → REVIEW → DONE
   ④ 启停 daemon 与 Web UI ⑤ 察看卡片状态与产物。
@@ -9,13 +9,13 @@ description: >
   dispatcher / orchestrator。
   复合触发短语（一键启停）：
     • "启动 kanban"      → daemon（mock 执行器，后台）+ Web UI（自动开浏览器）
-    • "启动 kanban 真跑" → daemon（--executor agentao，真调 sub-agent）+ Web UI
+    • "启动 kanban 真跑" → daemon（--executor arbiter，真调 sub-agent）+ Web UI
     • "停止 kanban"      → 先停 Web UI，再停 daemon
 ---
 
 # Kanban 任务管理 · 操作指南
 
-底层是本仓库虚拟环境中以 editable 模式安装的 `agentao-kanban`（console scripts: `kanban`, `kanban-mcp`）。
+底层是本仓库虚拟环境中以 editable 模式安装的 `arbiter-kanban`（console scripts: `kanban`, `kanban-mcp`）。
 所有命令必须用 `uv run kanban …`，不要直接 `python -m kanban`，也不要 `pip install`。
 
 ## 心智模型（先看这里再动手）
@@ -24,11 +24,11 @@ description: >
   唯一合法的状态写入者是 orchestrator；CLI 的 `move` 是给人/Claude 用的运营手段。
 - **板的位置**：`kanban init` 会在当前目录创建 `.kanban/`（项目根标记）和 `workspace/board/`（卡片
   与事件文件）。从该目录或任意子目录运行 `kanban …` 都能自动找回这块板，**不要带 `--board`**。
-- **执行器**：默认 `mock`（离线状态机，CI 安全），加 `--executor agentao` 才会真正调用四个角色
+- **执行器**：默认 `mock`（离线状态机，CI 安全），加 `--executor arbiter` 才会真正调用四个角色
   sub-agent。除非用户明确要求"真跑"，**默认保持 mock**。
 - **写锁**：所有写命令尊重 `.daemon.lock`。daemon 跑着的时候不要再用 `--force` 写卡（仅应急）。
 - **工作区铁律**：板一旦由 `kanban init` 落到 `workspace/board/`，就不要把卡片相关材料散落到仓库根；
-  生成的笔记/数据按 `AGENTAO.md §Workspace` 入 `workspace/docs/`、`workspace/data/` 等。
+  生成的笔记/数据按 `ARBITER.md §Workspace` 入 `workspace/docs/`、`workspace/data/` 等。
 
 ## 前置自检（开工前一次）
 
@@ -48,7 +48,7 @@ uv run kanban doctor               # 板 + 环境体检（无板时会提示先 
 | # | title | goal | priority | depends_on | acceptance(关键 1-3 条) |
 |---|---|---|---|---|---|
 
-拆卡原则（按本项目 `AGENTAO.md` 的 Code Review 思路：Survey → Classify → Prescribe → Verify）：
+拆卡原则（按本项目 `ARBITER.md` 的 Code Review 思路：Survey → Classify → Prescribe → Verify）：
 
 1. **原子性**：一张卡 = 一个可独立完成、可独立验证的产出。"重构 X 模块"不是卡，"把 X.foo 拆成两个
    纯函数并迁移调用点"才是卡。
@@ -137,8 +137,8 @@ uv run kanban run
 需要常驻 dispatcher（多卡并行 / 真 sub-agent）或浏览器看板时，见
 **「后台服务（daemon & web UI）」**一节。
 
-**只有用户明确要"真跑"时才加 `--executor agentao`**，例如：
-`uv run kanban --executor agentao run`。否则一律保持默认 mock。
+**只有用户明确要"真跑"时才加 `--executor arbiter`**，例如：
+`uv run kanban --executor arbiter run`。否则一律保持默认 mock。
 
 ### Step 6 — 复盘
 
@@ -175,7 +175,7 @@ uv run kanban run
 | 用户说 | 动作（按顺序） |
 |---|---|
 | **"启动 kanban"** | ① `daemon --detach`（默认 mock 执行器） ② Web UI 后台启动 + 探活 + 自动开浏览器 |
-| **"启动 kanban 真跑"** | ① `--executor agentao daemon --detach`（**真调** sub-agent） ② Web UI 同上 |
+| **"启动 kanban 真跑"** | ① `--executor arbiter daemon --detach`（**真调** sub-agent） ② Web UI 同上 |
 | **"停止 kanban"** | ① 停 Web UI（避免它再轮询已经撤掉的板） ② `daemon stop` |
 
 启停脚本（`BOARD/PORT/URL` 共用，三段是同一组变量）：
@@ -215,12 +215,12 @@ uv run kanban list
 
 ```bash
 # 1) Daemon — 真调四个角色 sub-agent
-uv run kanban --executor agentao daemon --detach
+uv run kanban --executor arbiter daemon --detach
 # 2)、3) 同 "启动 kanban"
 ```
 
 > 触发"真跑"前的检查清单：
-> - 用户**已明确**要真跑（不要从"启动 kanban"擅自升级到 `--executor agentao`）；
+> - 用户**已明确**要真跑（不要从"启动 kanban"擅自升级到 `--executor arbiter`）；
 > - 板里有 `READY`/`INBOX` 的卡，且 acceptance / context 写齐；
 > - 知晓真跑会消耗 LLM 配额、会真改 worktree 内文件。
 
@@ -243,7 +243,7 @@ fi
 uv run kanban daemon stop || echo "daemon: not running"
 ```
 
-> 注意：执行器（mock vs `agentao`）由**启动 daemon 时**决定，重启 daemon 才能切换。
+> 注意：执行器（mock vs `arbiter`）由**启动 daemon 时**决定，重启 daemon 才能切换。
 > 想从 mock 切到真跑，必须 "停止 kanban" → "启动 kanban 真跑"。
 
 ### Daemon · 启 / 停 / 体检
@@ -274,7 +274,7 @@ uv run kanban daemon --detach --role worker --worker-id w1
 uv run kanban daemon --detach --role worker --worker-id w2
 
 # 真跑（调用四个角色 sub-agent，需用户明确同意）
-uv run kanban --executor agentao daemon --detach
+uv run kanban --executor arbiter daemon --detach
 ```
 
 ### Web UI · 启 / 停（启动后自动打开浏览器）
@@ -449,7 +449,7 @@ uv run kanban events --limit 200
 
 ## 与本仓库其他约定的关系
 
-- **引用规范**：在向用户报告进度或写复盘时，遵循 `AGENTAO.md §Evidence Conventions`——每条事实
+- **引用规范**：在向用户报告进度或写复盘时，遵循 `ARBITER.md §Evidence Conventions`——每条事实
   要带 `path:line` 或 `[tool: kanban events <id>]` 这类 marker；推断结论标 `(unverified)` /
   `(inferred from X)`。
 - **分类标签**：复盘里给问题打 `[CRITICAL]` / `[WARNING]` / `[SUGGESTION]` / `[NITPICK]`。
@@ -478,12 +478,12 @@ uv run kanban doctor [--fix]
 
 ```bash
 # 用户说 "启动 kanban"      → daemon (mock) + Web UI（自动开浏览器）
-# 用户说 "启动 kanban 真跑" → daemon (--executor agentao) + Web UI
+# 用户说 "启动 kanban 真跑" → daemon (--executor arbiter) + Web UI
 # 用户说 "停止 kanban"      → 先停 Web UI，再停 daemon
 
 # 单独操作 Daemon
 uv run kanban daemon --detach                       # 启（mock）
-uv run kanban --executor agentao daemon --detach    # 启（真跑）
+uv run kanban --executor arbiter daemon --detach    # 启（真跑）
 uv run kanban daemon status                         # 看
 uv run kanban daemon logs -f                        # 跟踪
 uv run kanban daemon stop                           # 停

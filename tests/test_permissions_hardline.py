@@ -7,7 +7,7 @@ its bypass-resistance against wrappers, quoting, splits, and shell
 syntax. Split out from the original monolithic ``test_permissions.py``.
 """
 
-from agentao.permissions import PermissionDecision, PermissionEngine, PermissionMode
+from arbiter.permissions import PermissionDecision, PermissionEngine, PermissionMode
 
 from tests.support.permissions import deny, make_engine as _engine
 

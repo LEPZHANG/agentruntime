@@ -5,7 +5,7 @@
 > - 什么时候问用户、什么时候自动停、什么时候注入"总结后收尾"
 > - 生产环境的合理默认
 
-`max_iterations`（默认 100）是防止 Agent 陷入死循环的**保险丝**。当 Agent 连续调用了 100 轮工具还没给出最终回复时，Agentao 调用 `transport.on_max_iterations(count, messages)` 让你决定怎么办。
+`max_iterations`（默认 100）是防止 Agent 陷入死循环的**保险丝**。当 Agent 连续调用了 100 轮工具还没给出最终回复时，Arbiter 调用 `transport.on_max_iterations(count, messages)` 让你决定怎么办。
 
 ## 接口约定
 
@@ -175,7 +175,7 @@ def no_text_progress(messages, window=30):
 ## 完整综合示例
 
 ```python
-from agentao.transport import SdkTransport
+from arbiter.transport import SdkTransport
 
 def make_smart_bailout(user_notify):
     _retries = {"count": 0}

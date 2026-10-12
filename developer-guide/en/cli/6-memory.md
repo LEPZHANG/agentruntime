@@ -16,8 +16,8 @@ Two SQLite databases:
 
 | Scope | Path | Contents |
 |-------|------|----------|
-| Project | `.agentao/memory.db` | Project-scoped persistent memories + session summaries |
-| User | `~/.agentao/memory.db` | Cross-project user-scoped memories (your role, preferences, profile) |
+| Project | `.arbiter/memory.db` | Project-scoped persistent memories + session summaries |
+| User | `~/.arbiter/memory.db` | Cross-project user-scoped memories (your role, preferences, profile) |
 
 Inside each DB:
 
@@ -182,9 +182,9 @@ The recall side is automatic: every turn, the retriever scores all stored memori
 ## Pitfalls
 
 - **The agent saves things you didn't ask it to** — that's the design. If saved items are wrong or noisy, `/memory delete` them; if there's a pattern, tell the agent ("don't save memories about X").
-- **`/memory clear` clears both user and current-project scopes** — it is still a soft delete; other projects' `.agentao/memory.db` files are not touched.
+- **`/memory clear` clears both user and current-project scopes** — it is still a soft delete; other projects' `.arbiter/memory.db` files are not touched.
 - **Memory ≠ skills** — a skill teaches the agent how to do a task; a memory tells it what's true about you / the project. Don't crystallize behavior into a memory; that's a skill.
-- **Editing `memory.db` by hand** — fine if you know what you're doing. Schema is in [`agentao/memory/manager.py`](https://github.com/jin-bo/agentao/blob/main/agentao/memory/manager.py). Most users should stick to `/memory delete`.
+- **Editing `memory.db` by hand** — fine if you know what you're doing. Schema is in [`arbiter/memory/manager.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/memory/manager.py). Most users should stick to `/memory delete`.
 
 ## Where to go next
 
@@ -201,5 +201,5 @@ The `MemoryManager` is `agent.memory_manager`. Embedding hosts can call `mgr.get
 :::
 
 ::: tip Authoritative help
-Command syntax: `/help`. Behavior: [`agentao/cli/commands_ext/memory.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands_ext/memory.py). Storage and recall: [`agentao/memory/manager.py`](https://github.com/jin-bo/agentao/blob/main/agentao/memory/manager.py).
+Command syntax: `/help`. Behavior: [`arbiter/cli/commands_ext/memory.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands_ext/memory.py). Storage and recall: [`arbiter/memory/manager.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/memory/manager.py).
 :::

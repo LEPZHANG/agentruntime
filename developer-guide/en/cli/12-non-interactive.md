@@ -1,13 +1,13 @@
 # 12. Non-Interactive Entry Points
 
-`agentao` is not only a REPL. The top-level command also supports setup, one-shot prompts, session resume, ACP server mode, and skill / plugin management.
+`arbiter` is not only a REPL. The top-level command also supports setup, one-shot prompts, session resume, ACP server mode, and skill / plugin management.
 
-## `agentao init` — write `.env`
+## `arbiter init` — write `.env`
 
 For first use in a project, run the setup wizard:
 
 ```bash
-agentao init
+arbiter init
 ```
 
 It asks for provider, API key, base URL, and model, then writes:
@@ -21,32 +21,32 @@ OPENAI_MODEL=gpt-5.4
 
 If `.env` already exists, it asks before overwriting.
 
-## `agentao -p` / `--print` — one-shot run
+## `arbiter -p` / `--print` — one-shot run
 
 Print mode sends one prompt, prints the answer, and exits.
 
 ```bash
-agentao -p "Summarize README"
-cat issue.md | agentao --print "Create a fix plan from the content below"
+arbiter -p "Summarize README"
+cat issue.md | arbiter --print "Create a fix plan from the content below"
 ```
 
-Since 0.4.x, `-p` is a thin shim over `agentao run --format text --prompt …`, so both surfaces share the unified exit-code table documented under [`agentao run`](#agentao-run-structured-automation-surface) below.
+Since 0.4.x, `-p` is a thin shim over `arbiter run --format text --prompt …`, so both surfaces share the unified exit-code table documented under [`arbiter run`](#arbiter-run-structured-automation-surface) below.
 
 > **Migration note (0.3.x → 0.4.x):** under `-p`, `max_iterations` was previously exit `2`. It is now `4`; `2` means "invalid usage / spec validation failed".
 
-## `agentao run` — structured automation surface
+## `arbiter run` — structured automation surface
 
-`agentao run` is the automation contract: a structured spec (stdin or `--spec`) merged with explicit CLI overrides, executed as one Agentao turn, returning a machine-readable result.
+`arbiter run` is the automation contract: a structured spec (stdin or `--spec`) merged with explicit CLI overrides, executed as one Arbiter turn, returning a machine-readable result.
 
 ```bash
 # Spec from stdin
-agentao run --format json < task.yaml
+arbiter run --format json < task.yaml
 
 # Spec from file with flag overrides
-agentao run --spec .agentao/tasks/review.yaml --model gpt-5.5 --format json
+arbiter run --spec .arbiter/tasks/review.yaml --model gpt-5.5 --format json
 
 # Inline prompt convenience (no spec file needed)
-agentao run --prompt "Summarize the current directory" --format json
+arbiter run --prompt "Summarize the current directory" --format json
 ```
 
 `--spec` and piped stdin are mutually exclusive — passing both exits `2`.
@@ -56,8 +56,8 @@ agentao run --prompt "Summarize the current directory" --format json
 ```yaml
 prompt: string                 # required (or pass via --prompt). Templated.
 instructions: string           # appended to system prompt. Templated. Routes to
-                               # Agentao(project_instructions=…) when non-empty
-                               # after .strip(); skips AGENTAO.md disk read.
+                               # Arbiter(project_instructions=…) when non-empty
+                               # after .strip(); skips ARBITER.md disk read.
 parameters:                    # typed slots for spec-level --param substitution
   - name: string               # ASCII identifier; not a Jinja-reserved name
     required: boolean          # default false; mutually exclusive with `default`
@@ -70,7 +70,7 @@ permission_mode: read-only | workspace-write | full-access | plan
 interaction_policy: reject     # M0 only accepts "reject"
 permissions:
   allow:
-    - tool: string             # glob — same syntax as ~/.agentao/permissions.json
+    - tool: string             # glob — same syntax as ~/.arbiter/permissions.json
       args: { ... }            # optional arg-pattern map
       domain:                  # optional URL/domain matcher
         url_arg: string
@@ -96,7 +96,7 @@ CLI flags only override spec values when explicitly provided (argparse defaults 
 `prompt` and `instructions` are Jinja2 templates rendered against typed parameter values. Other spec fields are not templated (templating `permissions` or `skills` invites footguns).
 
 ```yaml
-# .agentao/runs/review-pr.yaml
+# .arbiter/runs/review-pr.yaml
 parameters:
   - name: pr_number
     required: true
@@ -112,7 +112,7 @@ max_iterations: 30
 ```
 
 ```bash
-agentao run --spec .agentao/runs/review-pr.yaml \
+arbiter run --spec .arbiter/runs/review-pr.yaml \
             --param pr_number=142 --param depth=deep
 ```
 
@@ -128,15 +128,15 @@ agentao run --spec .agentao/runs/review-pr.yaml \
 - Render-time errors propagated through Jinja (<span v-pre>`{{ 1/0 }}`</span> → `ZeroDivisionError`, `{% include %}` without loader, etc.) are caught and reported as "template error in spec.\<field\>".
 - Sandbox-blocked operation: the renderer uses `jinja2.sandbox.SandboxedEnvironment`, so attribute-walking escapes (e.g. <span v-pre>`{{ ''.__class__.__mro__ }}`</span>) are refused — recipes from shared/untrusted sources cannot reach Python internals before `permission_mode` and tool permissions apply.
 
-**Reserved parameter names.** Names that look like ASCII identifiers but are reserved by Jinja are rejected at spec-validation time: constants (`true`/`True`/`false`/`False`/`none`/`None`), keywords (`for`/`if`/`in`/`set`/`is`/`not`/`or`/…), and the runtime-injected names `self` / `parent`. The full list lives in `agentao/cli/run_models.py::_JINJA_RESERVED_NAMES`.
+**Reserved parameter names.** Names that look like ASCII identifiers but are reserved by Jinja are rejected at spec-validation time: constants (`true`/`True`/`false`/`False`/`none`/`None`), keywords (`for`/`if`/`in`/`set`/`is`/`not`/`or`/…), and the runtime-injected names `self` / `parent`. The full list lives in `arbiter/cli/run_models.py::_JINJA_RESERVED_NAMES`.
 
-**Instructions precedence.** When `spec.instructions` (after rendering) is non-empty and contains at least one non-whitespace char, it routes to `Agentao(project_instructions=…)` and the agent skips the `AGENTAO.md` disk read. Whitespace-only output (e.g. a YAML block scalar that renders to `"\n"`) falls through to `AGENTAO.md`, so a template that resolves to nothing doesn't silently nuke your project instructions.
+**Instructions precedence.** When `spec.instructions` (after rendering) is non-empty and contains at least one non-whitespace char, it routes to `Arbiter(project_instructions=…)` and the agent skips the `ARBITER.md` disk read. Whitespace-only output (e.g. a YAML block scalar that renders to `"\n"`) falls through to `ARBITER.md`, so a template that resolves to nothing doesn't silently nuke your project instructions.
 
 For the full design rationale — including v1 scope, deferred typing (`number` / `boolean`), and the goose-recipes comparison — see [docs/design/run-spec-parameters.md](https://github.com/jin-bo/agentao/blob/main/docs/design/run-spec-parameters.md).
 
 ### Output
 
-`--format text` writes only the final assistant text to stdout. Diagnostics go to stderr. This is the closest analog to `agentao -p`.
+`--format text` writes only the final assistant text to stdout. Diagnostics go to stderr. This is the closest analog to `arbiter -p`.
 
 `--format json` emits one envelope after the run completes:
 
@@ -148,7 +148,7 @@ For the full design rationale — including v1 scope, deferred typing (`number` 
   "cwd": "/abs/path/to/project",
   "model": "gpt-5.5",
   "final_text": "...",
-  "replay_path": ".agentao/replays/<id>.jsonl",
+  "replay_path": ".arbiter/replays/<id>.jsonl",
   "usage": {
     "prompt_tokens": 12000,
     "completion_tokens": 900,
@@ -175,7 +175,7 @@ The split is deliberate: `empty_response` means the model said nothing, `length_
 
 Note that a turn can end this way *after* running tools: the model may do the work and then fail to summarize it. `tool_calls` on the same envelope reports how many ran, and their side effects have already landed — an `empty_response` failure does **not** mean the workspace is untouched.
 
-### Exit codes (unified across `agentao run` and `agentao -p`)
+### Exit codes (unified across `arbiter run` and `arbiter -p`)
 
 | Code  | Meaning |
 |-------|---------|
@@ -191,8 +191,8 @@ For the full M0 design — merge rules, non-goals, post-MVP scope (`jsonl` event
 ## `--resume` — resume at launch
 
 ```bash
-agentao --resume
-agentao --resume a1b2c3
+arbiter --resume
+arbiter --resume a1b2c3
 ```
 
 Without an id, this resumes the latest session. With an id, it matches by prefix. Inside the REPL, the equivalent is `/sessions resume <id>`.
@@ -202,51 +202,51 @@ Combined with `--acp`, `--resume` resumes on the **first `session/new`** instead
 ## `--acp --stdio` — run as an ACP server
 
 ```bash
-agentao --acp --stdio
-agentao --acp --resume               # resume the latest session on first session/new
-agentao --acp --resume <SESSION_ID>  # resume a specific session on first session/new
+arbiter --acp --stdio
+arbiter --acp --resume               # resume the latest session on first session/new
+arbiter --acp --resume <SESSION_ID>  # resume a specific session on first session/new
 ```
 
-This starts Agentao as an ACP stdio JSON-RPC server for IDEs, host processes, or other agents. `--stdio` is currently meaningful only with `--acp`. Adding `--resume` arms a one-shot directive that the first `session/new` consumes to hydrate + replay a persisted session (any miss degrades to a fresh session). See [3.2 Agentao as an ACP Server → Resume a session on startup](/en/part-3/2-agentao-as-server#resume-a-session-on-startup).
+This starts Arbiter as an ACP stdio JSON-RPC server for IDEs, host processes, or other agents. `--stdio` is currently meaningful only with `--acp`. Adding `--resume` arms a one-shot directive that the first `session/new` consumes to hydrate + replay a persisted session (any miss degrades to a fresh session). See [3.2 Arbiter as an ACP Server → Resume a session on startup](/en/part-3/2-arbiter-as-server#resume-a-session-on-startup).
 
 ## `--plugin-dir` — load plugins temporarily
 
 ```bash
-agentao --plugin-dir ./my-plugin
-agentao plugin --plugin-dir ./my-plugin list
+arbiter --plugin-dir ./my-plugin
+arbiter plugin --plugin-dir ./my-plugin list
 ```
 
 `--plugin-dir` is repeatable. Use it while developing a plugin locally without packaging or installing it.
 
-## `agentao skill ...`
+## `arbiter skill ...`
 
 The top-level `skill` subcommands manage skills installed on disk:
 
 ```bash
-agentao skill install owner/repo[:path][@ref]
-agentao skill list
-agentao skill list --installed
-agentao skill remove <name>
-agentao skill update <name>
-agentao skill update --all
+arbiter skill install owner/repo[:path][@ref]
+arbiter skill list
+arbiter skill list --installed
+arbiter skill remove <name>
+arbiter skill update <name>
+arbiter skill update --all
 ```
 
-REPL `/skills` controls what the current session can see and activate. Top-level `agentao skill ...` controls what is installed on disk.
+REPL `/skills` controls what the current session can see and activate. Top-level `arbiter skill ...` controls what is installed on disk.
 
-## `agentao plugin list`
+## `arbiter plugin list`
 
 ```bash
-agentao plugin list
-agentao plugin list --json
+arbiter plugin list
+arbiter plugin list --json
 ```
 
 This loads plugins and emits diagnostics, useful for CI or pre-release checks. REPL `/plugins` is the interactive version of the same surface.
 
-## `agentao doctor` — health snapshot
+## `arbiter doctor` — health snapshot
 
 ```bash
-agentao doctor
-agentao doctor --json
+arbiter doctor
+arbiter doctor --json
 ```
 
 Aggregates every health signal the harness already produces — `.env` provider check (API-key *presence*, never the value), `settings.json`, permissions, MCP, replay config, ACP schema export, project + user memory stores, plugin diagnostics, and optional-dep probes — into one report. `--json` is the contract surface for CI / hosts; the human-readable default is for terminal use.
@@ -257,13 +257,13 @@ Output contract:
 - `ok` is `false` iff at least one finding has `"level": "error"`; in that case the command exits **1**. Warnings (e.g. "API key not set" on a fresh clone) keep `ok=true` and exit **0** so they don't trip CI.
 - Findings carry `level` (`info` / `warning` / `error`), `area` (the section the issue belongs to), a human message, and `source` (path or env-var label).
 - Doctor is **read-only**: it never creates a memory DB or mutates files. Probing an absent `memory.db` reports `"absent"` without bootstrapping the file.
-- Unknown flags fail with exit **2** (like `agentao run`), so a CI typo (`--jsno`) surfaces instead of exiting 0 against the wrong invocation.
+- Unknown flags fail with exit **2** (like `arbiter run`), so a CI typo (`--jsno`) surfaces instead of exiting 0 against the wrong invocation.
 
-## `agentao config validate` — explicit config check
+## `arbiter config validate` — explicit config check
 
 ```bash
-agentao config validate
-agentao config validate --json
+arbiter config validate
+arbiter config validate --json
 ```
 
 A narrower companion to `doctor` that *only* validates user-editable config — `settings.json`, `.env` provider variables, `permissions.json`, `mcp.json`, the `replay` block in `settings.json`, and the memory-store probe. Plugin discovery is intentionally excluded (use `doctor` or `plugin list`).
@@ -276,12 +276,12 @@ Validation surfaces problems the runtime would otherwise swallow silently:
 - user/project `mcp.json` name collisions (project entries are dropped at runtime — validate warns so you notice);
 - replay block values that `ReplayConfig.from_mapping` silently coerces away (`max_instances: 0`, non-bool capture flags, unknown flag keys, …).
 
-Runtime behavior is **unchanged** — `agentao config validate` is the explicit surface. The factory stays best-effort so an embedded host with a bad optional config isn't blocked from running.
+Runtime behavior is **unchanged** — `arbiter config validate` is the explicit surface. The factory stays best-effort so an embedded host with a bad optional config isn't blocked from running.
 
 Both commands honor `--plugin-dir DIR` (doctor uses it for plugin discovery) and require the `[cli]` extra to be installed; without it the standard missing-dep guard prints an install hint.
 
 ---
 
 ::: tip Authoritative reference
-The top-level parser lives in [`agentao/cli/entrypoints.py:_build_parser`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/entrypoints.py). Non-interactive print mode is `run_print_mode` in the same file (a shim over [`agentao/cli/run.py:execute`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/run.py)). Spec models live in [`agentao/cli/run_models.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/run_models.py); the Jinja2 sandboxed renderer (`prompt` + `instructions`) lives in [`agentao/cli/run_template.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/run_template.py). Skill / plugin subcommands live in [`agentao/cli/subcommands.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/subcommands.py).
+The top-level parser lives in [`arbiter/cli/entrypoints.py:_build_parser`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/entrypoints.py). Non-interactive print mode is `run_print_mode` in the same file (a shim over [`arbiter/cli/run.py:execute`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/run.py)). Spec models live in [`arbiter/cli/run_models.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/run_models.py); the Jinja2 sandboxed renderer (`prompt` + `instructions`) lives in [`arbiter/cli/run_template.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/run_template.py). Skill / plugin subcommands live in [`arbiter/cli/subcommands.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/subcommands.py).
 :::

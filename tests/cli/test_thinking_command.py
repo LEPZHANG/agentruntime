@@ -2,7 +2,7 @@
 
 The handler only touches ``cli.agent.llm.extra_body`` (the live request-body
 passthrough), so a lightweight fake CLI/agent/LLM is enough — no real provider
-credentials or network. See ``agentao/cli/commands/provider.py`` and
+credentials or network. See ``arbiter/cli/commands/provider.py`` and
 ``docs/design/host-llm-extra-params.md``.
 """
 
@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from agentao.cli.commands import handle_thinking_command
+from arbiter.cli.commands import handle_thinking_command
 
 
 def _fake_cli(extra_body=None):

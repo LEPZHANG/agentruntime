@@ -1,6 +1,6 @@
 # 3.4 Reverse: Calling External ACP Agents
 
-[3.2](./2-agentao-as-server) and [3.3](./3-host-client-architecture) frame Agentao as the **server** and your host as the client. This section flips the roles: **Agentao is the client**, driving an external ACP-capable agent as a subprocess. Use this when you have a specialist agent (search bot, doc crawler, code reviewer) that exposes ACP and you want your main Agentao to delegate turns to it.
+[3.2](./2-arbiter-as-server) and [3.3](./3-host-client-architecture) frame Arbiter as the **server** and your host as the client. This section flips the roles: **Arbiter is the client**, driving an external ACP-capable agent as a subprocess. Use this when you have a specialist agent (search bot, doc crawler, code reviewer) that exposes ACP and you want your main Arbiter to delegate turns to it.
 
 ## 3.4.1 When to use this
 
@@ -14,21 +14,21 @@
 When **not** to use this:
 
 - If you just want a local tool — write a `Tool` subclass instead, it's simpler
-- If the sub-agent is Python and shares your process — spawn another `Agentao` in-process instead
+- If the sub-agent is Python and shares your process — spawn another `Arbiter` in-process instead
 
 ## 3.4.2 The `ACPManager` — public API
 
-`ACPManager` is Agentao's ACP-client side. Import from `agentao.acp_client`:
+`ACPManager` is Arbiter's ACP-client side. Import from `arbiter.acp_client`:
 
 ```python
-from agentao.acp_client import ACPManager, load_acp_client_config, PromptResult
-from agentao.acp_client import AcpClientError, AcpErrorCode, ServerState
+from arbiter.acp_client import ACPManager, load_acp_client_config, PromptResult
+from arbiter.acp_client import AcpClientError, AcpErrorCode, ServerState
 ```
 
 Two construction paths:
 
 ```python
-# 1. From .agentao/acp.json (auto-discovers project root)
+# 1. From .arbiter/acp.json (auto-discovers project root)
 mgr = ACPManager.from_project()
 
 # 2. From an explicit config
@@ -64,7 +64,7 @@ Public surface:
 
 `send_prompt_nonblocking` / `finish_prompt_nonblocking` /
 `cancel_prompt_nonblocking` also exist on `ACPManager` but are
-**internal / unstable** — used by Agentao's own interactive CLI
+**internal / unstable** — used by Arbiter's own interactive CLI
 inline-confirmation pipeline. Headless embedders should call
 `send_prompt` or `prompt_once` instead. See
 [`docs/guides/headless-runtime.md`](../../../docs/guides/headless-runtime.md)
@@ -104,7 +104,7 @@ That is also why this is the default headless entry point: the behavior is narro
 ### Example: main agent delegating to a "searcher"
 
 ```python
-from agentao.acp_client import ACPManager, AcpClientError, AcpErrorCode
+from arbiter.acp_client import ACPManager, AcpClientError, AcpErrorCode
 
 mgr = ACPManager.from_project()
 
@@ -126,10 +126,10 @@ def search_via_subagent(query: str) -> str:
         raise
 ```
 
-Wrap it as an Agentao `Tool` so your main agent can use it like any other capability:
+Wrap it as an Arbiter `Tool` so your main agent can use it like any other capability:
 
 ```python
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 
 class SearcherTool(Tool):
     name = "delegate_search"
@@ -151,12 +151,12 @@ class SearcherTool(Tool):
 Register it in the main agent:
 
 ```python
-from agentao import Agentao
+from arbiter import Arbiter
 
 mgr = ACPManager.from_project()
 mgr.start_server("searcher")        # warm up; optional but reduces latency
 
-main = Agentao(tools=[SearcherTool(mgr)])
+main = Arbiter(tools=[SearcherTool(mgr)])
 main.chat("Research the agent-client protocol and summarize.")
 ```
 
@@ -177,9 +177,9 @@ mgr = ACPManager(config, notification_callback=on_notification)
 
 Callback runs on the reader thread — keep it fast, or push onto a queue.
 
-## 3.4.5 Config format — `.agentao/acp.json`
+## 3.4.5 Config format — `.arbiter/acp.json`
 
-Same schema as Agentao's own config-discovered servers:
+Same schema as Arbiter's own config-discovered servers:
 
 ```json
 {
@@ -201,7 +201,7 @@ Same schema as Agentao's own config-discovered servers:
 
 Required fields: `command`, `args`, `env`, `cwd`. Optional: `autoStart`, `startupTimeoutMs`, `requestTimeoutMs`, `capabilities`, `description`, `nonInteractivePolicy`.
 
-- Relative `cwd` resolves against the project root (the dir containing `.agentao/`)
+- Relative `cwd` resolves against the project root (the dir containing `.arbiter/`)
 - `$VAR` / `${VAR}` in `env` values expand against the host process's environment
 - `nonInteractivePolicy` is a structured object `{"mode": "reject_all" | "accept_all"}`. Missing ⇒ implicit `{"mode": "reject_all"}`. The pre-Week-3 bare string form (`"reject_all"` / `"accept_all"`) is rejected at config-load time — migrate via [Appendix E](/en/appendix/e-migration).
 - Use `reject_all` for production. Per-call `interaction_policy=` on `send_prompt` / `prompt_once` overrides the server default for a single turn.
@@ -211,7 +211,7 @@ See [Appendix B · Config keys](/en/appendix/b-config-keys) for the full field r
 ### Per-call policy override
 
 ```python
-from agentao.acp_client import ACPManager, InteractionPolicy
+from arbiter.acp_client import ACPManager, InteractionPolicy
 
 mgr = ACPManager.from_project()
 
@@ -269,7 +269,7 @@ Three common failure scenarios have pinned behaviour so embedders don't have to 
 **Fatal process death → sticky, operator action required.** OOM / SIGKILL / `exit 137`, signal-terminated processes, consecutive handshake failures, or idle non-zero exits beyond the cap mark the server as sticky-fatal. `mgr.is_fatal(name)` returns `True`; all calls raise `AcpClientError(code=TRANSPORT_DISCONNECT, details={"recovery": "fatal"})` until `mgr.restart_server(name)` or `mgr.start_server(name)` clears the mark.
 
 ```python
-from agentao.acp_client import ACPManager, AcpClientError, AcpErrorCode
+from arbiter.acp_client import ACPManager, AcpClientError, AcpErrorCode
 
 mgr = ACPManager.from_project()
 
@@ -282,7 +282,7 @@ except AcpClientError as e:
         # Later: mgr.restart_server("searcher")
 ```
 
-The classifier is a pure function — `classify_process_death` — exported from `agentao.acp_client` and testable in isolation. See [`docs/guides/headless-runtime.md` §7.2](../../../docs/guides/headless-runtime.md) for the full decision matrix.
+The classifier is a pure function — `classify_process_death` — exported from `arbiter.acp_client` and testable in isolation. See [`docs/guides/headless-runtime.md` §7.2](../../../docs/guides/headless-runtime.md) for the full decision matrix.
 
 ## 3.4.8 Cancellation & errors
 
@@ -317,7 +317,7 @@ Full error taxonomy (including the `AcpRpcError` contract and the `details["unde
 `ACPManager.get_status()` returns a typed `list[ServerStatus]`:
 
 ```python
-from agentao.acp_client import ServerStatus
+from arbiter.acp_client import ServerStatus
 
 for s in mgr.get_status():             # each s: ServerStatus
     print(s.server, s.state, s.pid, s.has_active_turn)
@@ -328,7 +328,7 @@ for s in mgr.get_status():             # each s: ServerStatus
 
 Core fields:
 
-- `server: str` — name from `.agentao/acp.json`
+- `server: str` — name from `.arbiter/acp.json`
 - `state: str` — `ServerState` enum value
 - `pid: int | None`
 - `has_active_turn: bool` — derived from the manager's active turn
@@ -345,11 +345,11 @@ view. See
 for the full field list and migration table from the pre-typed dict
 shape.
 
-Log files from the sub-agent land in `<server cwd>/agentao.log` (for Agentao-type sub-agents) or wherever that agent chooses. Always set `cwd` in `.agentao/acp.json` to a writable dir so logs don't get lost.
+Log files from the sub-agent land in `<server cwd>/arbiter.log` (for Arbiter-type sub-agents) or wherever that agent chooses. Always set `cwd` in `.arbiter/acp.json` to a writable dir so logs don't get lost.
 
 ## 3.4.10 Lifecycle checklist
 
-When your main Agentao process starts:
+When your main Arbiter process starts:
 
 ```python
 mgr = ACPManager.from_project()

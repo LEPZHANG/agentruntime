@@ -5,14 +5,14 @@ agent、可嵌入 agent-loop SDK、通用 agent 框架）。**这是一次"触�
 本记录确认 `path-a-roadmap.md` §16.4 的"外部变化"条件很可能已经满足，列出证据，并
 *供维护者判断*——提出什么该变、什么不该变。它**不**单方面退役或重写 Path A；在维护者
 做出决定之前，路线图 §1–§8 保持锁定。
-**读者：** Agentao 维护者与战略评审者。
+**读者：** Arbiter 维护者与战略评审者。
 **对照件：** `vendor-sdk-convergence-review.md`。
 **相关：**
 - `path-a-roadmap.md` —— 本评审据以检验的、已锁定的 embed-first 战略（尤其 §2.1 成功指标、§2.3 非目标、§7.1 模式二、§16.4 退役触发条件）。
 - `embedded-host-contract.md` —— 本评审确认*并非问题所在*的宿主契约设计。
 - `pi-mono-borrow-review.md` / `codex-reverse-review.md` —— 本记录遵循的反向评审纪律（先证据后建议；gap ≠ need）。
 
-**方法：** 竞品扫描 → 找出唯一一个晚于路线图锁定的市场变化 → 逐轴重估 Agentao 护城河
+**方法：** 竞品扫描 → 找出唯一一个晚于路线图锁定的市场变化 → 逐轴重估 Arbiter 护城河
 → 对衍生方向做 keep/cut/gate → 判定 §16.4 是否触发。代码引用锚定于 `main`@`bcdb8e4`
 （2026-06-18）；关于外部 SDK 的定位陈述带有日期、会漂移——在据其行动前请重新核实。
 
@@ -28,12 +28,12 @@ Path A 路线图**锁定于 2026-04-30**。此后，两大模型厂商各自交�
 - **OpenAI Agents SDK** —— 沙箱执行 + model-native harness（隔离工作区、文件级权限、
   快照/恢复）。非 OpenAI 模型经 Any-LLM / LiteLLM adapter 接入，官方文档标注为
   **best-effort / beta**，在工具调用、结构化输出、usage 上报上存在能力差异——即覆盖面广的
-  adapter，*而非* Agentao 式的一等 provider 中立。
+  adapter，*而非* Arbiter 式的一等 provider 中立。
 
 **结论：** "可嵌入的受治理 Python agent loop"已不再是差异化——它已成为 Anthropic 与
 OpenAI 凭借更大分发与原生模型集成提供的"标配"。这恰是 `path-a-roadmap.md` §16.4 命名
 的再审视/退役触发条件。**嵌入契约不是问题（P0 已证明它干净）；问题是"宿主为何要嵌入
-Agentao 而非厂商自家 SDK"这个问题的答案。**
+Arbiter 而非厂商自家 SDK"这个问题的答案。**
 
 **处置（提议，待维护者批准）：**
 - **§16.4 触发：已触发（再审视，非退役）。** embed-first 论点被收窄、而非失效——仍有可守
@@ -44,7 +44,7 @@ Agentao 而非厂商自家 SDK"这个问题的答案。**
 - **重构定位（渠道）：** 把已占代码库 ~21.5% 的 ACP 投入当作乘着**早期但真实**生态信号的
   *分发渠道*，而非仅是功能（§4 D3）。
 - **重排优先级但仍门控：** 路线图 P1.1（`on_usage_event`）与 P1.2（OTel）重要性上升，原因是
-  厂商 SDK *已经*出货 usage/cost 追踪与 OpenTelemetry——所以这是**Agentao 当前缺失的标配补齐项**，
+  厂商 SDK *已经*出货 usage/cost 追踪与 OpenTelemetry——所以这是**Arbiter 当前缺失的标配补齐项**，
   而非厂商的薄弱点。仅在有灯塔提出时才提优先级（§4 D4）。
 - **砍/搁置（与 §2.3 一致）：** CLI/TUI 打磨、托管 SaaS、强跨平台沙箱、无具名采用者的投机性 P1。
 
@@ -63,16 +63,16 @@ embed-first 论点失效（例如某个 Python 原生 agent 运行时以标准�
 
 ## 2. 竞品格局（2026 年 6 月）
 
-Agentao 处在四个品类的交叉点，每条轴上都被单独挑战：
+Arbiter 处在四个品类的交叉点，每条轴上都被单独挑战：
 
-| 品类 | 2026 领头羊 | Agentao 位置 |
+| 品类 | 2026 领头羊 | Arbiter 位置 |
 |---|---|---|
 | **A. CLI 编码 agent 产品** | opencode（~150k★、~650 万月活）、Claude Code、Codex CLI、Gemini CLI、Aider、Goose（已入 Linux 基金会）、Crush、Continue `cn` | CLI 能打，但 **Path A §2.3 已让出此战场**（"opencode 已赢 TUI"）。 |
 | **B. 可嵌入 agent-loop SDK** —— *Path A 的真正战场* | **Claude Agent SDK**、**OpenAI Agents SDK**、Vercel AI SDK、Pi | **被一方厂商 SDK 新挤入。** 即 §3 的变化。 |
-| **C. 通用 agent 框架** | pydantic-ai（类型契约）、smolagents（代码优先）、Agno（~39k★）、Strands、LangGraph、Instructor | *自己搭 agent 的工具箱。* Agentao 不同：**开箱即用**（工具+技能+权限+记忆+replay 已接好），非编排套件。真实且稳定的区分。 |
+| **C. 通用 agent 框架** | pydantic-ai（类型契约）、smolagents（代码优先）、Agno（~39k★）、Strands、LangGraph、Instructor | *自己搭 agent 的工具箱。* Arbiter 不同：**开箱即用**（工具+技能+权限+记忆+replay 已接好），非编排套件。真实且稳定的区分。 |
 | **D. 编码 agent 平台** | OpenHands、SWE-agent | 托管产品/研究，不在 Path A 范围。 |
 
-要点不是"Agentao 在四场赛跑里落后"，而是 Agentao 的身份是一个*组合*（受治理、provider
+要点不是"Arbiter 在四场赛跑里落后"，而是 Arbiter 的身份是一个*组合*（受治理、provider
 中立、开箱即用的编码运行时，同时又是干净的可嵌入库），这一组合仍然独特——尽管**每条单轴都
 被挑战**，B 类最为新近。
 
@@ -88,29 +88,29 @@ Agentao 处在四个品类的交叉点，每条轴上都被单独挑战：
   OpenAI 模型，官方文档将其标注为 **best-effort / beta**，相对原生 OpenAI 路径在工具调用、
   结构化输出、usage 上报上存在能力差异。
 
-对照 Agentao README 首句——*"本地优先、隐私优先、可嵌入 Python 宿主的 agent harness"*——
-其中**"可嵌入/带权限/子代理/沙箱"部分现已被两家厂商对齐**，而它们带来 Agentao 无法企及的
+对照 Arbiter README 首句——*"本地优先、隐私优先、可嵌入 Python 宿主的 agent harness"*——
+其中**"可嵌入/带权限/子代理/沙箱"部分现已被两家厂商对齐**，而它们带来 Arbiter 无法企及的
 分发与原生模型集成。P0 交付的干净嵌入契约是必要的，但已不再是充分的差异化。战略问题从
-*"嵌入契约干不干净？"*（干净）转为*"宿主为何要嵌入 Agentao 而非厂商自家 SDK？"*
+*"嵌入契约干不干净？"*（干净）转为*"宿主为何要嵌入 Arbiter 而非厂商自家 SDK？"*
 
 ## 4. 逐轴重估护城河
 
 ### 仍可守 —— 厂商 SDK 结构上难以匹配
 
 1. **天生 provider 中立*且无厂商数据链路*。** OpenAI 兼容的*任意* provider + 运行时
-   `/provider` 切换（`agentao/runtime/`、`LLM_PROVIDER`）。需精确区分：厂商 SDK 现已出货
+   `/provider` 切换（`arbiter/runtime/`、`LLM_PROVIDER`）。需精确区分：厂商 SDK 现已出货
    *广覆盖的第三方 provider adapter*（Claude SDK 可指向其他模型；OpenAI 的 SDK 经
-   Any-LLM/LiteLLM 覆盖 100+，best-effort/beta）——所以"能指向另一个模型"**已不再为 Agentao
-   独占**。仍独占的是*姿态*：agentao 不是套了 adapter 的厂商 loop、不带厂商 harness 文化、
+   Any-LLM/LiteLLM 覆盖 100+，best-effort/beta）——所以"能指向另一个模型"**已不再为 Arbiter
+   独占**。仍独占的是*姿态*：arbiter 不是套了 adapter 的厂商 loop、不带厂商 harness 文化、
    不经任何厂商数据链路。护城河是 **no-vendor-loop / no-vendor-telemetry**，而非仅仅"多模型"。
 2. **本地优先/隐私优先/无托管基建/无全局状态。** 能力注入、不污染宿主 logger、多实例隔离
-   （`tests/test_multi_agentao_isolation.py`、`tests/test_no_host_logger_pollution.py`）。
+   （`tests/test_multi_arbiter_isolation.py`、`tests/test_no_host_logger_pollution.py`）。
    *无法*把代码经厂商 loop 路由的宿主，就是楔子。
 3. **本地、进程内的审计契约。** 权限模式 + replay JSONL 审计 sink（v1.2，
-   `agentao/host/replay_projection.py`）+ `events()` 宿主事件流。**此处不可夸大：**两家厂商
+   `arbiter/host/replay_projection.py`）+ `events()` 宿主事件流。**此处不可夸大：**两家厂商
    SDK 均出货一等的治理/可观测——Claude Agent SDK 列出 hooks、permissions、sessions、cost/usage
    追踪、OpenTelemetry、checkpointing；OpenAI 的 SDK 有 tracing、usage、沙箱 permissions/results/
-   resume state。Agentao 更窄、可守的优势是其审计轨迹是**在 no-vendor-loop 姿态下的本地 JSONL
+   resume state。Arbiter 更窄、可守的优势是其审计轨迹是**在 no-vendor-loop 姿态下的本地 JSONL
    replay 产物**——记录落在宿主自己的文件里，而非厂商的 tracing 后端——这对无法向厂商发送遥测的
    宿主才是相关属性。这是*本地性/所有权*优势，不是"厂商没有审计"优势。
 4. **ACP-server 互操作 —— 乘着早期但真实的生态信号。** 代码库中 `acp/` + `acp_client/` 的
@@ -127,14 +127,14 @@ Agentao 处在四个品类的交叉点，每条轴上都被单独挑战：
 
 - **单凭"可嵌入"** —— 已成标配（§3）。
 - **CLI 体验** —— 已让给 opencode（§2.3，无变化）。
-- **沙箱成熟度** —— OpenAI/Claude 已上容器快照；Agentao 的 macOS `sandbox-exec` 更窄。
+- **沙箱成熟度** —— OpenAI/Claude 已上容器快照；Arbiter 的 macOS `sandbox-exec` 更窄。
   **不衍生任何动作**——§2.3 已把强跨平台沙箱列为非目标；厂商此举*印证*而非推翻该判断。
 
 ## 5. 一个可量化的分发拖累
 
-**方法快照（供复验）：** 查询 `"agentao" python agent framework github`，于 2026-06-18 经
+**方法快照（供复验）：** 查询 `"arbiter" python agent framework github`，于 2026-06-18 经
 助手的 `WebSearch` 工具运行（US locale、登出态、前 10 条结果）；首个自然结果是无关的
-`github.com/taoagents/agentao`（"ridges-old" 仓库），且**`jin-bo/agentao` 未出现在前列。**
+`github.com/taoagents/arbiter`（"ridges-old" 仓库），且**`jin-bo/agentao` 未出现在前列。**
 搜索排名随地区、登录状态、时间漂移——引用为现状前请以无痕/登出态重跑并记录引擎 + 日期。截至
 本快照：鉴于 §2.1 的成功指标是*"被依赖/被找到"*，这种重名 + 可发现性缺口是对 dependents 目标
 的直接、可量化拖累——并独立于 §3 的变化印证了 §7.1 模式二（*"问题在分发，不在技术"*）。与
@@ -149,8 +149,8 @@ Agentao 处在四个品类的交叉点，每条轴上都被单独挑战：
 | **D1** | 重写差异化标题：以"provider 中立 + 本地/隐私优先 + **可治理可审计**"打头，"可嵌入"降级 | **立即做**（文案，近零代码） | 直接回答新的"为何不用厂商 SDK"；现 README 以已商品化的词打头。 |
 | **D2** | 修复可发现性：仓库 topics、PyPI 关键词、一页"vs Claude/OpenAI Agent SDK"对比；主攻中文生态楔子 | **立即做**（分发） | §5 无歧义；§14 已把分发列为最主要的非工程风险。 |
 | **D3** | 把 ACP-server 当*渠道*而非仅功能（"插进 ACP 编辑器的、受治理、provider 中立的 agent"） | **重构定位（权重门控于 §4.4 核实）** | 把已有大块代码投入变成分发；乘早期但真实的 ACP 信号。权重应随 §4.4 未核实采用声称（JetBrains / Copilot CLI / "25+ agent"）经一手来源核实的成立比例而定。属 harness 范畴（互操作，类比 `acp_client`）。 |
-| **D4** | 路线图 P1.1 `on_usage_event` + P1.2 OTel | **重排优先级，仍门控** | 这是**标配补齐项**——两家厂商 SDK 已出货 usage/cost 追踪 + OpenTelemetry，故是 Agentao 补缺口，而非利用厂商弱点。重要性↑，但**仅在灯塔提出时才启动**——§4 纪律不变。 |
-| **D5** | 互操作桥：从 Agentao *驱动* Claude/OpenAI Agent SDK 的 agent，或把 Agentao *暴露*在其工具接口下 | **搁置（按需门控）** | 通过 harness-vs-product 检验（互操作，类比 `acp_client`），但无具名宿主前属投机。记为候选，非承诺。 |
+| **D4** | 路线图 P1.1 `on_usage_event` + P1.2 OTel | **重排优先级，仍门控** | 这是**标配补齐项**——两家厂商 SDK 已出货 usage/cost 追踪 + OpenTelemetry，故是 Arbiter 补缺口，而非利用厂商弱点。重要性↑，但**仅在灯塔提出时才启动**——§4 纪律不变。 |
+| **D5** | 互操作桥：从 Arbiter *驱动* Claude/OpenAI Agent SDK 的 agent，或把 Arbiter *暴露*在其工具接口下 | **搁置（按需门控）** | 通过 harness-vs-product 检验（互操作，类比 `acp_client`），但无具名宿主前属投机。记为候选，非承诺。 |
 | — | CLI/TUI 打磨 · 托管 SaaS · 强跨平台沙箱 · 投机性 P1 | **砍/搁置（不变）** | 与 §2.3 及既往边界否决一致；§3 的变化强化而非重开这些判断。 |
 
 ## 7. §16.4 触发判定
@@ -178,7 +178,7 @@ Agentao 处在四个品类的交叉点，每条轴上都被单独挑战：
 
 列出以便本记录可被证伪、而非被辩护：
 
-- **若**某灯塔采用者反馈他们*正是因为*厂商中立或审计而选 Agentao → 护城河（§4）被证明强于评分；
+- **若**某灯塔采用者反馈他们*正是因为*厂商中立或审计而选 Arbiter → 护城河（§4）被证明强于评分；
   D1/D2 获验证，加码分发。
 - **若**接下来两次月度快照显示 PyPI dependents 因中文生态楔子而上升 → D2 是主导杠杆，其余降级。
 - **若**某厂商 SDK 出货一等的 provider 中立 *且* 纯本地无遥测模式 *且* 一等审计契约 → 护城河

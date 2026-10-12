@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from agentao.permissions import PermissionMode
+from arbiter.permissions import PermissionMode
 
 from src.bot import (
     WRITE_ALLOWLIST_CONTACTS,
@@ -95,7 +95,7 @@ async def test_handle_message_calls_send_with_reply() -> None:
         posted.append({"contact_id": contact_id, "text": text})
 
     with patch(
-        "agentao.agent.Agentao._llm_call",
+        "arbiter.agent.Arbiter._llm_call",
         lambda self, msgs, tools, token: _fake_response(),
     ):
         result = await handle_message(
@@ -121,7 +121,7 @@ async def test_run_polling_loop_processes_one_batch_then_exits() -> None:
     )
 
     with patch(
-        "agentao.agent.Agentao._llm_call",
+        "arbiter.agent.Arbiter._llm_call",
         lambda self, msgs, tools, token: _fake_response("ok"),
     ):
         await run_polling_loop(
@@ -147,18 +147,18 @@ async def test_handle_message_uses_contact_specific_permission_mode() -> None:
     async def fake_send(*, contact_id: str, text: str) -> None:
         return None
 
-    from agentao.agent import Agentao as _Agentao
+    from arbiter.agent import Arbiter as _Arbiter
 
-    real_init = _Agentao.__init__
+    real_init = _Arbiter.__init__
 
     def _capturing_init(self, *args, **kwargs):
         captured.append(kwargs.get("permission_engine"))
         real_init(self, *args, **kwargs)
 
     with patch(
-        "agentao.agent.Agentao._llm_call",
+        "arbiter.agent.Arbiter._llm_call",
         lambda self, msgs, tools, token: _fake_response(),
-    ), patch("agentao.agent.Agentao.__init__", _capturing_init):
+    ), patch("arbiter.agent.Arbiter.__init__", _capturing_init):
         a_contact = next(iter(WRITE_ALLOWLIST_CONTACTS))
         await handle_message(
             text="deploy",

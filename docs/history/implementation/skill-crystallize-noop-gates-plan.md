@@ -27,9 +27,9 @@ Non-goals (explicitly out of scope for v1):
 
 `/crystallize suggest` currently has **one** weak gate: the prompt
 instructs the model to emit `NO_PATTERN_FOUND` when "no clear repeatable
-pattern exists" (`agentao/memory/crystallizer.py:283`). The CLI then
+pattern exists" (`arbiter/memory/crystallizer.py:283`). The CLI then
 prints a generic "no clear repeatable skill pattern found" message
-(`agentao/cli/commands_ext/crystallize.py:498`).
+(`arbiter/cli/commands_ext/crystallize.py:498`).
 
 In practice this single gate misfires in two directions:
 
@@ -151,10 +151,10 @@ descriptions before sending to the model) is **deferred to v1.1**.
 
 | File | Change |
 |------|--------|
-| `agentao/memory/crystallizer.py:259` | Rewrite `SUGGEST_SYSTEM_PROMPT` to include the 4 gates in the order above, with the fixed-enum `<gate_id>` contract documented inline. |
-| `agentao/memory/crystallizer.py:286` | Add `available_skills_text: str = ""` parameter to `suggest_prompt()`. When non-empty, render under a `# Available skills (do not duplicate)` heading before the evidence block. |
-| `agentao/cli/commands_ext/crystallize.py:482` | Build the `available_skills_text` block from `cli.agent.skill_manager` using the selection/truncation policy above; pass into `suggest_prompt(...)`. |
-| `agentao/cli/commands_ext/crystallize.py:498` | Replace the equality check with a parser: split on first `:`, whitelist-match the gate ID, render skip reason; fall back to the plain branch on unknown IDs. |
+| `arbiter/memory/crystallizer.py:259` | Rewrite `SUGGEST_SYSTEM_PROMPT` to include the 4 gates in the order above, with the fixed-enum `<gate_id>` contract documented inline. |
+| `arbiter/memory/crystallizer.py:286` | Add `available_skills_text: str = ""` parameter to `suggest_prompt()`. When non-empty, render under a `# Available skills (do not duplicate)` heading before the evidence block. |
+| `arbiter/cli/commands_ext/crystallize.py:482` | Build the `available_skills_text` block from `cli.agent.skill_manager` using the selection/truncation policy above; pass into `suggest_prompt(...)`. |
+| `arbiter/cli/commands_ext/crystallize.py:498` | Replace the equality check with a parser: split on first `:`, whitelist-match the gate ID, render skip reason; fall back to the plain branch on unknown IDs. |
 | `tests/test_crystallizer.py:61` | Add tests for: prompt contains all 4 gate IDs; `suggest_prompt` includes available skills text when provided; truncation hint appears when over budget. |
 | `tests/test_crystallizer.py` (new) | Add parser tests: known gate ID renders reason; unknown gate ID falls back to legacy branch; plain `NO_PATTERN_FOUND` still works. |
 

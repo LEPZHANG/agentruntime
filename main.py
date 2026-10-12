@@ -1,9 +1,9 @@
-"""Main entry point for Agentao."""
+"""Main entry point for Arbiter."""
 
 import warnings
 warnings.filterwarnings("ignore", message="urllib3.*or chardet.*doesn't match")
 
-from agentao.cli import entrypoint
+from arbiter.cli import entrypoint
 
 if __name__ == "__main__":
     entrypoint()

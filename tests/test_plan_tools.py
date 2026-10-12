@@ -4,9 +4,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock
 
-from agentao.plan.session import PlanPhase, PlanSession
-from agentao.plan.controller import PlanController
-from agentao.tools.plan import PlanSaveTool, PlanFinalizeTool
+from arbiter.plan.session import PlanPhase, PlanSession
+from arbiter.plan.controller import PlanController
+from arbiter.tools.plan import PlanSaveTool, PlanFinalizeTool
 
 
 def _make_tools(tmp_path: Path):

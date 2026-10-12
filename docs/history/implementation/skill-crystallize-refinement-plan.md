@@ -2,7 +2,7 @@
 
 ## Goal
 
-在现有 `/crystallize suggest|create` 基础上，增加一个显式的 `refine` 阶段，让 skill draft 可以复用随 `agentao` 发布的内置 `skill-creator` 经验做增强，但不把这套较重的 workflow 绑进 memory crystallization 主路径。
+在现有 `/crystallize suggest|create` 基础上，增加一个显式的 `refine` 阶段，让 skill draft 可以复用随 `arbiter` 发布的内置 `skill-creator` 经验做增强，但不把这套较重的 workflow 绑进 memory crystallization 主路径。
 
 目标效果：
 
@@ -22,9 +22,9 @@
 
 当前代码位置：
 
-- [`agentao/memory/crystallizer.py`](../../agentao/memory/crystallizer.py)
-- [`agentao/cli/commands_ext.py`](../../agentao/cli/commands_ext.py)
-- [`agentao/skills/manager.py`](../../agentao/skills/manager.py)
+- [`arbiter/memory/crystallizer.py`](../../arbiter/memory/crystallizer.py)
+- [`arbiter/cli/commands_ext.py`](../../arbiter/cli/commands_ext.py)
+- [`arbiter/skills/manager.py`](../../arbiter/skills/manager.py)
 - bundled skill: [`skills/skill-creator/SKILL.md`](../../../skills/skill-creator/SKILL.md)
 
 ## Design Decision
@@ -133,7 +133,7 @@ No pending skill draft. Run /crystallize suggest first.
 新增一个项目级 draft 文件：
 
 ```text
-<project-root>/.agentao/crystallize/skill_draft.json
+<project-root>/.arbiter/crystallize/skill_draft.json
 ```
 
 不放全局目录，原因：
@@ -173,7 +173,7 @@ No pending skill draft. Run /crystallize suggest first.
 
 新增：
 
-- [`agentao/skills/drafts.py`](../../agentao/skills/drafts.py)
+- [`arbiter/skills/drafts.py`](../../arbiter/skills/drafts.py)
 
 职责：
 
@@ -208,7 +208,7 @@ def replace_skill_name(skill_md: str, new_name: str) -> str: ...
 
 ### Existing Modules
 
-#### `agentao/memory/crystallizer.py`
+#### `arbiter/memory/crystallizer.py`
 
 保留现有 `MemoryCrystallizer` 不变。
 
@@ -221,7 +221,7 @@ def replace_skill_name(skill_md: str, new_name: str) -> str: ...
 
 `SkillCrystallizer` 继续只承担“把 skill 文本写到目标目录”的职责，不负责 draft 状态管理。
 
-#### `agentao/cli/commands_ext.py`
+#### `arbiter/cli/commands_ext.py`
 
 扩展 `/crystallize` 子命令分发：
 
@@ -255,7 +255,7 @@ CLI 层负责：
 
 建议系统提示语义：
 
-- 你在优化一个已有 Agentao skill draft
+- 你在优化一个已有 Arbiter skill draft
 - 可以参考 bundled `skill-creator` 中关于：
   - description 触发性
   - when to use
@@ -369,7 +369,7 @@ No pending skill draft.
 覆盖：
 
 - save / load / clear 正常工作
-- draft 文件写到项目级 `.agentao/crystallize/`
+- draft 文件写到项目级 `.arbiter/crystallize/`
 - `extract_skill_name(...)` 正常提取
 - `replace_skill_name(...)` 正常替换
 
@@ -406,7 +406,7 @@ No pending skill draft.
 
 建议按以下顺序落地：
 
-1. 新增 `agentao/skills/drafts.py`
+1. 新增 `arbiter/skills/drafts.py`
 2. 让 `/crystallize suggest` 自动保存 pending draft
 3. 实现 `/crystallize status`
 4. 实现 `/crystallize clear`

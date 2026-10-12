@@ -9,12 +9,12 @@ placeholder / canned notice / LLM-error string. It must mirror the gated
 from pathlib import Path
 from types import SimpleNamespace
 
-from agentao import Agentao, TurnOutcome
-from agentao.cancellation import CancellationToken
+from arbiter import Arbiter, TurnOutcome
+from arbiter.cancellation import CancellationToken
 
 
-def _make_agent() -> Agentao:
-    return Agentao(
+def _make_agent() -> Arbiter:
+    return Arbiter(
         api_key="test-key",
         base_url="https://example.test/v1",
         model="test-model",
@@ -31,7 +31,7 @@ def _text_response(content, *, finish_reason="stop", reasoning=None):
 
 
 def test_top_level_export():
-    """``from agentao import TurnOutcome`` works and needs no LLM stack."""
+    """``from arbiter import TurnOutcome`` works and needs no LLM stack."""
     assert TurnOutcome.__name__ == "TurnOutcome"
 
 
@@ -108,7 +108,7 @@ def test_cancelled_turn_is_not_reported_as_incomplete():
 def test_last_turn_mirrors_the_turn_end_wire_field():
     """The read-after and the TURN_END event must never disagree — both are
     fed from the same single gated value in ``runtime/turn.py``."""
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     agent = _make_agent()
     agent._llm_call = lambda messages, tools, token: _text_response(

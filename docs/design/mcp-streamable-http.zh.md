@@ -6,13 +6,13 @@
 **2026-07-01 决策（D2）**，裸 `url` **默认**走 Streamable HTTP（SSE 改为经
 `type: "sse"` 显式选入）—— 这是一个刻意的**破坏性变更**；见 §3 D2 与 §10。
 
-对 `main`@`8266de1`（2026-07-19）验证：`agentao/mcp/config.py:61`
+对 `main`@`8266de1`（2026-07-19）验证：`arbiter/mcp/config.py:61`
 （`_KNOWN_TRANSPORTS`）、`:166`（`resolve_transport`）、`:216`（裸 `url` → `http` 推断）；
-ACP 闸门见 `agentao/acp/schema.py:50`（能力宣告 `{"http": True, "sse": True}`）、
-`:174`（`Literal["stdio", "sse", "http"]`）、`agentao/acp/session_new.py:226`、
-`agentao/acp/mcp_translate.py:218,243`。
+ACP 闸门见 `arbiter/acp/schema.py:50`（能力宣告 `{"http": True, "sse": True}`）、
+`:174`（`Literal["stdio", "sse", "http"]`）、`arbiter/acp/session_new.py:226`、
+`arbiter/acp/mcp_translate.py:218,243`。
 
-**读者：** Agentao 维护者；DeepChat/TensorChat 的 ACP 集成负责人。
+**读者：** Arbiter 维护者；DeepChat/TensorChat 的 ACP 集成负责人。
 
 **对应英文：** `mcp-streamable-http.md`。
 
@@ -33,8 +33,8 @@ ACP 闸门见 `agentao/acp/schema.py:50`（能力宣告 `{"http": True, "sse": T
 
 ## 1. 背景 — 当前如何选择传输
 
-`McpClient`（`agentao/mcp/client.py`）只认两种传输，并且是**按结构**从配置中
-出现了哪个键来推断的 —— 原生 `.agentao/mcp.json` 里**没有**显式的传输选择字段：
+`McpClient`（`arbiter/mcp/client.py`）只认两种传输，并且是**按结构**从配置中
+出现了哪个键来推断的 —— 原生 `.arbiter/mcp.json` 里**没有**显式的传输选择字段：
 
 ```python
 # client.py:152-158
@@ -80,7 +80,7 @@ else:
 ## 2. 缺口与时机
 
 MCP 规范已在 2025-03-26 版把 **HTTP+SSE 传输标记为弃用**，改用 **Streamable HTTP**。
-新的远程 MCP 服务器都发 Streamable HTTP，很多**只**暴露它。Agentao 目前只有在这些
+新的远程 MCP 服务器都发 Streamable HTTP，很多**只**暴露它。Arbiter 目前只有在这些
 服务器同时保留 legacy SSE 端点时才够得着。客户端依赖已就位 ——
 `mcp.client.streamable_http.streamablehttp_client` 就在钉住的 `mcp>=1.26.0` SDK 里
 —— 所以这是接线工作，不是新增依赖。
@@ -89,7 +89,7 @@ MCP 规范已在 2025-03-26 版把 **HTTP+SSE 传输标记为弃用**，改用 *
 
 ### D1 — 传输选择器用显式 `type` 字段
 
-原生 `.agentao/mcp.json` 每个 server 新增可选 `type`：`"stdio" | "sse" | "http"`。
+原生 `.arbiter/mcp.json` 每个 server 新增可选 `type`：`"stdio" | "sse" | "http"`。
 接受 `"streamable-http"`、`"streamable_http"`、`"streamablehttp"` 作为大小写不敏感
 的别名，归一化到 `"http"`。
 
@@ -106,7 +106,7 @@ HTTP）**；`command` → `stdio` 不变。SSE 保留，但改为经 `type: "sse
 
 **为何：** MCP 规范已弃用 HTTP+SSE，改用 Streamable HTTP；新服务器 http 优先
 （Cursor 已把裸 `url` 定为 Streamable HTTP）。默认走存活的传输，正是大多数新配置
-所想要的，也让 agentao 跟随规范方向，而非钉死在一个已弃用的传输上。
+所想要的，也让 arbiter 跟随规范方向，而非钉死在一个已弃用的传输上。
 
 **接受的代价 —— 这是破坏性变更。** 每一份指向 SSE 端点的现有裸 `url` 配置，现在都会
 尝试 Streamable HTTP，并在握手时失败，直到加上 `"type": "sse"`。此决策归维护者
@@ -119,7 +119,7 @@ HTTP）**；`command` → `stdio` 不变。SSE 保留，但改为经 `type: "sse
 2. **发布说明迁移行（§10）。**
 
 **已考虑并否决的替代方案 —— 自动回退**（先试 Streamable HTTP，遇 405/404 回退
-SSE）。否决：它违背 agentao "显式优先于魔法"的姿态 —— 本设计复用的那个预检本身就是
+SSE）。否决：它违背 arbiter "显式优先于魔法"的姿态 —— 本设计复用的那个预检本身就是
 **白名单**、刻意不做内容嗅探（`client.py:113-119`）。自动回退还会让 `transport_type`
 不确定（破坏 `/mcp list` 状态与 `get_server_status`），在未命中路径上把 connect
 延迟预算翻倍，并模糊错误来自哪种传输。Legacy SSE 用户写 `type: "sse"` 即可 —— 一个词。
@@ -184,7 +184,7 @@ return "unknown"` —— 而 `connect()` 让它传播进既有 `except`（212）
 `http` 与 `sse` **形状同为 URL、且每个字段都一致**（`url`、`headers`、`timeout`、
 `trust`）—— 只有客户端工厂不同。正是这份对称让 §5 能共享几乎全部代码。
 
-## 5. 客户端改动（`agentao/mcp/client.py`）
+## 5. 客户端改动（`arbiter/mcp/client.py`）
 
 ### 5.1 导入 —— 用**规范**客户端，而非弃用别名
 
@@ -204,7 +204,7 @@ SDK 自己的 `create_mcp_http_client` 工厂（本模块也导出）来建，�
 所做的。
 
 SDK 已在模块顶部即时导入（`from mcp.client.sse import sse_client`，第 14 行）；
-Streamable HTTP 属同一包，故无新的懒加载顾虑 —— `agentao.mcp/__init__.py` 的
+Streamable HTTP 属同一包，故无新的懒加载顾虑 —— `arbiter.mcp/__init__.py` 的
 PEP-562 闸门已把整个 SDK 推迟到首次触碰 `McpClientManager` 时。
 
 ### 5.2 `transport_type` 与分发 → 委托 `resolve_transport`
@@ -389,7 +389,7 @@ except Exception as e:
    更新 63-69 的模块 docstring 与 233-237 的丢弃分支注释（那个 `else` 现在只兜真正
    未知的类型）。
 
-## 7. CLI 改动（`agentao/cli/commands/mcp.py`）
+## 7. CLI 改动（`arbiter/cli/commands/mcp.py`）
 
 `/mcp add` 目前对任何 `http(s)://` 端点都写 `{"url": endpoint}`（53-54）—— 恒为
 SSE。把无标志的 URL 默认翻为 Streamable HTTP（与 D2 一致），并加 `--sse` 退出项：
@@ -473,7 +473,7 @@ SSE。把无标志的 URL 默认翻为 Streamable HTTP（与 D2 一致），并�
 跑绿（参"绝不合并红/不稳定 CI"）。
 
 **迁移行（发布说明 / CHANGELOG）：** *"MCP：裸 `url` 服务器现在默认走 Streamable
-HTTP 传输。若你的服务器是 legacy SSE 端点，请在 `.agentao/mcp.json` 的条目里加
+HTTP 传输。若你的服务器是 legacy SSE 端点，请在 `.arbiter/mcp.json` 的条目里加
 `\"type\": \"sse\"`。Streamable HTTP 是规范对现已弃用的 HTTP+SSE 传输的替代。"*
 §5.7 的 connect 失败提示会为漏看说明的人在上下文里给出同样的修复。
 
@@ -490,15 +490,15 @@ HTTP 传输。若你的服务器是 legacy SSE 端点，请在 `.agentao/mcp.jso
 
 | 文件 | 改动 |
 |---|---|
-| `agentao/mcp/config.py` | `resolve_transport()`（失败即关闭）+ `McpTransportConfigError`；`McpServerConfig` docstring 加 `type`；超时文档措辞 |
-| `agentao/mcp/client.py` | 导入（规范 `streamable_http_client` + `create_mcp_http_client`）；`transport_type`（吞成 `unknown`）/`connect` → `resolve_transport`；`_connect_streamable_http`（3 元组，`terminate_on_close=False`）；`_prepare_url_connect` 助手；§5.7 门控提示 |
-| `agentao/acp/initialize.py` | `mcpCapabilities.http = True` + docstring |
-| `agentao/acp/session_new.py` | 解析接受 `http` + docstring |
-| `agentao/acp/mcp_translate.py` | 翻译 `http`，**双向盖 `type`** + docstring |
-| `agentao/acp/schema.py` | `mcpCapabilities` 默认 + `AcpMcpServer.type` `Literal` 加 `http` + docstring |
+| `arbiter/mcp/config.py` | `resolve_transport()`（失败即关闭）+ `McpTransportConfigError`；`McpServerConfig` docstring 加 `type`；超时文档措辞 |
+| `arbiter/mcp/client.py` | 导入（规范 `streamable_http_client` + `create_mcp_http_client`）；`transport_type`（吞成 `unknown`）/`connect` → `resolve_transport`；`_connect_streamable_http`（3 元组，`terminate_on_close=False`）；`_prepare_url_connect` 助手；§5.7 门控提示 |
+| `arbiter/acp/initialize.py` | `mcpCapabilities.http = True` + docstring |
+| `arbiter/acp/session_new.py` | 解析接受 `http` + docstring |
+| `arbiter/acp/mcp_translate.py` | 翻译 `http`，**双向盖 `type`** + docstring |
+| `arbiter/acp/schema.py` | `mcpCapabilities` 默认 + `AcpMcpServer.type` `Literal` 加 `http` + docstring |
 | `docs/schema/host.acp.v1.json` | 重新生成快照（`type` enum + 能力默认） |
-| `agentao/cli/commands/mcp.py` | `/mcp add [--http|--sse]`（标志在名字前/后；裸 URL → 无 `type`） |
-| `agentao/cli/help_text.py` | 权威 `/help` 的 `/mcp add` 行 |
+| `arbiter/cli/commands/mcp.py` | `/mcp add [--http|--sse]`（标志在名字前/后；裸 URL → 无 `type`） |
+| `arbiter/cli/help_text.py` | 权威 `/help` 的 `/mcp add` 行 |
 | `docs/reference/configuration.md` | Streamable HTTP 传输行 + 超时说明 |
 | `CLAUDE.md` | MCP 传输行 |
 | `tests/test_mcp_streamable_http.py`（新）+ `test_mcp_connect_timeouts.py` + 4 个 ACP 测试 | 见 §9 |
@@ -518,7 +518,7 @@ HTTP 传输。若你的服务器是 legacy SSE 端点，请在 `.agentao/mcp.jso
       **3 元组**且接受 `terminate_on_close`；弃用别名 `streamablehttp_client` 会发
       `DeprecationWarning`（用规范的那个）—— `uv run python -c "import inspect,mcp.client.streamable_http as m; print(inspect.signature(m.streamable_http_client))"`。
 
-### 阶段 1 —— `agentao/mcp/config.py`（地基，无树内依赖）
+### 阶段 1 —— `arbiter/mcp/config.py`（地基，无树内依赖）
 
 - [ ] 增加 `class McpTransportConfigError(ValueError)`。
 - [ ] 增加 `resolve_transport(config, *, return_source=False) -> str`，实现 D3：
@@ -532,7 +532,7 @@ HTTP 传输。若你的服务器是 legacy SSE 端点，请在 `.agentao/mcp.jso
 - [ ] 改 `resolve_timeouts` docstring 措辞（100-103）："交给 SSE 传输" → "交给 URL
       传输（SSE 或 Streamable HTTP）"。
 
-### 阶段 2 —— `agentao/mcp/client.py`
+### 阶段 2 —— `arbiter/mcp/client.py`
 
 - [ ] 顶部（第 14 行 `sse_client` 导入旁）加规范导入
       `from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client`
@@ -563,7 +563,7 @@ HTTP 传输。若你的服务器是 legacy SSE 端点，请在 `.agentao/mcp.jso
       `cfg = {"url": url, "type": transport_type}` —— **双向都盖**（§6.3）；更新模块
       docstring（63-69）与丢弃分支注释（233-237）。
 
-### 阶段 4 —— CLI `agentao/cli/commands/mcp.py`
+### 阶段 4 —— CLI `arbiter/cli/commands/mcp.py`
 
 - [ ] `/mcp add`（41-69）：解析在名字**前或后**均可的 `--sse`/`--http` 标志；无标志
       URL → **裸 `{"url": endpoint}`**（推断，可触发提示），`--http` → `{"type":"http",...}`，
@@ -601,7 +601,7 @@ HTTP 传输。若你的服务器是 legacy SSE 端点，请在 `.agentao/mcp.jso
 - [ ] 全套绿：`uv run python -m pytest tests/ -q`。
 - [ ] 定向：`uv run python -m pytest tests/test_mcp_*.py tests/test_acp_*.py -q`。
 - [ ] 无残留旧说法：
-      `grep -rn "streamable_http_client\|http is not supported\|only supports.*sse\|mcpCapabilities.*http.*[Ff]alse" agentao/`
+      `grep -rn "streamable_http_client\|http is not supported\|only supports.*sse\|mcpCapabilities.*http.*[Ff]alse" arbiter/`
       只剩预期匹配（注释描述历史，无断言当前行为者）。
 - [ ] 无说谎 docstring：三个 ACP 文件不再说 `http` 被拒。
 - [ ] 冒烟：把 `streamable_http_client` + `create_mcp_http_client` monkeypatch 成

@@ -4,7 +4,7 @@ Shows the two host-facing injection surfaces of the embedded contract,
 both replacing a built-in by *name* (drop-in override, same name + same
 parameter schema, so the model's existing tool calls keep working):
 
-1. **Construction-time** via ``Agentao(extra_tools=[...])`` —
+1. **Construction-time** via ``Arbiter(extra_tools=[...])`` —
    :class:`JinaWebFetchTool` (``web_fetch``) backed by Jina Reader
    (``https://r.jina.ai/{url}``). Registered as the final pass, so it
    overrides the built-in ``web_fetch`` if present. See ``make_agent``.
@@ -31,8 +31,8 @@ from typing import Any, Dict, Optional
 from urllib.parse import quote
 from unittest.mock import MagicMock
 
-from agentao import Agentao
-from agentao.host import Tool
+from arbiter import Arbiter
+from arbiter.host import Tool
 
 # Jina endpoints. Reader turns a URL into clean, LLM-ready text; Search
 # turns a query into ranked result text. Both accept an optional
@@ -181,9 +181,9 @@ class JinaWebSearchTool(Tool):
 
 
 def _fake_llm_client() -> MagicMock:
-    """Mimic the ``LLMClient`` shape Agentao reads at construction.
+    """Mimic the ``LLMClient`` shape Arbiter reads at construction.
 
-    Lets the demo + smoke tests build a real ``Agentao`` with no network
+    Lets the demo + smoke tests build a real ``Arbiter`` with no network
     and no API key. Replace with a real client (or pass ``api_key=`` /
     ``base_url=`` / ``model=``) to drive actual turns.
     """
@@ -205,15 +205,15 @@ def make_agent(
     jina_api_key: Optional[str] = None,
     transport: Optional[Any] = None,
     llm_client: Optional[Any] = None,
-) -> Agentao:
-    """Construct an ``Agentao`` with Jina ``web_fetch`` injected at build time.
+) -> Arbiter:
+    """Construct an ``Arbiter`` with Jina ``web_fetch`` injected at build time.
 
     This is the **construction-time** surface: ``extra_tools=`` registers
     :class:`JinaWebFetchTool` as the final pass, overriding the built-in
     ``web_fetch`` (``r.jina.ai``). ``web_search`` is *not* injected here —
     that happens at runtime, see :func:`inject_search_at_runtime`.
     """
-    return Agentao(
+    return Arbiter(
         working_directory=working_directory,
         llm_client=llm_client or _fake_llm_client(),
         extra_tools=[JinaWebFetchTool(api_key=jina_api_key, transport=transport)],
@@ -221,7 +221,7 @@ def make_agent(
 
 
 def inject_search_at_runtime(
-    agent: Agentao,
+    agent: Arbiter,
     *,
     jina_api_key: Optional[str] = None,
     transport: Optional[Any] = None,

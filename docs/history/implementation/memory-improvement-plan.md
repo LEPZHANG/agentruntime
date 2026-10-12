@@ -2,17 +2,17 @@
 
 Status: draft for follow-up research and implementation planning
 
-This document captures the current agreed plan for improving Agentao's memory system.
+This document captures the current agreed plan for improving Arbiter's memory system.
 It is intentionally scoped to near-term, incremental changes that fit the current
 architecture.
 
 Related code:
 
-- `agentao/memory/retriever.py`
-- `agentao/memory/manager.py`
-- `agentao/memory/render.py`
-- `agentao/memory/crystallizer.py`
-- `agentao/memory/storage.py`
+- `arbiter/memory/retriever.py`
+- `arbiter/memory/manager.py`
+- `arbiter/memory/render.py`
+- `arbiter/memory/crystallizer.py`
+- `arbiter/memory/storage.py`
 
 ## Goals
 
@@ -65,8 +65,8 @@ non-superseded decision records rather than all historical decisions.
 
 Implementation notes:
 
-- Keep budget enforcement in `agentao/memory/render.py`.
-- Keep selection policy in `agentao/memory/manager.py`.
+- Keep budget enforcement in `arbiter/memory/render.py`.
+- Keep selection policy in `arbiter/memory/manager.py`.
 - Ensure renderer-side truncation and manager-side selection do not drift.
 - Exclude superseded records from stable rendering by default once P1 lands.
 
@@ -122,7 +122,7 @@ Examples out of scope for this phase:
 
 Primary files:
 
-- `agentao/memory/retriever.py`
+- `arbiter/memory/retriever.py`
 
 ### P1: Append-Only Semantics For Historical Memory Types
 
@@ -158,8 +158,8 @@ Schema notes:
 
 - This phase requires schema migration.
 - Migration must be applied to both:
-  - project store: `.agentao/memory.db`
-  - user store: `<home>/.agentao/memory.db`
+  - project store: `.arbiter/memory.db`
+  - user store: `<home>/.arbiter/memory.db`
 - User store may be absent and must be skipped safely.
 - Migration should run idempotently during `SQLiteMemoryStore` initialization.
 
@@ -171,9 +171,9 @@ ALTER TABLE memories ADD COLUMN is_superseded INTEGER NOT NULL DEFAULT 0;
 
 Primary files:
 
-- `agentao/memory/manager.py`
-- `agentao/memory/storage.py`
-- `agentao/memory/models.py`
+- `arbiter/memory/manager.py`
+- `arbiter/memory/storage.py`
+- `arbiter/memory/models.py`
 
 ### P2: LLM-Structured Episodic Extraction With Deterministic Review-Queue Ingestion
 
@@ -238,9 +238,9 @@ Recommended parse-failure behavior:
 
 Primary files:
 
-- `agentao/context_manager.py`
-- `agentao/memory/crystallizer.py`
-- `agentao/memory/manager.py`
+- `arbiter/context_manager.py`
+- `arbiter/memory/crystallizer.py`
+- `arbiter/memory/manager.py`
 
 ### P3: Explicit Read-Only Memory Recall Tool
 

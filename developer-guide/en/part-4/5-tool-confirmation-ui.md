@@ -160,7 +160,7 @@ For batch jobs, **leave `confirm_tool` out entirely** — `NullTransport` auto-a
 
 ## Coordinating with the Permission Engine
 
-Agentao has two defense layers:
+Arbiter has two defense layers:
 
 ```
                ┌──────────────────────┐

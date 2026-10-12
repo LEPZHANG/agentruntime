@@ -5,7 +5,7 @@ Covers the test-plan requirements from
 
 - disabled by default → no file, no recorder
 - enabled → replay file created
-- /replay on|off toggles ``.agentao/settings.json``
+- /replay on|off toggles ``.arbiter/settings.json``
 - missing/corrupt settings → safe defaults
 - turn lifecycle: turn_started / turn_completed with final_text
 - multi-chunk ordering
@@ -32,7 +32,7 @@ from pathlib import Path
 
 import pytest
 
-from agentao.replay import (
+from arbiter.replay import (
     REPLAY_DEFAULTS,
     ReplayAdapter,
     ReplayConfig,
@@ -46,14 +46,14 @@ from agentao.replay import (
     resolve_replay_id,
     save_replay_enabled,
 )
-from agentao.replay.adapter import _classify_tool
-from agentao.replay.events import SCHEMA_VERSION, EventKind
-from agentao.replay.sanitize import (
+from arbiter.replay.adapter import _classify_tool
+from arbiter.replay.events import SCHEMA_VERSION, EventKind
+from arbiter.replay.sanitize import (
     TOOL_OUTPUT_CHUNK_MAX_CHARS,
     sanitize_payload,
     truncate_tool_output_chunk,
 )
-from agentao.transport import AgentEvent, EventType, NullTransport
+from arbiter.transport import AgentEvent, EventType, NullTransport
 
 
 # ---------------------------------------------------------------------------
@@ -68,16 +68,16 @@ def test_config_defaults_when_file_missing(tmp_path):
 
 
 def test_config_coerces_malformed_settings(tmp_path):
-    (tmp_path / ".agentao").mkdir()
-    (tmp_path / ".agentao" / "settings.json").write_text("not valid json")
+    (tmp_path / ".arbiter").mkdir()
+    (tmp_path / ".arbiter" / "settings.json").write_text("not valid json")
     cfg = load_replay_config(tmp_path)
     assert cfg.enabled is False
     assert cfg.max_instances == REPLAY_DEFAULTS["max_instances"]
 
 
 def test_config_coerces_invalid_max_instances(tmp_path):
-    (tmp_path / ".agentao").mkdir()
-    (tmp_path / ".agentao" / "settings.json").write_text(
+    (tmp_path / ".arbiter").mkdir()
+    (tmp_path / ".arbiter" / "settings.json").write_text(
         json.dumps({"replay": {"enabled": True, "max_instances": "oops"}})
     )
     cfg = load_replay_config(tmp_path)
@@ -86,18 +86,18 @@ def test_config_coerces_invalid_max_instances(tmp_path):
 
 
 def test_save_replay_enabled_preserves_other_keys(tmp_path):
-    (tmp_path / ".agentao").mkdir()
-    (tmp_path / ".agentao" / "settings.json").write_text(
+    (tmp_path / ".arbiter").mkdir()
+    (tmp_path / ".arbiter" / "settings.json").write_text(
         json.dumps({"mode": "workspace-write", "foo": 1})
     )
     save_replay_enabled(True, tmp_path)
-    data = json.loads((tmp_path / ".agentao" / "settings.json").read_text())
+    data = json.loads((tmp_path / ".arbiter" / "settings.json").read_text())
     assert data["mode"] == "workspace-write"
     assert data["foo"] == 1
     assert data["replay"]["enabled"] is True
 
     save_replay_enabled(False, tmp_path)
-    data = json.loads((tmp_path / ".agentao" / "settings.json").read_text())
+    data = json.loads((tmp_path / ".arbiter" / "settings.json").read_text())
     assert data["replay"]["enabled"] is False
 
 
@@ -163,7 +163,7 @@ def test_recorder_survives_non_serializable_values(tmp_path):
 
 
 def test_sanitize_drops_only_failing_fields(monkeypatch):
-    from agentao.replay import sanitize as sanmod
+    from arbiter.replay import sanitize as sanmod
 
     def fake_coerce(value):
         if isinstance(value, str) and "boom" in value:
@@ -321,7 +321,7 @@ def test_adapter_forwards_subscribe_to_inner(tmp_path):
     register nothing) the moment replay was enabled — losing the only signal
     that distinguishes an answerless turn.
     """
-    from agentao.transport.base import Transport
+    from arbiter.transport.base import Transport
 
     adapter, rec = _make_adapter(tmp_path)
     # Restores Protocol conformance — subscribe is part of the interface.
@@ -535,10 +535,10 @@ def test_adapter_subagent_gets_own_turn_id_with_parent_pointer(tmp_path):
 
 def test_retention_prunes_only_replays_not_sessions(tmp_path):
     # Create replay + sessions files; prune must touch only replays/.
-    (tmp_path / ".agentao" / "replays").mkdir(parents=True)
-    (tmp_path / ".agentao" / "sessions").mkdir(parents=True)
+    (tmp_path / ".arbiter" / "replays").mkdir(parents=True)
+    (tmp_path / ".arbiter" / "sessions").mkdir(parents=True)
     # A fake session file that must be preserved.
-    session_file = tmp_path / ".agentao" / "sessions" / "keep.json"
+    session_file = tmp_path / ".arbiter" / "sessions" / "keep.json"
     session_file.write_text("{}")
     # Create 4 replay instances (by hand; mtimes explicitly spaced).
     import time as _time
@@ -554,20 +554,20 @@ def test_retention_prunes_only_replays_not_sessions(tmp_path):
     # Session file untouched.
     assert session_file.exists()
     # Newest 2 survived.
-    remaining = list((tmp_path / ".agentao" / "replays").glob("*.jsonl"))
+    remaining = list((tmp_path / ".arbiter" / "replays").glob("*.jsonl"))
     assert len(remaining) == 2
 
 
 # ---------------------------------------------------------------------------
-# Agentao integration
+# Arbiter integration
 # ---------------------------------------------------------------------------
 
 
 def _build_agent(tmp_path: Path):
     # Import inside the function so the autouse credentials fixture wins.
-    from agentao.agent import Agentao
+    from arbiter.agent import Arbiter
 
-    return Agentao(working_directory=tmp_path)
+    return Arbiter(working_directory=tmp_path)
 
 
 def test_agent_disabled_by_default_creates_no_file(tmp_path):
@@ -575,14 +575,14 @@ def test_agent_disabled_by_default_creates_no_file(tmp_path):
     path = agent.start_replay("sess-123")
     assert path is None
     assert agent._replay_recorder is None
-    assert not (tmp_path / ".agentao" / "replays").exists()
+    assert not (tmp_path / ".arbiter" / "replays").exists()
     agent.close()
 
 
 def test_agent_enabled_creates_file(tmp_path):
     save_replay_enabled(True, tmp_path)
     agent = _build_agent(tmp_path)
-    # Agentao read config at construction — reload to pick up the new flag.
+    # Arbiter read config at construction — reload to pick up the new flag.
     agent.reload_replay_config()
     path = agent.start_replay("sess-123")
     assert path is not None

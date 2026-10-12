@@ -3,7 +3,7 @@
 When a user turn carries an image, the message ``content`` is an OpenAI-style
 list of parts (``text`` + ``image_url`` with an inline ``data:`` URL). The
 request logger must **summarize** those parts — never dump the raw base64
-blob, which is megabytes per image and would bloat ``agentao.log``.
+blob, which is megabytes per image and would bloat ``arbiter.log``.
 """
 
 import logging
@@ -11,12 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from agentao.llm import LLMClient
+from arbiter.llm import LLMClient
 
 
 @pytest.fixture
 def client(tmp_path: Path):
-    log_file = tmp_path / "agentao.log"
+    log_file = tmp_path / "arbiter.log"
     c = LLMClient(
         api_key="test-api-key",
         base_url="https://api.example.com/v1",

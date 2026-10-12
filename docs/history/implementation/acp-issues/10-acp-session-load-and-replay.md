@@ -2,7 +2,7 @@
 
 ## Problem
 
-Agentao can persist and load sessions locally, but ACP requires protocol-level session loading and replay through `session/update`.
+Arbiter can persist and load sessions locally, but ACP requires protocol-level session loading and replay through `session/update`.
 
 ## Scope
 
@@ -12,7 +12,7 @@ Agentao can persist and load sessions locally, but ACP requires protocol-level s
 
 ## Implementation Checklist
 
-- [ ] Reuse `agentao/session.py` load path
+- [ ] Reuse `arbiter/session.py` load path
 - [ ] Define mapping from persisted messages to ACP replay events
 - [ ] Replay user messages as user message updates
 - [ ] Replay assistant messages as agent message updates

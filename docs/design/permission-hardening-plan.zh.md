@@ -1,7 +1,7 @@
 # 权限地板化方案
 
 **状态：** 实施计划，rev 3。2026-05-03 起草，跨 4 轮评审。**PR 1（P0 正确性修复）、PR 2（P1 可选 hardline 层）、PR 3–5（P2/P3 便利项与敏感写入预设）均已于 2026-05-04 全部合入。** 本计划已收口；后续加固工作另行追踪。详见 §9 各 PR 落点；§10 保留遗留的开放追踪项（主要是 PR 5 正则层向 `bashlex` 解析的演进）。
-**读者：** 接手实施的 agentao 维护者；后续 PR 的评审者。
+**读者：** 接手实施的 arbiter 维护者；后续 PR 的评审者。
 **配套：**
 - `docs/design/embedded-host-contract.md` — `PermissionDecisionEvent` 在此定义
 - `docs/design/path-a-roadmap.md` — 锁定本计划必须遵守的 "embedded harness" 定位
@@ -13,17 +13,17 @@
 
 ## 1. 为什么写这份计划，以及为什么它一直在错
 
-Round 1 是 Hermes-借鉴 sweep——"Agentao 该从 `hermes-agent` 近期更新里采纳哪些？"。Round 2 修正了对 Agentao 实际代码的技术错误。Round 3 修正了由此产生的方案中的架构错误。Round 4——故意针对 Agentao 锁定定位的反向评审——发现 round 1–3 都在回答错误的问题：
+Round 1 是 Hermes-借鉴 sweep——"Arbiter 该从 `hermes-agent` 近期更新里采纳哪些？"。Round 2 修正了对 Arbiter 实际代码的技术错误。Round 3 修正了由此产生的方案中的架构错误。Round 4——故意针对 Arbiter 锁定定位的反向评审——发现 round 1–3 都在回答错误的问题：
 
 > "我们如何正确地复制 Hermes 的 hardline 地板？"
 
 正确的问题，也是本 rev 3 终于在面对的：
 
-> "鉴于 Agentao 是 embedded harness——不是策略权威，而 `agentao.host` 的存在恰恰是为了让宿主决定策略——Agentao 到底要不要采纳一个 hardline 地板？"
+> "鉴于 Arbiter 是 embedded harness——不是策略权威，而 `arbiter.host` 的存在恰恰是为了让宿主决定策略——Arbiter 到底要不要采纳一个 hardline 地板？"
 
-反向评审给的答案是：**部分采纳**。库应当**提供**一个安全默认开启的 hardline 层（这样 CLI 用户、或者没认真想清楚的宿主，能被保护免于 prompt 注入擦盘）。但它必须**对嵌入式宿主可关闭**——给那些自己承担策略责任的宿主——因为在一个本应可被嵌入的库里硬编码"agent 永远不能做 X"，跟整个 `agentao.host` 契约相矛盾。
+反向评审给的答案是：**部分采纳**。库应当**提供**一个安全默认开启的 hardline 层（这样 CLI 用户、或者没认真想清楚的宿主，能被保护免于 prompt 注入擦盘）。但它必须**对嵌入式宿主可关闭**——给那些自己承担策略责任的宿主——因为在一个本应可被嵌入的库里硬编码"agent 永远不能做 X"，跟整个 `arbiter.host` 契约相矛盾。
 
-本 rev 3 同时把**正确性修复**（不论 Agentao 怎么定位都需要）跟**策略选择**（取决于上面那个问题的答案）分开。正确性先发车，独立 PR，不带任何策略立场。
+本 rev 3 同时把**正确性修复**（不论 Arbiter 怎么定位都需要）跟**策略选择**（取决于上面那个问题的答案）分开。正确性先发车，独立 PR，不带任何策略立场。
 
 ## 2. 已折入的评审修正
 
@@ -31,24 +31,24 @@ Round 1 是 Hermes-借鉴 sweep——"Agentao 该从 `hermes-agent` 近期更新
 
 **Round 2（针对 Hermes-借鉴笔记）：**
 
-1. **MCP retry。** `agentao/mcp/client.py:135-156` 对**任何**第一轮异常都会重试一次，并非只在 `_session is None` 时。真正的问题是**错误分类**，不是漏掉 retry。
-2. **ANSI 处理。** `agentao/tools/shell.py:40` 已经剥 ANSI 转义。只缺 OSC 序列——而且只有引入 shell 化文件读路径后才会撞到。
+1. **MCP retry。** `arbiter/mcp/client.py:135-156` 对**任何**第一轮异常都会重试一次，并非只在 `_session is None` 时。真正的问题是**错误分类**，不是漏掉 retry。
+2. **ANSI 处理。** `arbiter/tools/shell.py:40` 已经剥 ANSI 转义。只缺 OSC 序列——而且只有引入 shell 化文件读路径后才会撞到。
 3. **Hardline 放置位置。** Hardline 检查**如果存在**，必须是 `PermissionEngine.decide_detail()` 里的前置检查，**不能**作为 `_PRESET_RULES` 的一行——否则 `full-access` 或用户 `allow` 规则会悄悄遮蔽它。
 4. **Hardline 范围。** 如果采纳 hardline 地板，只装**不可恢复**操作。可恢复但代价高的命令（`git reset --hard`、`pip install`、`chmod -R 777 /tmp/x`）留在普通 preset 规则。
-5. **具体漏掉的 bug。** `agentao/permissions.py:334` 在 `try/except (IOError, json.JSONDecodeError)` 里做 `data.get("rules", [])`。顶层非 dict 的 JSON 抛 `AttributeError`，**没被捕获**。
+5. **具体漏掉的 bug。** `arbiter/permissions.py:334` 在 `try/except (IOError, json.JSONDecodeError)` 里做 `data.get("rules", [])`。顶层非 dict 的 JSON 抛 `AttributeError`，**没被捕获**。
 
 **Round 3（针对本文档 rev 1）：**
 
-6. **模块形态。** `agentao/permissions.py` 是 21 KB 单文件，不是 package。把新逻辑**内联**进去；本次不做 package 拆分。
+6. **模块形态。** `arbiter/permissions.py` 是 21 KB 单文件，不是 package。把新逻辑**内联**进去；本次不做 package 拆分。
 7. **`copy_context()` 放置错误。** 捕获要在**父**线程，`executor.submit()` 之前。在 worker 入口里调 `copy_context()` 复制的是 worker 自己的空上下文。配套测试必须包含 isolation 断言。
 8. **事件分类不是用户 vs 策略 的判别器。** `PermissionDecisionEvent` 发在 Phase 2 确认**之前**。用户拒绝走 `ToolLifecycleEvent(cancelled)`。`reason` 字段是**策略来源分类**，不是用户 vs 策略 的字段。
 9. **（被 round 4 推翻。）** Round 3 说敏感写入需要自己的地板层。Round 4 反转了这一点——见下面修正 11。
 10. **Regex 覆盖。** 任何敏感写入 regex 匹配器都必须配正向和负向测试矩阵，并显式声明覆盖盲区。
 
-**Round 4（针对 Agentao 定位的反向评审）：**
+**Round 4（针对 Arbiter 定位的反向评审）：**
 
 11. **FLOOR_ASK Tier 2 是 overreach。** `~/.bashrc`、`~/.zshrc`、`~/.netrc` 是 installer、devops 脚本和 shell-config 工具的**合法写入目标**。一个"不能被 `*` 自动放行"的前置检查层会迫使每个跑这类工作负载的嵌入式宿主与框架对抗。这种强度的敏感写入保护应该在**preset 规则**里（mode-scoped、可被宿主覆盖），不是在地板里。Tier 2 在 rev 3 删除——见 §7。
-12. **Hardline (Tier 1) 不能硬编码进 `decide_detail()`。** Hermes 可以硬编码它的地板，因为 Hermes 是策略权威——一个 CLI-first 应用。Agentao 是 embedded harness。硬编码"无论宿主配置如何，agent 永远不能做 X"跟"宿主决定策略"的 `agentao.host` 契约相矛盾。Hardline 因此是**可关闭层**：默认 ON（保护 CLI 用户和"没想清楚"的宿主免于 prompt 注入），自担责任的宿主可以显式 OFF。见 §5。
+12. **Hardline (Tier 1) 不能硬编码进 `decide_detail()`。** Hermes 可以硬编码它的地板，因为 Hermes 是策略权威——一个 CLI-first 应用。Arbiter 是 embedded harness。硬编码"无论宿主配置如何，agent 永远不能做 X"跟"宿主决定策略"的 `arbiter.host` 契约相矛盾。Hardline 因此是**可关闭层**：默认 ON（保护 CLI 用户和"没想清楚"的宿主免于 prompt 注入），自担责任的宿主可以显式 OFF。见 §5。
 13. **`tests/test_permissions.py:162` 那条断言不是干净的 bug。** 在 `enable_hardline=False`（字面 full-access）下，`rm -rf /` *应该*返回 `ALLOW`——这就是 mode 字面意思。Rev 3 不删这条测试；而是把它拆成默认开启情形（DENY）和显式关闭情形（ALLOW），保留两份契约。
 14. **正确性修复不需要策略立场。** `isinstance` 防御、MCP 错误分类、`copy_context()` 传播是纯正确性——不论 hardline 这个问题怎么回答它们都适用。它们作为独立 PR（PR 1）发车，跟 hardline 工作（PR 2）解耦。
 
@@ -76,11 +76,11 @@ P2  便利性和工程卫生
 
 ## 4. P0 — 正确性修复
 
-这三项是纯正确性，作为一个 PR（PR 1）发车。它们对"Agentao 是否该采纳 hardline 地板"不持立场。
+这三项是纯正确性，作为一个 PR（PR 1）发车。它们对"Arbiter 是否该采纳 hardline 地板"不持立场。
 
 ### 4.1 `permissions.py` `isinstance(dict)` 防御
 
-`agentao/permissions.py:334` 当前：
+`arbiter/permissions.py:334` 当前：
 
 ```python
 data = json.load(f)
@@ -102,7 +102,7 @@ return data.get("rules", []), True
 
 ### 4.2 MCP 错误分类
 
-**现状：** `agentao/mcp/client.py:135-156` 第一轮任何异常都 retry 一次，然后原样把错误字符串透传。不区分"会话过期，请重连"、"鉴权 token 无效，别 retry"和"工具参数错了，别来回踢连接"。
+**现状：** `arbiter/mcp/client.py:135-156` 第一轮任何异常都 retry 一次，然后原样把错误字符串透传。不区分"会话过期，请重连"、"鉴权 token 无效，别 retry"和"工具参数错了，别来回踢连接"。
 
 **方案：** 引入私有 helper：
 
@@ -128,7 +128,7 @@ def _is_session_expired_error(exc: Exception) -> bool:
 
 ### 4.3 ToolRunner worker `copy_context()` 传播
 
-**现状：** `agentao/runtime/tool_runner.py` Phase 3 派发到 8-worker `ThreadPoolExecutor`。Worker 不传播父线程的 `ContextVar` 状态。
+**现状：** `arbiter/runtime/tool_runner.py` Phase 3 派发到 8-worker `ThreadPoolExecutor`。Worker 不传播父线程的 `ContextVar` 状态。
 
 **方案——父线程捕获，worker 调用。** `copy_context()` 快照的是**调用方**线程的上下文。所以捕获要在父（提交）线程，`executor.submit()` 之前；worker 调用捕获到的 `ctx.run`：
 
@@ -149,7 +149,7 @@ future = self._executor.submit(ctx.run, self._run_one_tool, plan)
 
 单条正向传播测试在某些 GIL 排序下，即使实现错了也能通过，掩盖 bug。隔离断言才能抓到错误实现。
 
-**优先级老实交代。** Agentao 当前没有 `ContextVar` 写入方依赖这一点。它是给未来宿主（注入 OTel span 上下文、日志 session id、tracing baggage）的结构防线。现在发车是因为成本低、测试也是个有用的回归 guard，不是因为有当前 bug。
+**优先级老实交代。** Arbiter 当前没有 `ContextVar` 写入方依赖这一点。它是给未来宿主（注入 OTel span 上下文、日志 session id、tracing baggage）的结构防线。现在发车是因为成本低、测试也是个有用的回归 guard，不是因为有当前 bug。
 
 ## 5. P1 — 可选 hardline 层
 
@@ -157,10 +157,10 @@ PR 1 落地后作为 PR 2 发车。跟正确性独立。
 
 ### 5.1 Hardline as opt-out
 
-**这一层必须遵守的原则。** Agentao 是 embedded harness。宿主决定策略。一个硬编码"无论宿主配置如何，agent 永远不能做 X"的库跟这条原则相矛盾。Hardline 地板因此是：
+**这一层必须遵守的原则。** Arbiter 是 embedded harness。宿主决定策略。一个硬编码"无论宿主配置如何，agent 永远不能做 X"的库跟这条原则相矛盾。Hardline 地板因此是：
 
 - **默认 ON。** CLI 用户、或者没认真想清楚威胁建模的宿主，能被保护免于 prompt 注入擦盘。安全默认。
-- **可显式 opt-out。** 自担策略责任的宿主——通常因为它把 Agentao 装在容器沙盒里，或者它合法需要完整系统访问——可以用 `enable_hardline=False` 关闭地板。字面 `full-access` 这时就是字面的全部 allow，跟 mode 承诺一致。
+- **可显式 opt-out。** 自担策略责任的宿主——通常因为它把 Arbiter 装在容器沙盒里，或者它合法需要完整系统访问——可以用 `enable_hardline=False` 关闭地板。字面 `full-access` 这时就是字面的全部 allow，跟 mode 承诺一致。
 
 **API 形状：**
 
@@ -183,7 +183,7 @@ class PermissionEngine:
         # ... 已有的 mode/preset/user-rule 路由
 ```
 
-**放置位置：** 把 `_HARDLINE_PATTERNS` 和 `_hardline_check()` **内联**到 `agentao/permissions.py` 顶部。本 PR **不**做 `permissions.py` → package 的迁移。
+**放置位置：** 把 `_HARDLINE_PATTERNS` 和 `_hardline_check()` **内联**到 `arbiter/permissions.py` 顶部。本 PR **不**做 `permissions.py` → package 的迁移。
 
 **Pattern 集合** —— `hermes-agent tools/approval.py:HARDLINE_PATTERNS` 的 12 条，范围严格限制在**不可恢复**操作：
 
@@ -260,11 +260,11 @@ def test_workspace_write_unaffected_by_hardline_flag():
 
 ### 6.1 Windows UTF-8
 
-把 `hermes_cli/__init__.py::_ensure_utf8()` 原样移植到 `agentao/__init__.py`。33 行，门控 `sys.platform == "win32"`，POSIX 无影响。
+把 `hermes_cli/__init__.py::_ensure_utf8()` 原样移植到 `arbiter/__init__.py`。33 行，门控 `sys.platform == "win32"`，POSIX 无影响。
 
 ### 6.2 `mask_secret()` helper
 
-新建 `agentao/redact.py::mask_secret(value, head=4, tail=4, floor=12, placeholder="(not set)")`。在 P0/P1 过程中遇到的零散 secret-masking 调用点迁移过来。
+新建 `arbiter/redact.py::mask_secret(value, head=4, tail=4, floor=12, placeholder="(not set)")`。在 P0/P1 过程中遇到的零散 secret-masking 调用点迁移过来。
 
 ### 6.3 OSC 序列剥离（推迟）
 
@@ -278,10 +278,10 @@ def test_workspace_write_unaffected_by_hardline_flag():
 
 **为什么它有吸引力。** 它堵上 shell 重定向（`echo X >> ~/.bashrc`）绕过 `write_file` 的 `PathPolicy` 这个缺口。Hermes 的 `69dd0f7cf` 正是覆盖这个 case。我们没经思考就借鉴了。
 
-**为什么它对 Agentao 是错的。**
+**为什么它对 Arbiter 是错的。**
 
 1. **`~/.bashrc` 是合法的写入目标。** Homebrew、pyenv、nvm、rustup 都写 shell rc 文件。碰 `.zshrc` 的 devops 脚本是常态。一个跑这类工作负载的嵌入式宿主在每次操作上都会跟框架对抗。
-2. **"不能被 `*` 自动放行"违反 host-overrides-defaults。** Agentao 整个设计就是宿主组合策略。一个说"任何宿主都不能关掉这个"的地板，正是 `agentao.host` 想要避免的东西。
+2. **"不能被 `*` 自动放行"违反 host-overrides-defaults。** Arbiter 整个设计就是宿主组合策略。一个说"任何宿主都不能关掉这个"的地板，正是 `arbiter.host` 想要避免的东西。
 3. **`full-access` 变成谎言。** 一个宣称"全部 allow"但偷偷在常见目标上 ASK 的 mode，比两种替代方案都糟——它给宿主制造意外。
 4. **真正的担忧（shell 绕过 PathPolicy）由 preset 规则解决。** 一条在 shell-RC 写入时 ASK 的 `workspace-write` preset 规则形状刚好对：mode-scoped（用户选了 workspace-write 才激活）、host-overridable（宿主可以替换规则）、显式（宿主读引擎 active rules 时能看到）。
 
@@ -304,10 +304,10 @@ def test_no_floor_ask_tier_exists():
 
 ## 8. 不在范围内
 
-- 单独的 "YOLO" 模式。Agentao 的 `enable_hardline=False` + `full-access` 就是等价物。
-- 每会话 sudo 缓存（Hermes `de03a332f`）。Agentao 的 terminal 工具目前不提示 sudo。等交互式 sudo 落地再回来看。
-- 插件 pre/post 审批钩子机制。Agentao 选择 host event；不要引入并行插件机制。
-- 把 `agentao/permissions.py` 迁成 package。Hardline 内联进去。拆分是另一个独立重构。
+- 单独的 "YOLO" 模式。Arbiter 的 `enable_hardline=False` + `full-access` 就是等价物。
+- 每会话 sudo 缓存（Hermes `de03a332f`）。Arbiter 的 terminal 工具目前不提示 sudo。等交互式 sudo 落地再回来看。
+- 插件 pre/post 审批钩子机制。Arbiter 选择 host event；不要引入并行插件机制。
+- 把 `arbiter/permissions.py` 迁成 package。Hardline 内联进去。拆分是另一个独立重构。
 - 任何未来重新引入 "Tier 2 FLOOR_ASK" 地板——见 §7。换成普通 preset 规则可以；恢复无条件地板不行。
 
 ## 9. PR 分批
@@ -323,7 +323,7 @@ PR 1 (P0)  permissions 正确性          ✓ 2026-05-03 已合入
 PR 2 (P1)  可选 hardline 层            ✓ 2026-05-03 已合入
                                           ─ enable_hardline flag、
                                           _hardline_check() 前置检查
-                                          (实际落在 agentao/permissions_hardline.py，
+                                          (实际落在 arbiter/permissions_hardline.py，
                                           permissions.py 只导入入口；规则评估
                                           按 §5.1 仍内联)、
                                           双契约测试（默认开启 DENY +
@@ -332,7 +332,7 @@ PR 2 (P1)  可选 hardline 层            ✓ 2026-05-03 已合入
                                           策略来源 reason 分类。
 
 PR 3 (P2)  windows utf-8 兜底         ✓ 2026-05-04 已合入
-                                          ─ agentao/__init__.py::_ensure_utf8()
+                                          ─ arbiter/__init__.py::_ensure_utf8()
                                           强制 CP_UTF8 + 重配置
                                           stdin/stdout/stderr；
                                           sys.platform == "win32" 才走；
@@ -340,7 +340,7 @@ PR 3 (P2)  windows utf-8 兜底         ✓ 2026-05-04 已合入
                                           tests/test_init_utf8.py。
 
 PR 4 (P2)  mask_secret + redact       ✓ 2026-05-04 已合入
-                                          ─ agentao/redact.py::mask_secret；
+                                          ─ arbiter/redact.py::mask_secret；
                                           P0/P1 阶段排查未发现需要迁移的
                                           ad-hoc 调用点。helper 是面向
                                           PermissionDecisionEvent 投影
@@ -366,9 +366,9 @@ Rev 2 方案把 hardline 捆进 PR 1 是因为两者都被打了 P0 标签。Rou
 
 下面这些问题来自 rev 3 发车前的清单，标注了已落地内容与剩余工作。
 
-- **`enable_hardline` 给终端用户怎么配？** **按暂定答案敲定（不通过 `.agentao/permissions.json`）。** PR 2 仅暴露构造函数参数；没有加 `--no-hardline` CLI flag —— CLI 实际用例没有迫切需求，凭空加会跟"嵌入式 harness、宿主决定策略"的原则相左。CLI 用户真的要关，就走嵌入入口设 `enable_hardline=False`；如果将来出现真实工作流缺口，再重开此问题。
+- **`enable_hardline` 给终端用户怎么配？** **按暂定答案敲定（不通过 `.arbiter/permissions.json`）。** PR 2 仅暴露构造函数参数；没有加 `--no-hardline` CLI flag —— CLI 实际用例没有迫切需求，凭空加会跟"嵌入式 harness、宿主决定策略"的原则相左。CLI 用户真的要关，就走嵌入入口设 `enable_hardline=False`；如果将来出现真实工作流缺口，再重开此问题。
 - **`sudo` 下的 `HOME` 解析。** **保留为开放项。** Hardline pattern 仍只在语法层匹配 `~ / $HOME / ${HOME}`。`sudo rm -rf $HOME` 在特权进程里 `$HOME` 会被重新求值为 root 的家目录，但 regex 不论求值结果都会捕获字面 token —— 现实风险反而是反向案例：`sudo` 用的家目录变量名不同。等到收到真实 bug 报告再修；不做臆测性补强。
-- **容器后端绕过。** **按暂定答案敲定（显式宿主 opt-out）。** Agentao 不做容器自检；做沙箱的宿主自己设 `enable_hardline=False`。要重新讨论，必须有具体宿主后端能证明运行时检测有正向收益。
+- **容器后端绕过。** **按暂定答案敲定（显式宿主 opt-out）。** Arbiter 不做容器自检；做沙箱的宿主自己设 `enable_hardline=False`。要重新讨论，必须有具体宿主后端能证明运行时检测有正向收益。
 - **Reason 受众。** **按暂定答案敲定（面向运营）。** `reason="hardline:recursive delete of root filesystem"` 当作审计 / 调试文案。给用户看的措辞继续由宿主负责 —— ACP 的 `request_permission` 载荷照样把原始 reason 字符串往上抛，宿主自己决定怎么渲染。
 - **PR 5 的 `bashlex` 演进。** **唯一遗留的开放追踪项。** PR 5 的 regex 命中常见形态（重定向、tee、cp/mv、sed -i）针对 `~`/`$HOME` 前缀的敏感文件。无法命中：
     1. shell 变量间接赋值：`dst=~/.bashrc; echo X > "$dst"`。

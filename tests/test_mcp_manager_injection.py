@@ -29,14 +29,14 @@ def test_injected_mcp_manager_tools_are_registered(tmp_path):
     fake_manager.clients = {"alpha": fake_client}
     fake_manager.call_tool = Mock(return_value="ok")
 
-    with patch("agentao.agent.LLMClient") as mock_llm_cls:
+    with patch("arbiter.agent.LLMClient") as mock_llm_cls:
         mock_llm = Mock()
         mock_llm.logger = Mock()
         mock_llm.model = "gpt-test"
         mock_llm_cls.return_value = mock_llm
 
-        from agentao.agent import Agentao
-        agent = Agentao(
+        from arbiter.agent import Arbiter
+        agent = Arbiter(
             working_directory=tmp_path,
             mcp_manager=fake_manager,
         )

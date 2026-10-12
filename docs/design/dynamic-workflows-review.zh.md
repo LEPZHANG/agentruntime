@@ -5,13 +5,13 @@
 该默认是否可绕过尚未定义），并在 §3.5 记录**触发后**的候选实施计划（非立项承诺）。
 **这是评审记录，不是已批准的方案。**
 
-**读者：** 关注「多子代理并行扇出 / 中间结果不进上下文」的 agentao 维护者。
+**读者：** 关注「多子代理并行扇出 / 中间结果不进上下文」的 arbiter 维护者。
 
 **配套：** 英文版 `dynamic-workflows-review.md` **待补**。
 
 **相关：**
 - `pi-mono-borrow-review.zh.md` —— **§3 的关键先例**。其 §「Per-tool `executionMode`」认定
-  agentao 的 per-tool-instance 锁**已覆盖**「shell / write 在并行 batch 中互斥」的需求。
+  arbiter 的 per-tool-instance 锁**已覆盖**「shell / write 在并行 batch 中互斥」的需求。
   本文 rev 3 据此推翻了前两版对该锁的「缺陷」定性。
 - `code-mode-ptc-review.zh.md` —— Code Mode / PTC 决策记录（不立项）。其 §4 已把「整脚本
   一次性审批」列为实验前置；本文 §4 与之同向，不另开一条路线。
@@ -20,10 +20,10 @@
 - `codex-goal-mechanism-review.zh.md` —— `/goal` 是**宿主拥有的顺序外循环**，与扇出正交。
 
 **方法：** 通读 Anthropic 官方 workflows 文档与发布公告；grep 本地 Claude Code 源码副本；
-对 agentao 与 `../software-agent-sdk/`（OpenHands SDK）逐项 grep。**所有被引为结论依据的
+对 arbiter 与 `../software-agent-sdk/`（OpenHands SDK）逐项 grep。**所有被引为结论依据的
 锚点均经人工读码复核**；仅供背景的锚点在附录 C.1 标注为未复核。
 
-**锚点：** agentao `main`@`8266de1`（2026-07-19）。OpenHands `main`@`4fe56566`（2026-07-17）。
+**锚点：** arbiter `main`@`8266de1`（2026-07-19）。OpenHands `main`@`4fe56566`（2026-07-17）。
 Dynamic Workflows 要求 Claude Code ≥ v2.1.154，2026-05-28 发布。
 
 **方法学警告：** 本仓惯例是 grep 验证式通读同侪源码，**对 Claude Code 做不到** —— 本地
@@ -33,7 +33,7 @@ Dynamic Workflows 要求 Claude Code ≥ v2.1.154，2026-05-28 发布。
 **修订记录：**
 - **rev 1** —— 四层分解；层 4 以「Python 宿主做不到」否决；§3 定性为「缺陷」。
 - **rev 2** —— 补入 OpenHands 对照；层 4 理由改为「取舍未决」。
-- **rev 3** —— **退回精简**。修正三处实质错误：(a) 层 2 的现状判断（agentao 已有子会话
+- **rev 3** —— **退回精简**。修正三处实质错误：(a) 层 2 的现状判断（arbiter 已有子会话
   隔离，§2）；(b) §3 的定性与修复路线（非缺陷，且原修复路线找错了状态）；(c) rev 2 在
   §4 重犯了 rev 1 的二元错误（「唯一形态」）。删除 rev 2 的 §5.1a，压缩 §4 与开放问题。
 - **rev 4** —— 小修。(a) §3.2 **收窄适用范围** —— 锁是 `execute_batch()` 的局部变量、
@@ -61,7 +61,7 @@ Dynamic Workflows 要求 Claude Code ≥ v2.1.154，2026-05-28 发布。
 > **3. 出现「大规模扇出导致父上下文膨胀」的真实用例后**，再评估宿主侧批处理 API。
 > 在此之前不加公开 fan-out API、聚合器、缓存/resume，也不重开 `/goal` 预算决策。
 
-| 层 | 能力 | agentao 现状 | rev 5 判断 |
+| 层 | 能力 | arbiter 现状 | rev 5 判断 |
 |---|---|---|---|
 | 1 | 并发子代理扇出 | 批次内同实例默认串行（§3）| **默认未分化**，非缺陷；不改 |
 | 2 | 中间结果不进上下文 | **PARTIAL** —— transcript 已隔离，批量结果未隔离（§2）| 等真实用例 |
@@ -84,10 +84,10 @@ Dynamic Workflows 要求 Claude Code ≥ v2.1.154，2026-05-28 发布。
 
 ## 2. 层 2 的现状：transcript 已隔离，批量结果未隔离
 
-**rev 1/rev 2 把层 2 记为 ABSENT，这是错的。** agentao 的子代理早已不回传 transcript：
+**rev 1/rev 2 把层 2 记为 ABSENT，这是错的。** arbiter 的子代理早已不回传 transcript：
 
 - `agents/tools/_wrapper.py:606` —— `result = sub_agent.chat(...)`，子代理跑在独立
-  `Agentao` 实例上。
+  `Arbiter` 实例上。
 - `:653` —— `return result, stats`。
 - `_format_result` —— 只拼「result + 一行 stats footer」。
 
@@ -95,7 +95,7 @@ Dynamic Workflows 要求 Claude Code ≥ v2.1.154，2026-05-28 发布。
 `task/manager.py:359-363`（仅取 `get_agent_final_response()`）是同一姿态。
 
 **因此 rev 2 §5.1a 的论证无效并已删除** —— 它用 OpenHands 证明「层 2 成本低于估计」，
-而它证明的那件事 agentao 本来就有。
+而它证明的那件事 arbiter 本来就有。
 
 **真正缺的是另一件事：** 扇出的 N 个**最终结果**仍逐条作为 tool result 落进编排模型的
 上下文。Dynamic Workflows 的增量正在此处 —— 批量结果留在脚本变量，只有聚合结果回到上下文。
@@ -121,7 +121,7 @@ Dynamic Workflows 要求 Claude Code ≥ v2.1.154，2026-05-28 发布。
 
 ### 3.2 为什么「缺陷」的定性是错的（rev 4 收窄了适用范围）
 
-`pi-mono-borrow-review.zh.md:50` 记录：agentao 的 per-tool-instance 锁**已经覆盖**
+`pi-mono-borrow-review.zh.md:50` 记录：arbiter 的 per-tool-instance 锁**已经覆盖**
 pi-mono 用 `executionMode: "sequential"` 解决的需求 —— 「两次并行的 `run_shell_command`
 命中同一把锁、被串行化」。
 
@@ -217,7 +217,7 @@ per-batch 锁字典（§3.2）。故两个并发子代理各持独立锁字典�
 
 模型生成编排代码有多条实现路线，**都存在**：
 
-| 路线 | 代表 | agentao 侧成本 |
+| 路线 | 代表 | arbiter 侧成本 |
 |---|---|---|
 | 进程内 Python + AST 校验 + 审批 | OpenHands（附录 C.2）| 放弃隔离边界，改用审批门 |
 | 独立 JS / QuickJS 受限解释器 | opencode（`code-mode-ptc-review` 附录 F）| 新增运行时依赖 |
@@ -229,7 +229,7 @@ per-batch 锁字典（§3.2）。故两个并发子代理各持独立锁字典�
 
 **rev 3 的处理：不在路线之间选。**
 
-> **agentao 当前没有「模型生成编排代码」的明确需求。无论采用哪条路线，暂不设计。**
+> **arbiter 当前没有「模型生成编排代码」的明确需求。无论采用哪条路线，暂不设计。**
 
 需求门未触发时，路线选择是不必要的前置工作。若需求出现，
 `code-mode-ptc-review.zh.md` §4 的五项实验前置是现成的验证清单。
@@ -303,22 +303,22 @@ Python 路线，代价是什么。
 `src/tools/AgentTool/prompt.ts:271` 教模型「一条消息里发多个 AgentTool 调用」实现并行 ——
 即**模型驱动的并行，结果全进上下文**。
 
-## 附录 B：agentao 承重锚点（均已人工复核）
+## 附录 B：arbiter 承重锚点（均已人工复核）
 
 ```
-agentao/runtime/tool_executor.py:126-130   tool_locks[id(plan.tool)] = threading.Lock()
-agentao/runtime/tool_executor.py:152       ThreadPoolExecutor(max_workers=8)
-agentao/runtime/tool_executor.py:312       with tool_locks[id(tool)]:   ← 包住整个执行
-agentao/runtime/tool_executor.py:313       hasattr(tool, "output_callback") ← 对 wrapper 为 False
-agentao/agents/manager.py:157-179          每个 definition 恰好一个 AgentToolWrapper
-agentao/agents/tools/_wrapper.py:182,205   self._output_callback 构造期注入（非每调用）
-agentao/agents/tools/_wrapper.py:220       self._cancellation_token ← 真正的每调用状态
-agentao/agents/tools/_wrapper.py:530       转发 output_callback 给子代理
-agentao/agents/tools/_wrapper.py:606,653   result = sub_agent.chat(...) → return result, stats
-agentao/agents/tools/_wrapper.py:761       后台代理 threading.Thread，无池无上限
-agentao/prompts/sections.py:201            "Call independent tools in parallel"
-agentao/host/models.py:97-122              SubagentLifecycleEvent 已含血缘三元组
-agentao/cli/goal_state.py:18-20            token 预算被刻意丢弃
+arbiter/runtime/tool_executor.py:126-130   tool_locks[id(plan.tool)] = threading.Lock()
+arbiter/runtime/tool_executor.py:152       ThreadPoolExecutor(max_workers=8)
+arbiter/runtime/tool_executor.py:312       with tool_locks[id(tool)]:   ← 包住整个执行
+arbiter/runtime/tool_executor.py:313       hasattr(tool, "output_callback") ← 对 wrapper 为 False
+arbiter/agents/manager.py:157-179          每个 definition 恰好一个 AgentToolWrapper
+arbiter/agents/tools/_wrapper.py:182,205   self._output_callback 构造期注入（非每调用）
+arbiter/agents/tools/_wrapper.py:220       self._cancellation_token ← 真正的每调用状态
+arbiter/agents/tools/_wrapper.py:530       转发 output_callback 给子代理
+arbiter/agents/tools/_wrapper.py:606,653   result = sub_agent.chat(...) → return result, stats
+arbiter/agents/tools/_wrapper.py:761       后台代理 threading.Thread，无池无上限
+arbiter/prompts/sections.py:201            "Call independent tools in parallel"
+arbiter/host/models.py:97-122              SubagentLifecycleEvent 已含血缘三元组
+arbiter/cli/goal_state.py:18-20            token 预算被刻意丢弃
 docs/design/pi-mono-borrow-review.zh.md:50 per-instance 锁被认定为已覆盖 executionMode 需求
 ```
 
@@ -368,7 +368,7 @@ task/manager.py:336         sub_agent_llm.reset_metrics()
 task/manager.py:359-363     仅取 get_agent_final_response()，从不回传 transcript
 task/manager.py:364-368     非 FINISHED 终态报错并保留部分输出
 task/manager.py:155-160     _evict_task：pause + close + 置空引用
-delegate/impl.py:351-363    裸 threading.Thread，无信号量 ← 与 agentao _wrapper.py:761 同形
+delegate/impl.py:351-363    裸 threading.Thread，无信号量 ← 与 arbiter _wrapper.py:761 同形
 delegate/impl.py:41-45      max_children: int = 5
 subagent/schema.py:248      max_budget_per_run: float | None（USD）
 local_conversation.py:1841/2092/2270   三个预算检查点 → MaxBudgetReached

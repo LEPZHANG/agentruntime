@@ -1,6 +1,6 @@
 """Tests for the ACP ``initialize`` handshake (Issue 02).
 
-These drive :func:`agentao.acp.initialize.handle_initialize` both directly
+These drive :func:`arbiter.acp.initialize.handle_initialize` both directly
 (unit-style, asserting on the dict return) and through the full ``AcpServer``
 dispatcher (integration-style, asserting on the NDJSON wire output). The
 wire tests make sure the handler composes correctly with the Issue 01 server.
@@ -11,14 +11,14 @@ import json
 
 import pytest
 
-from agentao import __version__ as AGENTAO_VERSION
-from agentao.acp import initialize as acp_initialize
-from agentao.acp.protocol import (
+from arbiter import __version__ as ARBITER_VERSION
+from arbiter.acp import initialize as acp_initialize
+from arbiter.acp.protocol import (
     ACP_PROTOCOL_VERSION,
     INVALID_PARAMS,
     METHOD_INITIALIZE,
 )
-from agentao.acp.server import AcpServer
+from arbiter.acp.server import AcpServer
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ def test_agent_capabilities_shape():
         "embeddedContext": False,
     }
 
-    # Reflects actual MCP support in agentao/mcp/client.py — both URL
+    # Reflects actual MCP support in arbiter/mcp/client.py — both URL
     # transports (SSE + Streamable HTTP) are dispatchable.
     assert caps["mcpCapabilities"] == {"http": True, "sse": True}
 
@@ -97,9 +97,9 @@ def test_agent_info_uses_package_version():
 
     info = acp_initialize.handle_initialize(server, _minimal_params())["agentInfo"]
 
-    assert info["name"] == "agentao"
-    assert info["title"] == "Agentao"
-    assert info["version"] == AGENTAO_VERSION
+    assert info["name"] == "arbiter"
+    assert info["title"] == "Arbiter"
+    assert info["version"] == ARBITER_VERSION
 
 
 def test_auth_methods_is_empty_list_by_default():
@@ -316,5 +316,5 @@ def test_initialize_over_wire_returns_expected_response_shape():
     result = response["result"]
     assert result["protocolVersion"] == ACP_PROTOCOL_VERSION
     assert result["agentCapabilities"]["loadSession"] is True
-    assert result["agentInfo"]["name"] == "agentao"
+    assert result["agentInfo"]["name"] == "arbiter"
     assert result["authMethods"] == []

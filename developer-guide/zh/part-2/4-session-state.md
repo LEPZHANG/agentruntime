@@ -1,30 +1,30 @@
 # 2.4 会话状态与持久化
 
 > **本节你会学到**
-> - `Agentao` 实例承载的 4 块状态分别在哪里
+> - `Arbiter` 实例承载的 4 块状态分别在哪里
 > - 哪些必须由宿主持久化才能跨进程重启
 > - 三种部署形态（长驻池 / 每请求重建 / 混合）以及怎么选
 
-一个运行中的 `Agentao` 实例承载的远不止"上一句 assistant 回复"。**清楚每一块状态分别存在哪里**，决定了你的服务是"重启后用户不丢上下文"还是"每次重启都从零开始"。
+一个运行中的 `Arbiter` 实例承载的远不止"上一句 assistant 回复"。**清楚每一块状态分别存在哪里**，决定了你的服务是"重启后用户不丢上下文"还是"每次重启都从零开始"。
 
 本节回答三个问题：
 
-1. 一个 `Agentao` 实例到底握着哪些状态？
+1. 一个 `Arbiter` 实例到底握着哪些状态？
 2. 哪些必须由宿主持久化才能扛住重启？
 3. 怎么优雅地还原它们？
 
 ## 2.4.1 四个状态桶
 
-每个 `Agentao` 实例有四块独立存储——**彼此不同**，持久化时必须分别对待。
+每个 `Arbiter` 实例有四块独立存储——**彼此不同**，持久化时必须分别对待。
 
 | 桶 | 存放位置 | `close()` 后还在吗？ | 谁负责落盘 |
 |----|---------|--------------------|-----------|
 | **对话消息** | `agent.messages`（内存列表） | ❌ 否 | 宿主 |
-| **记忆（持久化）** | `.agentao/memory.db` + `~/.agentao/memory.db`（SQLite） | ✅ 是 | Agentao |
-| **会话摘要** | 项目 SQLite 的 `session_summaries` 表 | ✅ 是 | Agentao |
+| **记忆（持久化）** | `.arbiter/memory.db` + `~/.arbiter/memory.db`（SQLite） | ✅ 是 | Arbiter |
+| **会话摘要** | 项目 SQLite 的 `session_summaries` 表 | ✅ 是 | Arbiter |
 | **技能激活状态** | `agent.skill_manager.active_skills`（内存字典） | ❌ 否 | 宿主（恢复时需重激活） |
 
-一句话：**落在 SQLite 的 Agentao 会管；落在 Python 列表/字典的要你自己管。**
+一句话：**落在 SQLite 的 Arbiter 会管；落在 Python 列表/字典的要你自己管。**
 
 ## 2.4.2 `agent.messages` — 逐轮对话流水
 
@@ -56,7 +56,7 @@ agent.messages = [
 
 ### `agent.messages` 里**不**包含的东西
 
-- 系统提示——每次 `chat()` 都会由 `AGENTAO.md` + 日期 + 激活的技能 + 记忆块重建，**不要**落盘
+- 系统提示——每次 `chat()` 都会由 `ARBITER.md` + 日期 + 激活的技能 + 记忆块重建，**不要**落盘
 - 工具 schema——每次调用都会从工具注册表重建
 - 工作目录——构造时固定，之后不可变
 
@@ -73,9 +73,9 @@ agent.messages = [
 ```python
 import json
 from pathlib import Path
-from agentao import Agentao
+from arbiter import Arbiter
 
-def save_session(agent: Agentao, session_id: str, db) -> None:
+def save_session(agent: Arbiter, session_id: str, db) -> None:
     """每次 chat() 后调用。"""
     db.upsert(
         session_id,
@@ -87,13 +87,13 @@ def save_session(agent: Agentao, session_id: str, db) -> None:
         },
     )
 
-def load_session(session_id: str, db) -> Agentao:
+def load_session(session_id: str, db) -> Arbiter:
     """宿主启动时或请求到达时调用。"""
     row = db.get(session_id)
     if row is None:
         raise KeyError(session_id)
 
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=Path(row["working_directory"]),
         model=row["model"],
     )
@@ -115,11 +115,11 @@ def load_session(session_id: str, db) -> Agentao:
 
 ## 2.4.4 记忆会自愈
 
-你**不需要**手动持久化记忆——Agentao 已经在做了。
+你**不需要**手动持久化记忆——Arbiter 已经在做了。
 
 ```python
-agent = Agentao(working_directory=Path("/app/users/alice"))
-# MemoryManager 会自动打开 /app/users/alice/.agentao/memory.db
+agent = Arbiter(working_directory=Path("/app/users/alice"))
+# MemoryManager 会自动打开 /app/users/alice/.arbiter/memory.db
 # 上次会话的持久化记忆自动加载。
 ```
 
@@ -127,7 +127,7 @@ agent = Agentao(working_directory=Path("/app/users/alice"))
 
 ## 2.4.5 会话摘要 — 别动它
 
-当上下文窗口满了，Agentao 的压缩管线会往 `agent.messages` 里写入 `[Conversation Summary]` 块，同时把同一份摘要存到 `session_summaries`（SQLite）。这一切对你透明：
+当上下文窗口满了，Arbiter 的压缩管线会往 `agent.messages` 里写入 `[Conversation Summary]` 块，同时把同一份摘要存到 `session_summaries`（SQLite）。这一切对你透明：
 
 - 被压缩的消息仍然留在 `agent.messages` 里，所以你落盘的 JSON 依然可来回复盘
 - 重启后不需要另外拉 `session_summaries`——摘要块已经嵌在 `messages` 里了

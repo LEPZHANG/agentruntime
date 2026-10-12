@@ -1,10 +1,10 @@
 # ACP Server —— 标准一致性差距评审
 
-**状态：** 评审记录。起草于 2026-06-18，基于对 `agentao.acp` server 包的逐文件通读，
+**状态：** 评审记录。起草于 2026-06-18，基于对 `arbiter.acp` server 包的逐文件通读，
 对照 Agent Client Protocol（ACP，协议版本 1）核对。**这是一份差距分析 + 优先级化的改进
 建议，而非已批准的方案。** 它记录 ACP server 实现了什么、在哪些地方偏离标准，并*供维护者
 判断*——什么该建、什么该写明文档、什么该有意不做。
-**读者：** Agentao 维护者；以及任何把 agentao 嵌入到 ACP client（Zed、DeepChat……）
+**读者：** Arbiter 维护者；以及任何把 arbiter 嵌入到 ACP client（Zed、DeepChat……）
 背后的人。
 **对照件：** `acp-server-conformance-review.md`。
 **相关：**
@@ -24,25 +24,25 @@ TL;DR 下的更正说明。
 
 ## TL;DR
 
-Agentao 的 ACP server 是**工程质量很高、但只实现了"Agent 一侧"协议**的实现。*核心*的
+Arbiter 的 ACP server 是**工程质量很高、但只实现了"Agent 一侧"协议**的实现。*核心*的
 client→agent 请求面（`initialize`、`session/new|load|prompt|cancel`、mode/config）很健壮
 ——但 v1 的会话管理方法（`session/list|delete|resume|close`、`logout`）尚未实现。几乎缺席
 的，是*消费 client 反向提供的能力*——`fs/*` 与 `terminal/*` 方法。结果是：嵌入真实 ACP
-client 时，agentao 更像一个"恰好会说 ACP 的无头 agent"，而非深度集成进编辑器的 agent。
+client 时，arbiter 更像一个"恰好会说 ACP 的无头 agent"，而非深度集成进编辑器的 agent。
 
 > **更正（2026-06-18，评审后）：** 本文初稿后重新拉取了官方 ACP v1 schema（release 日期
 > 2026-06-18）。初稿有三处错误，已在下文修正：(i) 请求面**并非**"完整"——v1 定义了
-> `session/list|delete|resume|close` 与 `logout`，agentao 均未实现；(ii) `session/set_model`
-> 与 `session/list_models` 是 **Agentao 扩展，不是 ACP v1 方法**；(iii) G2/G3 **并非**纯运行时
-> ——agentao 自己冻结的契约（`agentao/acp/schema.py` → `docs/schema/host.acp.v1.json`）当前
+> `session/list|delete|resume|close` 与 `logout`，arbiter 均未实现；(ii) `session/set_model`
+> 与 `session/list_models` 是 **Arbiter 扩展，不是 ACP v1 方法**；(iii) G2/G3 **并非**纯运行时
+> ——arbiter 自己冻结的契约（`arbiter/acp/schema.py` → `docs/schema/host.acp.v1.json`）当前
 > *禁止* `locations`/`diff`，且漏了 `max_tokens` 停止原因，这些也必须一并更新。来源：`main` 上
 > 的官方 ACP schema `schema/v1/schema.json`。
 
 > **定位前提（决定 G1 的优先级）。** ACP 把 `fs/*` 与 `terminal/*` 设为 *capability-gated*：
 > agent 只有在 client 广告 `fs.readTextFile`/`writeTextFile`/`terminal` 时才用它们。**chat-class
-> 的 host 通常不广告**——所以 agentao 现在的"本地文件工具 + 本地 shell"行为在那里**已经正确且
+> 的 host 通常不广告**——所以 arbiter 现在的"本地文件工具 + 本地 shell"行为在那里**已经正确且
 > 合规**，G1 对非 IDE host **根本不是 gap**。G1 只在**编辑器级 client（Zed/Cursor）**广告了这些
-> 能力、而 agentao 无视时才咬人。设计文档（`embedding-vs-acp.md:13`）确实把 Zed/Cursor/IDE 列为
+> 能力、而 arbiter 无视时才咬人。设计文档（`embedding-vs-acp.md:13`）确实把 Zed/Cursor/IDE 列为
 > ACP 目标，但唯一*在途*的真实集成是 **DeepChat**（Electron 聊天 UI，
 > `deepchat-acp-patch-revision.md`）。按项目自己的 demand-gated 纪律（gap ≠ need），**G1 的
 > headline 地位取决于"编辑器级 client 是否成为真实目标"**；没有这个信号时，当前优先级是 client
@@ -51,7 +51,7 @@ client 时，agentao 更像一个"恰好会说 ACP 的无头 agent"，而非深�
 
 > **决定（2026-06-18）：目标 client 类别 = chat/automation。** 维护者已把定位设为
 > **chat/automation host**（DeepChat 为在途集成），而非编辑器级 IDE。按 §4 P0 的 option (b)，
-> **G1（fs/terminal 代理）是有文档的非目标**：*agentao 是自洽的 ACP agent，自带文件系统与 shell
+> **G1（fs/terminal 代理）是有文档的非目标**：*arbiter 是自洽的 ACP agent，自带文件系统与 shell
 > （sandbox、权限引擎、provider 中立）；把文件/终端操作路由给 client 是有意排除在范围外的。* 它
 > 现在的本地 fs/本地 shell 行为是预期的、合规的行为——不是疏漏。下文的条件分析保留为**复活条款**：
 > 若将来转向编辑器级 client（Zed/Cursor），G1 重新成为 headline。**现在该做：G4、G3、G2 的
@@ -81,23 +81,23 @@ ACP（Agent Client Protocol，agentclientprotocol.com）是 Zed 发起的、位�
   `session/load`、`session/prompt`、`session/cancel`（notification）、
   `session/list`、`session/delete`、`session/resume`、`session/close`、
   `session/set_mode`、`session/set_config_option`。（注：`session/set_model` 与
-  `session/list_models` **不在** v1 中——它们是 Agentao 扩展。）
+  `session/list_models` **不在** v1 中——它们是 Arbiter 扩展。）
 - **agent → client**：`session/update`（notification）、`session/request_permission`，
   以及受能力门控的 **`fs/read_text_file`**、**`fs/write_text_file`**、
   **`terminal/create`**、**`terminal/output`**、**`terminal/wait_for_exit`**、
   **`terminal/kill`**、**`terminal/release`**。
 
-协议版本：**1**（`agentao/acp/protocol.py:18`）。
+协议版本：**1**（`arbiter/acp/protocol.py:18`）。
 
 一个*完整*的 ACP agent 做两件事：既回答 client 的请求，**也**驱动 client 的 fs/terminal，
-使文件编辑与 shell 命令流经编辑器自己的视图（未保存缓冲区、diff 审阅、终端面板）。agentao
+使文件编辑与 shell 命令流经编辑器自己的视图（未保存缓冲区、diff 审阅、终端面板）。arbiter
 把第一件做得很彻底，第二件几乎没做。
 
 ---
 
 ## 2. 已实现的部分（Agent 一侧——做得好）
 
-注册的 handler（`agentao/acp/__main__.py:99-108`）：
+注册的 handler（`arbiter/acp/__main__.py:99-108`）：
 
 | 方法 | 文件 | 说明 |
 |---|---|---|
@@ -106,12 +106,12 @@ ACP（Agent Client Protocol，agentclientprotocol.com）是 Zed 发起的、位�
 | `session/load` | `session_load.py` | 经 `_ReplayMixin` 做历史回放 |
 | `session/prompt` | `session_prompt.py` | `text` / `resource_link` / `image` content block；返回 `stopReason` |
 | `session/cancel` | `session_cancel.py` | 规范为 notification；容忍被当 request 发送的 client |
-| `session/set_model` ⚠ | `session_set_model.py` | **Agentao 扩展——不在 ACP v1。** 无 vendor 的模型切换 |
+| `session/set_model` ⚠ | `session_set_model.py` | **Arbiter 扩展——不在 ACP v1。** 无 vendor 的模型切换 |
 | `session/set_config_option` | `session_set_config_option.py` | 标准 config 路径；host `provider_resolver` 使凭据不上线 |
 | `session/set_mode` | `session_set_mode.py` | `modeId` 字段；accept-unknown（DeepChat 的 `code`/`ask`） |
-| `session/list_models` ⚠ | `session_list_models.py` | **Agentao 扩展——不在 ACP v1。** `{models: [...]}` |
+| `session/list_models` ⚠ | `session_list_models.py` | **Arbiter 扩展——不在 ACP v1。** `{models: [...]}` |
 | `_agentao.cn/ask_user` | 扩展 | 按 ACP 用下划线前缀，在 `_meta` 声明 |
-| `_agentao.cn/set_model` | `agentao_set_model.py` | 自由文本模型设定（DeepChat"输入任意模型"UX） |
+| `_agentao.cn/set_model` | `arbiter_set_model.py` | 自由文本模型设定（DeepChat"输入任意模型"UX） |
 
 出站（agent → client）：`session/update` notification（事件映射丰富，`transport.py`）与
 `session/request_permission`（`_transport_interaction.py:161`）。
@@ -137,18 +137,18 @@ ACP（Agent Client Protocol，agentclientprotocol.com）是 Zed 发起的、位�
 ### G1 —— Agent 不消费 client 的 `fs/*` 与 `terminal/*` 能力 *(最高杠杆——仅对编辑器级 client)*
 
 > **已定为非目标（决定 2026-06-18：chat/automation）。** 因为 ACP 把 `fs/*`/`terminal/*` 门控
-> 在 client 广告的能力上，一个不广告这些的 chat-class host 从 agentao 拿到的就是*正确、合规*的
+> 在 client 广告的能力上，一个不广告这些的 chat-class host 从 arbiter 拿到的就是*正确、合规*的
 > 行为——既然目标类别定为 chat/automation，**这是有文档的非目标，而非 gap**。下文保留为**复活
 > 条款**：它描述的是*若*将来某个广告了 fs/terminal 的编辑器级 client（Zed/Cursor）成为目标，需要
 > 建什么。
 
 **证据。** 整个 server 只有**两处**出站 `server.call`（`_transport_interaction.py:161,328`）：
-`session/request_permission` 与 `_agentao.cn/ask_user`。`agentao/` 中**没有**任何对
+`session/request_permission` 与 `_agentao.cn/ask_user`。`arbiter/` 中**没有**任何对
 `fs/read_text_file`、`fs/write_text_file` 或任意 `terminal/*` 方法的调用（grep：无出站
 `fs/` 或 `terminal/` 字符串）。
 
 **后果。**
-- **文件系统**：文件读写走 agentao 的*本地*文件工具，而非 client。在 Zed 这类编辑器里，这会
+- **文件系统**：文件读写走 arbiter 的*本地*文件工具，而非 client。在 Zed 这类编辑器里，这会
   绕过未保存缓冲区与编辑器自己的 fs 视图；client 无法经其原生路径居中调停、做 diff 或追踪编辑。
 - **终端**：shell 命令经本地 `LocalShellExecutor` 运行，只能以纯文本塞进 `session/update`。
   client 的终端面板/终端块、以及标准终端生命周期
@@ -158,7 +158,7 @@ ACP（Agent Client Protocol，agentclientprotocol.com）是 Zed 发起的、位�
 未来的 factory 能据 `fs.readTextFile: true` 在本地文件工具与 ACP 代理文件工具之间做选择。"*
 分支已设计好，只是尚未实现。
 
-**定调。** 这是**有代价的选择，而非单纯 bug。** Agentao 是嵌入式 harness，自带 sandbox、
+**定调。** 这是**有代价的选择，而非单纯 bug。** Arbiter 是嵌入式 harness，自带 sandbox、
 权限引擎与 provider 中立的运行时（`embedding-vs-acp.md`、`host-fs-policy.md`）。为 ACP 会话
 把 fs/terminal 路由给 client，*反转*了这种所有权，且必须与宿主 fs 策略设计调和。**不作为**的
 代价是在编辑器级 ACP client 里沦为二等公民；**作为**的代价是要多维护一条 fs/exec 路径并做策略
@@ -172,19 +172,19 @@ ACP（Agent Client Protocol，agentclientprotocol.com）是 Zed 发起的、位�
 - **`locations: [{path, line}]`** —— 没有它，agent 读/改文件时 client 无法做"跟随 agent"高亮。
 - **`type:"diff"` 的 `content`（`oldText`/`newText`）** —— 编辑类工具的结果被当作纯文本
   （`_tool_content_text`）发出，于是 client 渲染成文本块而非可审阅 diff。**diff 视图是 ACP
-  对编辑工具的招牌 UX，agentao 放弃了它。**
-- **人类可读 `title`** —— ACP 期望如"Writing config.py"，agentao 发"write_file"。
+  对编辑工具的招牌 UX，arbiter 放弃了它。**
+- **人类可读 `title`** —— ACP 期望如"Writing config.py"，arbiter 发"write_file"。
 
-**这是契约变更，不只是发送变更。** agentao 自己冻结的 ACP schema 比 ACP v1 *更*严格，当前
+**这是契约变更，不只是发送变更。** arbiter 自己冻结的 ACP schema 比 ACP v1 *更*严格，当前
 **禁止**这些形态：`AcpSessionUpdateToolCall` 没有 `locations` 字段且 `extra="forbid"`
 （`schema.py:536-552`）；`AcpToolCallContentEntry` **只**接受 `type:"content"` 带内层文本块
 ——没有 `diff`、没有 `terminal`（`schema.py:630-642`）。本地 `kind` 枚举也只有 6 个值
 （`read, edit, search, execute, fetch, other`，`schema.py:547`），而 ACP v1 有 9 个（多
 `delete, move, think`）——于是 `transport.py:39` 的 `_tool_kind` 映射已经可能产出一个被自己
-schema 拒绝的值。因此实现 G2 意味着：更新 `agentao/acp/schema.py`、重新生成
+schema 拒绝的值。因此实现 G2 意味着：更新 `arbiter/acp/schema.py`、重新生成
 `docs/schema/host.acp.v1.json`、并更新 schema 快照测试——否则发送会过不了项目自己的契约测试。
 
-相关小项：`TOOL_COMPLETE` 把 agentao 的 `cancelled` 映射成 ACP 的 `failed`
+相关小项：`TOOL_COMPLETE` 把 arbiter 的 `cancelled` 映射成 ACP 的 `failed`
 （`transport.py:261-268`），因为 ACP 的 tool call 没有 cancelled 状态——可接受但有损。
 
 ### G3 —— `stopReason` 贫乏 *(运行时 + schema 漂移)*
@@ -213,10 +213,10 @@ schema 拒绝的值。因此实现 G2 意味着：更新 `agentao/acp/schema.py`
   `currentModeId`，也不发 `current_mode_update` notification。`session_set_mode.py:15-19`
   明确把这点、以及 UI-mode 与权限轴的拆分，列为 deferred。
 - **Plan**：ACP 有 `plan` 这种 `sessionUpdate`（带状态的条目，client 渲染成任务勾选清单）。
-  agentao 既有 plan 模式**又**有 todo 工具，却都没映射到 `plan`——它们停留在内部。子 agent
+  arbiter 既有 plan 模式**又**有 todo 工具，却都没映射到 `plan`——它们停留在内部。子 agent
   同样被拍平成 `agent_thought_chunk` 文本标记，而非结构化 `tool_call` 时间线
   （`transport.py:30-35,279-301`）。
-- **Commands**：无 `available_commands_update`。agentao 丰富的斜杠命令是 CLI-only，从不向
+- **Commands**：无 `available_commands_update`。arbiter 丰富的斜杠命令是 CLI-only，从不向
   ACP client 广告。
 
 ### G5 —— 能力面较薄 *(多属需求门控)*
@@ -230,7 +230,7 @@ schema 拒绝的值。因此实现 G2 意味着：更新 `agentao/acp/schema.py`
   `fs/read_text_file` 往返，这又直接回到 **G1**。
 - `loadSession:true` **已**实现——好。
 - **v1 已确认、未实现**：`session/list`、`session/delete`、`session/close`、`session/resume`、
-  `logout` **确实**定义在官方 ACP v1 schema 中（2026-06-18 核实）——它们不是"提案/较新"。agentao
+  `logout` **确实**定义在官方 ACP v1 schema 中（2026-06-18 核实）——它们不是"提案/较新"。arbiter
   一个都没注册。仍属需求门控（当目标 client 用到会话管理 UI 时再建），但这是真实的一致性缺口，
   而非未知项。
 - `authenticate` 是真实的 ACP 方法且未注册，但既然广告了 `authMethods:[]`
@@ -239,9 +239,9 @@ schema 拒绝的值。因此实现 G2 意味着：更新 `agentao/acp/schema.py`
 
 ### G6 —— 无上游 schema 一致性测试
 
-`schema_export.py` 把 agentao 自己的 ACP Pydantic 模型导出为 JSON Schema（好基座），测试套件
+`schema_export.py` 把 arbiter 自己的 ACP Pydantic 模型导出为 JSON Schema（好基座），测试套件
 也断言了*内部*的 event→update 映射——但**没有任何东西拿线路去对照上游 ACP schema 校验**，也
-没有让 agentao 跑参考 client。对规范的漂移不会被发现。
+没有让 arbiter 跑参考 client。对规范的漂移不会被发现。
 
 ---
 
@@ -251,7 +251,7 @@ schema 拒绝的值。因此实现 G2 意味着：更新 `agentao/acp/schema.py`
 
 **P0 —— 目标 client 类别：已决定 = chat/automation（2026-06-18）。** 它门控以下一切。决定为
 **chat/automation host**（DeepChat 为在途集成），因此：
-- **G1 是有文档的非目标**——agentao 保持为自洽 ACP agent，自带 fs/shell；其现有本地 fs/本地 shell
+- **G1 是有文档的非目标**——arbiter 保持为自洽 ACP agent，自带 fs/shell；其现有本地 fs/本地 shell
   行为即预期的、合规的行为。不建 fs/terminal 代理。
 - **复活条款**：若将来编辑器级 client（Zed/Cursor）成为目标，G1 重新成为 headline——经
   `session_new.py:93-95` seam 按 `client_capabilities` 门控实现 ACP fs/terminal 代理工具（**先 fs
@@ -271,14 +271,14 @@ automation 表面和任意 client UI 都重要。
 
 **P1 —— `tool_call` 的 `diff` 内容（G2，diff 那一半）。** 对编辑类工具发 `diff`
 （`oldText`/`newText`）——它在 chat client 里也能渲染，不只编辑器。先拓宽冻结契约
-（`agentao/acp/schema.py`：给 `AcpToolCallContentEntry` 加 `diff`/`terminal` 变体、把 `kind`
+（`arbiter/acp/schema.py`：给 `AcpToolCallContentEntry` 加 `diff`/`terminal` 变体、把 `kind`
 枚举扩到 v1 的 9 个值），重新生成 `docs/schema/host.acp.v1.json`、更新快照测试，然后发送。
 **`locations` 那一半是编辑器专属——随 G1 一起延后。**
 
 **P2 —— streamable-HTTP MCP 传输（G5）。** 加 `streamable_http_client` 让
 `mcpCapabilities.http:true`。需求门控：仅当目标 client 真在 `session/new` 传入 HTTP MCP server 时。
 
-**P3 —— 上游一致性测试（G6）。** 把 `schema_export.py` 接到官方 ACP schema（或让 agentao 跑在
+**P3 —— 上游一致性测试（G6）。** 把 `schema_export.py` 接到官方 ACP schema（或让 arbiter 跑在
 参考 ACP client 下）作为 CI 检查，使规范漂移被机械捕获。
 
 ---
@@ -296,10 +296,10 @@ client 无关 / chat 相关的收益——**G4**（plan/modes/commands）、**G3
 
 ## 6. 方法覆盖矩阵
 
-`I` = 已实现，`—` = 未实现，`ext` = Agentao 扩展（不在 ACP v1）。
+`I` = 已实现，`—` = 未实现，`ext` = Arbiter 扩展（不在 ACP v1）。
 所有 v1 方法归属已于 2026-06-18 对照官方 schema 核实。
 
-| ACP 方法 | 方向 | Agentao | 备注 |
+| ACP 方法 | 方向 | Arbiter | 备注 |
 |---|---|---|---|
 | `initialize` | c→a | I | 版本协商 + `_meta` 扩展 |
 | `authenticate` | c→a | — | `authMethods:[]` ⇒ 永不被调；OK |
@@ -311,8 +311,8 @@ client 无关 / chat 相关的收益——**G4**（plan/modes/commands）、**G3
 | `session/set_mode` | c→a | I | 无 `availableModes`/`current_mode_update`（G4） |
 | `session/set_config_option` | c→a | I | host `provider_resolver` |
 | `session/list`/`delete`/`close`/`resume` | c→a | — | **v1 方法，未实现**；需求门控（G5） |
-| `session/set_model` | c→a | ext | **Agentao 扩展，不在 ACP v1** |
-| `session/list_models` | c→a | ext | **Agentao 扩展，不在 ACP v1** |
+| `session/set_model` | c→a | ext | **Arbiter 扩展，不在 ACP v1** |
+| `session/list_models` | c→a | ext | **Arbiter 扩展，不在 ACP v1** |
 | `_agentao.cn/set_model` | c→a | ext | 自由文本模型设定 |
 | `session/update` | a→c | I | 映射丰富；无 `plan`/`diff`/`locations`（G2/G4） |
 | `session/request_permission` | a→c | I | 阻塞式、并发安全 |
@@ -330,7 +330,7 @@ client 无关 / chat 相关的收益——**G4**（plan/modes/commands）、**G3
 ## 7. 结论
 
 ACP server 凡已实现处都建得扎实，入站路径在构造上即安全。它的一致性上限**取决于目标 client
-类别**。对在途的 chat host（DeepChat），agentao 现有行为已合规——G1 在那里不是 gap——*现在*该做
+类别**。对在途的 chat host（DeepChat），arbiter 现有行为已合规——G1 在那里不是 gap——*现在*该做
 的是 client 无关 / chat 相关的收益：**G4**（plan/modes/commands）、**G3**（stopReason）、**G2 的
 `diff`**，每项都是本地的 schema + 发送改动，不需协议往返。**G1**（驱动 client 的 fs/terminal）只
 *在追求*编辑器级 client（Zed/Cursor）时才成为 headline。所以先定目标类别，优先级顺序随之而出。

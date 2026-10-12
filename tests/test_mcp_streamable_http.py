@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 import pytest
 
-from agentao.mcp.client import (
+from arbiter.mcp.client import (
     _DEFAULT_SSE_READ_TIMEOUT,
     _MCP_USER_AGENT,
     _with_default_user_agent,
@@ -26,7 +26,7 @@ from agentao.mcp.client import (
     NonMcpEndpointError,
     ServerStatus,
 )
-from agentao.mcp.config import McpTransportConfigError, resolve_transport
+from arbiter.mcp.config import McpTransportConfigError, resolve_transport
 from tests.support.mcp import run_async
 
 # Distinctive substring of the §5.7 connect hint.
@@ -113,10 +113,10 @@ def _drive_connect(
         return None
 
     client = McpClient("svr", config)
-    with patch("agentao.mcp.client.streamable_http_client", fake_http), patch(
-        "agentao.mcp.client.create_mcp_http_client", fake_create_client
-    ), patch("agentao.mcp.client.sse_client", fake_sse), patch(
-        "agentao.mcp.client.ClientSession", fake_session
+    with patch("arbiter.mcp.client.streamable_http_client", fake_http), patch(
+        "arbiter.mcp.client.create_mcp_http_client", fake_create_client
+    ), patch("arbiter.mcp.client.sse_client", fake_sse), patch(
+        "arbiter.mcp.client.ClientSession", fake_session
     ), patch.object(
         McpClient, "_preflight_content_type", preflight
     ):
@@ -326,12 +326,12 @@ def test_bad_type_fails_closed_at_connect_no_hint_no_dispatch():
 def _cli_add(tmp_path, args):
     from types import SimpleNamespace
 
-    from agentao.cli.commands.mcp import handle_mcp_command
-    from agentao.mcp.config import _load_json_file
+    from arbiter.cli.commands.mcp import handle_mcp_command
+    from arbiter.mcp.config import _load_json_file
 
     cli = SimpleNamespace(agent=SimpleNamespace(working_directory=tmp_path))
     handle_mcp_command(cli, args)
-    cfg = _load_json_file(tmp_path / ".agentao" / "mcp.json")
+    cfg = _load_json_file(tmp_path / ".arbiter" / "mcp.json")
     return cfg.get("mcpServers", {})
 
 
@@ -365,10 +365,10 @@ def test_cli_add_stdio_unaffected(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_user_agent_constant_is_named_and_versioned():
-    # Server operators identify agentao by this string; keep the name/version
+    # Server operators identify arbiter by this string; keep the name/version
     # shape so it stays greppable in their logs.
-    assert _MCP_USER_AGENT.startswith("agentao-mcp/")
-    assert _MCP_USER_AGENT != "agentao-mcp/"  # a real version is appended
+    assert _MCP_USER_AGENT.startswith("arbiter-mcp/")
+    assert _MCP_USER_AGENT != "arbiter-mcp/"  # a real version is appended
 
 
 def test_with_default_user_agent_adds_when_absent():
@@ -410,7 +410,7 @@ def test_sse_sends_default_user_agent():
 
 def test_preflight_probe_receives_default_user_agent():
     # The UA is injected before the preflight call, so the probe identifies
-    # agentao too — not only the handshake and tool calls.
+    # arbiter too — not only the handshake and tool calls.
     seen = {}
 
     async def capture_preflight(self, url, headers):

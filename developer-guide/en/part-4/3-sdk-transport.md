@@ -5,7 +5,7 @@
 > - Idiomatic patterns: dispatcher, fan-out, class-grouped state
 > - Common pitfalls: hangs, exceptions, mixing transport with legacy callbacks
 
-`SdkTransport` is Agentao's official **general-purpose Transport implementation** — four callbacks that cover 90% of embeddings.
+`SdkTransport` is Arbiter's official **general-purpose Transport implementation** — four callbacks that cover 90% of embeddings.
 
 ## Constructor
 
@@ -32,7 +32,7 @@ class SdkTransport:
 ## Minimum use
 
 ```python
-from agentao.transport import SdkTransport
+from arbiter.transport import SdkTransport
 
 transport = SdkTransport(
     on_event=lambda ev: print(ev.type.value, ev.data),
@@ -46,7 +46,7 @@ Already enough to print the full event stream.
 ### 1) `on_event` — event dispatcher
 
 ```python
-from agentao.transport import EventType
+from arbiter.transport import EventType
 
 def on_event(event):
     match event.type:
@@ -130,7 +130,7 @@ transport = SdkTransport(
     ask_user=session.ask_user,
     on_max_iterations=session.on_max_iterations,
 )
-agent = Agentao(transport=transport, working_directory=Path("/tmp/sess-123"))
+agent = Arbiter(transport=transport, working_directory=Path("/tmp/sess-123"))
 ```
 
 ## Fan-out: multiple subscribers
@@ -162,11 +162,11 @@ transport = SdkTransport(on_event=fanout)
 
 ## Legacy 8-callback API
 
-Pre-0.2.10 Agentao used 8 standalone callbacks (`confirmation_callback`, `step_callback`, `thinking_callback`…). **They still work** — internally Agentao auto-wraps them via `build_compat_transport()` into an `SdkTransport`:
+Pre-0.2.10 Arbiter used 8 standalone callbacks (`confirmation_callback`, `step_callback`, `thinking_callback`…). **They still work** — internally Arbiter auto-wraps them via `build_compat_transport()` into an `SdkTransport`:
 
 ```python
 # Old (still works)
-agent = Agentao(
+agent = Arbiter(
     confirmation_callback=lambda n, d, a: True,
     llm_text_callback=lambda chunk: print(chunk, end=""),
     step_callback=lambda name, args: print(f"[{name}]"),
@@ -179,7 +179,7 @@ def on_event(ev):
     elif ev.type == EventType.TOOL_START:
         print(f"[{ev.data['tool']}]")
 
-agent = Agentao(transport=SdkTransport(
+agent = Arbiter(transport=SdkTransport(
     on_event=on_event,
     confirm_tool=lambda n, d, a: True,
 ))
@@ -223,7 +223,7 @@ If your confirmation dialog bugs out and never returns, the agent **hangs indefi
 
 ```python
 # Both provided — legacy ones are IGNORED
-agent = Agentao(
+agent = Arbiter(
     transport=my_transport,
     confirmation_callback=my_callback,  # not called!
 )
@@ -234,8 +234,8 @@ Pick one. `transport` wins.
 ## Minimal "handle everything" template
 
 ```python
-from agentao import Agentao
-from agentao.transport import SdkTransport, EventType
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport, EventType
 from pathlib import Path
 
 class AgentBridge:
@@ -281,7 +281,7 @@ transport = SdkTransport(
     ask_user=bridge.ask_user,
     on_max_iterations=bridge.on_max_iterations,
 )
-agent = Agentao(transport=transport, working_directory=Path.cwd())
+agent = Arbiter(transport=transport, working_directory=Path.cwd())
 print(agent.chat("hello"))
 agent.close()
 ```

@@ -7,13 +7,13 @@ from unittest.mock import Mock, patch, MagicMock
 
 
 def _make_agent():
-    with patch('agentao.agent.LLMClient') as mock_llm_class:
+    with patch('arbiter.agent.LLMClient') as mock_llm_class:
         mock_llm = Mock()
         mock_llm.logger = Mock()
         mock_llm.model = "gpt-4"
         mock_llm_class.return_value = mock_llm
-        from agentao.agent import Agentao
-        return Agentao(working_directory=Path.cwd())
+        from arbiter.agent import Arbiter
+        return Arbiter(working_directory=Path.cwd())
 
 
 def test_date_not_in_system_prompt():

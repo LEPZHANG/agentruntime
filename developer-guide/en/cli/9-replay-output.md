@@ -4,7 +4,7 @@ Three commands for capturing what the agent did and controlling what you see: `/
 
 ## `/replay` — record, list, inspect, prune sessions
 
-When recording is on, every event the agent emits (LLM responses, tool calls, tool results, permission decisions, memory writes, ...) is appended to a JSONL file under `.agentao/replay/`. You can list, render, tail, and prune those files later.
+When recording is on, every event the agent emits (LLM responses, tool calls, tool results, permission decisions, memory writes, ...) is appended to a JSONL file under `.arbiter/replay/`. You can list, render, tail, and prune those files later.
 
 ### `/replay on` and `/replay off`
 
@@ -13,7 +13,7 @@ When recording is on, every event the agent emits (LLM responses, tool calls, to
 Replay recording ON. (max_instances=20)
 ```
 
-Persists to `.agentao/settings.json` so the next session starts with the same setting. Off by default — turn it on when you want a paper trail.
+Persists to `.arbiter/settings.json` so the next session starts with the same setting. Off by default — turn it on when you want a paper trail.
 
 ### `/replay` and `/replay list` — list recordings
 
@@ -80,7 +80,7 @@ Flat view of the last `n` events (default 20). Useful when a long replay finishe
 Pruned 5 replay(s) beyond max_instances=20.
 ```
 
-Deletes the oldest replays beyond `replay.max_instances` (configurable in `.agentao/settings.json`). Doesn't ask for confirmation — it's bounded and safe.
+Deletes the oldest replays beyond `replay.max_instances` (configurable in `.arbiter/settings.json`). Doesn't ask for confirmation — it's bounded and safe.
 
 ### `/replay delete <id>` and `/replay delete all`
 
@@ -169,9 +169,9 @@ A common workflow:
 ---
 
 ::: info Where this fits
-Replay is implemented in `agentao.replay` — embedding hosts can read the same JSONL files and use `agentao.replay.read_replay()` to deserialize them. The event schema is identical across CLI and embedded paths. Use replays in CI to verify behavior changes don't regress against past sessions.
+Replay is implemented in `arbiter.replay` — embedding hosts can read the same JSONL files and use `arbiter.replay.read_replay()` to deserialize them. The event schema is identical across CLI and embedded paths. Use replays in CI to verify behavior changes don't regress against past sessions.
 :::
 
 ::: tip Authoritative help
-Command syntax: `/help`. Behavior: [`agentao/cli/replay_commands.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/replay_commands.py). Render logic: [`agentao/cli/replay_render.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/replay_render.py). Storage: [`agentao/replay/`](https://github.com/jin-bo/agentao/blob/main/agentao/replay/).
+Command syntax: `/help`. Behavior: [`arbiter/cli/replay_commands.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/replay_commands.py). Render logic: [`arbiter/cli/replay_render.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/replay_render.py). Storage: [`arbiter/replay/`](https://github.com/jin-bo/agentao/blob/main/arbiter/replay/).
 :::

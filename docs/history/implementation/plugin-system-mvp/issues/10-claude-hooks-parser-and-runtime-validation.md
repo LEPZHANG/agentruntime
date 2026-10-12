@@ -20,7 +20,7 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Deliverables
 
-- `agentao/plugins/hooks.py` 的 parser 部分
+- `arbiter/plugins/hooks.py` 的 parser 部分
 - hooks parser tests
 
 ## Dependencies

@@ -5,7 +5,7 @@ The minimum loop is four commands: launch, chat, end-and-start-fresh, exit. Once
 ## Launch
 
 ```bash
-uv run agentao
+uv run arbiter
 # or
 ./run.sh
 ```
@@ -13,7 +13,7 @@ uv run agentao
 You drop into the REPL. The current working directory becomes the agent's `working_directory` — every file/glob/shell tool the agent runs is rooted here. **Always `cd` to the project you want the agent to work in before launching.**
 
 ```text
-🌟 Agentao — terminal agent
+🌟 Arbiter — terminal agent
 Working dir: /Users/you/projects/my-app
 Model: gpt-5.4 · Mode: workspace-write
 
@@ -101,9 +101,9 @@ Both do the same thing: flush any in-flight work, close MCP / ACP subprocesses, 
 ---
 
 ::: info Where this fits
-The commands on this page (`/help`, `/status`, `/clear`, `/new`, `/exit`) are pure CLI session control. An embedding host manages lifecycle through `Agentao(...)` / `agent.close()` and reads status from `active_permissions()` / event streams instead. See [Part 2 · Lifecycle](/en/part-2/3-lifecycle) and [Part 4 · Host Contract](/en/part-4/7-host-contract).
+The commands on this page (`/help`, `/status`, `/clear`, `/new`, `/exit`) are pure CLI session control. An embedding host manages lifecycle through `Arbiter(...)` / `agent.close()` and reads status from `active_permissions()` / event streams instead. See [Part 2 · Lifecycle](/en/part-2/3-lifecycle) and [Part 4 · Host Contract](/en/part-4/7-host-contract).
 :::
 
 ::: tip Authoritative help
-This page describes behavior; the canonical command syntax lives in `/help` and [`agentao/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/help_text.py). When in doubt, trust `/help`.
+This page describes behavior; the canonical command syntax lives in `/help` and [`arbiter/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/help_text.py). When in doubt, trust `/help`.
 :::

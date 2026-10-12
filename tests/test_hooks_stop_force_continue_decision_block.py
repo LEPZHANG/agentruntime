@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 
-from agentao.plugins.hooks import PluginHookDispatcher
-from agentao.plugins.models import ParsedHookRule, StopHookResult
+from arbiter.plugins.hooks import PluginHookDispatcher
+from arbiter.plugins.models import ParsedHookRule, StopHookResult
 
 
 def _parse(stdout_payload: dict) -> StopHookResult:

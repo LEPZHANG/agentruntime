@@ -1,4 +1,4 @@
-# Agentao Plugin System MVP Staged Plan
+# Arbiter Plugin System MVP Staged Plan
 
 这组文档把原始总设计稿拆成可分阶段实施的版本。
 
@@ -30,8 +30,8 @@
 所有阶段默认继承以下总约束：
 
 - 插件来源分三层：
-  - `<home>/.agentao/plugins`
-  - `<project-root>/.agentao/plugins`
+  - `<home>/.arbiter/plugins`
+  - `<project-root>/.arbiter/plugins`
   - `--plugin-dir`
 - 插件唯一身份使用 `plugin.json.name`
 - 同名插件按 global < project < inline 原子覆盖
@@ -41,7 +41,7 @@
   - `agents`
   - `mcpServers`
   - `hooks`
-- `commands` 映射为 Agentao skill/prompt 能力
+- `commands` 映射为 Arbiter skill/prompt 能力
 - `UserPromptSubmit` 支持 `command` 和 `prompt`
 - 其它受支持 hook 事件只支持 `command`
 - 已知但不支持的能力记录 warning，不 silently ignore

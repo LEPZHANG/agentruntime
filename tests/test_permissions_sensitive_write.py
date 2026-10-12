@@ -9,7 +9,7 @@ access), and ``plan`` mode already denies all shell commands anyway.
 Split out from the original monolithic ``test_permissions.py``.
 """
 
-from agentao.permissions import PermissionDecision, PermissionEngine, PermissionMode
+from arbiter.permissions import PermissionDecision, PermissionEngine, PermissionMode
 
 
 _SENSITIVE_WRITE_POSITIVE_CASES = [

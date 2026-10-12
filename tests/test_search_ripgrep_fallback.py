@@ -15,8 +15,8 @@ from typing import List
 
 import pytest
 
-from agentao.tools import search as search_mod
-from agentao.tools.search import SearchTextTool
+from arbiter.tools import search as search_mod
+from arbiter.tools.search import SearchTextTool
 
 
 def _seed_tree(root: Path) -> None:

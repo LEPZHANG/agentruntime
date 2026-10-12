@@ -1,6 +1,6 @@
-# Agentao CLI — Quick Start Guide
+# Arbiter CLI — Quick Start Guide
 
-> **Embedding `agentao` in a Python host instead of using the CLI?**
+> **Embedding `arbiter` in a Python host instead of using the CLI?**
 > See [`EMBEDDING.md`](../guides/embedding.md) — that's the primary use case
 > and has its own setup path. This guide covers the CLI only.
 
@@ -8,20 +8,20 @@ Get the CLI up and running in under 2 minutes.
 
 ## 1. Install
 
-This guide drives the `agentao` console script, which lives in the `[cli]`
+This guide drives the `arbiter` console script, which lives in the `[cli]`
 extra (rich, prompt-toolkit, readchar, pygments) starting in 0.4.0:
 
 ```bash
-pip install 'agentao[cli]'
+pip install 'arbiter[cli]'
 ```
 
-Plain `pip install agentao` installs the embedding-only core. See
+Plain `pip install arbiter` installs the embedding-only core. See
 [`migration/0.3.x-to-0.4.0.md`](../migration/0.3.x-to-0.4.0.md) if you
 are upgrading from 0.3.x.
 
 ## 2. Set Up Your Provider Variables
 
-Agentao requires **all three** provider variables at startup. Missing any of them raises `ValueError` immediately:
+Arbiter requires **all three** provider variables at startup. Missing any of them raises `ValueError` immediately:
 
 - `OPENAI_API_KEY` — your API key
 - `OPENAI_BASE_URL` — API endpoint (e.g. `https://api.openai.com/v1`)
@@ -37,10 +37,10 @@ cp .env.example .env
 # Edit .env and fill in all three values
 ```
 
-## 3. Run Agentao
+## 3. Run Arbiter
 
 ```bash
-agentao
+arbiter
 ```
 
 ## 4. Try It Out!
@@ -145,11 +145,11 @@ You: Use the codebase investigator to analyze the project structure
 
 ## Troubleshooting
 
-**Problem**: `command not found: agentao`
-**Solution**: Make sure the install completed with the CLI extras: `pip install 'agentao[cli]'`; or check that your Python scripts directory is on your PATH.
+**Problem**: `command not found: arbiter`
+**Solution**: Make sure the install completed with the CLI extras: `pip install 'arbiter[cli]'`; or check that your Python scripts directory is on your PATH.
 
-**Problem**: `agentao CLI requires extra packages (missing: rich)` and exit 2
-**Solution**: You installed only the embedding core. Run `pip install 'agentao[cli]'` to add the terminal UI deps.
+**Problem**: `arbiter CLI requires extra packages (missing: rich)` and exit 2
+**Solution**: You installed only the embedding core. Run `pip install 'arbiter[cli]'` to add the terminal UI deps.
 
 **Problem**: API key error
 **Solution**: Make sure `.env` file exists and contains a valid `OPENAI_API_KEY`.
@@ -164,4 +164,4 @@ You: Use the codebase investigator to analyze the project structure
 - Try activating different skills with the `/skills` command
 - Save your preferences with the `save_memory` tool
 
-Enjoy using Agentao!
+Enjoy using Arbiter!

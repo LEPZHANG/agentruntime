@@ -1,7 +1,7 @@
 # 宿主 FS 策略:单一 chokepoint(含 shell)上的路径域写边界
 
 > 状态:**设计提案**,源自**两个**独立嵌入宿主的需求(一个知识库宿主 + 一个多房间聊天宿主,均嵌入
-> `Agentao(...)`)。记录两个宿主当前都被迫自行重造的写边界,并把它提为一条 host-contract 原语。按
+> `Arbiter(...)`)。记录两个宿主当前都被迫自行重造的写边界,并把它提为一条 host-contract 原语。按
 > **(a) 路径域泛化 /
 > (b) 可热切换的生命周期 / (c) shell enforcement** 拆为三段,各自可独立落地;
 > **(a)+(b) 不依赖 (c)**。
@@ -11,11 +11,11 @@
 > **非目标 / P2** 条目 —— 见 (c)。
 >
 > **更新 —— 找到 host-side interim path(只覆盖*一个* facet),优先级*下调*:****cwd 内的 immutable
-> 挖洞**(guanlan/KB 宿主的 facet)**今天**就能满足、零 agentao 改动 —— 注入一个会查策略的
-> `FileSystem` 能力(`Agentao(filesystem=...)`),对 **leaf 解引用后的 effective target** 做成员判定
+> 挖洞**(guanlan/KB 宿主的 facet)**今天**就能满足、零 arbiter 改动 —— 注入一个会查策略的
+> `FileSystem` 能力(`Arbiter(filesystem=...)`),对 **leaf 解引用后的 effective target** 做成员判定
 > —— 见*interim adoption path*。**但 chahua 的 external-root facet 对原生 `write_file` 不行**:内置
 > 工具在能力*之前*先跑单根 `PathPolicy` 前置检查(`file_ops.py:197,368`),写到 cwd 之外的根在 wrapper
-> 上游就被拒 —— 需要 host 的 extra_tool、或 option-2 的 gate 下推(agentao 改动)。这让把 `fs_policy=` /
+> 上游就被拒 —— 需要 host 的 extra_tool、或 option-2 的 gate 下推(arbiter 改动)。这让把 `fs_policy=` /
 > `set_fs_policy` 建成新一等公民 API **进一步 demand-gated、而非现在做**:仅在 (i) **第三个**宿主开始
 > 复制粘贴该 wrapper、(ii) wrapper 因 `FileSystem` / `_bind_and_register` 内部重构而**碎掉**、或
 > (iii) 真要 **(c)**(shell,filesystem wrapper 证明做不到的唯一一件事)时才提升。在其一触发前,诚实的
@@ -32,13 +32,13 @@
 enforcement 属于 (c),对应 roadmap 的 **P2** 条目、可能永不落地,故在那之前 shell 仍归宿主(宿主自己已
 在跑的快照哨兵 / OS 沙箱)。
 
-agentao 已有两个对的内核,但都没泛化、也没接线到这个用途:
+arbiter 已有两个对的内核,但都没泛化、也没接线到这个用途:
 
 - `security/path_policy.py` —— 只有单根 containment。
 - `sandbox/` —— 单一可写子树(`_RW1`),无 immutable 子集,默认禁用,且仅 darwin。
 
 于是每个嵌入宿主都在自己代码里重造这条边界(逐路径正则 deny-rules + 每轮快照 diff +
-为绕开「run-rules 不可删」而打的 `set_mode` 补丁)。本提案请 agentao 把这条边界作为嵌入面原语提供。
+为绕开「run-rules 不可删」而打的 `set_mode` 补丁)。本提案请 arbiter 把这条边界作为嵌入面原语提供。
 
 ## 两个驱动宿主 —— 同一缺口的两个 facet
 
@@ -108,7 +108,7 @@ chahua 这例是「单根逼出绕过工具」更尖锐的证据:它的 symlink(
    因为 `_bind_and_register` 把*同一个*能力交给 `extra_tools`,这才让「单一 chokepoint」
    *成真*:经绑定 filesystem 写盘的注入工具自动被覆盖,内置工具手写的 `for_tool` 调用也收敛进来。
    **推荐** —— 这是唯一与本文其余处「单一 chokepoint」措辞一致的选项。(MCP 工具仍绕过 —— 它们不用
-   `agent.filesystem` —— 故封闭 allow-set 的论断永远须限定为「经 agentao filesystem 能力的写」,而非
+   `agent.filesystem` —— 故封闭 allow-set 的论断永远须限定为「经 arbiter filesystem 能力的写」,而非
    「任意工具」。)
 
 ### augment 而非 replace —— 以及 `fs_policy` 从不门禁什么(抄示例前先读)
@@ -116,12 +116,12 @@ chahua 这例是「单根逼出绕过工具」更尖锐的证据:它的 symlink(
 - **`working_directory` 恒隐式可写(augment 语义)。**`writable=[...]` 声明的是*额外*根 —— 通常在
   cwd *之外*;它**不替换** cwd。宿主永不需要为「让 agent 写自己的工作区」而重列自己的 cwd,漏列反而
   是个静默 footgun。
-- **agentao 自身的持久化完全在 `fs_policy` 范围之外。**`PathPolicy` 只在写*工具*里施加:
+- **arbiter 自身的持久化完全在 `fs_policy` 范围之外。**`PathPolicy` 只在写*工具*里施加:
   `PathPolicy.for_tool(...)` 仅出现在 `tools/file_ops.py:197,368` 与 `tools/shell.py:230`
   (grep 核对 —— 这是它仅有的调用点)。`MemoryManager`(`memory/manager.py`)与 `session.py` 不 import
-  `PathPolicy`,经直接 sqlite/file I/O 写 `.agentao/memory.db` / `sessions/`,从不经过该 chokepoint
+  `PathPolicy`,经直接 sqlite/file I/O 写 `.arbiter/memory.db` / `sessions/`,从不经过该 chokepoint
   —— 所以 `fs_policy` 在任何语义下都既保护不了也破坏不了它们。(这纠正一个诱人的误读:声明
-  `writable=[share, tasks]` **不会**危及 guest 的 `.agentao/` 持久化。*replace* 式 allow-list 真正会
+  `writable=[share, tasks]` **不会**危及 guest 的 `.arbiter/` 持久化。*replace* 式 allow-list 真正会
   破坏的,是 guest 经 `write_file` 往自己 cwd 写的 scratch 文件 —— 而 augment 语义保住了它。)
 
 **刻意:augment 是无条件的 —— 没有 cwd 内白名单模式。**cwd 默认可写,`immutable` 从中挖只读子路径
@@ -158,7 +158,7 @@ motivating 宿主都不要白名单 —— KB 接受 deny-list 挖洞、多房�
 - **不引入新 TOCTOU 面。**外部根仍走 `resolve()`-then-check,与今天单根 `PathPolicy` 完全一致;
   check 与 write 之间换 symlink 的经典缝隙,既不因允许外部根而变大也不变小。
 - **相对根条目相对 `working_directory` 解析,且在构造期规范化。**KB 示例用 `immutable=["raw",
-  "AGENTAO.md"]`(相对)、而 `writable` 可能写外部*绝对*根 —— 故相对-vs-绝对语义须钉死,不能交给
+  "ARBITER.md"]`(相对)、而 `writable` 可能写外部*绝对*根 —— 故相对-vs-绝对语义须钉死,不能交给
   `Path` 默认。规则:相对 `writable`/`immutable` 条目 join 到 `working_directory`(与
   `_resolve_for_write` 现有的「相对则 join 到 `project_root`」一致,`path_policy.py:119-120`),**不**
   相对进程 cwd。所有根在 **`FsPolicy` 构造期**做 `expanduser().resolve()` 规范化并校验(安全边界应在
@@ -174,14 +174,14 @@ motivating 宿主都不要白名单 —— KB 接受 deny-list 挖洞、多房�
 agent = build_from_environment(
     working_directory=kb,                              # 隐式可写
     fs_policy=FsPolicy(
-        immutable=["raw", "AGENTAO.md", "SCHEMA.md"],  # cwd 下其余一律仍可写
+        immutable=["raw", "ARBITER.md", "SCHEMA.md"],  # cwd 下其余一律仍可写
     ),
 )
 
 # 多房间聊天宿主(chahua)—— 额外外部根(writable facet):
 agent = build_from_environment(
     working_directory=room / "guests" / name,           # 隐式可写:guest 自己的区域、
-                                                         # .agentao/ 持久化、经 write_file 的 scratch
+                                                         # .arbiter/ 持久化、经 write_file 的 scratch
     fs_policy=FsPolicy(
         writable=[room / "share", room / "tasks"],       # 追加根,在 guest cwd 之外
     ),
@@ -199,7 +199,7 @@ agent = build_from_environment(
 声明 active-task artifacts 目录并用 (b) 在重指时切换 policy。父根方案用 active-only 精度换 policy
 稳定;由宿主拍板。
 
-**交付物:**经 agentao `FileSystem` 能力的每一次写都在单一 chokepoint enforce `FsPolicy`(按「chokepoint
+**交付物:**经 arbiter `FileSystem` 能力的每一次写都在单一 chokepoint enforce `FsPolicy`(按「chokepoint
 实际在哪」:选项 2 —— 在 `agent.filesystem` 里 enforce —— 才让这对注入的 `extra_tools` 也成立,而非仅
 内置;MCP 工具留在范围外)—— 宿主不必知道每个工具的 arg 名、也不必逐工具加写正则。**同时**退掉知识库
 宿主的正则 deny-rule 层**和**多房间宿主的 `PathPolicy`-绕过工具(连同其读写不对称与工具 description 里
@@ -235,20 +235,20 @@ read-only —— 那仍是 Mode 的职责。
 ## Interim adoption path —— host-side wrapper(只覆盖 immutable facet)
 
 本提案想要的执行点 —— 「chokepoint 实际在哪」的选项 2,一个会查策略的 `FileSystem` 能力 ——
-**今天就已是可注入的 host-contract 面**:`Agentao(filesystem=...)`(`agent.py:87`)被
-`_bind_and_register` 绑给每个工具(`registry.py:78`)。宿主**当下**就能注入一个 wrapper、零 agentao 改动:
+**今天就已是可注入的 host-contract 面**:`Arbiter(filesystem=...)`(`agent.py:87`)被
+`_bind_and_register` 绑给每个工具(`registry.py:78`)。宿主**当下**就能注入一个 wrapper、零 arbiter 改动:
 
 > **范围先说清 —— wrapper 只能*收紧*,绝不能*扩张*。**内置 `write_file` / `replace` 在调
 > `self.filesystem.write_text` **之前**先跑自己那道单根 `PathPolicy.for_tool(...).contain_file(...)`
 > (`file_ops.py:197,368`)。wrapper 在那道前置检查的*下游*,所以:
 > - **cwd 内 immutable 挖洞(guanlan/KB 宿主):完全可行。**`cwd/raw/secret` 在 cwd 内 → *过*前置检查
->   → 到 wrapper → wrapper 拒。从已可写的 cwd 里挖只读子路径,正是「在已允许的范围内收紧」。✅ 零 agentao
+>   → 到 wrapper → wrapper 拒。从已可写的 cwd 里挖只读子路径,正是「在已允许的范围内收紧」。✅ 零 arbiter
 >   改动、原生 `write_file`。
 > - **cwd 之外的外部根(chahua):原生 `write_file` 不行。**`./task/x → <room>/tasks/...` 解析到 cwd 外
 >   → 前置检查在**上游就拒**,wrapper 根本没机会跑。wrapper 无法*放行*前置检查已拒的东西。宿主只能
 >   (a) 把外部写走 `extra_tool`(chahua 已有 `TaskWriteArtifactTool`),其 `self.filesystem` 是 wrapper
 >   —— 这让那条 bypass *纳入门禁*,但**不退役**它、也**不**让原生 `write_file` 够到外部根;或 (b) option-2
->   的 gate 下推,那是 agentao 代码改动。所以 external-root facet **不是**「零改动 host 可满足」—— 只有
+>   的 gate 下推,那是 arbiter 代码改动。所以 external-root facet **不是**「零改动 host 可满足」—— 只有
 >   immutable facet 是。
 
 ```python
@@ -300,7 +300,7 @@ class PolicyFileSystem:
 agent = build_from_environment(
     working_directory=kb,
     filesystem=PolicyFileSystem(LocalFileSystem(), kb,
-        _Rule(writable=(), immutable=(kb / "raw", kb / "AGENTAO.md"))),
+        _Rule(writable=(), immutable=(kb / "raw", kb / "ARBITER.md"))),
 )
 ```
 
@@ -321,7 +321,7 @@ immutable-`raw` 检查会 **fail open**:parent(`cwd/scratch`)不在 `raw` 下,�
 违反「immutable wins」。正确依据是 **leaf 解引用后的 effective target**,用 `is_relative_to` 对每个根判定
 (上面的 `_effective_target`)。这**确实**在宿主侧重写了 `PathPolicy` resolve 逻辑的 ~6 行 —— 而那恰是
 安全关键部分,也恰恰说明:正确的「多根 + immutable」谓词**今天无法**从单根原语组合出来(见下文
-*让 wrapper 正确的 agentao 侧 helper*)。宿主不必从零推导算法,但「复用 `contain_file` 就安全」是错的 —— 必须说清。
+*让 wrapper 正确的 arbiter 侧 helper*)。宿主不必从零推导算法,但「复用 `contain_file` 就安全」是错的 —— 必须说清。
 
 **热切换有效 —— 但只能改共享实例,绝不能换对象。**`_bind_and_register` 在注册时把 `agent.filesystem`
 拷进每个工具*自己的* `tool.filesystem`(`registry.py:78`;工具随后读 `self.filesystem`,
@@ -343,7 +343,7 @@ filesystem wrapper 都够不到。
   API 的理由。
 - **外部根(chahua):**对原生工具**不是**零改动 host 可满足 —— 内置单根前置检查(`file_ops.py:197,368`)
   在 wrapper 上游。宿主只能 (a) 保留一个 `extra_tool`(现在被 wrapper 纳入门禁,但未退役)或 (b) option-2
-  gate 下推(agentao 代码改动)。所以这个 facet **保留了一个真正 agentao 形状的内核**:让内置写工具遵守
+  gate 下推(arbiter 代码改动)。所以这个 facet **保留了一个真正 arbiter 形状的内核**:让内置写工具遵守
   声明的多根策略(即 (a) 的 gate 下推)是退役 bypass、让原生 `write_file` 够到外部根的*唯一*办法。
 
 故在以下具体触发时才往 wrapper 之外提升:
@@ -357,7 +357,7 @@ filesystem wrapper 都够不到。
 external-root 的 gate 下推当作「当 chahua(或第三个宿主)真要原生外部写、而非一个被门禁的 `extra_tool`
 时」第一个值得建的切片。
 
-### 让 wrapper *正确*(而不只是更短)的 agentao 侧 helper
+### 让 wrapper *正确*(而不只是更短)的 arbiter 侧 helper
 
 因为单根 `contain_file` 无法充当多根成员判定(见上),每个宿主 wrapper 都得手写 `_effective_target`
 —— 安全关键的 resolve 逻辑,而一部分宿主*会*写错(本文存在的全部理由就是消除这个 footgun)。所以在现有
@@ -413,15 +413,15 @@ wrapper 与 fail-open wrapper 的分界。interim wrapper 没有它*也*能用(�
 artifact `diff-scan`,不是拦越界写),那么 (c) 对它是**新增**边界、非简化 —— 它的扫盘为自己的目的而留。
 不要假设每个带轮末 diff 的宿主都想要 (c)。
 
-## 为什么这条该在 agentao(边界论证)
+## 为什么这条该在 arbiter(边界论证)
 
-「写能落到哪」是确定性安全边界,而 `PathPolicy` 本就是 agentao 里这个家族的原语。本提案是对一个
+「写能落到哪」是确定性安全边界,而 `PathPolicy` 本就是 arbiter 里这个家族的原语。本提案是对一个
 现有 host-contract 原语的自然泛化(`project_root: Path` → 一个声明的 `writable`/`immutable` 根集),
-外加接线到另一个现有原语(`sandbox/`)——**不是**新增产品关切,且要求 agentao 学习**零**宿主领域
+外加接线到另一个现有原语(`sandbox/`)——**不是**新增产品关切,且要求 arbiter 学习**零**宿主领域
 语义。两个独立宿主已从相反方向各自重造它(根内细分 + 外部多根),这正是 roadmap P1 门禁要的需求证据。
-shell enforcement 尤其**无法**在宿主侧实现,除非重造一套 agentao 已经拥有的沙箱。每个嵌入宿主都受益。
+shell enforcement 尤其**无法**在宿主侧实现,除非重造一套 arbiter 已经拥有的沙箱。每个嵌入宿主都受益。
 
-## 仍归宿主侧(agentao 范围之外)
+## 仍归宿主侧(arbiter 范围之外)
 
 - **哪些**路径可写/只读 —— 宿主策略,经 `FsPolicy` 声明,非内置。
 - 领域门禁(如写后 frontmatter / 断链校验、ingest 快照 gate)—— 业务校验。
@@ -433,10 +433,10 @@ shell enforcement 尤其**无法**在宿主侧实现,除非重造一套 agentao 
 
 ## 排序建议
 
-0. **现在 —— host-side、零 agentao 改动(仅 immutable facet):**为 **cwd 内只读挖洞**(guanlan/KB
+0. **现在 —— host-side、零 arbiter 改动(仅 immutable facet):**为 **cwd 内只读挖洞**(guanlan/KB
    宿主)注入 `PolicyFileSystem` wrapper(见*interim adoption path*)。wrapper 必须判定 **leaf 解引用后的
    effective target**(不是逐根复用单根 `contain_file` —— 那对 immutable carve 是 fail-open)。这就删掉了
-   KB 宿主的正则 deny-rule 层与 `set_mode` 补丁,无需等任何 agentao 改动。**chahua 的 external-root facet
+   KB 宿主的正则 deny-rule 层与 `set_mode` 补丁,无需等任何 arbiter 改动。**chahua 的 external-root facet
    在此*不*解锁** —— 内置单根前置检查在 wrapper 上游拒掉 cwd 外的写;chahua 保留一个(现在被门禁的)
    `extra_tool`,直到 step 1。
 0.5 **落 `PathPolicy.contain_any(raw, writable, immutable)`** —— 很小、无新 API 面,但它把安全关键的

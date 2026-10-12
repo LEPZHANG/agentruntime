@@ -1,9 +1,9 @@
 # Appendix D · AcpErrorCode Reference
 
-When Agentao is used as an **ACP client** (`from agentao.acp_client import ACPManager`), every failure surfaces as an `AcpClientError` (or a subclass) with a structured `code: AcpErrorCode`. Branch on `code`, not on message strings — messages are considered unstable.
+When Arbiter is used as an **ACP client** (`from arbiter.acp_client import ACPManager`), every failure surfaces as an `AcpClientError` (or a subclass) with a structured `code: AcpErrorCode`. Branch on `code`, not on message strings — messages are considered unstable.
 
 ```python
-from agentao.acp_client import ACPManager, AcpClientError, AcpErrorCode
+from arbiter.acp_client import ACPManager, AcpClientError, AcpErrorCode
 
 try:
     result = manager.prompt_once(name="x", prompt="hi", timeout=30)
@@ -22,7 +22,7 @@ except AcpClientError as e:
 
 | Code | Typical cause | Remediation |
 |------|---------------|-------------|
-| `config_invalid` | `.agentao/acp.json` malformed, missing required field, or env-var expansion failed | Validate JSON; print `e.details` — it includes `server` + the offending field |
+| `config_invalid` | `.arbiter/acp.json` malformed, missing required field, or env-var expansion failed | Validate JSON; print `e.details` — it includes `server` + the offending field |
 | `server_not_found` | Called `prompt_once(name=...)` / `start_server(name=...)` with a name not in config | Check `ACPManager().get_status()` for declared names |
 | `process_start_fail` | `command` not on PATH, missing executable bit, subprocess died during spawn | Inspect `e.cause` and `e.details['stderr']`; re-run the `command` + `args` manually |
 | `handshake_fail` | Server process started but `initialize` / `session/new` failed (protocol/transport/timeout during setup). **Auto-emitted by the manager for non-RPC `AcpClientError`** — it reclassifies `code` from `PROTOCOL_ERROR` / `TRANSPORT_DISCONNECT` / `REQUEST_TIMEOUT` to `HANDSHAKE_FAIL` and stashes the original code in `details["underlying_code"]` so finer detail stays available (see §D.7). `AcpRpcError` is **not** re-coded (see §D.2 contract); detect RPC handshake failures via `isinstance(err, AcpRpcError) and err.details["phase"] == "handshake"`. | Check server logs; `details["underlying_code"]` tells you whether the root cause was a timeout, disconnect, or protocol error |
@@ -44,7 +44,7 @@ Two namespaces — don't confuse them:
 `AcpRpcError` always carries `error_code = AcpErrorCode.PROTOCOL_ERROR` — the underlying category. If you need the numeric code, read `rpc_code` explicitly:
 
 ```python
-from agentao.acp_client import AcpRpcError
+from arbiter.acp_client import AcpRpcError
 
 try:
     ...
@@ -124,7 +124,7 @@ Handshake / session-setup failures split into two shapes by subclass, which the 
 Both branches stamp `details["phase"] = "handshake"`, so that key is the one canonical cross-subclass detector — but existing `case AcpErrorCode.HANDSHAKE_FAIL:` code still works for the non-RPC path it has always covered.
 
 ```python
-from agentao.acp_client import AcpClientError, AcpErrorCode, AcpRpcError
+from arbiter.acp_client import AcpClientError, AcpErrorCode, AcpRpcError
 
 try:
     manager.connect_server("x", timeout=30)

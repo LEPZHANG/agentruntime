@@ -2,9 +2,9 @@
 
 Demonstrates the host-stable observation surface added in 0.3.1:
 
-- ``Agentao.events(session_id=None)`` — async iterator over
-  :class:`agentao.host.HostEvent`.
-- ``Agentao.active_permissions()`` — JSON-safe snapshot of the active
+- ``Arbiter.events(session_id=None)`` — async iterator over
+  :class:`arbiter.host.HostEvent`.
+- ``Arbiter.active_permissions()`` — JSON-safe snapshot of the active
   permission policy.
 
 The pattern below is the typical embedding shape: one task consumes
@@ -31,8 +31,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from agentao.embedding import build_from_environment
-from agentao.host import (
+from arbiter.embedding import build_from_environment
+from arbiter.host import (
     HostEvent,
     PermissionDecisionEvent,
     SubagentLifecycleEvent,
@@ -119,7 +119,7 @@ def main() -> int:
         )
         return 2
 
-    workdir = Path(tempfile.mkdtemp(prefix="agentao-harness-events-"))
+    workdir = Path(tempfile.mkdtemp(prefix="arbiter-harness-events-"))
     return asyncio.run(amain(workdir))
 
 

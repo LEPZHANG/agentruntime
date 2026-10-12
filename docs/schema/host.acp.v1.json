@@ -2,7 +2,7 @@
   "$defs": {
     "AcpAgentCapabilities": {
       "additionalProperties": true,
-      "description": "Capabilities Agentao advertises in the ``initialize`` response.",
+      "description": "Capabilities Arbiter advertises in the ``initialize`` response.",
       "properties": {
         "loadSession": {
           "default": true,
@@ -58,7 +58,7 @@
       "title": "AcpAgentInfo",
       "type": "object"
     },
-    "AcpAgentaoSetModelRequest": {
+    "AcpArbiterSetModelRequest": {
       "additionalProperties": false,
       "description": "``_agentao.cn/set_model`` request params \u2014 free-form, secret-free.\n\nThe vendor free-form path: ``{sessionId, model}`` only. ``extra=\"forbid\"``\nkeeps it secret-free (no ``apiKey`` / ``baseUrl`` / ``_meta``). Model-only\nswitch \u2014 the provider is unchanged. Reuses the ``model`` field name so a\nDeepChat-style adapter maps its UI ``modelId`` \u2192 ``model``.",
       "properties": {
@@ -76,10 +76,10 @@
         "sessionId",
         "model"
       ],
-      "title": "AcpAgentaoSetModelRequest",
+      "title": "AcpArbiterSetModelRequest",
       "type": "object"
     },
-    "AcpAgentaoSetModelResponse": {
+    "AcpArbiterSetModelResponse": {
       "additionalProperties": false,
       "description": "The active model after the vendor free-form switch.",
       "properties": {
@@ -91,7 +91,7 @@
       "required": [
         "model"
       ],
-      "title": "AcpAgentaoSetModelResponse",
+      "title": "AcpArbiterSetModelResponse",
       "type": "object"
     },
     "AcpAskUserAnswered": {
@@ -282,7 +282,7 @@
     },
     "AcpConfigOption": {
       "additionalProperties": true,
-      "description": "A single ACP config option advertised in ``session/new`` / ``load``.\n\nAgentao advertises exactly one option today (``id=\"model\"``,\n``category=\"model\"``, ``type=\"select\"``). ``currentValue`` and the\n``options`` values both use the ``provider/model`` convention. Open shape\nso future categories / fields don't require a snapshot churn for every\nhost extension.",
+      "description": "A single ACP config option advertised in ``session/new`` / ``load``.\n\nArbiter advertises exactly one option today (``id=\"model\"``,\n``category=\"model\"``, ``type=\"select\"``). ``currentValue`` and the\n``options`` values both use the ``provider/model`` convention. Open shape\nso future categories / fields don't require a snapshot churn for every\nhost extension.",
       "properties": {
         "category": {
           "enum": [
@@ -349,7 +349,7 @@
     },
     "AcpConfigOptionChoice": {
       "additionalProperties": true,
-      "description": "One selectable choice in a ``configOptions`` entry.\n\nFor the ``model`` option the ``value`` is the Agentao convention\n``provider/model`` (an **Agentao value convention, not an ACP standard**).\nOpen shape (extra=\"allow\") so a host-injected catalog can attach extra\ndescriptive fields without breaking schema validation.",
+      "description": "One selectable choice in a ``configOptions`` entry.\n\nFor the ``model`` option the ``value`` is the Arbiter convention\n``provider/model`` (an **Arbiter value convention, not an ACP standard**).\nOpen shape (extra=\"allow\") so a host-injected catalog can attach extra\ndescriptive fields without breaking schema validation.",
       "properties": {
         "description": {
           "anyOf": [
@@ -444,7 +444,7 @@
     },
     "AcpInitializeExtension": {
       "additionalProperties": true,
-      "description": "One advertised extension method on the ``initialize`` response.\n\nAgentao advertises ``_agentao.cn/ask_user`` so hosts know they may be\nasked free-form questions over the same JSON-RPC channel. The shape\nis intentionally open (extra=\"allow\") so future extensions can add\nfields without breaking existing schema-following clients.",
+      "description": "One advertised extension method on the ``initialize`` response.\n\nArbiter advertises ``_agentao.cn/ask_user`` so hosts know they may be\nasked free-form questions over the same JSON-RPC channel. The shape\nis intentionally open (extra=\"allow\") so future extensions can add\nfields without breaking existing schema-following clients.",
       "properties": {
         "description": {
           "anyOf": [
@@ -596,7 +596,7 @@
     },
     "AcpMcpServer": {
       "additionalProperties": false,
-      "description": "A session-scoped MCP server config passed in ``session/new``.\n\n``type`` discriminates ``stdio`` (command/args/env) vs the URL transports\n``sse`` and ``http`` (url/headers). Agentao's MCP client dispatches all\nthree (``http`` via ``streamable_http_client``). ``type`` defaults to\n``\"stdio\"`` because the runtime parser treats a missing ``type`` field as\nstdio for compatibility with the established wire form that historical\nclients send (just ``{name, command}``); making the schema strict here\nwould reject runtime-valid payloads.",
+      "description": "A session-scoped MCP server config passed in ``session/new``.\n\n``type`` discriminates ``stdio`` (command/args/env) vs the URL transports\n``sse`` and ``http`` (url/headers). Arbiter's MCP client dispatches all\nthree (``http`` via ``streamable_http_client``). ``type`` defaults to\n``\"stdio\"`` because the runtime parser treats a missing ``type`` field as\nstdio for compatibility with the established wire form that historical\nclients send (just ``{name, command}``); making the schema strict here\nwould reject runtime-valid payloads.",
       "properties": {
         "args": {
           "anyOf": [
@@ -735,7 +735,7 @@
     },
     "AcpPlanEntry": {
       "additionalProperties": false,
-      "description": "One entry in a ``plan`` update (``PlanEntry``).\n\nagentao's ``todo_write`` carries only ``content`` + ``status``; ACP\nrequires ``priority`` too, so the transport synthesizes ``\"medium\"``.",
+      "description": "One entry in a ``plan`` update (``PlanEntry``).\n\narbiter's ``todo_write`` carries only ``content`` + ``status``; ACP\nrequires ``priority`` too, so the transport synthesizes ``\"medium\"``.",
       "properties": {
         "content": {
           "title": "Content",
@@ -1015,7 +1015,7 @@
     },
     "AcpSessionMode": {
       "additionalProperties": false,
-      "description": "One selectable ACP session mode (``SessionMode``).\n\nagentao surfaces each :class:`~agentao.permissions.PermissionMode`\npreset as one of these: ``id`` is the preset's string value (the ACP\n``modeId`` a client passes to ``session/set_mode``), ``name`` is a\nhuman label, ``description`` an optional one-liner.",
+      "description": "One selectable ACP session mode (``SessionMode``).\n\narbiter surfaces each :class:`~arbiter.permissions.PermissionMode`\npreset as one of these: ``id`` is the preset's string value (the ACP\n``modeId`` a client passes to ``session/set_mode``), ``name`` is a\nhuman label, ``description`` an optional one-liner.",
       "properties": {
         "description": {
           "anyOf": [
@@ -1185,7 +1185,7 @@
     },
     "AcpSessionPromptResponse": {
       "additionalProperties": false,
-      "description": "``session/prompt`` response result.\n\n``stopReason`` is the ACP v1 enum, all five members: ``end_turn``,\n``cancelled``, ``max_tokens``, ``max_turn_requests``, ``refusal``.\n\n``max_tokens`` was missing here until 0.4.16 \u2014 the local enum had\ndrifted from the spec, so the schema could not express a turn the\nharness halted at the token limit even once the runtime could detect\none. The agent emits ``end_turn``, ``cancelled``, ``max_tokens``, and\n``max_turn_requests``; ``refusal`` is spec-listed but never emitted \u2014\nagentao has no content-refusal detection, and reporting an\ninfrastructure failure as a refusal would be a different lie.",
+      "description": "``session/prompt`` response result.\n\n``stopReason`` is the ACP v1 enum, all five members: ``end_turn``,\n``cancelled``, ``max_tokens``, ``max_turn_requests``, ``refusal``.\n\n``max_tokens`` was missing here until 0.4.16 \u2014 the local enum had\ndrifted from the spec, so the schema could not express a turn the\nharness halted at the token limit even once the runtime could detect\none. The agent emits ``end_turn``, ``cancelled``, ``max_tokens``, and\n``max_turn_requests``; ``refusal`` is spec-listed but never emitted \u2014\narbiter has no content-refusal detection, and reporting an\ninfrastructure failure as a refusal would be a different lie.",
       "properties": {
         "stopReason": {
           "enum": [
@@ -1207,7 +1207,7 @@
     },
     "AcpSessionSetConfigOptionRequest": {
       "additionalProperties": false,
-      "description": "``session/set_config_option`` request params.\n\n``extra=\"forbid\"`` is load-bearing security: it is one of the two\nmechanisms (the other is the handler whitelist) that reject any\ncredential-bearing field (``apiKey`` / ``baseUrl`` / ``_meta``). The wire\ncarries only the ``provider/model`` *identifier*; credentials resolve\nserver-side via the host-injectable ``provider_resolver``.\n\nAgentao supports ``configId=\"model\"`` only. ``value`` is\n``\"provider/model\"`` (split on the first ``/``; a bare value with no\n``/`` is a model-only switch that keeps the current provider).",
+      "description": "``session/set_config_option`` request params.\n\n``extra=\"forbid\"`` is load-bearing security: it is one of the two\nmechanisms (the other is the handler whitelist) that reject any\ncredential-bearing field (``apiKey`` / ``baseUrl`` / ``_meta``). The wire\ncarries only the ``provider/model`` *identifier*; credentials resolve\nserver-side via the host-injectable ``provider_resolver``.\n\nArbiter supports ``configId=\"model\"`` only. ``value`` is\n``\"provider/model\"`` (split on the first ``/``; a bare value with no\n``/`` is a model-only switch that keeps the current provider).",
       "properties": {
         "configId": {
           "title": "Configid",
@@ -1248,7 +1248,7 @@
     },
     "AcpSessionSetModeRequest": {
       "additionalProperties": false,
-      "description": "``session/set_mode`` request params.\n\nThe field is the ACP-standard ``modeId`` (not ``mode``), and it is an\n**open string**, not a closed enum: a ``modeId`` is a UI/behavioural\nselector that need not map to an Agentao permission preset. The handler\napplies a permission preset only on an exact match\n(``read-only`` / ``workspace-write`` / ``full-access`` / ``plan``) and\notherwise persists the value unchanged \u2014 so a client mode like ``code`` /\n``ask`` round-trips instead of being rejected.",
+      "description": "``session/set_mode`` request params.\n\nThe field is the ACP-standard ``modeId`` (not ``mode``), and it is an\n**open string**, not a closed enum: a ``modeId`` is a UI/behavioural\nselector that need not map to an Arbiter permission preset. The handler\napplies a permission preset only on an exact match\n(``read-only`` / ``workspace-write`` / ``full-access`` / ``plan``) and\notherwise persists the value unchanged \u2014 so a client mode like ``code`` /\n``ask`` round-trips instead of being rejected.",
       "properties": {
         "modeId": {
           "minLength": 1,
@@ -1805,5 +1805,5 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Public host-facing ACP payload models: initialize, session/* request/response, request_permission, ask_user, and the shared error envelope.",
-  "title": "AgentaoHostACP"
+  "title": "ArbiterHostACP"
 }

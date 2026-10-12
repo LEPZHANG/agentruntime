@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from agentao.mcp.client import (
+from arbiter.mcp.client import (
     McpClient,
     McpErrorKind,
     ServerStatus,

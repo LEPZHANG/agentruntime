@@ -5,14 +5,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from agentao import Agentao
+from arbiter import Arbiter
 
 
 def test_skills_in_system_prompt():
     """Test that available skills are listed in the system prompt."""
     load_dotenv()
 
-    agent = Agentao(
+    agent = Arbiter(
         api_key=os.getenv("OPENAI_API_KEY"),
         base_url=os.getenv("OPENAI_BASE_URL"),
         model=os.getenv("OPENAI_MODEL"),

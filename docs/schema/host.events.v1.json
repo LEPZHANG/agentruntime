@@ -409,5 +409,5 @@
       "$ref": "#/$defs/PermissionDecisionEvent"
     }
   ],
-  "title": "AgentaoHostEvents"
+  "title": "ArbiterHostEvents"
 }

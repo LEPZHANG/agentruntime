@@ -4,7 +4,7 @@ The single most important thing the CLI does for safety is **ask before risky to
 
 ## The four modes
 
-Agentao has four permission modes. Three are user-selectable; one (`plan`) is set by `/plan` and lives in [4. Plan Mode](./4-plan-mode).
+Arbiter has four permission modes. Three are user-selectable; one (`plan`) is set by `/plan` and lives in [4. Plan Mode](./4-plan-mode).
 
 | Mode | Writes & shell | Web | Confirmation UI |
 |------|----------------|-----|-----------------|
@@ -28,7 +28,7 @@ Permission mode: workspace-write
 ✓ Permission mode: full-access  (all tools allowed without prompting)
 ```
 
-The change is written to `.agentao/settings.json` under `mode`; the next launch from the same project uses it. Permission rules themselves are read only from user-level `~/.agentao/permissions.json` — see [10. Configuration Reference](./10-config-reference).
+The change is written to `.arbiter/settings.json` under `mode`; the next launch from the same project uses it. Permission rules themselves are read only from user-level `~/.arbiter/permissions.json` — see [10. Configuration Reference](./10-config-reference).
 
 ::: warning Plan-mode interaction
 You can't change `/mode` while plan mode is active. Exit plan first with `/plan implement` or `/plan clear`. `/mode` will refuse and tell you so.
@@ -67,7 +67,7 @@ Asks before running:
 
 Refused outright:
 
-- `web_fetch` to blocklist domains (SSRF defenses) — these can't be allowed via the prompt; you have to edit `~/.agentao/permissions.json` to override
+- `web_fetch` to blocklist domains (SSRF defenses) — these can't be allowed via the prompt; you have to edit `~/.arbiter/permissions.json` to override
 
 Use when: normal development. The default for a reason.
 
@@ -146,13 +146,13 @@ If `/sandbox` is enabled but the profile is malformed (typo, missing file), **al
 
 ## Where rules come from
 
-`/status` shows the active mode plus a `Loaded sources:` line listing rule sources. Project-level `.agentao/permissions.json` is ignored; file rules are user-only. Precedence:
+`/status` shows the active mode plus a `Loaded sources:` line listing rule sources. Project-level `.arbiter/permissions.json` is ignored; file rules are user-only. Precedence:
 
-1. `~/.agentao/permissions.json` (user-global custom rules)
+1. `~/.arbiter/permissions.json` (user-global custom rules)
 2. The current mode's built-in preset (safe-shell allowlists, SSRF denylists, etc.)
-3. CLI `/mode` change (persisted to `.agentao/settings.json`, selects the current mode)
+3. CLI `/mode` change (persisted to `.arbiter/settings.json`, selects the current mode)
 
-Edit `~/.agentao/permissions.json` directly to persist rule changes. The CLI re-reads it on each launch.
+Edit `~/.arbiter/permissions.json` directly to persist rule changes. The CLI re-reads it on each launch.
 
 ## Advanced: `/permission`
 
@@ -163,7 +163,7 @@ There's also a `/permission` command for inspecting the currently effective rule
 - **Confirmation UI hangs** — the spinner stops on confirmation. If the prompt seems frozen, you might be looking at the spinner-stopped state and missed the menu. Scroll up.
 - **`workspace-write` and writes outside cwd** — overwriting `~/Documents/...` from a project at `/repo/foo` triggers a confirmation, even though you're in workspace-write. That's by design; the "workspace" is the launch dir.
 - **Picking `2` in confirmation flips the whole session** — there's no undo other than `/mode workspace-write` or restart. Treat option 2 as "I'm done supervising this session".
-- **Sandbox profile change is session-only** — to make the change stick across restarts, edit `default_profile` in `.agentao/sandbox.json` or `~/.agentao/sandbox.json`.
+- **Sandbox profile change is session-only** — to make the change stick across restarts, edit `default_profile` in `.arbiter/sandbox.json` or `~/.arbiter/sandbox.json`.
 
 ## Where to go next
 
@@ -177,9 +177,9 @@ There's also a `/permission` command for inspecting the currently effective rule
 ---
 
 ::: info Where this fits
-The CLI's confirmation UI is one implementation of the harness's `confirmation_callback` hook. An embedding host provides its own UI (modal in an IDE, button in a web app, audit log in a CI runner) by passing a callback to `Agentao(confirmation_callback=...)`. The mode model and rule engine are identical across CLI and embedded paths. See [Part 4.5 · Tool Confirmation UI](/en/part-4/5-tool-confirmation-ui).
+The CLI's confirmation UI is one implementation of the harness's `confirmation_callback` hook. An embedding host provides its own UI (modal in an IDE, button in a web app, audit log in a CI runner) by passing a callback to `Arbiter(confirmation_callback=...)`. The mode model and rule engine are identical across CLI and embedded paths. See [Part 4.5 · Tool Confirmation UI](/en/part-4/5-tool-confirmation-ui).
 :::
 
 ::: tip Authoritative help
-Behavior described here is anchored in [`agentao/cli/transport.py:confirm_tool_execution`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/transport.py) (UI), [`agentao/permissions.py`](https://github.com/jin-bo/agentao/blob/main/agentao/permissions.py) (rules), and [`agentao/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/help_text.py) (commands).
+Behavior described here is anchored in [`arbiter/cli/transport.py:confirm_tool_execution`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/transport.py) (UI), [`arbiter/permissions.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/permissions.py) (rules), and [`arbiter/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/help_text.py) (commands).
 :::

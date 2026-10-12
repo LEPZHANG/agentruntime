@@ -18,8 +18,8 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Deliverables
 
-- `agentao/plugins/loader.py`
-- `agentao/plugins/diagnostics.py`
+- `arbiter/plugins/loader.py`
+- `arbiter/plugins/diagnostics.py`
 
 ## Dependencies
 

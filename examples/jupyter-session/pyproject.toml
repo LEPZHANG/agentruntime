@@ -1,10 +1,10 @@
 [project]
-name = "agentao-example-jupyter-session"
+name = "arbiter-example-jupyter-session"
 version = "0.1.0"
-description = "One Agentao for the kernel lifetime; events() drives a notebook display."
+description = "One Arbiter for the kernel lifetime; events() drives a notebook display."
 requires-python = ">=3.10"
 dependencies = [
-    "agentao",
+    "arbiter",
 ]
 
 [project.optional-dependencies]
@@ -18,7 +18,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-agentao = { path = "../..", editable = true }
+arbiter = { path = "../..", editable = true }
 
 [build-system]
 requires = ["hatchling"]

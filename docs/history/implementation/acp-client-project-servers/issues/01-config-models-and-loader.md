@@ -10,7 +10,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Scope
 
-- `cwd/.agentao/acp.json` 定位规则
+- `cwd/.arbiter/acp.json` 定位规则
 - 配置数据模型
 - schema 校验
 - 默认值填充
@@ -18,8 +18,8 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Deliverables
 
-- `agentao/acp_client/models.py`
-- `agentao/acp_client/config.py`
+- `arbiter/acp_client/models.py`
+- `arbiter/acp_client/config.py`
 - 配置加载与校验单测
 
 ## Dependencies

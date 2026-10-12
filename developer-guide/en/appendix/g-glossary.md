@@ -6,12 +6,12 @@ Canonical EN ↔ ZH terms used in this guide. If you find a translation that doe
 
 | English | 中文 | Definition |
 |---------|------|------------|
-| Agent | 智能体 / Agent | The LLM-driven loop that calls tools and returns text. In this guide, an **instance of `Agentao`** |
-| Harness | 框架 / 运行容器 | The reusable runtime that wraps an agent — Agentao itself |
-| Embedded Harness Contract | 嵌入式 Harness 合约 / 前向兼容宿主合约 | The **stable host-facing API** at `agentao.host` (since 0.3.1): Pydantic-modeled events, policy snapshot, and capability protocols whose wire form is schema-snapshotted and CI-enforced. Hosts that target only this surface stay forward-compatible across releases. See [4.7](/en/part-4/7-host-contract). |
+| Agent | 智能体 / Agent | The LLM-driven loop that calls tools and returns text. In this guide, an **instance of `Arbiter`** |
+| Harness | 框架 / 运行容器 | The reusable runtime that wraps an agent — Arbiter itself |
+| Embedded Harness Contract | 嵌入式 Harness 合约 / 前向兼容宿主合约 | The **stable host-facing API** at `arbiter.host` (since 0.3.1): Pydantic-modeled events, policy snapshot, and capability protocols whose wire form is schema-snapshotted and CI-enforced. Hosts that target only this surface stay forward-compatible across releases. See [4.7](/en/part-4/7-host-contract). |
 | Harness event | Harness 事件 | One of `ToolLifecycleEvent` / `SubagentLifecycleEvent` / `PermissionDecisionEvent` — the schema-stable projection consumed via `agent.events()` (distinct from internal `AgentEvent`) |
 | Active permissions snapshot | 策略快照 / 当前权限快照 | The `ActivePermissions` value returned by `agent.active_permissions()` — `mode` + `rules` + `loaded_sources`, JSON-safe and pinnable into audit logs |
-| Capability protocol | 能力协议 | `FileSystem` / `ShellExecutor` runtime-checkable Protocols at `agentao.host.protocols`, injected at construction time to route IO through Docker / virtual FS / audit proxies |
+| Capability protocol | 能力协议 | `FileSystem` / `ShellExecutor` runtime-checkable Protocols at `arbiter.host.protocols`, injected at construction time to route IO through Docker / virtual FS / audit proxies |
 | Schema snapshot | Schema 快照 | The checked-in JSON schema files (`docs/schema/host.events.v1.json`, `host.acp.v1.json`) re-generated from the Pydantic models and CI-asserted byte-equal — the wire-form contract |
 | Session | 会话 | One agent instance's lifetime of conversation, bound to a `working_directory` |
 | Turn | 一轮 / 一次 | One `chat()` call; may fire many tool calls internally |
@@ -19,7 +19,7 @@ Canonical EN ↔ ZH terms used in this guide. If you find a translation that doe
 | Working directory | 工作目录 | The filesystem root pinned at construction time; tool calls and memory DBs are scoped under it |
 | Tool | 工具 | A unit of capability the LLM can call — subclass of `Tool` ABC |
 | Skill | 技能 | A `SKILL.md` bundle injected into the system prompt when activated |
-| System prompt | 系统提示 | The composed header (AGENTAO.md + date + skills + memory) prepended to every turn |
+| System prompt | 系统提示 | The composed header (ARBITER.md + date + skills + memory) prepended to every turn |
 
 ## G.2 Extension points
 
@@ -30,7 +30,7 @@ Canonical EN ↔ ZH terms used in this guide. If you find a translation that doe
 | Permission engine | 权限引擎 | `PermissionEngine` — decides allow / deny / ask per tool call |
 | Permission mode | 权限模式 | `READ_ONLY` / `WORKSPACE_WRITE` / `FULL_ACCESS` / `PLAN` presets |
 | Memory | 记忆 | Persistent notes stored in SQLite (project + user scopes) |
-| Memory scope | 记忆作用域 | `project` (inside `working_directory`) vs `user` (`~/.agentao/`) |
+| Memory scope | 记忆作用域 | `project` (inside `working_directory`) vs `user` (`~/.arbiter/`) |
 | MCP | MCP / Model Context Protocol | Third-party tool server protocol (stdio / Streamable HTTP / SSE) |
 | Sandbox | 沙箱 | macOS `sandbox-exec` profile wrapping the shell tool |
 | Skill activation | 激活技能 | Turning a skill on for the current agent so its prompt text is injected |
@@ -41,8 +41,8 @@ Canonical EN ↔ ZH terms used in this guide. If you find a translation that doe
 
 | English | 中文 | Definition |
 |---------|------|------------|
-| ACP | ACP / Agent Client Protocol | The stdio + NDJSON JSON-RPC 2.0 protocol Agentao speaks when run with `--acp --stdio` |
-| ACP server | ACP 服务器 | The Agentao subprocess in an ACP connection |
+| ACP | ACP / Agent Client Protocol | The stdio + NDJSON JSON-RPC 2.0 protocol Arbiter speaks when run with `--acp --stdio` |
+| ACP server | ACP 服务器 | The Arbiter subprocess in an ACP connection |
 | ACP client | ACP 客户端 | The host process that spawns and drives the ACP server |
 | `initialize` | 初始化 | The first RPC call — negotiates `protocolVersion` and capabilities |
 | `session/new` | 新建会话 | Creates a fresh session bound to a cwd |
@@ -57,13 +57,13 @@ Canonical EN ↔ ZH terms used in this guide. If you find a translation that doe
 
 | English | 中文 | Definition |
 |---------|------|------------|
-| In-process SDK | 进程内 SDK | Importing `agentao` as a Python library — same process as the host |
-| ACP stdio | ACP stdio 集成 | Running Agentao as a subprocess and speaking JSON-RPC over stdio |
-| Session pool | 会话池 | Cache of long-lived `Agentao` instances keyed by `session_id` |
+| In-process SDK | 进程内 SDK | Importing `arbiter` as a Python library — same process as the host |
+| ACP stdio | ACP stdio 集成 | Running Arbiter as a subprocess and speaking JSON-RPC over stdio |
+| Session pool | 会话池 | Cache of long-lived `Arbiter` instances keyed by `session_id` |
 | TTL eviction | TTL 驱逐 | Removing pool entries idle beyond a time-to-live |
 | LRU eviction | LRU 驱逐 | Removing the least-recently-used pool entry when capacity is hit |
 | `prompt_once` | 一次性提示 | `ACPManager.prompt_once()` — single-turn fire-and-forget API |
-| Headless runtime | 无头运行时 | Running Agentao as a non-interactive embedding target — `ACPManager` driving ACP servers with typed `get_status()` snapshots and no human in the loop. See [`docs/guides/headless-runtime.md`](../../../docs/guides/headless-runtime.md). |
+| Headless runtime | 无头运行时 | Running Arbiter as a non-interactive embedding target — `ACPManager` driving ACP servers with typed `get_status()` snapshots and no human in the loop. See [`docs/guides/headless-runtime.md`](../../../docs/guides/headless-runtime.md). |
 | Tenant | 租户 | The top-level isolation unit in multi-tenant SaaS — each tenant has its own working directory + memory |
 | Canary | 灰度 | Rolling out a change to a small traffic % before full deployment |
 

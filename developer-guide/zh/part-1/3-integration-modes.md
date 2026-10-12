@@ -5,7 +5,7 @@
 > - 30 秒看完就能选好的决策树
 > - 什么场景下要在同一个进程里组合两者
 
-Agentao 提供**两条稳定的嵌入路径**。选哪条取决于你的宿主是不是 Python、你对隔离度的要求、以及你的分发形态。
+Arbiter 提供**两条稳定的嵌入路径**。选哪条取决于你的宿主是不是 Python、你对隔离度的要求、以及你的分发形态。
 
 ## 模式 A · Python 进程内 SDK
 
@@ -19,12 +19,12 @@ Agentao 提供**两条稳定的嵌入路径**。选哪条取决于你的宿主�
 │          │                          │
 │          ▼                          │
 │   ┌─────────────┐                   │
-│   │  Agentao()  │   同一进程 同一堆    │
+│   │  Arbiter()  │   同一进程 同一堆    │
 │   └─────────────┘                   │
 └─────────────────────────────────────┘
 ```
 
-**原理**：`from agentao import Agentao` 直接拿到运行时，通过方法调用驱动。
+**原理**：`from arbiter import Arbiter` 直接拿到运行时，通过方法调用驱动。
 
 **优势**：
 - ✅ 零协议开销：方法调用 = 函数调用
@@ -34,19 +34,19 @@ Agentao 提供**两条稳定的嵌入路径**。选哪条取决于你的宿主�
 **劣势**：
 - ⚠️ 与你的进程共享内存/崩溃/依赖：Agent 挂了你的服务也挂了
 - ⚠️ 仅限 Python 宿主
-- ⚠️ 依赖锁定：你必须兼容 `agentao` 的 `openai` / `mcp` / `httpx` 版本
+- ⚠️ 依赖锁定：你必须兼容 `arbiter` 的 `openai` / `mcp` / `httpx` 版本
 
 ## 模式 B · ACP 协议（跨语言 / 跨进程）
 
 ```
 ┌─────────────────────────┐       stdio NDJSON         ┌────────────────────────┐
-│  你的宿主（任意语言）      │   JSON-RPC 2.0 双向       │  Agentao 子进程         │
-│                         │◄──────────────────────────►│  agentao --acp --stdio │
+│  你的宿主（任意语言）      │   JSON-RPC 2.0 双向       │  Arbiter 子进程         │
+│                         │◄──────────────────────────►│  arbiter --acp --stdio │
 │  Node / Go / Rust / …   │                           │                        │
 └─────────────────────────┘                           └────────────────────────┘
 ```
 
-**原理**：Agentao 作为子进程，以 NDJSON（每行一条 JSON）JSON-RPC 2.0 对外。宿主通过 stdin/stdout 发送 `initialize` / `session/new` / `session/prompt` 等请求，接收 `session/update` / `session/request_permission` 通知。
+**原理**：Arbiter 作为子进程，以 NDJSON（每行一条 JSON）JSON-RPC 2.0 对外。宿主通过 stdin/stdout 发送 `initialize` / `session/new` / `session/prompt` 等请求，接收 `session/update` / `session/request_permission` 通知。
 
 **优势**：
 - ✅ 语言无关：Node / Go / Rust / Java / 任何能启子进程的宿主都可用
@@ -70,7 +70,7 @@ Agentao 提供**两条稳定的嵌入路径**。选哪条取决于你的宿主�
 | 调试难度 | 低 | 中 |
 | 工具确认 UI | 直接回调 | 通过 `session/request_permission` 通知 |
 | 流式事件 | Python 事件对象 | JSON 通知 |
-| 协议标准 | Agentao 私有 | 公开的 ACP |
+| 协议标准 | Arbiter 私有 | 公开的 ACP |
 | 适合场景 | SaaS 后端、批处理、Python 数据服务 | IDE 插件、非 Python 产品、多租户隔离 |
 
 ## 决策树
@@ -90,7 +90,7 @@ Agentao 提供**两条稳定的嵌入路径**。选哪条取决于你的宿主�
 
 两种模式**可以同时用**。典型做法：
 
-- 你的 Python 后端用 SDK 嵌入 Agentao 做主流程
+- 你的 Python 后端用 SDK 嵌入 Arbiter 做主流程
 - 主流程中再通过 `ACPManager` 反向调用**另一个** ACP Server（比如专门做代码审查的）
 
 这让你能把长期状态放在 SDK 侧、把一次性重任务丢给隔离的 ACP 子进程。
@@ -129,4 +129,4 @@ Agentao 提供**两条稳定的嵌入路径**。选哪条取决于你的宿主�
 - **两者可以组合** —— Python 后端用 SDK 跑主流程，再用 `ACPManager` 调其他 ACP server。
 - **Headless runtime 不是第三种模式** —— 它就是 `ACPManager` 在无人值守场景下驱动 ACP server。
 
-下一节：[1.4 5 分钟 Hello Agentao →](./4-hello-agentao)
+下一节：[1.4 5 分钟 Hello Arbiter →](./4-hello-arbiter)

@@ -1,6 +1,6 @@
-# Agentao Developer Guide — Site Source
+# Arbiter Developer Guide — Site Source
 
-Bilingual VitePress site for third-party developers embedding Agentao's harness.
+Bilingual VitePress site for third-party developers embedding Arbiter's harness.
 
 ## Local Development
 
@@ -29,6 +29,6 @@ developer-guide/
 ## Editing Conventions
 
 - **Keep ZH and EN parallel**: every page that exists in one locale should exist in the other with the same filename.
-- **Code examples must be runnable**: prefer copy-paste-friendly blocks; verify against `agentao/` source before merging.
+- **Code examples must be runnable**: prefer copy-paste-friendly blocks; verify against `arbiter/` source before merging.
 - **File-based routing**: `/zh/part-1/hello.md` → `/zh/part-1/hello.html`.
 - **Sidebar**: update `.vitepress/config.mts` when adding new pages.

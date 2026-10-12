@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for the agentao test suite."""
+"""Shared pytest fixtures for the arbiter test suite."""
 
 import os
 from pathlib import Path
@@ -13,10 +13,10 @@ def _stub_llm_credentials(monkeypatch):
     """Set dummy LLM credentials for every test that doesn't supply its own.
 
     Production code resolves provider env vars only inside
-    ``agentao.embedding.build_from_environment``. Tests that
-    instantiate ``Agentao(working_directory=...)`` directly used to
+    ``arbiter.embedding.build_from_environment``. Tests that
+    instantiate ``Arbiter(working_directory=...)`` directly used to
     rely on those env reads, so we stub them here and have
-    ``_agentao_env_default_credentials`` mirror the factory's
+    ``_arbiter_env_default_credentials`` mirror the factory's
     discovery contract through ``discover_llm_kwargs()``.
     """
     monkeypatch.setenv("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", "test-dummy-key"))
@@ -25,17 +25,17 @@ def _stub_llm_credentials(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _agentao_env_default_credentials(monkeypatch, _stub_llm_credentials):
-    """Backfill explicit LLM kwargs on ``Agentao(...)`` from env.
+def _arbiter_env_default_credentials(monkeypatch, _stub_llm_credentials):
+    """Backfill explicit LLM kwargs on ``Arbiter(...)`` from env.
 
     Mirrors what ``build_from_environment`` does, scoped per-test so
     production code under test never sees implicit env reads from
-    ``Agentao.__init__`` itself.
+    ``Arbiter.__init__`` itself.
     """
-    from agentao.agent import Agentao
-    from agentao.embedding.factory import discover_llm_kwargs
+    from arbiter.agent import Arbiter
+    from arbiter.embedding.factory import discover_llm_kwargs
 
-    _orig_init = Agentao.__init__
+    _orig_init = Arbiter.__init__
 
     def _patched_init(self, *args, **kwargs):
         if kwargs.get("llm_client") is None:
@@ -43,13 +43,13 @@ def _agentao_env_default_credentials(monkeypatch, _stub_llm_credentials):
                 kwargs.setdefault(key, value)
         _orig_init(self, *args, **kwargs)
 
-    monkeypatch.setattr(Agentao, "__init__", _patched_init)
+    monkeypatch.setattr(Arbiter, "__init__", _patched_init)
 
 
 @pytest.fixture
 def search_tool(tmp_path: Path):
     """SearchTextTool wired to ``tmp_path`` as its working directory."""
-    from agentao.tools.search import SearchTextTool
+    from arbiter.tools.search import SearchTextTool
 
     tool = SearchTextTool()
     tool.working_directory = tmp_path
@@ -68,7 +68,7 @@ def capture_subprocess_run(monkeypatch) -> List[List[str]]:
     tool runs every external engine through it for stdin-detach /
     process-group / kill-the-tree-on-timeout hardening.
     """
-    from agentao.tools import search as search_mod
+    from arbiter.tools import search as search_mod
 
     captured: List[List[str]] = []
 

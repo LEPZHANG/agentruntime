@@ -12,7 +12,7 @@
 | Mechanism | Scope | Who triggers | Response time |
 |-----------|-------|--------------|---------------|
 | `CancellationToken` | Cooperative, any point | Host code | **Next check** (sub-second for streaming, up to a tool's runtime for tools) |
-| `max_iterations` | Tool-call loop count | Agentao itself | Only after N tool rounds |
+| `max_iterations` | Tool-call loop count | Arbiter itself | Only after N tool rounds |
 | Thread-level kill | Last resort | Host supervisor | Immediate but **unsafe** — leaks MCP subprocesses |
 
 Use `CancellationToken` by default. Use `max_iterations` to cap runaway loops. Avoid thread kills.
@@ -20,7 +20,7 @@ Use `CancellationToken` by default. Use `max_iterations` to cap runaway loops. A
 ## 2.6.2 `CancellationToken` — the right way
 
 ```python
-from agentao.cancellation import CancellationToken, AgentCancelledError
+from arbiter.cancellation import CancellationToken, AgentCancelledError
 
 token = CancellationToken()
 reply = agent.chat("Crawl the repo and summarize", cancellation_token=token)
@@ -68,7 +68,7 @@ Cancellation propagates through the call stack on a **cooperative** basis — ch
 | Inside long tools (shell, web fetch) | Best-effort — some external I/O can't be interrupted |
 | MCP forward | MCP subprocess requests are sent; cancellation stops *listening* but the remote server may still do work |
 
-A running shell command does **not** get killed — the token just stops the next iteration. For true shell kills, wire a timeout into the shell tool itself (`.agentao/sandbox.json`).
+A running shell command does **not** get killed — the token just stops the next iteration. For true shell kills, wire a timeout into the shell tool itself (`.arbiter/sandbox.json`).
 
 ## 2.6.3 Wiring from FastAPI / HTTP disconnect
 
@@ -77,7 +77,7 @@ When a client disconnects (closed connection), cancel the turn:
 ```python
 from fastapi import FastAPI, Request
 from asyncio import to_thread
-from agentao.cancellation import CancellationToken
+from arbiter.cancellation import CancellationToken
 
 @app.post("/chat/{session_id}")
 async def chat_endpoint(session_id: str, message: str, request: Request):
@@ -141,7 +141,7 @@ A timeout is a cancellation on a timer. Wrap the call yourself:
 ```python
 import asyncio
 from asyncio import to_thread, wait_for, TimeoutError
-from agentao.cancellation import CancellationToken
+from arbiter.cancellation import CancellationToken
 
 async def chat_with_timeout(agent, msg: str, seconds: float) -> str:
     token = CancellationToken()
@@ -180,7 +180,7 @@ If you're paying per token, `max_iterations=20-30` is a good default for a chat 
 
 Two other places you can bound work:
 
-- **Shell tool**: default 30 s timeout per command (configurable in `.agentao/sandbox.json`). Processes that exceed the limit are `SIGTERM`-ed. See [6.2](/en/part-6/2-shell-sandbox).
+- **Shell tool**: default 30 s timeout per command (configurable in `.arbiter/sandbox.json`). Processes that exceed the limit are `SIGTERM`-ed. See [6.2](/en/part-6/2-shell-sandbox).
 - **MCP request timeout**: each MCP server has a `timeout` field (default 60 s). See [5.3 MCP](/en/part-5/3-mcp).
 
 These are lower-layer hard kills — they complement, not replace, `CancellationToken`. A hung MCP server will still be killed by its own timeout regardless of whether the token fires.

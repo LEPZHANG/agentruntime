@@ -1,19 +1,19 @@
 # Runtime tool injection: `add_tool` / `remove_tool` (deferred design)
 
-**Status:** **v1 landed** — `Agentao.add_tool` / `remove_tool` + `ToolRegistry.unregister` implemented per §6. Tracked in [issue #65](https://github.com/jin-bo/agentao/issues/65). This document is kept as the design record; the demand-gate rationale (§8) explains why it was deferred until then.
-**Audience:** agentao maintainers considering, on top of construction-time tool injection (PR #64), a runtime (post-construction) entry point for hosts to add / remove tools.
+**Status:** **v1 landed** — `Arbiter.add_tool` / `remove_tool` + `ToolRegistry.unregister` implemented per §6. Tracked in [issue #65](https://github.com/jin-bo/agentao/issues/65). This document is kept as the design record; the demand-gate rationale (§8) explains why it was deferred until then.
+**Audience:** arbiter maintainers considering, on top of construction-time tool injection (PR #64), a runtime (post-construction) entry point for hosts to add / remove tools.
 **Companions:**
 - `docs/design/runtime-tool-injection.zh.md` — Chinese version
 - `docs/design/host-tool-injection.md` — construction-time injection (`extra_tools` / `disable_tools`), the predecessor to this design
 - `docs/design/embedded-host-contract.md` — the host-contract stability boundary (where this design belongs)
-- `agentao/tools/base.py` — `ToolRegistry` (main change site: add `unregister`)
-- `agentao/tooling/registry.py` — `_bind_and_register` (reused by runtime injection)
+- `arbiter/tools/base.py` — `ToolRegistry` (main change site: add `unregister`)
+- `arbiter/tooling/registry.py` — `_bind_and_register` (reused by runtime injection)
 
 ---
 
 ## 1. Problem: we have construction-time injection, not runtime
 
-PR #64 landed **construction-time** tool injection — `Agentao(extra_tools=..., disable_tools=...)` (see `host-tool-injection.md`). Those two kwargs are consumed once in `_wire_tooling` and **never re-read**.
+PR #64 landed **construction-time** tool injection — `Arbiter(extra_tools=..., disable_tools=...)` (see `host-tool-injection.md`). Those two kwargs are consumed once in `_wire_tooling` and **never re-read**.
 
 This design tracks the **runtime** counterpart: a host wanting to add / replace / remove a tool *after* construction, *between* `chat()` calls. Real scenarios:
 
@@ -26,7 +26,7 @@ This design tracks the **runtime** counterpart: a host wanting to add / replace 
 | Fact | Anchor | Implication |
 |---|---|---|
 | **Schema is rebuilt once per `chat()` / `arun()` call** | `runtime/chat_loop/_runner.py:201` (`to_openai_format()` snapshots once, *before* the inner LLM iteration loop) | A registry change made *between* `chat()`/`arun()` calls takes effect on the next call; *within* a single call (across later LLM iterations, stop-hook re-entry) the tool list is frozen |
-| **Dynamic add / replace technically works** | `tools/base.py:209` `ToolRegistry.register(tool, replace=)` | …but that pokes runtime internals; it is not on the `agentao.host` contract surface |
+| **Dynamic add / replace technically works** | `tools/base.py:209` `ToolRegistry.register(tool, replace=)` | …but that pokes runtime internals; it is not on the `arbiter.host` contract surface |
 | **…and it bypasses two safeguards** | `tooling/registry.py:67` `_bind_and_register` | (a) capability binding (`working_directory`/`filesystem`/`shell`) is lost → the tool goes "bare" (ACP cwd isolation + host FS/shell redirection break); (b) the construction-time validation (`mcp_` prefix ban, empty/non-str name guard, override audit log) does not run |
 | **Dynamic removal has no API at all** | `tools/base.py:198-263` (only `register`/`get`/`list_tools`/`to_openai_format`) | No `unregister`/`remove`; `disable_tools` filters at construction only |
 
@@ -34,14 +34,14 @@ In one line: **runtime add/replace is possible but unsafe (bare tools + no valid
 
 ## 3. Scope: `add_tool` + `remove_tool`, demand-gated
 
-**Only once §8 is triggered**, add two methods to the `agentao.host` contract, **reusing existing infrastructure rather than special-casing**:
+**Only once §8 is triggered**, add two methods to the `arbiter.host` contract, **reusing existing infrastructure rather than special-casing**:
 
 ```python
 agent.add_tool(tool, *, replace=False)   # reuse _bind_and_register + the extra_tools validation
 agent.remove_tool(name) -> bool          # reuse the new ToolRegistry.unregister(name)
 ```
 
-Placed in the `Agentao` public-method cluster alongside `events()` (`agent.py:681`), `active_permissions()` (`agent.py:699`), and `add_host_event_observer()` (`agent.py:658`) — already contract-surface methods.
+Placed in the `Arbiter` public-method cluster alongside `events()` (`agent.py:681`), `active_permissions()` (`agent.py:699`), and `add_host_event_observer()` (`agent.py:658`) — already contract-surface methods.
 
 **Explicitly out of scope:**
 - No mid-turn (within a single `chat()`) visibility — the snapshot already constrains this, see §5.
@@ -52,7 +52,7 @@ Placed in the `Agentao` public-method cluster alongside `events()` (`agent.py:68
 
 ## 4. API
 
-### 4.1 `Agentao.add_tool`
+### 4.1 `Arbiter.add_tool`
 
 ```python
 def add_tool(self, tool: "RegistrableTool", *, replace: bool = False) -> None:
@@ -73,7 +73,7 @@ def add_tool(self, tool: "RegistrableTool", *, replace: bool = False) -> None:
     """
 ```
 
-### 4.2 `Agentao.remove_tool`
+### 4.2 `Arbiter.remove_tool`
 
 ```python
 def remove_tool(self, name: str) -> bool:
@@ -110,9 +110,9 @@ def unregister(self, name: str) -> bool:
 |---|---|
 | `ToolRegistry.unregister(name) -> bool` | `tools/base.py`, next to `register` (:209) |
 | Extract per-tool validation `_validate_one_extra_tool(tool)` | `agent.py`, from the existing `_validate_tool_injection`; shared by the construction-time loop and `add_tool`. **Reserved-name set = `mcp_` prefix ∪ `_PLAN_ONLY_TOOLS`**, plus the empty/non-string name guard |
-| `Agentao.add_tool` / `remove_tool` | `agent.py`, in the `events()`/`active_permissions()` cluster (near :681/:699). Both validate against the reserved-name set first (`add_tool` via `_validate_one_extra_tool`; `remove_tool` likewise rejects `mcp_` + `_PLAN_ONLY_TOOLS`), then bind / `unregister` |
+| `Arbiter.add_tool` / `remove_tool` | `agent.py`, in the `events()`/`active_permissions()` cluster (near :681/:699). Both validate against the reserved-name set first (`add_tool` via `_validate_one_extra_tool`; `remove_tool` likewise rejects `mcp_` + `_PLAN_ONLY_TOOLS`), then bind / `unregister` |
 | `add_tool` reuses `_bind_and_register` | already at `tooling/registry.py:67`, no change |
-| Docs + contract surface | add two rows to the public-method table in `docs/reference/host-api.md`; `host/__init__.py` needs no change (these are `Agentao` methods, not package-level symbols) |
+| Docs + contract surface | add two rows to the public-method table in `docs/reference/host-api.md`; `host/__init__.py` needs no change (these are `Arbiter` methods, not package-level symbols) |
 
 A simple route, same shape as PR #64: **grep-verify → design (this doc) → patch + tests**.
 
@@ -128,7 +128,7 @@ If a real "must mutate the tool surface mid-session, concurrently" scenario appe
 
 Start implementation only when **one** of these holds (gap ≠ need):
 
-1. A real embedding scenario needs to add/remove tools **mid-session**, where construction-time `extra_tools`/`disable_tools` + rebuilding `Agentao` won't do (e.g. a long ACP session that can't be rebuilt).
+1. A real embedding scenario needs to add/remove tools **mid-session**, where construction-time `extra_tools`/`disable_tools` + rebuilding `Arbiter` won't do (e.g. a long ACP session that can't be rebuilt).
 2. An ACP `session/update`-style need appears, requiring a session-scoped dynamic tool surface.
 3. A host reports being forced to poke `agent.tools.register(...)` and hitting the bare-tool (FS/shell unbound) pitfall.
 
@@ -136,7 +136,7 @@ Until then this doc is a spec on the shelf, ensuring the implementation lands in
 
 ## 9. Open questions (out of v1 scope, recorded for later)
 
-**v1 converges to three steps, no expansion:** `ToolRegistry.unregister()` + `Agentao.add_tool()` (reusing `_bind_and_register`) + `Agentao.remove_tool()` (name validation then `unregister`). All of the following are **not done** for now:
+**v1 converges to three steps, no expansion:** `ToolRegistry.unregister()` + `Arbiter.add_tool()` (reusing `_bind_and_register`) + `Arbiter.remove_tool()` (name validation then `unregister`). All of the following are **not done** for now:
 
 - **Should `add_tool(replace=False)` raise or warn on a name clash?** (Decide at implementation; leaning raise — a deliberate host call, stricter than `register`'s warn — and distinguish it from `register`'s semantics in the docs.)
 - **Concurrency lock / snapshot versioning** — see §7, await a real signal.
@@ -153,12 +153,12 @@ Until then this doc is a spec on the shelf, ensuring the implementation lands in
 ## 11. References
 
 - **Predecessor design:** `host-tool-injection.md` (construction-time injection, PR #64), its §9 (landing prerequisites).
-- **Agentao touch points (verified 2026-06-01):**
-  - `agentao/tools/base.py:198-263` — `ToolRegistry` (no `unregister`).
-  - `agentao/runtime/chat_loop/_runner.py:201` — the `to_openai_format` snapshot taken before `chat()`/`arun()` enters the LLM iteration loop (the *only* runtime tool-surface build point; the `to_openai_format` in `agent.py`'s `get_conversation_summary()` is token estimation, not the runtime tool surface).
-  - `agentao/tooling/registry.py:67` — `_bind_and_register` (capability binding, reused at runtime).
-  - `agentao/tooling/registry.py:138` — `register_extra_tools` (the construction-time final pass, same-shape reference).
-  - `agentao/mcp/tool.py:19-21` — `make_mcp_tool_name` (source of the `mcp_` prefix).
-  - `agentao/cli/app.py:91-92` — plan tools registered post-construction (the orthogonal path).
-  - `agentao/agent.py:658/681/699` — `add_host_event_observer` / `events` / `active_permissions` (the public-method cluster, where the new methods go).
+- **Arbiter touch points (verified 2026-06-01):**
+  - `arbiter/tools/base.py:198-263` — `ToolRegistry` (no `unregister`).
+  - `arbiter/runtime/chat_loop/_runner.py:201` — the `to_openai_format` snapshot taken before `chat()`/`arun()` enters the LLM iteration loop (the *only* runtime tool-surface build point; the `to_openai_format` in `agent.py`'s `get_conversation_summary()` is token estimation, not the runtime tool surface).
+  - `arbiter/tooling/registry.py:67` — `_bind_and_register` (capability binding, reused at runtime).
+  - `arbiter/tooling/registry.py:138` — `register_extra_tools` (the construction-time final pass, same-shape reference).
+  - `arbiter/mcp/tool.py:19-21` — `make_mcp_tool_name` (source of the `mcp_` prefix).
+  - `arbiter/cli/app.py:91-92` — plan tools registered post-construction (the orthogonal path).
+  - `arbiter/agent.py:658/681/699` — `add_host_event_observer` / `events` / `active_permissions` (the public-method cluster, where the new methods go).
 - **Tracking:** [issue #65](https://github.com/jin-bo/agentao/issues/65).

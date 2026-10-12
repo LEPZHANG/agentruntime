@@ -1,42 +1,42 @@
 # Embedded Harness API
 
-**Package:** `agentao.host`
+**Package:** `arbiter.host`
 **Status:** Stable, since 0.3.1.
 **Coding agents:** for a distilled, copy-paste embedding playbook, start with [`docs/guides/embed-for-agents.md`](../guides/embed-for-agents.md).
 **Source design:** [`docs/design/embedded-host-contract.md`](../design/embedded-host-contract.md)
 **Implementation plan (historical):** [`docs/history/implementation/embedded-harness-contract-implementation-plan.md`](../history/implementation/embedded-harness-contract-implementation-plan.md)
 
 The harness API is the host-facing compatibility boundary for embedding
-Agentao inside another application. Internal runtime types
+Arbiter inside another application. Internal runtime types
 (`AgentEvent`, `ToolExecutionResult`, `PermissionEngine`) are
 intentionally not part of this surface.
 
 > **Scope.** This package is the stability boundary for hosts embedding
-> Agentao **in-process**. Three pillars:
+> Arbiter **in-process**. Three pillars:
 >
 > - **Observability events** — `ToolLifecycleEvent`,
 >   `SubagentLifecycleEvent`, `PermissionDecisionEvent`.
 > - **Permission state** — `ActivePermissions` snapshot.
 > - **ACP schema surface** — versioned Pydantic models for ACP wire
 >   payloads, exported *only* for the long-tail case where an
->   in-process host *also* re-exposes Agentao to its own clients via
+>   in-process host *also* re-exposes Arbiter to its own clients via
 >   ACP. Vanilla in-process hosts do not need this surface and can
 >   ignore the ACP-related exports entirely.
 >
 > This package is **not** a complete chat runtime. Drive a turn with
-> `Agentao.arun()` and render streaming UI from the internal
+> `Arbiter.arun()` and render streaming UI from the internal
 > `Transport` / `AgentEvent` stream — that carries assistant text,
 > reasoning, and raw tool I/O, which the stable host contract
 > intentionally omits.
 >
 > > Not sure whether you want this surface, the ACP server
-> > (`agentao --acp --stdio`), or the ACP client (`ACPManager`)?
+> > (`arbiter --acp --stdio`), or the ACP client (`ACPManager`)?
 > > See [Embedding vs. ACP](../design/embedding-vs-acp.md).
 
-> **Import discipline.** All public types live on the `agentao.host`
+> **Import discipline.** All public types live on the `arbiter.host`
 > module — they are deliberately **not** re-exported from the top-level
-> `agentao` package. Always `from agentao.host import ...`; do not
-> rely on `agentao.ToolLifecycleEvent` or similar to exist.
+> `arbiter` package. Always `from arbiter.host import ...`; do not
+> rely on `arbiter.ToolLifecycleEvent` or similar to exist.
 
 ## Public exports
 
@@ -50,9 +50,9 @@ intentionally not part of this surface.
 | `RFC3339UTCString` | Constrained timestamp type used by all public events. |
 | `export_host_event_json_schema()` | Canonical JSON schema for the events + permissions surface. |
 | `export_host_acp_json_schema()` | Canonical JSON schema for the host-facing ACP payload surface. |
-| `Tool`, `AsyncToolBase` | Base classes for host-supplied tools passed via `Agentao(extra_tools=[...])`. Re-export of the canonical types in `agentao.tools.base` — a stable import path, not a new abstraction layer. |
+| `Tool`, `AsyncToolBase` | Base classes for host-supplied tools passed via `Arbiter(extra_tools=[...])`. Re-export of the canonical types in `arbiter.tools.base` — a stable import path, not a new abstraction layer. |
 | `RegistrableTool` | `Union[Tool, AsyncToolBase]` — the type the registry / `extra_tools=` accepts. |
-| `agentao.host.replay_projection` | Submodule bridging `EventStream` ⇄ replay JSONL — see [Replay projection](#replay-projection-agentaohostreplay_projection) below. |
+| `arbiter.host.replay_projection` | Submodule bridging `EventStream` ⇄ replay JSONL — see [Replay projection](#replay-projection-arbiterhostreplay_projection) below. |
 
 ### Sub-agent `failed` has two shapes
 
@@ -110,10 +110,10 @@ injected tool is never "bare" (it always inherits the session
 
 | Method | Purpose |
 |---|---|
-| `Agentao(extra_tools=[...], disable_tools={...})` | Construction-time injection — add host tools, skip built-ins. See [`host-tool-injection.md`](../design/host-tool-injection.md). |
-| `Agentao(enabled_tools={...})` | Construction-time allowlist — keep only the named built-in / agent-path tools (`extra_tools` / MCP / plan-only always kept). `None` = disabled; empty set = enabled. Mutually exclusive with `disable_tools`. See [`host-tool-allowlist.md`](../design/host-tool-allowlist.md). |
-| `Agentao.add_tool(tool, *, replace=False)` | Register a tool after construction. `replace=False` + a name clash raises (stricter than `register`); `replace=True` overrides a built-in / agent / extra tool with an INFO audit line. |
-| `Agentao.remove_tool(name) -> bool` | Unregister a tool. Returns whether it existed (unknown name → `False`, non-raising). |
+| `Arbiter(extra_tools=[...], disable_tools={...})` | Construction-time injection — add host tools, skip built-ins. See [`host-tool-injection.md`](../design/host-tool-injection.md). |
+| `Arbiter(enabled_tools={...})` | Construction-time allowlist — keep only the named built-in / agent-path tools (`extra_tools` / MCP / plan-only always kept). `None` = disabled; empty set = enabled. Mutually exclusive with `disable_tools`. See [`host-tool-allowlist.md`](../design/host-tool-allowlist.md). |
+| `Arbiter.add_tool(tool, *, replace=False)` | Register a tool after construction. `replace=False` + a name clash raises (stricter than `register`); `replace=True` overrides a built-in / agent / extra tool with an INFO audit line. |
+| `Arbiter.remove_tool(name) -> bool` | Unregister a tool. Returns whether it existed (unknown name → `False`, non-raising). |
 
 Reserved namespaces — the `mcp_` prefix (MCP lifecycle) and `_PLAN_ONLY_TOOLS`
 (`plan_save` / `plan_finalize`, bound to the plan-mode state machine) — are
@@ -127,17 +127,17 @@ v1 supports calling these methods **between** turns only (not from a concurrent
 task, nor from inside a tool's `execute()` mid-turn — see
 [`runtime-tool-injection.md`](../design/runtime-tool-injection.md) §7).
 
-## Capability protocols (`agentao.host.protocols`)
+## Capability protocols (`arbiter.host.protocols`)
 
 Embedded hosts override IO by injecting these `Protocol` types into
-`Agentao(filesystem=..., shell=..., mcp_registry=..., memory_manager=...)`.
+`Arbiter(filesystem=..., shell=..., mcp_registry=..., memory_manager=...)`.
 The submodule is a stable re-export of the protocols and their value
-shapes; **always import from `agentao.host.protocols` rather than
-reaching into `agentao.capabilities.*`** (which is internal and may
+shapes; **always import from `arbiter.host.protocols` rather than
+reaching into `arbiter.capabilities.*`** (which is internal and may
 move).
 
 ```python
-from agentao.host.protocols import (
+from arbiter.host.protocols import (
     FileSystem, ShellExecutor, MCPRegistry, MemoryStore,
     FileEntry, FileStat, ShellRequest, ShellResult, BackgroundHandle,
 )
@@ -153,14 +153,14 @@ from agentao.host.protocols import (
 | `ShellRequest`, `ShellResult`, `BackgroundHandle` | Value shapes for `ShellExecutor` implementations. |
 
 The `Local*` defaults (e.g. `LocalFileSystem`, `LocalShellExecutor`)
-remain in `agentao.capabilities` because they are reference
+remain in `arbiter.capabilities` because they are reference
 implementations, not part of the public host-injection surface.
 
 ### `FileSystem.write_text` must replace atomically
 
 Implementations that **replace existing content** owe the caller an
 atomic swap: a reader must see either the old content or the new one,
-never a truncated or half-written file. Agentao runs inside a host
+never a truncated or half-written file. Arbiter runs inside a host
 process it does not control, so a plain truncate-then-write leaves a
 window in which a Ctrl+C, an OOM kill, or a `kill` destroys the user's
 file. This is a requirement on **your** implementation, not just on the
@@ -184,14 +184,14 @@ existing content: `append=True`, and a target that does not exist yet.
 Scope: this closes the *process-death* window. It is not fsync'd, so
 durability across power loss remains the host's concern.
 
-## Replay projection (`agentao.host.replay_projection`)
+## Replay projection (`arbiter.host.replay_projection`)
 
 The harness event stream and the replay JSONL are two views of the
 same facts. This submodule bridges them so embedded hosts have one
 audit artifact instead of two parallel streams.
 
 ```python
-from agentao.host.replay_projection import (
+from arbiter.host.replay_projection import (
     HostReplaySink,
     replay_payload_to_host_event,
     host_event_to_replay_kind,
@@ -201,11 +201,11 @@ from agentao.host.replay_projection import (
 
 | Symbol | Purpose |
 |---|---|
-| `HostReplaySink(recorder, *, stream=None)` | Forward projection. `Agentao.start_replay()` wires this automatically; hosts that drive replay manually can pass a stream explicitly. Every published `ToolLifecycleEvent` / `SubagentLifecycleEvent` / `PermissionDecisionEvent` is then written into `recorder` as a v1.2 replay event. Errors during write are logged at WARNING and swallowed — audit storage failure never breaks the runtime. |
+| `HostReplaySink(recorder, *, stream=None)` | Forward projection. `Arbiter.start_replay()` wires this automatically; hosts that drive replay manually can pass a stream explicitly. Every published `ToolLifecycleEvent` / `SubagentLifecycleEvent` / `PermissionDecisionEvent` is then written into `recorder` as a v1.2 replay event. Errors during write are logged at WARNING and swallowed — audit storage failure never breaks the runtime. |
 | `replay_payload_to_host_event(kind, payload)` | Reverse projection. Rehydrates a `HostEvent` Pydantic model from a replay JSONL line. Strips the sanitizer's optional projection metadata (`redaction_hits`, `redacted`, `redacted_fields`) so a redacted line still validates against the public `extra="forbid"` models. |
 | `host_event_to_replay_kind(event)` / `host_event_to_replay_payload(event)` | Lower-level helpers used by sinks and tests. Return `None` / `model_dump(mode="json")` respectively. |
 
-`Agentao.start_replay()` auto-instantiates `HostReplaySink` against
+`Arbiter.start_replay()` auto-instantiates `HostReplaySink` against
 the agent's `EventStream`; `end_replay()` detaches and clears the sink.
 Hosts that drive the replay subsystem manually can do the same wiring
 themselves.
@@ -217,10 +217,10 @@ for the version compatibility contract.
 
 ## Typing gate
 
-`agentao.host` ships clean under `mypy --strict`:
+`arbiter.host` ships clean under `mypy --strict`:
 
 ```
-uv run mypy --strict --package agentao.host
+uv run mypy --strict --package arbiter.host
 ```
 
 CI's `Typing gate` job enforces this on every PR. Downstream projects
@@ -248,7 +248,7 @@ Compatibility rules:
   note.
 - Public events must not reuse the internal `AgentEvent.data` payload
   directly; projection/redaction lives in
-  `agentao/host/projection.py`.
+  `arbiter/host/projection.py`.
 - Public summary fields (`summary`, `task_summary`, `reason`) are
   redacted/truncated host-facing strings — never raw user input,
   arguments, tool output, or policy internals.
@@ -259,14 +259,14 @@ Compatibility rules:
 ## Runtime identity contract
 
 Public events depend on a small set of stable id fields. The helpers
-live in `agentao/runtime/identity.py` and are wired into planning, tool
+live in `arbiter/runtime/identity.py` and are wired into planning, tool
 execution, permission decisions, and sub-agent spawn at the runtime
 boundary.
 
 | Field | Source |
 |---|---|
-| `session_id` | Persisted session id when available; UUID4 fallback at `Agentao` construction. |
-| `turn_id` | UUID4 minted at turn entry (`agentao/runtime/turn.py`). One user-submitted agentic loop. |
+| `session_id` | Persisted session id when available; UUID4 fallback at `Arbiter` construction. |
+| `turn_id` | UUID4 minted at turn entry (`arbiter/runtime/turn.py`). One user-submitted agentic loop. |
 | `tool_call_id` | LLM-provided tool call id when present, UUID4 fallback otherwise; normalized once at planning and reused. |
 | `decision_id` | UUID4 per permission decision. |
 | `child_task_id` / `child_session_id` | Captured at sub-agent spawn time, not inferred at completion. |
@@ -276,9 +276,9 @@ provider-generated ids are not assumed globally unique.
 
 ## Event subscription semantics
 
-`Agentao.events(session_id: str | None = None)` returns an async
+`Arbiter.events(session_id: str | None = None)` returns an async
 iterator over `HostEvent`. Pass `session_id=` to filter; pass `None`
-to subscribe to every session owned by this `Agentao` instance.
+to subscribe to every session owned by this `Arbiter` instance.
 
 - Same-session ordering is guaranteed.
 - Within one `tool_call_id`, `PermissionDecisionEvent` is emitted before
@@ -292,7 +292,7 @@ to subscribe to every session owned by this `Agentao` instance.
   producer blocks for matching events.
 - Cancellation of the iterator releases queue/subscription resources.
 - MVP supports one **async iterator** consumer per filter
-  (`Agentao.events(session_id=…)`); attaching a second iterator with
+  (`Arbiter.events(session_id=…)`); attaching a second iterator with
   the same filter raises `StreamSubscribeError`. For multi-sink
   fan-out (audit, metrics, replay) use synchronous observers — see
   [Synchronous observer fan-out](#synchronous-observer-fan-out) below.
@@ -341,7 +341,7 @@ Semantics:
   twice.
 
 `HostReplaySink` is the canonical user of this mechanism — see
-[Replay projection](#replay-projection-agentaohostreplay_projection)
+[Replay projection](#replay-projection-arbiterhostreplay_projection)
 above.
 
 ## Need richer events? The internal `Transport` channel
@@ -355,12 +355,12 @@ context compression) attach a transport callback at construction
 time:
 
 ```python
-from agentao import Agentao
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
 
 events = []
 transport = SdkTransport(on_event=events.append)
-agent = Agentao(transport=transport, ...)
+agent = Arbiter(transport=transport, ...)
 
 # After a turn:
 for ev in events:
@@ -370,7 +370,7 @@ for ev in events:
 
 ### What flows through `Transport` today
 
-Definitive list lives in `agentao/transport/events.py::EventType`. As
+Definitive list lives in `arbiter/transport/events.py::EventType`. As
 of this writing:
 
 | Family | Members |
@@ -400,7 +400,7 @@ meaning changed under a name consumers already read.
 |---|---|---|
 | Schema snapshot in `docs/schema/`? | ✅ `host.events.v1.json` | ❌ |
 | Field rename / removal triggers version bump? | ✅ enforced by `tests/test_host_schema.py` | ⚠️ best-effort `schema_version` bump — global, so it moves every event type |
-| Redaction / projection layer? | ✅ `agentao/host/projection.py` strips raw input/output | ❌ raw payloads (LLM_CALL_IO can contain full prompts and tool I/O) |
+| Redaction / projection layer? | ✅ `arbiter/host/projection.py` strips raw input/output | ❌ raw payloads (LLM_CALL_IO can contain full prompts and tool I/O) |
 | Cross-version compatibility audit before release? | ✅ part of the release checklist | ❌ |
 | Safe to forward over a long-lived wire? | ✅ | ⚠️ only after you pin `schema_version` and own the upgrade path |
 
@@ -433,7 +433,7 @@ meaning changed under a name consumers already read.
   `reasoning_only`, `length_truncated`, `doom_loop`, `llm_error`, or
   `None`; `tool_count`; `error`), and `.is_answer` folds it into one
   check. That is a **pull** surface: it answers "how did the turn I just
-  awaited end?", which covers `chat()` / `arun()` callers, `agentao
+  awaited end?", which covers `chat()` / `arun()` callers, `arbiter
   run`, and any embedder. What is **not** on the stable contract is the
   **push** shape — a `HostEvent` an async observer that does *not* drive
   the turn could subscribe to. That gap is now **main-loop-only**: for

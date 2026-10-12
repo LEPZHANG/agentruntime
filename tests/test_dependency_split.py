@@ -6,7 +6,7 @@ Three slow-marked tests against a built wheel:
   2026-06-19 in ``tests/data/full_extras_baseline.txt`` after the ``pdf`` /
   ``excel`` / ``image`` / ``crypto`` / ``google`` extras were dropped as dead
   weight — T1.1; transitive version bumps tracked across refreshes).
-- bare ``pip install agentao`` constructs an ``Agentao()`` offline.
+- bare ``pip install arbiter`` constructs an ``Arbiter()`` offline.
 - bare install does NOT pull rich/bs4/jieba/prompt-toolkit/readchar/pygments
   — they live in ``[cli]`` / ``[web]`` / ``[i18n]``.
 
@@ -54,7 +54,7 @@ def test_full_extras_freeze_matches_baseline(tmp_path: Path) -> None:
     actual = sorted(
         _normalize_freeze_line(line)
         for line in proc.stdout.splitlines()
-        if line and not line.startswith(("agentao @ file", "agentao=="))
+        if line and not line.startswith(("arbiter @ file", "arbiter=="))
     )
     expected = sorted(_normalize_freeze_line(line) for line in BASELINE.read_text().splitlines())
 
@@ -70,7 +70,7 @@ def test_full_extras_freeze_matches_baseline(tmp_path: Path) -> None:
         )
 
 
-def test_core_install_constructs_agentao(tmp_path: Path) -> None:
+def test_core_install_constructs_arbiter(tmp_path: Path) -> None:
     wheel = require_wheel()
     venv = make_venv(tmp_path)
     venv.pip_install(str(wheel))
@@ -78,10 +78,10 @@ def test_core_install_constructs_agentao(tmp_path: Path) -> None:
     snippet = (
         "import tempfile\n"
         "from pathlib import Path\n"
-        "from agentao import Agentao\n"
-        "from agentao.llm import LLMClient\n"
-        "from agentao.transport import NullTransport\n"
-        "agent = Agentao(\n"
+        "from arbiter import Arbiter\n"
+        "from arbiter.llm import LLMClient\n"
+        "from arbiter.transport import NullTransport\n"
+        "agent = Arbiter(\n"
         "    working_directory=Path(tempfile.mkdtemp()),\n"
         "    llm_client=LLMClient(api_key='dummy', base_url='http://localhost:1', model='dummy'),\n"
         "    transport=NullTransport(),\n"

@@ -1,9 +1,9 @@
-# Embedding Agentao — Guide for Coding Agents
+# Embedding Arbiter — Guide for Coding Agents
 
 **Audience:** a coding agent (Claude Code, Codex, Cursor, …) tasked with
-embedding the Agentao runtime into *another* project. You are reading
-this because someone asked you to "add Agentao" / "embed the agent" /
-"drive Agentao from our app."
+embedding the Arbiter runtime into *another* project. You are reading
+this because someone asked you to "add Arbiter" / "embed the agent" /
+"drive Arbiter from our app."
 
 **This is a distilled playbook, not the full reference.** The
 authoritative sources are linked inline; open them only when a step
@@ -15,9 +15,9 @@ below points you there.
 - Non-Python hosts (stdio): [`docs/guides/acp.md`](acp.md)
 - Working examples: [`examples/`](../examples/)
 
-> ⚠️ This doc is for embedding Agentao **into other projects**. It is
+> ⚠️ This doc is for embedding Arbiter **into other projects**. It is
 > NOT the same as the repo's `CLAUDE.md` (which guides agents editing
-> *this* repo) or `AGENTAO.md` (instructions the running agent reads).
+> *this* repo) or `ARBITER.md` (instructions the running agent reads).
 
 ---
 
@@ -27,10 +27,10 @@ Pick the surface before writing any code.
 
 | Host situation | Use | Doc |
 |---|---|---|
-| Host is a **Python** process (webapp, worker, notebook, plugin) | In-process embedding (`Agentao(...)`) | this doc |
-| Host is **not Python** (editor, IDE extension, Electron, non-Python sandbox) | ACP stdio server: `agentao --acp --stdio` | [`ACP.md`](acp.md) |
-| You only need **non-interactive automation** (run a prompt, get exit code) | `agentao run --prompt "..."` | [`docs/reference/configuration.md`](../reference/configuration.md), `agentao/cli/run.py` |
-| You want Agentao to **drive other agents** (Claude Code, Codex) as backends | ACP client | [`features/acp-client.md`](acp-client.md) |
+| Host is a **Python** process (webapp, worker, notebook, plugin) | In-process embedding (`Arbiter(...)`) | this doc |
+| Host is **not Python** (editor, IDE extension, Electron, non-Python sandbox) | ACP stdio server: `arbiter --acp --stdio` | [`ACP.md`](acp.md) |
+| You only need **non-interactive automation** (run a prompt, get exit code) | `arbiter run --prompt "..."` | [`docs/reference/configuration.md`](../reference/configuration.md), `arbiter/cli/run.py` |
+| You want Arbiter to **drive other agents** (Claude Code, Codex) as backends | ACP client | [`features/acp-client.md`](acp-client.md) |
 
 If the answer is not "in-process Python," stop reading this file and go
 to the linked doc. The rest of this guide assumes in-process embedding.
@@ -40,13 +40,13 @@ to the linked doc. The rest of this guide assumes in-process embedding.
 ## 1. Then decide: factory vs. pure injection
 
 There are exactly two supported construction paths. Do not invent a
-third (no module-level singletons, no `Agentao()` with no args — that
+third (no module-level singletons, no `Arbiter()` with no args — that
 raises `TypeError` since 0.3.0).
 
 | You want… | Use | Reads env/disk/cwd? |
 |---|---|---|
-| Drop-in CLI parity — read `.env`, `~/.agentao/`, `<wd>/.agentao/` | `build_from_environment(...)` | **Yes** |
-| Deterministic, side-effect-free, host owns every input (multi-tenant, containers, tests) | `Agentao(...)` (pure injection) | **No** |
+| Drop-in CLI parity — read `.env`, `~/.arbiter/`, `<wd>/.arbiter/` | `build_from_environment(...)` | **Yes** |
+| Deterministic, side-effect-free, host owns every input (multi-tenant, containers, tests) | `Arbiter(...)` (pure injection) | **No** |
 
 **Default recommendation for embedding into a host app: pure
 injection.** It is the only form that gives the host full control and
@@ -57,7 +57,7 @@ genuinely want to inherit local config.
 
 ```python
 from pathlib import Path
-from agentao.embedding import build_from_environment
+from arbiter.embedding import build_from_environment
 
 agent = build_from_environment(working_directory=Path("/srv/myapp/run-1"))
 reply = agent.chat("Summarize today's logs.")
@@ -68,11 +68,11 @@ agent.close()
 
 ```python
 from pathlib import Path
-from agentao import Agentao
-from agentao.llm import LLMClient
-from agentao.transport import NullTransport
+from arbiter import Arbiter
+from arbiter.llm import LLMClient
+from arbiter.transport import NullTransport
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path("/srv/myapp/run-1"),   # REQUIRED, frozen at construction
     llm_client=LLMClient(
         api_key="sk-...",
@@ -98,7 +98,7 @@ Everything else (`permission_engine`, `memory_manager`, `mcp_registry`,
 `transport`) has a safe default. See the table in
 [`EMBEDDING.md` §2](embedding.md#2-pure-injection-construction).
 
-> **MCP transports.** The default `mcp_registry` reads `.agentao/mcp.json` and
+> **MCP transports.** The default `mcp_registry` reads `.arbiter/mcp.json` and
 > speaks all three MCP transports with no embedding-side work: **stdio**,
 > **Streamable HTTP** (the default for a bare `url`), and legacy **SSE**
 > (`"type": "sse"`). A bare `url` defaults to Streamable HTTP — this is a
@@ -112,7 +112,7 @@ Need a request param the closed build does not expose — `reasoning_effort`,
 with its own client passes it to that `LLMClient(...)` instead):
 
 ```python
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path("/srv/myapp/run-1"),
     api_key="sk-...", base_url="https://api.openai.com/v1", model="gpt-5.4",
     extra_body={"reasoning_effort": "high"},   # keyword-only; sub-agents inherit it
@@ -141,7 +141,7 @@ worker checks it at every tool boundary and LLM chunk. Cancelling the
 awaiting `asyncio` task (timeout / client disconnect) also forwards.
 
 ```python
-from agentao.cancellation import CancellationToken
+from arbiter.cancellation import CancellationToken
 
 token = CancellationToken()
 task = asyncio.create_task(agent.arun(req.prompt, cancellation_token=token))
@@ -155,7 +155,7 @@ Both `chat()` and `arun()` take
 (0.4.8+). `data`/`mimeType` are required non-empty strings (`ValueError`
 otherwise); `_source` is optional. The engine enforces **no** size/count
 caps — cap untrusted input in the host (the CLI/ACP boundaries use
-`agentao.media_limits`: 20 MB/image, 16/turn).
+`arbiter.media_limits`: 20 MB/image, 16/turn).
 
 Degradation convention: if the model rejects image input, the turn retries
 once with the user message rewritten to plain text, each image becoming a
@@ -172,33 +172,33 @@ These are the lines most likely to drift. Follow them exactly.
 ✅ **DO import from these stable surfaces:**
 
 ```python
-from agentao import Agentao
-from agentao.embedding import build_from_environment
-from agentao.llm import LLMClient
-from agentao.transport import NullTransport
-from agentao.host import (                      # observability contract
+from arbiter import Arbiter
+from arbiter.embedding import build_from_environment
+from arbiter.llm import LLMClient
+from arbiter.transport import NullTransport
+from arbiter.host import (                      # observability contract
     ActivePermissions, HostEvent,
     ToolLifecycleEvent, SubagentLifecycleEvent, PermissionDecisionEvent,
 )
-from agentao.host.protocols import (            # capability injection
+from arbiter.host.protocols import (            # capability injection
     FileSystem, ShellExecutor, MemoryStore, MCPRegistry,
 )
 ```
 
 ❌ **DO NOT import these from a host** (internal; may move any release):
 
-- `agentao.capabilities.*` for the *protocol types* — import the
-  Protocols from `agentao.host.protocols`. (The reference *impls* like
-  `LocalFileSystem` do live in `agentao.capabilities` and are fine to
+- `arbiter.capabilities.*` for the *protocol types* — import the
+  Protocols from `arbiter.host.protocols`. (The reference *impls* like
+  `LocalFileSystem` do live in `arbiter.capabilities` and are fine to
   use as defaults to wrap.)
-- `agentao.transport.AgentEvent`, `Transport.emit(...)` — internal
+- `arbiter.transport.AgentEvent`, `Transport.emit(...)` — internal
   event shape; use `agent.events()` instead.
-- `agentao.runtime.*`, `agentao.host.projection.*` — runtime-private.
+- `arbiter.runtime.*`, `arbiter.host.projection.*` — runtime-private.
 
 ⚠️ **Rename trail (don't use the old names):**
 
-- `agentao.harness` → **`agentao.host`** (deprecated alias since 0.4.2,
-  removed in 0.5.0). Import from `agentao.host`.
+- `arbiter.harness` → **`arbiter.host`** (deprecated alias since 0.4.2,
+  removed in 0.5.0). Import from `arbiter.host`.
 - `allow_all_tools` flag is **gone**. Use permission modes / the
   permission engine instead (see §5).
 
@@ -211,8 +211,8 @@ To route filesystem / shell / memory / MCP through your own backend
 duck-typed object matching the Protocol. No inheritance — PEP 544.
 
 ```python
-from agentao.host.protocols import FileSystem      # the contract
-from agentao.capabilities import LocalFileSystem    # default impl to wrap
+from arbiter.host.protocols import FileSystem      # the contract
+from arbiter.capabilities import LocalFileSystem    # default impl to wrap
 
 class AuditedFileSystem:                            # duck-types FileSystem
     def __init__(self, inner): self.inner = inner
@@ -227,7 +227,7 @@ agent = build_from_environment(
 ```
 
 The four protocols: `FileSystem`, `ShellExecutor`, `MemoryStore`,
-`MCPRegistry`. Full method signatures: `agentao/host/protocols.py` and
+`MCPRegistry`. Full method signatures: `arbiter/host/protocols.py` and
 [`EMBEDDING.md` §3](embedding.md#3-capability-injection).
 
 ### 4.1 Path-domain write boundary (declare some subpaths read-only)
@@ -270,11 +270,11 @@ class PolicyFileSystem:                     # duck-types FileSystem
         return self._fs.write_text(path, data, append=append)
     def __getattr__(self, name): return getattr(self._fs, name)   # reads pass through
 
-from agentao.capabilities import LocalFileSystem
+from arbiter.capabilities import LocalFileSystem
 agent = build_from_environment(
     working_directory=kb,
     filesystem=PolicyFileSystem(LocalFileSystem(), kb,
-                                immutable=[kb / "raw", kb / "AGENTAO.md"]),
+                                immutable=[kb / "raw", kb / "ARBITER.md"]),
 )
 ```
 
@@ -286,7 +286,7 @@ agent = build_from_environment(
   **read-only subpaths out of cwd** (works, zero change), but it
   **cannot** authorize writes to roots *outside* cwd — those are rejected
   upstream. Multi-root-outside-cwd needs a host `extra_tool` or an
-  agentao change (see the design doc).
+  arbiter change (see the design doc).
 - **Absolute paths only.** The `FileSystem` protocol accepts absolute
   paths; relative resolution is the *tool's* job (`Tool._resolve_path`).
   Built-ins already hand `write_text` an absolute path. A custom
@@ -294,7 +294,7 @@ agent = build_from_environment(
   `self.filesystem.write_text(...)` — the `is_absolute()` guard turns a
   miss into a loud refusal instead of a silent process-cwd write.
 - **Replace existing files atomically.** `write_text` must not leave a
-  truncated file if the process dies mid-write — agentao runs inside a
+  truncated file if the process dies mid-write — arbiter runs inside a
   host it does not control, so that window has to be closed. A
   delegating wrapper inherits this from `LocalFileSystem`, which stages
   a sibling temp file (`.{name}.*.tmp`, visible to audit/watcher
@@ -323,12 +323,12 @@ Tools with `requires_confirmation=True` (shell, web, writes, deletes)
 are gated by `PermissionEngine`. From a host you set the posture, you
 do not disable the engine.
 
-- Modes (`agentao.permissions.PermissionMode`): `read-only`,
+- Modes (`arbiter.permissions.PermissionMode`): `read-only`,
   `workspace-write` (default), `full-access`, `plan`. Set with
   `agent.permission_engine.set_mode(PermissionMode.WORKSPACE_WRITE)`.
-- Rules come from `.agentao/permissions.json` (project) +
-  `~/.agentao/permissions.json` (user). The engine does no file I/O;
-  `agentao.embedding.permission_loader.load_permission_rules()` reads
+- Rules come from `.arbiter/permissions.json` (project) +
+  `~/.arbiter/permissions.json` (user). The engine does no file I/O;
+  `arbiter.embedding.permission_loader.load_permission_rules()` reads
   them.
 - Inspect what *will* apply: `agent.active_permissions()` →
   `{mode, rules, loaded_sources}` (JSON-safe snapshot).
@@ -361,7 +361,7 @@ Delivery contract (full version in [`api/host.md`](../reference/host-api.md)):
   `ToolLifecycleEvent(phase="started")`.
 - **No replay** — events before your first subscription are dropped.
 - Host-pulled backpressure (bounded queue; producer blocks, never grows
-  unbounded). One public stream consumer per `Agentao` instance (MVP).
+  unbounded). One public stream consumer per `Arbiter` instance (MVP).
 
 For streaming assistant *text/tokens* (not on the stable contract),
 you must consume the internal `Transport` — accept that it may change
@@ -383,7 +383,7 @@ Read `agent.last_turn` — the structured companion to the string return —
 before treating the reply as the model's:
 
 ```python
-from agentao import TurnOutcome  # for the type hint; optional
+from arbiter import TurnOutcome  # for the type hint; optional
 
 reply = agent.chat(prompt)
 outcome: TurnOutcome = agent.last_turn
@@ -416,10 +416,10 @@ unless overridden. Enable deliberately:
 
 | Subsystem | Enable when | Reads |
 |---|---|---|
-| `sandbox_policy` | untrusted prompts, multi-tenant, CI eval | `<wd>/.agentao/sandbox.json` |
-| `replay_config` | reproducing flake, A/B prompt diffs | `<wd>/.agentao/replay.json` |
-| `bg_store` | long-lived server surviving restarts | `<wd>/.agentao/bg/` |
-| `enable_builtin_agents=True` | want `codebase-investigator` / `generalist` delegation tools | `<wd>/.agentao/settings.json :: agents.enable_builtin` |
+| `sandbox_policy` | untrusted prompts, multi-tenant, CI eval | `<wd>/.arbiter/sandbox.json` |
+| `replay_config` | reproducing flake, A/B prompt diffs | `<wd>/.arbiter/replay.json` |
+| `bg_store` | long-lived server surviving restarts | `<wd>/.arbiter/bg/` |
+| `enable_builtin_agents=True` | want `codebase-investigator` / `generalist` delegation tools | `<wd>/.arbiter/settings.json :: agents.enable_builtin` |
 
 ---
 
@@ -455,22 +455,22 @@ Do **not** build this on the plugin `Stop` / `force_continue` path (hard-capped
 at 3, injects a visible message) — that's for one extra nudge inside a single
 turn, not sustained pursuit. Full pattern + invariants:
 [developer-guide 4.8 Orchestration Continuation](../../developer-guide/en/part-4/8-orchestration-continuation.md).
-Agentao's own CLI `/goal` is the worked reference
-([guide](goal.md), `agentao/cli/input_loop.py::run_goal_continuation`).
+Arbiter's own CLI `/goal` is the worked reference
+([guide](goal.md), `arbiter/cli/input_loop.py::run_goal_continuation`).
 
 ---
 
 ## 8. Logging — silence it from the host
 
-By default `Agentao(...)` writes `<wd>/agentao.log` and raises the
-`"agentao"` package logger to DEBUG. To stop both, inject a logger:
+By default `Arbiter(...)` writes `<wd>/arbiter.log` and raises the
+`"arbiter"` package logger to DEBUG. To stop both, inject a logger:
 
 ```python
 import logging
-quiet = logging.getLogger("myhost.agentao")
+quiet = logging.getLogger("myhost.arbiter")
 quiet.addHandler(logging.NullHandler())
 quiet.propagate = False
-agent = Agentao(api_key=..., base_url=..., model=...,
+agent = Arbiter(api_key=..., base_url=..., model=...,
                 working_directory=workdir, logger=quiet)
 ```
 
@@ -483,18 +483,18 @@ must pass `logger=`. ([`EMBEDDING.md` §2](embedding.md#2-pure-injection-constru
 ## 9. Integration checklist (run through this before you call it done)
 
 - [ ] Picked the right surface (§0) — in-process Python, else go to ACP/run.
-- [ ] Construction uses `build_from_environment` **or** pure `Agentao(...)`; no no-arg `Agentao()`.
+- [ ] Construction uses `build_from_environment` **or** pure `Arbiter(...)`; no no-arg `Arbiter()`.
 - [ ] `working_directory` is an explicit absolute path.
 - [ ] LLM creds supplied (`llm_client` or `api_key`+`base_url`+`model`).
 - [ ] Every code path calls `agent.close()` (use `try/finally`).
 - [ ] Async host uses `arun()`, not `chat()` on the loop thread.
 - [ ] A turn that produced no answer is not presented as one (§6.1) — the reply string alone does not tell you.
 - [ ] If the host forwards images: `data`/`mimeType` validated, size/count capped host-side, and consumers of `agent.messages` tolerate the `<attachment …/>` degradation rewrite (§2).
-- [ ] Imports come from `agentao`, `agentao.embedding`, `agentao.host`, `agentao.host.protocols` only — no `agentao.runtime.*` / `AgentEvent` / `agentao.harness`.
+- [ ] Imports come from `arbiter`, `arbiter.embedding`, `arbiter.host`, `arbiter.host.protocols` only — no `arbiter.runtime.*` / `AgentEvent` / `arbiter.harness`.
 - [ ] Permission posture set explicitly; untrusted input → `sandbox_policy`.
 - [ ] Secrets come from the host (env/secret manager), not hard-coded.
 - [ ] Logging handled (`logger=` if the host owns logging).
-- [ ] Pin/declare dependency on a compatible Agentao version; note `pydantic>=2` is required.
+- [ ] Pin/declare dependency on a compatible Arbiter version; note `pydantic>=2` is required.
 
 ---
 
@@ -503,7 +503,7 @@ must pass `logger=`. ([`EMBEDDING.md` §2](embedding.md#2-pure-injection-constru
 Minimal smoke test the integration should pass:
 
 ```python
-agent = Agentao(working_directory=Path("/tmp/agentao-smoke"),
+agent = Arbiter(working_directory=Path("/tmp/arbiter-smoke"),
                 api_key=..., base_url=..., model=..., transport=NullTransport())
 try:
     out = agent.chat("Reply with the single word: ok")

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from unittest.mock import Mock, patch
-from agentao.tools import ShellTool, WebFetchTool, WebSearchTool, ReadFileTool
+from arbiter.tools import ShellTool, WebFetchTool, WebSearchTool, ReadFileTool
 
 
 def test_requires_confirmation_property():
@@ -30,18 +30,18 @@ def test_agent_with_confirmation_callback():
     """Test agent with confirmation callback."""
 
     # Mock the LLMClient and OpenAI
-    with patch('agentao.agent.LLMClient') as mock_llm_client:
+    with patch('arbiter.agent.LLMClient') as mock_llm_client:
         mock_logger = Mock()
         mock_llm_client.return_value.logger = mock_logger
         mock_llm_client.return_value.model = "gpt-4"
 
-        from agentao.agent import Agentao
+        from arbiter.agent import Arbiter
 
         # Create a mock confirmation callback
         confirmation_callback = Mock(return_value=True)
 
         # Create agent with confirmation callback
-        agent = Agentao(
+        agent = Arbiter(
             confirmation_callback=confirmation_callback,
             working_directory=Path.cwd(),
         )
@@ -67,15 +67,15 @@ def test_confirmation_callback_signature():
         return True
 
     # Mock the LLMClient
-    with patch('agentao.agent.LLMClient') as mock_llm_client:
+    with patch('arbiter.agent.LLMClient') as mock_llm_client:
         mock_logger = Mock()
         mock_llm_client.return_value.logger = mock_logger
         mock_llm_client.return_value.model = "gpt-4"
 
-        from agentao.agent import Agentao
+        from arbiter.agent import Arbiter
 
         # Create agent with callback
-        agent = Agentao(
+        agent = Arbiter(
             confirmation_callback=sample_callback,
             working_directory=Path.cwd(),
         )
@@ -90,15 +90,15 @@ def test_confirmation_callback_signature():
 def test_no_confirmation_callback():
     """Test agent works without confirmation callback."""
 
-    with patch('agentao.agent.LLMClient') as mock_llm_client:
+    with patch('arbiter.agent.LLMClient') as mock_llm_client:
         mock_logger = Mock()
         mock_llm_client.return_value.logger = mock_logger
         mock_llm_client.return_value.model = "gpt-4"
 
-        from agentao.agent import Agentao
+        from arbiter.agent import Arbiter
 
         # Create agent without callback
-        agent = Agentao(working_directory=Path.cwd())
+        agent = Arbiter(working_directory=Path.cwd())
 
         assert agent.confirmation_callback is None, "Confirmation callback should be None"
         print("✅ Agent works without confirmation callback")

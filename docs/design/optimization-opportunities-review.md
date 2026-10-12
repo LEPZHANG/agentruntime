@@ -1,12 +1,12 @@
-# Agentao — Optimization Opportunities Review
+# Arbiter — Optimization Opportunities Review
 
 **Status:** Review record. Drafted 2026-06-19 from a multi-dimension audit of the
-`agentao` runtime, packaging, and CLI/ACP surfaces. **This is an evidence-backed
+`arbiter` runtime, packaging, and CLI/ACP surfaces. **This is an evidence-backed
 findings list + prioritized improvement proposal, not an approved plan.** It
 records where the codebase carries localized performance cost, packaging dead
 weight, or drift-prone duplication — and, *for the maintainer's judgment*, what
 to fix now, what to consolidate, and what to leave alone.
-**Audience:** Agentao maintainers.
+**Audience:** Arbiter maintainers.
 
 > **Superseded in part (2026-07-25).** Tier 1–2 shipped in v0.4.12 (see
 > *Implementation status* at the end of this doc). **Tier 3 is formally
@@ -40,10 +40,10 @@ drift — re-grep before acting.
 
 ## TL;DR
 
-Agentao is a **mature, well-maintained codebase, not one with low-hanging tech
+Arbiter is a **mature, well-maintained codebase, not one with low-hanging tech
 debt.** 262 source files / ~54.5k LOC with a near-1:1 test ratio (195 test files
 / ~54.8k LOC), only 4 TODO markers (3 of them false positives), and clean
-lazy-import boundaries (`import agentao` loads **zero** heavy modules, verified
+lazy-import boundaries (`import arbiter` loads **zero** heavy modules, verified
 empirically). There is **no architectural emergency.**
 
 "Optimization" here means three concrete, bounded classes of work:
@@ -95,7 +95,7 @@ note below); Tier 3 stays recorded, not near-term.
 | `TODO`/`FIXME`/`XXX`/`HACK` | 4 (3 false positives: `XXXX` provider placeholder) | effectively zero debt markers |
 | Deprecation markers | 31 | live, documented back-compat shims (not rot) |
 | Commits / last 90 days | 316 | actively developed |
-| `import agentao` heavy modules | 0 | openai/mcp/httpx/jinja2/rich/bs4/tiktoken all `loaded=False` |
+| `import arbiter` heavy modules | 0 | openai/mcp/httpx/jinja2/rich/bs4/tiktoken all `loaded=False` |
 
 The takeaway: the usual cheap signals of neglect are absent. The findings below
 are residual, not systemic.
@@ -106,7 +106,7 @@ are residual, not systemic.
 
 ### T1.1 — Five packaging extras are dead weight (`google` clearly removable) · HIGH
 `pyproject.toml:48-52`. Five extras have **zero import sites** anywhere in
-shipped `agentao/` code (verified by grep for the actual import names —
+shipped `arbiter/` code (verified by grep for the actual import names —
 `google.genai`, `Crypto`, `fitz`/`pdfplumber`, `pandas`/`openpyxl`, `PIL`):
 
 ```
@@ -187,7 +187,7 @@ abstraction.
 `output_callback`, `tool_complete_callback` are **declared but never stored or
 referenced** (body lines 65-90 store none), and **no caller passes them** — the
 sole production constructor (`agent.py:587`) and all five test constructors omit
-them. Unlike the `Agentao.__init__` legacy callbacks (live shims that emit
+them. Unlike the `Arbiter.__init__` legacy callbacks (live shims that emit
 `DeprecationWarning` and feed `build_compat_transport`), these are inert
 signature noise with no warning, no storage, no use.
 
@@ -227,7 +227,7 @@ roadmap.
 `_handler_utils.py:52-81` is the purpose-built helper; its own docstring
 (`:10-12`) names the laggards. Five newer handlers adopt it
 (`session_set_mode`, `session_set_model`, `session_list_models`,
-`session_set_config_option`, `agentao_set_model` — confirmed). Still
+`session_set_config_option`, `arbiter_set_model` — confirmed). Still
 hand-inlining the same 4-step gate: `session_cancel.py:112-129`,
 `session_prompt.py:235-253`, `session_load.py:157-166`. The verbatim
 `_parse_session_id` (cancel `:82-84`, prompt `:100-101`, load `:109-111`) is the
@@ -253,13 +253,13 @@ Re-implemented inline at `cli/diagnostics/collectors.py:47-50`,
   (`provider._list_providers_from_env`, which *scans all* `*_API_KEY` keys, is a
   legitimately different shape — leave it.)
 
-### T2.3 — `cli/app.py` reads *and writes* `.agentao/settings.json` cwd-relative instead of the resolved project root · MEDIUM (bug — do now) + optional follow-up
+### T2.3 — `cli/app.py` reads *and writes* `.arbiter/settings.json` cwd-relative instead of the resolved project root · MEDIUM (bug — do now) + optional follow-up
 The actionable item is a **bug that spans both sides of the settings round-trip**:
 `cli/app.py:140` (`_load_settings`) **and** `cli/app.py:149` (`_save_settings`)
-both use **cwd-relative** `Path(".agentao") / "settings.json"` instead of the
+both use **cwd-relative** `Path(".arbiter") / "settings.json"` instead of the
 resolved project root. `factory.py:37-45` and `replay/config.py:107-115` read the
 *same file* from the resolved root. So a CLI launched from a subdirectory
-persists `mode` to a cwd-local `.agentao/settings.json` (it even `mkdir`s one)
+persists `mode` to a cwd-local `.arbiter/settings.json` (it even `mkdir`s one)
 that the factory never reads — **read and write both disagree** with the factory's
 frozen `working_directory` contract.
 
@@ -336,7 +336,7 @@ path to ~120 lines.
   only on ALLOW" ordering, and the single-emit-per-`call_id` guarantee are
   load-bearing for ACP/replay/CLI. Any extraction must preserve emit ordering.
 
-### T3.2 — `Agentao.get_conversation_summary` is a 64-line presentation method in core · LOW/MEDIUM
+### T3.2 — `Arbiter.get_conversation_summary` is a 64-line presentation method in core · LOW/MEDIUM
 `agent.py:1188-1250`. Pure string-formatting for a CLI/status display that reaches
 into `context_manager`, `memory_manager`, `skill_manager`, `todo_tool`,
 `mcp_manager`, and `llm` only to format text. A display concern that fits
@@ -364,9 +364,9 @@ constructions. Reads more naturally as a short sequence of `_attempt(...)` steps
 Recorded so a future pass doesn't re-flag intentional design (this repo's culture
 is *gap ≠ need*):
 
-- **`import agentao` is clean.** openai SDK, mcp, jieba, tiktoken, bs4, jinja2 are
-  all lazy / deferred; `from agentao import Agentao` loads zero heavy modules.
-- **AGENTAO.md is not re-read per turn** — loaded once at construction
+- **`import arbiter` is clean.** openai SDK, mcp, jieba, tiktoken, bs4, jinja2 are
+  all lazy / deferred; `from arbiter import Arbiter` loads zero heavy modules.
+- **ARBITER.md is not re-read per turn** — loaded once at construction
   (`agent.py:504`); the builder uses cached `agent.project_instructions`.
 - **Memory recall is not O(n²)** — inverted index + `write_version` dirty-gate
   (`retriever.py:300-319`); token bundles cached.
@@ -377,10 +377,10 @@ is *gap ≠ need*):
 - **No imported-but-undeclared deps.** Every import resolves to a declared dep
   (`pygments` has 0 import sites but is an intentional presence-probe in
   `cli/__init__.py:81`).
-- **`Agentao.__init__` (232 lines)** is already decomposed into ~9
+- **`Arbiter.__init__` (232 lines)** is already decomposed into ~9
   `_init_*`/`_resolve_*`/`_validate_*` helpers with documented ordering — further
   splitting adds indirection without reducing real complexity.
-- **`chat_loop/` mixins, `harness→host` alias, legacy `Agentao` callbacks** are
+- **`chat_loop/` mixins, `harness→host` alias, legacy `Arbiter` callbacks** are
   intentional documented shims, not debt.
 - **`write_session_update` envelope centralization holds** — all three
   session/update emit sites route through it (commit `c6d6406` intact).
@@ -423,11 +423,11 @@ boundary call that belongs to the maintainer.
 
 | Finding | Verification |
 |---|---|
-| T1.1 | `grep -rE "from google\|import Crypto\|import fitz\|pdfplumber\|import pandas\|import openpyxl\|from PIL" agentao/` → 0 hits; `llm/client.py:493-495` Gemini-over-OpenAI path read |
+| T1.1 | `grep -rE "from google\|import Crypto\|import fitz\|pdfplumber\|import pandas\|import openpyxl\|from PIL" arbiter/` → 0 hits; `llm/client.py:493-495` Gemini-over-OpenAI path read |
 | T1.2 / T1.3 | read `context_manager.py` (`_heuristic_token_count`, `_threshold_token_estimate`, anchor) + `_compaction.py`; **reverse review:** confirmed `_runner.py:268` warms the anchor with `message_count`, so the slow loop is cold-path-only → both downgraded to LOW |
-| T1.4 | read `tool_runner.py:60-90`; `grep "ToolRunner("` across `agentao/` + `tests/` — no caller passes the four params |
+| T1.4 | read `tool_runner.py:60-90`; `grep "ToolRunner("` across `arbiter/` + `tests/` — no caller passes the four params |
 | T1.5 | `grep "start_replay\|end_replay\|reload_replay_config"` → live CLI + ACP callers |
-| T2.1 | `grep "require_active_session" agentao/acp/` — 5 adopters, 3 laggards |
+| T2.1 | `grep "require_active_session" arbiter/acp/` — 5 adopters, 3 laggards |
 | T2.2 | `grep "LLM_PROVIDER\|discover_llm_kwargs"`; read each re-impl site |
 | T2.3 | read `app.py` `_load_settings` **and** `_save_settings` — both cwd-relative read/write; compared against `factory.py` / `replay/config.py` resolved-root loads |
 | T2.4–T2.6 | read each cited snippet pair; confirmed drift / single-file dup |
@@ -463,7 +463,7 @@ read with these corrections:
   deprecated callback kwargs ends their backward-compat window early: an external
   host/test still constructing `ToolRunner` directly with them would hit
   `TypeError`. They are restored as accepted-but-ignored no-ops, scheduled for
-  removal in 0.5.0 alongside the matching `Agentao.__init__` legacy callbacks
+  removal in 0.5.0 alongside the matching `Arbiter.__init__` legacy callbacks
   (same compat policy), not before. Net: no change to `tool_runner.py`.
 - **T2.1 — the "safe drop-in" claim held only for `session_cancel`.** On close
   reading, `session_prompt` is **not** behavior-preserving against

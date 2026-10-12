@@ -2,7 +2,7 @@
 
 > **What you'll learn**
 > - The 11 blocks the system prompt is composed from each turn
-> - Which 3 you actually own (AGENTAO.md, skills, custom Tool descriptions)
+> - Which 3 you actually own (ARBITER.md, skills, custom Tool descriptions)
 > - Which 8 are runtime-injected and not safe to override
 
 The agent's system prompt is **rebuilt every `chat()` turn**, not a static string. This section walks through the 11 stitched blocks — where each comes from, which you can customize, and which you shouldn't touch.
@@ -14,7 +14,7 @@ The agent's system prompt is **rebuilt every `chat()` turn**, not a static strin
 │ System prompt                               │
 │                                            │
 │ ┌─────────────────────────────────────┐    │
-│ │ 1. Project instructions (AGENTAO.md)│    │  ← you write
+│ │ 1. Project instructions (ARBITER.md)│    │  ← you write
 │ ├─────────────────────────────────────┤    │
 │ │ 2. Agent capability description     │    │  ← fixed
 │ ├─────────────────────────────────────┤    │
@@ -51,7 +51,7 @@ The agent's system prompt is **rebuilt every `chat()` turn**, not a static strin
 
 ## Three injection points you own
 
-### 1. `AGENTAO.md` — project instructions
+### 1. `ARBITER.md` — project instructions
 
 Place it at the root of `working_directory`. Loaded automatically on construction.
 
@@ -100,16 +100,16 @@ Injected in the stable block on every subsequent session.
 | Block | Why |
 |-------|-----|
 | Agent capability description | Governs how the agent uses tools, thinks |
-| Reliability / operational rules | Core Agentao quality |
+| Reliability / operational rules | Core Arbiter quality |
 | Sub-agent / skills catalog | Reflects registration state, not static text |
 
-If you want to **drastically reshape** agent behavior (remove a capability, impose a totally different mission), there's no public API. **Recommended pattern**: layer via AGENTAO.md + skills — don't try to replace.
+If you want to **drastically reshape** agent behavior (remove a capability, impose a totally different mission), there's no public API. **Recommended pattern**: layer via ARBITER.md + skills — don't try to replace.
 
 ## Inspect the system prompt
 
 ```python
 # Right after construction
-agent = Agentao(working_directory=Path.cwd())
+agent = Arbiter(working_directory=Path.cwd())
 print(agent._build_system_prompt())
 ```
 
@@ -130,15 +130,15 @@ A bloated prompt will:
 
 ## Prompt Cache tactics
 
-Agentao splits the prompt into "stable prefix + dynamic suffix" — the prefix is identical across turns, so vendor prompt caches **cut cost and latency significantly**.
+Arbiter splits the prompt into "stable prefix + dynamic suffix" — the prefix is identical across turns, so vendor prompt caches **cut cost and latency significantly**.
 
 ### What goes in the stable prefix
 
-Blocks 1–6 (AGENTAO.md, capability, rules, reasoning, sub-agents).
+Blocks 1–6 (ARBITER.md, capability, rules, reasoning, sub-agents).
 
 ### What breaks the cache
 
-- Mutating `AGENTAO.md` between turns
+- Mutating `ARBITER.md` between turns
 - Switching activated skills (block 8 moves — the cache invalidates for that suffix, but blocks 1-6 stay cached — that's fine)
 - Adding todos / memories (blocks 9-11) **does not** break the prefix cache — they live after it
 
@@ -146,31 +146,31 @@ Blocks 1–6 (AGENTAO.md, capability, rules, reasoning, sub-agents).
 
 On OpenAI: response includes `usage.prompt_tokens_details.cached_tokens`. Ideal case: from turn 2 onward most of the system prompt is cached.
 
-## Different AGENTAO.md per business line
+## Different ARBITER.md per business line
 
-Multi-tenant / multi-product: each `working_directory` can have a **different** `AGENTAO.md`:
+Multi-tenant / multi-product: each `working_directory` can have a **different** `ARBITER.md`:
 
 ```
 /data/tenants/acme-corp/
-├── AGENTAO.md           ← acme's conventions
-└── .agentao/
+├── ARBITER.md           ← acme's conventions
+└── .arbiter/
 
 /data/tenants/globex/
-├── AGENTAO.md           ← globex's conventions
-└── .agentao/
+├── ARBITER.md           ← globex's conventions
+└── .arbiter/
 ```
 
 This is the **cleanest** way to do per-tenant customization — no code branching, just directory layout.
 
-## Dynamic AGENTAO.md
+## Dynamic ARBITER.md
 
-Some facts are per-session (subscription tier, language, region). Write `AGENTAO.md` into the session's working directory before constructing the agent:
+Some facts are per-session (subscription tier, language, region). Write `ARBITER.md` into the session's working directory before constructing the agent:
 
 ```python
 def prepare_workdir(tenant, user) -> Path:
     workdir = Path(f"/tmp/session-{user.id}")
     workdir.mkdir(exist_ok=True)
-    (workdir / "AGENTAO.md").write_text(f"""
+    (workdir / "ARBITER.md").write_text(f"""
 # User Context
 
 - Tenant: {tenant.name} ({tenant.plan})
@@ -183,49 +183,49 @@ def prepare_workdir(tenant, user) -> Path:
 """)
     return workdir
 
-agent = Agentao(working_directory=prepare_workdir(tenant, user))
+agent = Arbiter(working_directory=prepare_workdir(tenant, user))
 ```
 
 Now the agent's system prompt is **tailored to this session**.
 
 ## "But I really want to replace the whole prompt"
 
-No public API. You can subclass `Agentao` and override the private method:
+No public API. You can subclass `Arbiter` and override the private method:
 
 ```python
-from agentao import Agentao
+from arbiter import Arbiter
 
-class MyAgentao(Agentao):
+class MyArbiter(Arbiter):
     def _build_system_prompt(self) -> str:
         parent = super()._build_system_prompt()
         return "# Your company's top-level charter\n\n...\n\n" + parent
 
-agent = MyAgentao(working_directory=Path.cwd())
+agent = MyArbiter(working_directory=Path.cwd())
 ```
 
-⚠️ Relies on a private method name; retest on every version upgrade. **Prefer AGENTAO.md + skills**.
+⚠️ Relies on a private method name; retest on every version upgrade. **Prefer ARBITER.md + skills**.
 
 ## ⚠️ Common pitfalls
 
 ::: warning Don't ship without these
-- ❌ **Oversized AGENTAO.md** — long preambles dilute the model's attention to the actual user message
-- ❌ **Shared AGENTAO.md across sessions** — one tenant's rules apply to another
-- ❌ **Sensitive info in AGENTAO.md** — gets shipped to every LLM call (and possibly logged)
+- ❌ **Oversized ARBITER.md** — long preambles dilute the model's attention to the actual user message
+- ❌ **Shared ARBITER.md across sessions** — one tenant's rules apply to another
+- ❌ **Sensitive info in ARBITER.md** — gets shipped to every LLM call (and possibly logged)
 
 Each pitfall below has the full fix.
 :::
 
-### ❌ Oversized AGENTAO.md
+### ❌ Oversized ARBITER.md
 
-2000+ words eats too much context. Move operational how-to into skills; keep AGENTAO.md for hard constraints + key facts.
+2000+ words eats too much context. Move operational how-to into skills; keep ARBITER.md for hard constraints + key facts.
 
-### ❌ Shared AGENTAO.md across sessions
+### ❌ Shared ARBITER.md across sessions
 
-If all agents point to the same `working_directory`, they share AGENTAO.md — but you may want per-tenant customization. **Per-session working_directory** is the clean answer.
+If all agents point to the same `working_directory`, they share ARBITER.md — but you may want per-tenant customization. **Per-session working_directory** is the clean answer.
 
-### ❌ Sensitive info in AGENTAO.md
+### ❌ Sensitive info in ARBITER.md
 
-AGENTAO.md is a project file — it may land in git, in memory, or in logs. **Never** include API keys, real credentials, or customer PII.
+ARBITER.md is a project file — it may land in git, in memory, or in logs. **Never** include API keys, real credentials, or customer PII.
 
 ---
 
@@ -234,8 +234,8 @@ AGENTAO.md is a project file — it may land in git, in memory, or in logs. **Ne
 ## TL;DR
 
 - The system prompt is **rebuilt every turn** — never assume it's a static string you can cache.
-- You own 3 of 11 blocks: **`AGENTAO.md`** (project hard rules), **skill bodies** (activated knowledge), **custom Tool descriptions** (when/how to call).
+- You own 3 of 11 blocks: **`ARBITER.md`** (project hard rules), **skill bodies** (activated knowledge), **custom Tool descriptions** (when/how to call).
 - The other 8 — date, working directory, available tools/skills catalog, memory recall, todos, etc. — are runtime-injected and should not be overridden.
-- Keep `AGENTAO.md` short and absolute ("never run X", "always use Y format") — long preambles dilute attention.
+- Keep `ARBITER.md` short and absolute ("never run X", "always use Y format") — long preambles dilute attention.
 
 → [Part 6 · Security & Production](/en/part-6/)

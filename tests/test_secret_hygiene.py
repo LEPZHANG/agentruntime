@@ -1,12 +1,12 @@
 """Secrets must not be written to disk, and must not ride into children.
 
-Two independent leaks, same root cause — agentao was more generous with
+Two independent leaks, same root cause — arbiter was more generous with
 its own credentials than it needed to be:
 
 1. The 10-pattern secret scanner existed but was reachable only through
-   the replay recorder, which is **off by default**. Everything agentao
-   writes to disk unconditionally — ``agentao.log`` and
-   ``.agentao/tool-outputs/`` — went out unscanned.
+   the replay recorder, which is **off by default**. Everything arbiter
+   writes to disk unconditionally — ``arbiter.log`` and
+   ``.arbiter/tool-outputs/`` — went out unscanned.
 2. Every shell and MCP child inherited the full parent environment,
    including the provider key that pays for the LLM. A prompt-injected
    ``run_shell_command("env")`` needed no exotic technique.
@@ -24,8 +24,8 @@ import os
 
 import pytest
 
-from agentao.capabilities.process import HARNESS_ENV_KEYS, build_child_env
-from agentao.security.secret_scan import redact, scan_and_redact
+from arbiter.capabilities.process import HARNESS_ENV_KEYS, build_child_env
+from arbiter.security.secret_scan import redact, scan_and_redact
 
 
 # A syntactically valid, obviously fake OpenAI-shaped key.
@@ -56,19 +56,19 @@ class TestScanner:
 
     def test_replay_re_export_is_the_same_function(self):
         """Existing replay callers must keep working after the move."""
-        from agentao.replay.redact import scan_and_redact as replay_scan
+        from arbiter.replay.redact import scan_and_redact as replay_scan
 
         assert replay_scan is scan_and_redact
 
 
 class TestLogRedaction:
     def test_credentials_do_not_reach_the_log_file(self, tmp_path):
-        from agentao.llm.client import _RedactingFormatter
+        from arbiter.llm.client import _RedactingFormatter
 
-        log_file = tmp_path / "agentao.log"
+        log_file = tmp_path / "arbiter.log"
         handler = logging.FileHandler(log_file, encoding="utf-8")
         handler.setFormatter(_RedactingFormatter("%(message)s"))
-        logger = logging.getLogger("agentao.test.redaction")
+        logger = logging.getLogger("arbiter.test.redaction")
         logger.setLevel(logging.DEBUG)
         logger.addHandler(handler)
         logger.propagate = False
@@ -83,12 +83,12 @@ class TestLogRedaction:
         assert "REDACTED" in written
 
     def test_ordinary_lines_are_unharmed(self, tmp_path):
-        from agentao.llm.client import _RedactingFormatter
+        from arbiter.llm.client import _RedactingFormatter
 
-        log_file = tmp_path / "agentao.log"
+        log_file = tmp_path / "arbiter.log"
         handler = logging.FileHandler(log_file, encoding="utf-8")
         handler.setFormatter(_RedactingFormatter("%(message)s"))
-        logger = logging.getLogger("agentao.test.redaction.clean")
+        logger = logging.getLogger("arbiter.test.redaction.clean")
         logger.setLevel(logging.DEBUG)
         logger.addHandler(handler)
         logger.propagate = False
@@ -102,17 +102,17 @@ class TestLogRedaction:
 
     def test_a_scanner_failure_cannot_break_logging(self, tmp_path, monkeypatch):
         """Logging must degrade to unredacted, never raise into the caller."""
-        from agentao.llm import client as client_mod
+        from arbiter.llm import client as client_mod
 
         def boom(_text):
             raise RuntimeError("scanner exploded")
 
         monkeypatch.setattr(client_mod, "redact", boom)
 
-        log_file = tmp_path / "agentao.log"
+        log_file = tmp_path / "arbiter.log"
         handler = logging.FileHandler(log_file, encoding="utf-8")
         handler.setFormatter(client_mod._RedactingFormatter("%(message)s"))
-        logger = logging.getLogger("agentao.test.redaction.boom")
+        logger = logging.getLogger("arbiter.test.redaction.boom")
         logger.setLevel(logging.DEBUG)
         logger.addHandler(handler)
         logger.propagate = False
@@ -128,7 +128,7 @@ class TestLogRedaction:
 class TestToolOutputSpill:
     def test_saved_output_is_redacted_but_the_excerpt_is_not(self, tmp_path, monkeypatch):
         """Disk gets scrubbed; the model's copy stays verbatim on purpose."""
-        from agentao.runtime import tool_result_formatter as trf
+        from arbiter.runtime import tool_result_formatter as trf
 
         monkeypatch.setattr(trf, "_TOOL_OUTPUT_DIR", tmp_path / "tool-outputs")
 
@@ -174,12 +174,12 @@ class TestChildEnvironment:
     @pytest.mark.parametrize("value", ["0", "false", "no", "off", "FALSE"])
     def test_opt_out_restores_full_inheritance(self, monkeypatch, value):
         monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
-        monkeypatch.setenv("AGENTAO_SCRUB_CHILD_ENV", value)
+        monkeypatch.setenv("ARBITER_SCRUB_CHILD_ENV", value)
         assert build_child_env()["OPENAI_API_KEY"] == FAKE_KEY
 
     def test_unset_opt_out_means_scrubbing_is_on(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
-        monkeypatch.delenv("AGENTAO_SCRUB_CHILD_ENV", raising=False)
+        monkeypatch.delenv("ARBITER_SCRUB_CHILD_ENV", raising=False)
         assert "OPENAI_API_KEY" not in build_child_env()
 
     def test_every_declared_key_is_actually_dropped(self):
@@ -192,7 +192,7 @@ class TestChildEnvironment:
 class TestShellChildEnvironment:
     def test_shell_child_does_not_see_the_provider_key(self, monkeypatch, tmp_path):
         """End-to-end: the executor the shell tool actually uses."""
-        from agentao.capabilities.shell import LocalShellExecutor, ShellRequest
+        from arbiter.capabilities.shell import LocalShellExecutor, ShellRequest
 
         monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
         result = LocalShellExecutor().run(
@@ -206,7 +206,7 @@ class TestShellChildEnvironment:
 
     def test_explicit_env_is_passed_through_verbatim(self, monkeypatch, tmp_path):
         """An explicit ``request.env`` is the host's decision, not ours."""
-        from agentao.capabilities.shell import LocalShellExecutor, ShellRequest
+        from arbiter.capabilities.shell import LocalShellExecutor, ShellRequest
 
         monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
         result = LocalShellExecutor().run(
@@ -225,7 +225,7 @@ class TestScrubCoversEveryChildSpawner:
     a guarantee — plugin hooks and search both go through run_captured."""
 
     def test_run_captured_scrubs_by_default(self, monkeypatch, tmp_path):
-        from agentao.capabilities.process import run_captured
+        from arbiter.capabilities.process import run_captured
 
         monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
         out = run_captured(
@@ -234,7 +234,7 @@ class TestScrubCoversEveryChildSpawner:
         assert "key=[]" in out.stdout
 
     def test_run_captured_honours_an_explicit_env(self, monkeypatch, tmp_path):
-        from agentao.capabilities.process import run_captured
+        from arbiter.capabilities.process import run_captured
 
         monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
         out = run_captured(
@@ -253,7 +253,7 @@ class TestScrubCoversEveryChildSpawner:
         """
         import inspect
 
-        from agentao.acp_client import process as acp_process
+        from arbiter.acp_client import process as acp_process
 
         src = inspect.getsource(acp_process)
         assert "build_child_env" in src, (
@@ -307,7 +307,7 @@ class TestProviderPrefixedKeys:
 
     def test_opt_out_also_restores_the_derived_key(self):
         env = build_child_env(
-            base={"AGENTAO_SCRUB_CHILD_ENV": "0",
+            base={"ARBITER_SCRUB_CHILD_ENV": "0",
                   "LLM_PROVIDER": "qwen", "QWEN_API_KEY": FAKE_KEY},
         )
         assert env["QWEN_API_KEY"] == FAKE_KEY
@@ -318,7 +318,7 @@ class TestScrubDoesNotOverreach:
         """GOOGLE_API_KEY is the standard name for Maps/Drive/YouTube too.
 
         Stripping it breaks user scripts with a 401 that points nowhere
-        near agentao. Gemini's own GEMINI_API_KEY is unambiguous.
+        near arbiter. Gemini's own GEMINI_API_KEY is unambiguous.
         """
         monkeypatch.setenv("GOOGLE_API_KEY", "maps-key")
         assert build_child_env()["GOOGLE_API_KEY"] == "maps-key"
@@ -341,7 +341,7 @@ class TestMemoryGuardSharesTheScanner:
         "gho_" + "c" * 36,
     ])
     def test_patterns_the_local_copy_missed_are_now_caught(self, secret):
-        from agentao.memory.guards import MemoryGuard, SensitiveMemoryError
+        from arbiter.memory.guards import MemoryGuard, SensitiveMemoryError
 
         with pytest.raises(SensitiveMemoryError):
             MemoryGuard().detect_sensitive(f"the value is {secret}")
@@ -350,12 +350,12 @@ class TestMemoryGuardSharesTheScanner:
         """Detector-only addition: the shared pattern needs a full
         BEGIN..END block because it substitutes; a truncated key pasted
         into a memory should still be refused."""
-        from agentao.memory.guards import MemoryGuard, SensitiveMemoryError
+        from arbiter.memory.guards import MemoryGuard, SensitiveMemoryError
 
         with pytest.raises(SensitiveMemoryError):
             MemoryGuard().detect_sensitive("-----BEGIN RSA PRIVATE KEY-----\nMIIE")
 
     def test_ordinary_memory_still_saves(self):
-        from agentao.memory.guards import MemoryGuard
+        from arbiter.memory.guards import MemoryGuard
 
         MemoryGuard().detect_sensitive("user prefers tabs over spaces")

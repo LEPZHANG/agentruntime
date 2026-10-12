@@ -19,12 +19,12 @@ Agent 是**资源不可预测**的工作负载——一轮简单问答可能 200
 ## 控制点 1 · 上下文窗口
 
 ```python
-agent = Agentao(
+agent = Arbiter(
     max_context_tokens=128_000,   # 默认 200_000
 )
 ```
 
-超过这个数，Agentao 触发**上下文压缩**——用 LLM 总结老消息、保留结构。压缩本身花钱花时间。
+超过这个数，Arbiter 触发**上下文压缩**——用 LLM 总结老消息、保留结构。压缩本身花钱花时间。
 
 **选择经验**：
 
@@ -45,7 +45,7 @@ reply = agent.chat(msg, max_iterations=50)   # 默认 100
 
 配合 `on_max_iterations_callback`（[4.6 节](/zh/part-4/6-max-iterations)）做兜底。
 
-Agentao 也会在单轮内跟踪重复的工具调用失败。完全相同的重复工具调用会触发 doom-loop 保护；同一个工具连续产出无法解析的参数时，会返回 `role:tool` 中止消息，确保下一次 LLM 请求仍满足协议要求，而不是无限重试。
+Arbiter 也会在单轮内跟踪重复的工具调用失败。完全相同的重复工具调用会触发 doom-loop 保护；同一个工具连续产出无法解析的参数时，会返回 `role:tool` 中止消息，确保下一次 LLM 请求仍满足协议要求，而不是无限重试。
 
 按场景设：
 
@@ -57,7 +57,7 @@ Agentao 也会在单轮内跟踪重复的工具调用失败。完全相同的重
 
 ## 控制点 3 · 每轮超时
 
-Agentao **本身没有 chat() 超时**——它会一直跑下去。用宿主层加：
+Arbiter **本身没有 chat() 超时**——它会一直跑下去。用宿主层加：
 
 ```python
 import asyncio
@@ -110,7 +110,7 @@ MCP 工具的超时从 `timeout` 字段：
 async def chat(req):
     workdir = Path(f"/tmp/ephemeral-{uuid.uuid4()}")
     try:
-        agent = Agentao(working_directory=workdir)
+        agent = Arbiter(working_directory=workdir)
         return await asyncio.to_thread(agent.chat, req.message)
     finally:
         agent.close()
@@ -133,7 +133,7 @@ class AgentPool:
         self.max_sessions = max_sessions
         self.ttl_s = ttl_s
 
-    async def get(self, session_id: str, workdir: Path) -> tuple[Agentao, Lock]:
+    async def get(self, session_id: str, workdir: Path) -> tuple[Arbiter, Lock]:
         async with self._global_lock:
             now = monotonic()
             # 1. 淘汰过期的
@@ -143,7 +143,7 @@ class AgentPool:
                 self._evict_lru()
             # 3. 创建或返回
             if session_id not in self._pool:
-                agent = Agentao(working_directory=workdir)
+                agent = Arbiter(working_directory=workdir)
                 self._pool[session_id] = (agent, Lock(), now)
             entry = list(self._pool[session_id])
             entry[2] = now   # touch
@@ -205,7 +205,7 @@ def on_event(ev):
             budget.used_today.get(current_user, 0) + len(ev.data["chunk"]) // 4
 ```
 
-精确计算用 `tiktoken`（`pip install 'agentao[tokenizer]'`）。
+精确计算用 `tiktoken`（`pip install 'arbiter[tokenizer]'`）。
 
 ## 内存占用
 

@@ -18,8 +18,8 @@ Memory lets the agent **remember across sessions** — user preferences, project
 ## Two SQLite databases
 
 ```
-<working_directory>/.agentao/memory.db   ← project-level
-~/.agentao/memory.db                      ← user-level (cross-project)
+<working_directory>/.arbiter/memory.db   ← project-level
+~/.arbiter/memory.db                      ← user-level (cross-project)
 ```
 
 Project-level = "facts specific to this project" (project codename, team conventions, deploy paths). User-level = "this user's own preferences" (tabs vs spaces, timezone).
@@ -29,7 +29,7 @@ Project-level = "facts specific to this project" (project codename, team convent
 In ACP subprocesses, restricted containers, or read-only filesystems, the memory DB may not be writable. The fallback policy lives at the storage layer (`SQLiteMemoryStore.open_or_memory`) and the embedding factory wires it in:
 
 ```
-SQLiteMemoryStore.open_or_memory(<cwd>/.agentao/memory.db)
+SQLiteMemoryStore.open_or_memory(<cwd>/.arbiter/memory.db)
  ├─ success → normal usage
  └─ fail (OSError / sqlite3.Error)
      → return SQLiteMemoryStore(":memory:")
@@ -41,7 +41,7 @@ The user-scope store uses `SQLiteMemoryStore.open(...)` (strict): a failure disa
 
 ## How to use it while embedding
 
-You usually **don't touch MemoryManager directly** — Agentao handles:
+You usually **don't touch MemoryManager directly** — Arbiter handles:
 
 1. Injecting relevant memories into the system prompt each turn (`<memory-context>` block)
 2. Letting the LLM save memories via the built-in `save_memory` tool
@@ -49,21 +49,21 @@ You usually **don't touch MemoryManager directly** — Agentao handles:
 
 ### Custom DB paths
 
-For **full isolation** across agents (multi-tenant), passing distinct `working_directory` values is enough — project DBs land in `<working_directory>/.agentao/memory.db` and are naturally isolated.
+For **full isolation** across agents (multi-tenant), passing distinct `working_directory` values is enough — project DBs land in `<working_directory>/.arbiter/memory.db` and are naturally isolated.
 
 ### Disable user-level memory
 
-By default the factory reads/writes `~/.agentao/memory.db`. If your product shouldn't pull in any "user-level" state, build the manager yourself with `user_store=None` and pass it explicitly (post-#16, `MemoryManager` takes pre-built stores):
+By default the factory reads/writes `~/.arbiter/memory.db`. If your product shouldn't pull in any "user-level" state, build the manager yourself with `user_store=None` and pass it explicitly (post-#16, `MemoryManager` takes pre-built stores):
 
 ```python
-from agentao.memory import MemoryManager, SQLiteMemoryStore
+from arbiter.memory import MemoryManager, SQLiteMemoryStore
 
 workdir = Path("/tmp/sess")
-agent = Agentao(
+agent = Arbiter(
     working_directory=workdir,
     memory_manager=MemoryManager(
         project_store=SQLiteMemoryStore.open_or_memory(
-            workdir / ".agentao" / "memory.db"
+            workdir / ".arbiter" / "memory.db"
         ),
         # user_store=None — no cross-project memory
     ),
@@ -76,9 +76,9 @@ agent = Agentao(
 Simplest way: point both stores at `:memory:` (or just project; user is `None` by default on the bare constructor):
 
 ```python
-from agentao.memory import MemoryManager, SQLiteMemoryStore
+from arbiter.memory import MemoryManager, SQLiteMemoryStore
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path("/tmp/sess"),
     memory_manager=MemoryManager(
         project_store=SQLiteMemoryStore(":memory:"),
@@ -91,11 +91,11 @@ Works for the session, forgotten on process exit.
 
 ### Custom memory backend (Redis / Postgres / remote API)
 
-The `MemoryStore` capability protocol (`agentao.capabilities.MemoryStore`) is the supported injection point — implement the 15-method contract once and pass an instance as `project_store=` / `user_store=`. See `docs/guides/embedding.md` and `agentao/capabilities/memory.py` for the surface.
+The `MemoryStore` capability protocol (`arbiter.capabilities.MemoryStore`) is the supported injection point — implement the 15-method contract once and pass an instance as `project_store=` / `user_store=`. See `docs/guides/embedding.md` and `arbiter/capabilities/memory.py` for the surface.
 
 ## The two prompt blocks
 
-Agentao injects two memory blocks into the system prompt (composition lives in `agentao/prompts/builder.py::SystemPromptBuilder.build()`, invoked via the `agent._build_system_prompt()` facade):
+Arbiter injects two memory blocks into the system prompt (composition lives in `arbiter/prompts/builder.py::SystemPromptBuilder.build()`, invoked via the `agent._build_system_prompt()` facade):
 
 ### `<memory-stable>` — stable block
 
@@ -112,7 +112,7 @@ Top-k recall scored against the current user message each turn. Selected from al
 
 ## MemoryGuard: sensitive-info protection
 
-`MemoryGuard` validates memories before they're persisted. The default (`agentao/memory/guards.py`) rejects obvious sensitive patterns:
+`MemoryGuard` validates memories before they're persisted. The default (`arbiter/memory/guards.py`) rejects obvious sensitive patterns:
 
 - API keys, tokens, password literals
 - Credit card numbers, national-ID-style PII
@@ -120,7 +120,7 @@ Top-k recall scored against the current user message each turn. Selected from al
 Customize:
 
 ```python
-from agentao.memory.guards import MemoryGuard
+from arbiter.memory.guards import MemoryGuard
 
 class StrictGuard(MemoryGuard):
     def validate(self, content: str, key: str) -> None:
@@ -128,7 +128,7 @@ class StrictGuard(MemoryGuard):
         if "internal-only" in content.lower():
             raise SensitiveMemoryError("Cannot store 'internal-only' content")
 
-agent = Agentao(working_directory=Path("/tmp"))
+agent = Arbiter(working_directory=Path("/tmp"))
 agent._memory_manager.guard = StrictGuard()
 ```
 
@@ -175,13 +175,13 @@ mm.clear_all_session_summaries()
 
 **Compliance value**: "show the user what AI remembers about them" and a "forget me" button are often SaaS hard requirements.
 
-## Memory vs conversation history vs AGENTAO.md
+## Memory vs conversation history vs ARBITER.md
 
 | Content | Use |
 |---------|-----|
 | "What we just discussed this turn" | Conversation history (`agent.messages`; cleared by `clear_history()`) |
 | "User is always a Python + tabs person" | Memory (`save_memory`) |
-| "This project uses Ruff for linting, port 8080" | `AGENTAO.md` (project-level constraint, committed to git) |
+| "This project uses Ruff for linting, port 8080" | `ARBITER.md` (project-level constraint, committed to git) |
 | "Technical plan needed for this turn" | Plan mode (doesn't cross sessions) |
 
 ## ⚠️ Common pitfalls
@@ -213,7 +213,7 @@ A user clicks "new conversation" → `agent.clear_history()` — that clears ses
 ## TL;DR
 
 - Memory ≠ conversation history. Memory persists across sessions in SQLite; history lives on `agent.messages`.
-- Two scopes / two DBs: **project** (`<wd>/.agentao/memory.db`) and **user** (`~/.agentao/memory.db`). Multi-tenant deployments must key user scope by `tenant_id+user_id` or disable it.
+- Two scopes / two DBs: **project** (`<wd>/.arbiter/memory.db`) and **user** (`~/.arbiter/memory.db`). Multi-tenant deployments must key user scope by `tenant_id+user_id` or disable it.
 - Read-only / restricted FS auto-degrades to in-memory store with a warning — agent keeps starting.
 - `clear_history()` does **not** clear memory; that's intentional. Wipe both explicitly when "new conversation" should forget everything.
 

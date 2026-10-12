@@ -16,7 +16,7 @@
 
 ### 配置文件
 
-实时配置：`.agentao/mcp.json`（项目）和 `~/.agentao/mcp.json`（用户全局）。
+实时配置：`.arbiter/mcp.json`（项目）和 `~/.arbiter/mcp.json`（用户全局）。
 
 ```json
 {
@@ -75,7 +75,7 @@ MCP Servers (3):
     Connection refused
 ```
 
-`/mcp add` 写到**项目**配置（`.agentao/mcp.json`）— 不动用户全局那一份。
+`/mcp add` 写到**项目**配置（`.arbiter/mcp.json`）— 不动用户全局那一份。
 
 `/mcp remove` 从项目配置里删条目，但**改动需要重启**才生效（CLI 会提示）。当前会话保留运行中的连接。
 
@@ -92,13 +92,13 @@ MCP 工具注册成 `mcp_{server}_{tool}`。所以 `filesystem.read_file` 在 ag
 
 ## `/acp` — ACP 服务器
 
-[ACP（Agent Client Protocol）](/zh/part-3/) 是 Agentao 用来 agent 间通信的协议。`/acp` 让你在 CLI 会话里启停、对话于其他说 ACP 的 agent。
+[ACP（Agent Client Protocol）](/zh/part-3/) 是 Arbiter 用来 agent 间通信的协议。`/acp` 让你在 CLI 会话里启停、对话于其他说 ACP 的 agent。
 
 跟 MCP（给*你的* agent 加工具）不同，ACP 接进来的是**另一个 agent**，你可以把 prompt 派给它。把它想成 agent 版的 `gh repo clone`。
 
 ### 配置文件
 
-实时配置：`.agentao/acp.json`。格式类似 `mcp.json`，每条描述一个完整的 agent 进程。
+实时配置：`.arbiter/acp.json`。格式类似 `mcp.json`，每条描述一个完整的 agent 进程。
 
 ### 子命令
 
@@ -171,12 +171,12 @@ Pending interactions: 1
 
 ```text
 > /plugins
-Agentao Plugin Diagnostics
+Arbiter Plugin Diagnostics
 
 Loaded plugins (2):
   • my-org/audit-logger  v1.2.0
     Hooks: UserPromptSubmit, PreToolUse, Stop
-    Source: pip-installed (agentao_plugin_audit_logger)
+    Source: pip-installed (arbiter_plugin_audit_logger)
 
   • ./plugins/dev-only-injector  (inline)
     Hooks: UserPromptSubmit
@@ -216,12 +216,12 @@ Errors: 0
 ::: info 这一章在体系里的位置
 - MCP：`agent.mcp_manager` — 嵌入式宿主可以调 `manager.get_server_status()` 拿到本页一样的数据
 - ACP：`agent.acp_manager` — ACP 状态、send、cancel 同上
-- Plugins：`PluginManager`（在 `agentao.embedding.plugins.manager`）— 诊断报告由 `agentao.embedding.plugins.diagnostics.build_diagnostics` 生成，宿主也可以调。完整的可编程接口见 [Part 5.7](/zh/part-5/7-plugin-hooks)
+- Plugins：`PluginManager`（在 `arbiter.embedding.plugins.manager`）— 诊断报告由 `arbiter.embedding.plugins.diagnostics.build_diagnostics` 生成，宿主也可以调。完整的可编程接口见 [Part 5.7](/zh/part-5/7-plugin-hooks)
 :::
 
 ::: tip 真相源头
 命令语法：`/help`。行为锚点：
-- [`agentao/cli/commands.py:handle_mcp_command`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands.py)
-- [`agentao/cli/commands_ext/acp.py:handle_acp_command`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands_ext/acp.py)
-- [`agentao/cli/subcommands.py:_handle_plugins_interactive`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/subcommands.py)
+- [`arbiter/cli/commands.py:handle_mcp_command`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands.py)
+- [`arbiter/cli/commands_ext/acp.py:handle_acp_command`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands_ext/acp.py)
+- [`arbiter/cli/subcommands.py:_handle_plugins_interactive`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/subcommands.py)
 :::

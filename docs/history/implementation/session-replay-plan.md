@@ -2,17 +2,17 @@
 
 ## Summary
 
-Add a `Session Replay` capability to Agentao that records and replays the actual runtime process of a session, separate from `save_session/load_session`. The v1 design uses runtime events as the source of truth, persists replay data as append-only JSONL, does not provide a UI, does not re-execute tools, and does not change the semantics of `session/load`.
+Add a `Session Replay` capability to Arbiter that records and replays the actual runtime process of a session, separate from `save_session/load_session`. The v1 design uses runtime events as the source of truth, persists replay data as append-only JSONL, does not provide a UI, does not re-execute tools, and does not change the semantics of `session/load`.
 
 This version also locks two implementation constraints:
 
 - replay recording must have a configuration switch
-- the existing `.agentao/settings.json` remains JSON; replay settings are added there rather than migrating to YAML
+- the existing `.arbiter/settings.json` remains JSON; replay settings are added there rather than migrating to YAML
 
 Key principles:
 
 - separate "resume session" from "replay process"
-- replay truth comes from runtime events, not `messages` or `agentao.log`
+- replay truth comes from runtime events, not `messages` or `arbiter.log`
 - each replay file represents one interpretable session lifecycle instance
 - v1 recording is disabled by default and must be explicitly enabled
 - ACP gets no new method in v1; storage and reader behavior come first
@@ -28,13 +28,13 @@ Key principles:
 
 - No terminal or IDE replay UI in v1.
 - No tool re-execution or behavioral simulation.
-- No attempt to reconstruct replay from `messages` or `agentao.log`.
+- No attempt to reconstruct replay from `messages` or `arbiter.log`.
 - No ACP `session/replay` method in v1.
 - No migration of settings storage from JSON to YAML.
 
 ## Configuration And Settings
 
-Continue using `.agentao/settings.json`.
+Continue using `.arbiter/settings.json`.
 
 Rationale:
 
@@ -60,9 +60,9 @@ Semantics:
   - `true`: create a recorder for new replay instances and persist events
   - `false`: do not create a recorder and do not write replay files
 - `replay.max_instances`
-  - maximum replay instances retained under `.agentao/replays/`
+  - maximum replay instances retained under `.arbiter/replays/`
   - affects replay files only
-  - does not affect `.agentao/sessions/`
+  - does not affect `.arbiter/sessions/`
 
 Defaults:
 
@@ -87,7 +87,7 @@ Add a dedicated replay module with:
 
 Storage path:
 
-- `.agentao/replays/<session_id>.<instance_id>.jsonl`
+- `.arbiter/replays/<session_id>.<instance_id>.jsonl`
 
 Filename rules:
 
@@ -147,7 +147,7 @@ Suggested event kinds:
 
 Turn semantics are fixed in v1:
 
-- a `turn` is the full lifecycle of one `Agentao.chat()` call
+- a `turn` is the full lifecycle of one `Arbiter.chat()` call
 - all assistant text chunks, thinking chunks, tool loops, and tool outputs inside that call share one `turn_id`
 - sub-agents do not reuse the parent `turn_id`
 - sub-agent events carry their own `turn_id` and point back with `parent_turn_id`
@@ -280,7 +280,7 @@ Command semantics:
 - `show` renders in `seq` order
 - `tail` slices by event count only
 - `<id>` must resolve uniquely to a replay instance, not just a logical `session_id`
-- `/replay on|off` updates `.agentao/settings.json` under `replay.enabled`
+- `/replay on|off` updates `.arbiter/settings.json` under `replay.enabled`
 - toggling recording affects only future replay instances, not the currently-running instance
 
 ## Retention
@@ -290,7 +290,7 @@ Retention rules:
 - v1 keeps the most recent `N` replay instances, default `N = 20`
 - prune runs best-effort after a new replay instance is created or an instance ends
 - `/replays prune` provides a manual cleanup path
-- retention deletes replay files only and must not touch `.agentao/sessions/`
+- retention deletes replay files only and must not touch `.arbiter/sessions/`
 
 When recording is disabled:
 
@@ -304,7 +304,7 @@ The following behaviors remain unchanged:
 
 - `save_session/load_session` continue to handle conversation-state persistence and resume
 - `session/load` continues to replay historical messages for continuation
-- `agentao.log` remains a textual debug log
+- `arbiter.log` remains a textual debug log
 
 Replay is responsible for:
 
@@ -339,7 +339,7 @@ Must cover:
 
 - when `replay.enabled=false`, no recorder is created and no replay file is written
 - when `replay.enabled=true`, a new session creates a replay file
-- `/replay on` and `/replay off` correctly update `.agentao/settings.json`
+- `/replay on` and `/replay off` correctly update `.arbiter/settings.json`
 - missing, corrupt, or partial settings still fall back to stable defaults
 - a tool-free turn emits the expected events and a correct `turn_completed.final_text`
 - multi-chunk assistant output preserves chunk ordering and final text
@@ -364,6 +364,6 @@ Must cover:
 - one `ReplayRecorder` exists per replay instance and its lifecycle matches the replay file lifecycle
 - `replay_header` is the first JSONL event and owns schema metadata
 - `turn = chat() call` is a fixed v1 rule
-- recording is disabled by default and must be explicitly enabled through `.agentao/settings.json` or `/replay on`
-- `.agentao/settings.json` remains JSON rather than migrating to YAML
+- recording is disabled by default and must be explicitly enabled through `.arbiter/settings.json` or `/replay on`
+- `.arbiter/settings.json` remains JSON rather than migrating to YAML
 - v1 provides only minimal CLI control and read paths, not ACP replay methods or advanced querying

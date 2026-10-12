@@ -63,32 +63,32 @@ description: 处理客户工单时使用——遵循公司退款规范、用固�
 ## 三层目录搜索顺序
 
 ```
-1. ~/.agentao/skills/            ← 全局（所有项目共享）
-2. <cwd>/.agentao/skills/        ← 项目配置目录
+1. ~/.arbiter/skills/            ← 全局（所有项目共享）
+2. <cwd>/.arbiter/skills/        ← 项目配置目录
 3. <cwd>/skills/                 ← 项目仓库目录
 ```
 
-**同名冲突时，后加载的覆盖先加载的**（也就是 `.agentao/skills/` 覆盖全局，`skills/` 覆盖前两层）。所以：
+**同名冲突时，后加载的覆盖先加载的**（也就是 `.arbiter/skills/` 覆盖全局，`skills/` 覆盖前两层）。所以：
 
 - **嵌入你的产品时**：把技能放在**项目 repo 根的 `skills/` 下**，用户拉代码即有
-- **用户自定义**：留出 `~/.agentao/skills/` 让用户自己写个人技能
-- **临时/试验**：`.agentao/skills/` 适合本项目专属但不想污染 git
+- **用户自定义**：留出 `~/.arbiter/skills/` 让用户自己写个人技能
+- **临时/试验**：`.arbiter/skills/` 适合本项目专属但不想污染 git
 
 ### 远程安装
 
 CLI 可以从 GitHub 安装受管理的技能：
 
 ```bash
-agentao skill install owner/repo[:path][@ref]
+arbiter skill install owner/repo[:path][@ref]
 ```
 
-如果带 `:path`，Agentao 会把仓库里的这个子目录当作单个技能包安装。比如 Anthropic 官方 PDF 技能位于一个更大的仓库中：
+如果带 `:path`，Arbiter 会把仓库里的这个子目录当作单个技能包安装。比如 Anthropic 官方 PDF 技能位于一个更大的仓库中：
 
 ```bash
-agentao skill install anthropics/skills:skills/pdf
+arbiter skill install anthropics/skills:skills/pdf
 ```
 
-项目级安装写入 `<project-root>/.agentao/skills/`；全局安装写入 `~/.agentao/skills/`。仓库根目录的 `skills/` 仍然优先级最高，所以产品随 repo 分发的技能可以覆盖受管理安装。
+项目级安装写入 `<project-root>/.arbiter/skills/`；全局安装写入 `~/.arbiter/skills/`。仓库根目录的 `skills/` 仍然优先级最高，所以产品随 repo 分发的技能可以覆盖受管理安装。
 
 ### 多租户场景的隔离
 
@@ -96,12 +96,12 @@ ACP 或多实例 Python 嵌入时，每个 Agent 构造时传的 `working_direct
 
 ```python
 # tenant-a 只能看到 /data/tenant-a 下的技能
-agent_a = Agentao(working_directory=Path("/data/tenant-a"))
+agent_a = Arbiter(working_directory=Path("/data/tenant-a"))
 # tenant-b 只能看到 /data/tenant-b 下的技能
-agent_b = Agentao(working_directory=Path("/data/tenant-b"))
+agent_b = Arbiter(working_directory=Path("/data/tenant-b"))
 ```
 
-但 **`~/.agentao/skills/` 是全局共享**的（进程级用户 HOME），如果你不希望它被加载，在构造 Agent 之前用环境变量改 HOME 或者设计成 `SkillManager(skills_dir=...)` 的私有目录。
+但 **`~/.arbiter/skills/` 是全局共享**的（进程级用户 HOME），如果你不希望它被加载，在构造 Agent 之前用环境变量改 HOME 或者设计成 `SkillManager(skills_dir=...)` 的私有目录。
 
 ## 激活机制
 
@@ -216,7 +216,7 @@ ready to merge.
 
 ```python
 # 构造后检查
-agent = Agentao(working_directory=Path.cwd())
+agent = Arbiter(working_directory=Path.cwd())
 print(list(agent.skill_manager.available_skills.keys()))   # 都发现了吗？
 print(list(agent.skill_manager.active_skills.keys()))       # 当前激活了哪些？
 
@@ -244,7 +244,7 @@ print(agent.skill_manager.get_skills_context())
 
 - 技能是一个**目录**：`SKILL.md`（YAML frontmatter + 正文）+ 可选 `references/*.md`（激活时按需加载）。
 - `description` 决定 LLM **何时**激活——按 LLM 第一视角写（"用户问到 X 时激活我"）。
-- 三层搜索顺序：`~/.agentao/skills/`（全局）→ `<wd>/.agentao/skills/` → `<wd>/skills/`，**项目内的优先级最高**。
+- 三层搜索顺序：`~/.arbiter/skills/`（全局）→ `<wd>/.arbiter/skills/` → `<wd>/skills/`，**项目内的优先级最高**。
 - 多个小而具体的技能 > 一个大杂烩。激活会消耗上下文 token，技能小才不肉疼。
 
 → 下一节：[5.3 MCP 服务器接入](./3-mcp)

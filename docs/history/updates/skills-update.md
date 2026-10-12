@@ -83,7 +83,7 @@ Each `SKILL.md` file contains:
 ### Code Changes
 
 **Updated Files:**
-1. `agentao/skills/manager.py` - Complete rewrite
+1. `arbiter/skills/manager.py` - Complete rewrite
    - New `_parse_yaml_frontmatter()` method
    - New `_load_skills()` implementation
    - Scans subdirectories for SKILL.md files
@@ -91,7 +91,7 @@ Each `SKILL.md` file contains:
    - Extracts metadata and content
    - Added `get_skill_content()` for full documentation access
 
-2. `agentao/cli/app.py` - Enhanced skill display
+2. `arbiter/cli/app.py` - Enhanced skill display
    - Shows skill title and description
    - Better formatted output
    - Shows loaded skill count
@@ -144,7 +144,7 @@ $ uv run python test_skills.py
 ### API Usage
 
 ```python
-from agentao.skills import SkillManager
+from arbiter.skills import SkillManager
 
 # Initialize (auto-discovers skills)
 manager = SkillManager()
@@ -176,7 +176,7 @@ manager.reload_skills()
 ### CLI Usage
 
 ```bash
-# Start Agentao
+# Start Arbiter
 uv run python main.py
 
 # List skills
@@ -240,7 +240,7 @@ uv run python test_imports.py
 # Test skills loading
 uv run python test_skills.py
 
-# Start Agentao
+# Start Arbiter
 uv run python main.py
 ```
 

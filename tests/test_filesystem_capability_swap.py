@@ -1,6 +1,6 @@
 """Issue #9 — file/search tools route reads/writes through an injected FileSystem.
 
-A swappable :class:`agentao.capabilities.FileSystem` means embedded hosts
+A swappable :class:`arbiter.capabilities.FileSystem` means embedded hosts
 can redirect tool IO through Docker exec, virtual filesystems, or audit
 proxies without monkey-patching ``open()`` / ``Path``. The tests below
 confirm the wire-up: a fake FS captures every call the tool routes
@@ -15,14 +15,14 @@ from typing import Dict, List
 
 import pytest
 
-from agentao.capabilities import FileEntry, FileStat, FileSystem
-from agentao.tools.file_ops import (
+from arbiter.capabilities import FileEntry, FileStat, FileSystem
+from arbiter.tools.file_ops import (
     EditTool,
     ReadFileTool,
     ReadFolderTool,
     WriteFileTool,
 )
-from agentao.tools.search import FindFilesTool, SearchTextTool
+from arbiter.tools.search import FindFilesTool, SearchTextTool
 
 
 class FakeFS:

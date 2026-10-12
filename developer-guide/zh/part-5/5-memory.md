@@ -18,8 +18,8 @@
 ## 两个 SQLite 数据库
 
 ```
-<working_directory>/.agentao/memory.db  ← 项目级
-~/.agentao/memory.db                     ← 用户级（跨项目）
+<working_directory>/.arbiter/memory.db  ← 项目级
+~/.arbiter/memory.db                     ← 用户级（跨项目）
 ```
 
 项目级保存"这个项目专属的事实"（项目代号、团队约定、部署路径）；用户级保存"用户本人偏好"（喜欢 tabs 还是 spaces、工作时区）。
@@ -29,7 +29,7 @@
 ACP 子进程、受限容器、只读文件系统里，记忆 DB 可能写不了。fallback 策略下沉到存储层（`SQLiteMemoryStore.open_or_memory`），由嵌入式工厂负责接进来：
 
 ```
-SQLiteMemoryStore.open_or_memory(<cwd>/.agentao/memory.db)
+SQLiteMemoryStore.open_or_memory(<cwd>/.arbiter/memory.db)
  ├─ 成功 → 正常使用
  └─ 失败（OSError / sqlite3.Error）
      → 返回 SQLiteMemoryStore(":memory:")
@@ -41,7 +41,7 @@ SQLiteMemoryStore.open_or_memory(<cwd>/.agentao/memory.db)
 
 ## 在嵌入里怎么用
 
-大多数情况你**不需要直接碰 MemoryManager**——Agentao 自己会：
+大多数情况你**不需要直接碰 MemoryManager**——Arbiter 自己会：
 
 1. 每轮 `chat()` 前把相关记忆注入系统提示（`<memory-context>` 块）
 2. LLM 通过内置 `save_memory` 工具主动存记忆
@@ -49,21 +49,21 @@ SQLiteMemoryStore.open_or_memory(<cwd>/.agentao/memory.db)
 
 ### 自定义 DB 路径
 
-如果你要把多个 Agent 实例的记忆**完全隔离**（多租户），每个实例传不同的 `working_directory` 就够了——项目 DB 会落在 `<working_directory>/.agentao/memory.db`，天然隔离。
+如果你要把多个 Agent 实例的记忆**完全隔离**（多租户），每个实例传不同的 `working_directory` 就够了——项目 DB 会落在 `<working_directory>/.arbiter/memory.db`，天然隔离。
 
 ### 禁用用户级记忆
 
-默认工厂会读写 `~/.agentao/memory.db`。如果你的产品不希望 Agent 沾染"用户"层的任何状态，自己构造 `MemoryManager`、显式 `user_store=None` 传进来即可（#16 之后 `MemoryManager` 接的是预先构造好的 store）：
+默认工厂会读写 `~/.arbiter/memory.db`。如果你的产品不希望 Agent 沾染"用户"层的任何状态，自己构造 `MemoryManager`、显式 `user_store=None` 传进来即可（#16 之后 `MemoryManager` 接的是预先构造好的 store）：
 
 ```python
-from agentao.memory import MemoryManager, SQLiteMemoryStore
+from arbiter.memory import MemoryManager, SQLiteMemoryStore
 
 workdir = Path("/tmp/sess")
-agent = Agentao(
+agent = Arbiter(
     working_directory=workdir,
     memory_manager=MemoryManager(
         project_store=SQLiteMemoryStore.open_or_memory(
-            workdir / ".agentao" / "memory.db"
+            workdir / ".arbiter" / "memory.db"
         ),
         # user_store=None — 不要跨项目用户作用域
     ),
@@ -76,9 +76,9 @@ agent = Agentao(
 最简单的方法：让项目 store 指向 `:memory:`（user_store 默认 `None`，无需显式给）：
 
 ```python
-from agentao.memory import MemoryManager, SQLiteMemoryStore
+from arbiter.memory import MemoryManager, SQLiteMemoryStore
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path("/tmp/sess"),
     memory_manager=MemoryManager(
         project_store=SQLiteMemoryStore(":memory:"),
@@ -91,11 +91,11 @@ agent = Agentao(
 
 ### 自定义记忆后端（Redis / Postgres / 远端 API）
 
-`MemoryStore` 能力协议（`agentao.capabilities.MemoryStore`）就是这种场景的官方注入点——实现一次它的 15 个方法，把实例作为 `project_store=` / `user_store=` 传入即可。详见 `docs/guides/embedding.md` 与 `agentao/capabilities/memory.py`。
+`MemoryStore` 能力协议（`arbiter.capabilities.MemoryStore`）就是这种场景的官方注入点——实现一次它的 15 个方法，把实例作为 `project_store=` / `user_store=` 传入即可。详见 `docs/guides/embedding.md` 与 `arbiter/capabilities/memory.py`。
 
 ## 提示词里的两个记忆块
 
-Agentao 在系统提示中注入两种块（组装逻辑在 `agentao/prompts/builder.py::SystemPromptBuilder.build()`，由 `agent._build_system_prompt()` facade 转发）：
+Arbiter 在系统提示中注入两种块（组装逻辑在 `arbiter/prompts/builder.py::SystemPromptBuilder.build()`，由 `agent._build_system_prompt()` facade 转发）：
 
 ### `<memory-stable>` — 稳定块
 
@@ -111,7 +111,7 @@ Agentao 在系统提示中注入两种块（组装逻辑在 `agentao/prompts/bui
 
 ## MemoryGuard：敏感信息防护
 
-`MemoryGuard` 在记忆写入前做验证。默认配置（`agentao/memory/guards.py`）拒绝明显的敏感信息：
+`MemoryGuard` 在记忆写入前做验证。默认配置（`arbiter/memory/guards.py`）拒绝明显的敏感信息：
 
 - API keys、token、password 字面量
 - 信用卡号、身份证号等 PII 模式
@@ -119,7 +119,7 @@ Agentao 在系统提示中注入两种块（组装逻辑在 `agentao/prompts/bui
 自定义：
 
 ```python
-from agentao.memory.guards import MemoryGuard
+from arbiter.memory.guards import MemoryGuard
 
 class StrictGuard(MemoryGuard):
     def validate(self, content: str, key: str) -> None:
@@ -128,13 +128,13 @@ class StrictGuard(MemoryGuard):
         if "internal-only" in content.lower():
             raise SensitiveMemoryError("Cannot store 'internal-only' content")
 
-agent = Agentao(working_directory=Path("/tmp"))
+agent = Arbiter(working_directory=Path("/tmp"))
 agent._memory_manager.guard = StrictGuard()
 ```
 
 ## LLM 能做什么、不能做什么
 
-Agentao 只给 LLM 暴露了**写**记忆的工具：
+Arbiter 只给 LLM 暴露了**写**记忆的工具：
 
 ```python
 # LLM 可以调
@@ -174,13 +174,13 @@ mm.clear_all_session_summaries()
 
 **合规价值**：给用户"查看 AI 知道关于我的什么"和"一键遗忘"的按钮，是很多 SaaS 场景的硬性要求。
 
-## 记忆 vs 会话历史 vs AGENTAO.md
+## 记忆 vs 会话历史 vs ARBITER.md
 
 | 存放内容 | 用哪个 |
 |---------|-------|
 | "这次对话刚聊的事" | 会话历史（`agent.messages`；`clear_history()` 清） |
 | "用户一直是 Python + tabs 党" | 记忆（`save_memory`） |
-| "本项目用 Ruff 做 lint、端口 8080" | `AGENTAO.md`（项目级约束，进 git） |
+| "本项目用 Ruff 做 lint、端口 8080" | `ARBITER.md`（项目级约束，进 git） |
 | "本轮需要的技术方案" | Plan 模式（不跨会话） |
 
 ## ⚠️ 常见陷阱
@@ -212,7 +212,7 @@ save_memory("doc", open("readme.md").read())   # 几十 KB
 ## TL;DR
 
 - 记忆 ≠ 对话历史。记忆跨会话存在 SQLite；历史活在 `agent.messages` 上。
-- 两个作用域 / 两个 DB：**项目**（`<wd>/.agentao/memory.db`）和**用户**（`~/.agentao/memory.db`）。多租户部署里要么按 `tenant_id+user_id` 拆分用户作用域，要么直接禁用。
+- 两个作用域 / 两个 DB：**项目**（`<wd>/.arbiter/memory.db`）和**用户**（`~/.arbiter/memory.db`）。多租户部署里要么按 `tenant_id+user_id` 拆分用户作用域，要么直接禁用。
 - 只读 / 受限 FS 自动降级为内存 store 并 warning——Agent 还是能起。
 - `clear_history()` **不**清记忆；这是设计如此。要"新对话"彻底忘记时显式同时清两边。
 

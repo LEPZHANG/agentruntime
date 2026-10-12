@@ -1,7 +1,7 @@
 """Test script to verify skills loading from SKILL.md files."""
 
 from pathlib import Path
-from agentao.skills import SkillManager
+from arbiter.skills import SkillManager
 
 print("=" * 70)
 print("Testing Skills Loading from SKILL.md Files")

@@ -12,7 +12,7 @@
 | 机制 | 粒度 | 由谁触发 | 响应时间 |
 |------|------|---------|---------|
 | `CancellationToken` | 协作式，任意点 | 宿主代码 | **下一个 check 点**（流式 < 1s；工具要等工具跑完或自己 abort） |
-| `max_iterations` | 工具回路数 | Agentao 自己 | N 轮工具之后 |
+| `max_iterations` | 工具回路数 | Arbiter 自己 | N 轮工具之后 |
 | 线程级强杀 | 最后手段 | 宿主监督进程 | 立即，但**不安全** —— MCP 子进程会泄漏 |
 
 默认用 `CancellationToken`。`max_iterations` 用来封顶失控回路。线程强杀基本不用。
@@ -20,7 +20,7 @@
 ## 2.6.2 `CancellationToken` — 正规做法
 
 ```python
-from agentao.cancellation import CancellationToken, AgentCancelledError
+from arbiter.cancellation import CancellationToken, AgentCancelledError
 
 token = CancellationToken()
 reply = agent.chat("扫仓库并总结", cancellation_token=token)
@@ -68,7 +68,7 @@ if reply.startswith("[Cancelled:"):
 | 长耗时工具内部（shell、web fetch） | 尽力而为——有些外部 IO 打不断 |
 | MCP 转发 | 请求已发出；取消只是停止**监听**，远端仍可能在干活 |
 
-**正在跑的 shell 命令不会被强杀**——token 只阻断下一轮。想真杀 shell，给 shell 工具自己设超时（`.agentao/sandbox.json`）。
+**正在跑的 shell 命令不会被强杀**——token 只阻断下一轮。想真杀 shell，给 shell 工具自己设超时（`.arbiter/sandbox.json`）。
 
 ## 2.6.3 对接 FastAPI / HTTP 断连
 
@@ -77,7 +77,7 @@ if reply.startswith("[Cancelled:"):
 ```python
 from fastapi import FastAPI, Request
 from asyncio import to_thread
-from agentao.cancellation import CancellationToken
+from arbiter.cancellation import CancellationToken
 
 @app.post("/chat/{session_id}")
 async def chat_endpoint(session_id: str, message: str, request: Request):
@@ -140,7 +140,7 @@ async def cancel_endpoint(session_id: str):
 ```python
 import asyncio
 from asyncio import to_thread, wait_for, TimeoutError
-from agentao.cancellation import CancellationToken
+from arbiter.cancellation import CancellationToken
 
 async def chat_with_timeout(agent, msg: str, seconds: float) -> str:
     token = CancellationToken()
@@ -178,7 +178,7 @@ agent.chat("干 20 件事", max_iterations=20)
 
 还有两处可以设边界：
 
-- **Shell 工具**：每条命令默认 30 秒超时（可在 `.agentao/sandbox.json` 配）。超时就 `SIGTERM`。详见 [6.2](/zh/part-6/2-shell-sandbox)
+- **Shell 工具**：每条命令默认 30 秒超时（可在 `.arbiter/sandbox.json` 配）。超时就 `SIGTERM`。详见 [6.2](/zh/part-6/2-shell-sandbox)
 - **MCP 请求超时**：每个 MCP server 有 `timeout` 字段（默认 60 秒）。详见 [5.3 MCP](/zh/part-5/3-mcp)
 
 它们是更底层的**强杀**——与 `CancellationToken` 互补，不替代。MCP 卡死时其自身超时会兜底，无论 token 是否触发。

@@ -3,16 +3,16 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from agentao.plan import PlanPhase
+from arbiter.plan import PlanPhase
 
 
 def _make_agent():
-    with patch("agentao.agent.LLMClient") as mock_llm_client:
+    with patch("arbiter.agent.LLMClient") as mock_llm_client:
         mock_llm_client.return_value.logger = Mock()
         mock_llm_client.return_value.model = "gpt-4"
-        from agentao.agent import Agentao
+        from arbiter.agent import Arbiter
 
-        return Agentao(working_directory=Path.cwd())
+        return Arbiter(working_directory=Path.cwd())
 
 
 def _activate_plan(agent):
@@ -146,7 +146,7 @@ def test_plan_mode_prompt_tiered_sections():
 def test_plan_tools_hidden_outside_plan_mode():
     """plan_save and plan_finalize must not appear in tool list when inactive."""
     agent = _make_agent()
-    from agentao.tools.base import Tool
+    from arbiter.tools.base import Tool
 
     class _StubTool(Tool):
         def __init__(self, n):

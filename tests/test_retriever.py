@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from agentao.memory.manager import MemoryManager
-from agentao.memory.models import MemoryRecord, RecallCandidate
-from agentao.memory.retriever import (
+from arbiter.memory.manager import MemoryManager
+from arbiter.memory.models import MemoryRecord, RecallCandidate
+from arbiter.memory.retriever import (
     MemoryRetriever,
     _jaccard,
     _days_since,
@@ -299,7 +299,7 @@ def test_recall_error_logged_as_warning(tmp_path, monkeypatch, caplog):
     ret, _ = _make_retriever(tmp_path)
     monkeypatch.setattr(ret, "tokenize", lambda _text: (_ for _ in ()).throw(ValueError("bad input")))
 
-    with caplog.at_level(logging.WARNING, logger="agentao.memory.retriever"):
+    with caplog.at_level(logging.WARNING, logger="arbiter.memory.retriever"):
         ret.recall_candidates("test")
 
     assert any("recall_candidates failed" in r.message for r in caplog.records)
@@ -339,9 +339,9 @@ def test_initialize_jieba_redirects_stderr_to_logger(monkeypatch, caplog, capsys
         print("Building prefix dict from the default dictionary ...", file=sys.stderr)
         print("Prefix dict has been built successfully.", file=sys.stderr)
 
-    monkeypatch.setattr("agentao.memory.retriever.jieba.initialize", fake_initialize)
+    monkeypatch.setattr("arbiter.memory.retriever.jieba.initialize", fake_initialize)
 
-    with caplog.at_level(logging.DEBUG, logger="agentao.memory.retriever"):
+    with caplog.at_level(logging.DEBUG, logger="arbiter.memory.retriever"):
         _initialize_jieba_with_logging()
 
     captured = capsys.readouterr()
@@ -351,15 +351,15 @@ def test_initialize_jieba_redirects_stderr_to_logger(monkeypatch, caplog, capsys
 
 
 def test_ensure_jieba_ready_logs_progress_without_terminal_output(monkeypatch, caplog, capsys):
-    monkeypatch.setattr("agentao.memory.retriever._JIEBA_INITIALIZED", False)
-    monkeypatch.setattr("agentao.memory.retriever._USERDICT_PATH", Path("/definitely/missing/userdict.txt"))
+    monkeypatch.setattr("arbiter.memory.retriever._JIEBA_INITIALIZED", False)
+    monkeypatch.setattr("arbiter.memory.retriever._USERDICT_PATH", Path("/definitely/missing/userdict.txt"))
 
     def fake_initialize():
         print("Loading model from cache /tmp/jieba.cache", file=sys.stderr)
 
-    monkeypatch.setattr("agentao.memory.retriever.jieba.initialize", fake_initialize)
+    monkeypatch.setattr("arbiter.memory.retriever.jieba.initialize", fake_initialize)
 
-    with caplog.at_level(logging.DEBUG, logger="agentao.memory.retriever"):
+    with caplog.at_level(logging.DEBUG, logger="arbiter.memory.retriever"):
         _ensure_jieba_ready()
 
     captured = capsys.readouterr()
@@ -371,9 +371,9 @@ def test_initialize_jieba_redirects_jieba_logger_without_terminal_output(monkeyp
     def fake_initialize():
         logging.getLogger("jieba").info("Loading model cost 0.258 seconds.")
 
-    monkeypatch.setattr("agentao.memory.retriever.jieba.initialize", fake_initialize)
+    monkeypatch.setattr("arbiter.memory.retriever.jieba.initialize", fake_initialize)
 
-    with caplog.at_level(logging.DEBUG, logger="agentao.memory.retriever"):
+    with caplog.at_level(logging.DEBUG, logger="arbiter.memory.retriever"):
         _initialize_jieba_with_logging()
 
     captured = capsys.readouterr()

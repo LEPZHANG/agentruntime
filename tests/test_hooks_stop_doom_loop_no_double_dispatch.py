@@ -17,8 +17,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from agentao.cancellation import CancellationToken
-from agentao.plugins.models import ParsedHookRule, StopHookResult
+from arbiter.cancellation import CancellationToken
+from arbiter.plugins.models import ParsedHookRule, StopHookResult
 
 from tests.support.stop_precompact import make_runner_with_rules
 

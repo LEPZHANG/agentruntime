@@ -1,4 +1,4 @@
-# Agentao Headless Runtime Issues
+# Arbiter Headless Runtime Issues
 
 本文件把 `HEADLESS_RUNTIME_PLAN.md` 拆成可执行 issue backlog。默认按 Week 1-4 排序，单个 issue 尽量保持"一个明确产出 + 一组验收条件"。
 
@@ -146,7 +146,7 @@ ACPManager.get_status() -> list[ServerStatus]
 
 **Goal**
 
-把并发语义前置写死。**注意：`AcpErrorCode.SERVER_BUSY` 已存在**（`agentao/acp_client/client.py:54`），`prompt_once` / `send_prompt` / `send_prompt_nonblocking` 三个入口在 busy 时已抛此错误（`manager.py:962`、`client.py:681`、`client.py:768`）。本 issue 的目标是**文档化并用测试 pin 住现有行为**，不是新建错误类型。
+把并发语义前置写死。**注意：`AcpErrorCode.SERVER_BUSY` 已存在**（`arbiter/acp_client/client.py:54`），`prompt_once` / `send_prompt` / `send_prompt_nonblocking` 三个入口在 busy 时已抛此错误（`manager.py:962`、`client.py:681`、`client.py:768`）。本 issue 的目标是**文档化并用测试 pin 住现有行为**，不是新建错误类型。
 
 **Dependencies**
 
@@ -323,7 +323,7 @@ ACPManager.get_status() -> list[ServerStatus]
   interaction_policy: InteractionPolicy | Literal["reject_all", "accept_all"] | None = None
   ```
 
-- `None` = 回退到 server default（`.agentao/acp.json` 中的 `nonInteractivePolicy`）
+- `None` = 回退到 server default（`.arbiter/acp.json` 中的 `nonInteractivePolicy`）
 - 如果 Week 1 决定 `send_prompt_nonblocking` 也是 public，则它必须使用**同名同语义**的 `interaction_policy=` kwarg；如果它保持 internal，本 issue **不得**修改其公开签名，也不得在文档中把它当正式 surface 描述
 - 明确**不用** `call_options` / `CallOptions` 包装对象：只有一个维度要覆盖时不值得引入；待第二个维度（timeout 等）出现再迁移
 
@@ -344,7 +344,7 @@ ACPManager.get_status() -> list[ServerStatus]
 
 **Goal**
 
-升级策略模型时，不打断现有 `.agentao/acp.json`。
+升级策略模型时，不打断现有 `.arbiter/acp.json`。
 
 **Dependencies**
 

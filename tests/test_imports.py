@@ -3,13 +3,13 @@
 print("Testing imports...")
 
 try:
-    from agentao.llm import LLMClient
+    from arbiter.llm import LLMClient
     print("✓ LLM client import successful")
 except Exception as e:
     print(f"✗ LLM client import failed: {e}")
 
 try:
-    from agentao.tools import (
+    from arbiter.tools import (
         ToolRegistry,
         ReadFileTool,
         WriteFileTool,
@@ -30,23 +30,23 @@ except Exception as e:
     print(f"✗ Tools import failed: {e}")
 
 try:
-    from agentao.skills import SkillManager
+    from arbiter.skills import SkillManager
     print("✓ Skill manager import successful")
 except Exception as e:
     print(f"✗ Skill manager import failed: {e}")
 
 try:
-    from agentao.agent import Agentao
+    from arbiter.agent import Arbiter
     print("✓ Agent import successful")
 except Exception as e:
     print(f"✗ Agent import failed: {e}")
 
 try:
-    from agentao.cli import AgentaoCLI
+    from arbiter.cli import ArbiterCLI
     print("✓ CLI import successful")
 except Exception as e:
     print(f"✗ CLI import failed: {e}")
 
 print("\n✓ All imports successful! The project is ready to run.")
-print("\nTo start Agentao, run:")
-print("  agentao")
+print("\nTo start Arbiter, run:")
+print("  arbiter")

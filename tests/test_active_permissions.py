@@ -19,8 +19,8 @@ from typing import List
 
 import pytest
 
-from agentao.host.models import ActivePermissions
-from agentao.permissions import PermissionEngine, PermissionMode
+from arbiter.host.models import ActivePermissions
+from arbiter.permissions import PermissionEngine, PermissionMode
 
 
 def _write_perms(path: Path, rules: List[dict]) -> None:
@@ -51,14 +51,14 @@ def test_user_file_loaded_source(tmp_path):
 
 
 def test_stray_project_file_is_not_recorded(tmp_path):
-    """A ``.agentao/permissions.json`` in the project tree must NOT
+    """A ``.arbiter/permissions.json`` in the project tree must NOT
     produce a ``project:`` loaded-source entry, and its rules must not
     appear in the projection. The engine logs a warning when the file
     exists; this test asserts the silent-but-firm policy.
     """
     proj_root = tmp_path / "proj"
     user_root = tmp_path / "user"
-    _write_perms(proj_root / ".agentao" / "permissions.json", [
+    _write_perms(proj_root / ".arbiter" / "permissions.json", [
         {"tool": "write_file", "action": "deny"},
     ])
     _write_perms(user_root / "permissions.json", [
@@ -142,7 +142,7 @@ def test_active_permissions_does_not_re_read_disk(tmp_path, monkeypatch):
     ])
     engine = PermissionEngine(project_root=tmp_path, user_root=user_root)
 
-    from agentao.embedding import permission_loader as _loader_mod
+    from arbiter.embedding import permission_loader as _loader_mod
 
     calls: List[Path] = []
     real_load = _loader_mod.load_permission_rules
@@ -160,7 +160,7 @@ def test_active_permissions_does_not_re_read_disk(tmp_path, monkeypatch):
 
 
 def test_agent_active_permissions_falls_back_when_no_engine(tmp_path):
-    """``Agentao.active_permissions()`` reflects the engine-less runtime
+    """``Arbiter.active_permissions()`` reflects the engine-less runtime
     accurately.
 
     Without a ``PermissionEngine`` the runtime falls back to per-tool
@@ -170,18 +170,18 @@ def test_agent_active_permissions_falls_back_when_no_engine(tmp_path):
     ``workspace-write`` plus the ``default:no-engine`` source label
     is the closest accurate projection.
     """
-    from agentao.host.models import ActivePermissions
+    from arbiter.host.models import ActivePermissions
 
-    # Build an Agentao without invoking the LLM stack: stub out the
+    # Build an Arbiter without invoking the LLM stack: stub out the
     # heavy bits so we can assert the active_permissions surface only.
-    from agentao import agent as _agent_mod
+    from arbiter import agent as _agent_mod
 
-    class _NoLLMAgent(_agent_mod.Agentao):
+    class _NoLLMAgent(_agent_mod.Arbiter):
         def __init__(self):
             self.permission_engine = None
 
         def active_permissions(self):  # type: ignore[override]
-            return _agent_mod.Agentao.active_permissions(self)
+            return _agent_mod.Arbiter.active_permissions(self)
 
     snap = _NoLLMAgent().active_permissions()
     assert isinstance(snap, ActivePermissions)
@@ -198,5 +198,5 @@ def test_engine_decide_unaffected_by_loaded_sources_tracking(tmp_path):
     ])
     engine = PermissionEngine(project_root=tmp_path, user_root=user_root)
     engine.add_loaded_source("injected:host")
-    from agentao.permissions import PermissionDecision
+    from arbiter.permissions import PermissionDecision
     assert engine.decide("write_file", {}) == PermissionDecision.DENY

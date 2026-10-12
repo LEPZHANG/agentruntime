@@ -14,13 +14,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from agentao.acp_client.client import (
+from arbiter.acp_client.client import (
     ACPClient,
     AcpClientError,
     AcpRpcError,
     _PendingRequest,
 )
-from agentao.acp_client.models import ServerState
+from arbiter.acp_client.models import ServerState
 
 from .support.acp_client import make_jsonrpc_mock_handle as _make_mock_handle
 
@@ -268,7 +268,7 @@ class TestClose:
         err = errors[0]
         assert isinstance(err, AcpClientError)
         assert "transport closed" in str(err)
-        from agentao.acp_client import AcpErrorCode
+        from arbiter.acp_client import AcpErrorCode
 
         assert err.code is AcpErrorCode.TRANSPORT_DISCONNECT
 

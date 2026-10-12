@@ -1,16 +1,16 @@
 # Host tool allowlist: `enabled_tools` (design draft · converged)
 
 **Status:** **Draft, pending review.** Not yet implemented. The additive dual of `host-tool-injection` (`extra_tools` / `disable_tools`, already shipped).
-**Audience:** agentao maintainers who want to give hosts a declarative "minimal tool set" selector; and reviewers of the follow-up PR.
+**Audience:** arbiter maintainers who want to give hosts a declarative "minimal tool set" selector; and reviewers of the follow-up PR.
 **Companions:**
 - `docs/design/host-tool-allowlist.zh.md` — Chinese version (authoritative source; this file mirrors it)
 - `docs/design/host-tool-injection.md` — the subtractive/per-instance additive entry points `extra_tools` / `disable_tools` (direct predecessor)
 - `docs/design/runtime-tool-injection.md` — the runtime dual `add_tool` / `remove_tool`
 - `docs/design/embedded-host-contract.md` — host-contract stability boundary (where this design belongs)
-- `agentao/tooling/registry.py` — `register_builtin_tools` / `BUILTIN_TOOL_NAMES`
-- `agentao/agent.py` — constructor, registration order, `remove_tool`
+- `arbiter/tooling/registry.py` — `register_builtin_tools` / `BUILTIN_TOOL_NAMES`
+- `arbiter/agent.py` — constructor, registration order, `remove_tool`
 
-> **Convergence note (2nd pass):** The first draft modeled `enabled_tools` as a "final visible set spanning built-in + agent + extra, exempting MCP/plan," raised on `extra_tools` conflict, and exported a companion `CORE_TOOL_NAMES`. Review judged that over-designed. This draft converges to the **shortest viable path**: `enabled_tools` only prunes agentao-owned built-in + agent-path tools; extra is always kept; MCP / profiles / `CORE_TOOL_NAMES` / bringing extra under the allowlist are all demand-gated (see §8).
+> **Convergence note (2nd pass):** The first draft modeled `enabled_tools` as a "final visible set spanning built-in + agent + extra, exempting MCP/plan," raised on `extra_tools` conflict, and exported a companion `CORE_TOOL_NAMES`. Review judged that over-designed. This draft converges to the **shortest viable path**: `enabled_tools` only prunes arbiter-owned built-in + agent-path tools; extra is always kept; MCP / profiles / `CORE_TOOL_NAMES` / bringing extra under the allowlist are all demand-gated (see §8).
 
 ---
 
@@ -33,7 +33,7 @@ The single most common embedded need — "**keep only a minimal core set**" — 
 
 ## 2. Scope decision: v1 adds exactly one kwarg, `enabled_tools`
 
-**v1 ships only the constructor parameter `enabled_tools`**: an additive allowlist that **acts only on agentao-owned (built-in + agent-path) tools**. It closes the additive gap of §1 and kills "new built-in silently enters" in one stroke — a built-in/agent tool not named in the allowlist never enters, whenever it is added.
+**v1 ships only the constructor parameter `enabled_tools`**: an additive allowlist that **acts only on arbiter-owned (built-in + agent-path) tools**. It closes the additive gap of §1 and kills "new built-in silently enters" in one stroke — a built-in/agent tool not named in the allowlist never enters, whenever it is added.
 
 | Host need | Existing mechanism | This design |
 |---|---|---|
@@ -125,17 +125,17 @@ self.tool_runner = ToolRunner(tools=self.tools, ...)
 
 ```python
 # tooling/registry.py
-def apply_enabled_tools(agent: "Agentao") -> None:
+def apply_enabled_tools(agent: "Arbiter") -> None:
     allow = agent._enabled_tools
     if allow is None:                       # default: disabled
         return
 
     # (b) typo guard: fail-fast on unknown names (§5-3)
-    from agentao.tools.base import ToolRegistry
+    from arbiter.tools.base import ToolRegistry
     known = set(agent.tools.tools) | BUILTIN_TOOL_NAMES
     unknown = sorted(allow - known)
     if unknown:
-        raise ValueError(f"Agentao(enabled_tools=): unknown tool name(s) {unknown}")
+        raise ValueError(f"Arbiter(enabled_tools=): unknown tool name(s) {unknown}")
 
     # extra is always kept (§4) — computed locally, not stored as state
     extra_names = {tool.name for tool in agent._extra_tools}
@@ -156,30 +156,30 @@ def apply_enabled_tools(agent: "Agentao") -> None:
 - `extra_names` is computed locally inside `apply_enabled_tools()` (`agent._extra_tools` already exists by then) — **no new instance field**.
 - **Observability:** pruning is explicit intent, so no warning; but emit an INFO audit line so a host can diagnose "where did my agent go."
 
-**Change surface:** `Agentao.__init__` (accept `enabled_tools` + the §5a checks); add `apply_enabled_tools` and call it after `register_extra_tools` and before `ToolRunner`. Leaves the existing `disable_tools` / `extra_tools` / MCP / plan paths untouched; introduces no constant/profile/instance field.
+**Change surface:** `Arbiter.__init__` (accept `enabled_tools` + the §5a checks); add `apply_enabled_tools` and call it after `register_extra_tools` and before `ToolRunner`. Leaves the existing `disable_tools` / `extra_tools` / MCP / plan paths untouched; introduces no constant/profile/instance field.
 
 ## 7. Usage
 
 ```python
-from agentao import Agentao
+from arbiter import Arbiter
 
 # 1) Minimal core: hand-write the name set (v1 does not export CORE_TOOL_NAMES, see §8)
 CORE = {"read_file", "write_file", "replace",
         "list_directory", "glob", "search_file_content", "run_shell_command"}
-agent = Agentao(working_directory=wd, enabled_tools=CORE)
+agent = Arbiter(working_directory=wd, enabled_tools=CORE)
 
 # 2) Core + custom retrieval: extra is always kept, no need to re-list its name (§4)
-agent = Agentao(
+agent = Arbiter(
     working_directory=wd,
     extra_tools=[MyRetrievalTool()],
     enabled_tools=CORE,            # MyRetrievalTool still present — because it's an extra
 )
 
 # 3) Bare minimum: remove all built-in + agent (extra / MCP / plan still present)
-agent = Agentao(working_directory=wd, enabled_tools=set())
+agent = Arbiter(working_directory=wd, enabled_tools=set())
 
 # 4) Illegal: mutually exclusive
-Agentao(working_directory=wd,
+Arbiter(working_directory=wd,
         enabled_tools={"read_file"}, disable_tools={"web_search"})   # ValueError (§5a-1)
 ```
 
@@ -189,7 +189,7 @@ Agentao(working_directory=wd,
 |---|---|
 | **Export `CORE_TOOL_NAMES`** | When a **second** host also wants the same core set — export it then, settling the "does core include `ask_user`/`list_directory`" boundary debate at that point, with a pin test against drift |
 | **Profile tiers** `tool_profile=` | When multiple hosts repeatedly want the **same** subset; and build it as a host-extensible dict, not fixed strings (else it re-imports the tool categorization `BUILTIN_TOOL_NAMES` deliberately rejected) |
-| **Bring MCP under the allowlist** | When a real need arises to minimize `mcp_*` at the agentao layer rather than the MCP layer — would need matching/wildcard semantics for the `mcp_` prefix |
+| **Bring MCP under the allowlist** | When a real need arises to minimize `mcp_*` at the arbiter layer rather than the MCP layer — would need matching/wildcard semantics for the `mcp_` prefix |
 | **Bring extra under the allowlist** ("single final set" semantics) | When "reusable extra list + per-instance subset selection" becomes a real need; decide raise-vs-drop on conflict then |
 | **Per-axis switch** `enable_agent_tools=False` | When "keep all agents, filter only built-ins" (the inverse of §4's all-or-nothing) becomes a real pain — today only `enable_builtin_agents` exists, which can't reach project/plugin agents |
 

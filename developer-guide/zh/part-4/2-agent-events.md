@@ -14,8 +14,8 @@ Agent 在运行过程中通过 `transport.emit(event)` 推送结构化事件。�
 
 | 面 | 在哪里 | 稳定性 | 何时使用 |
 |---|---|---|---|
-| `agentao.transport.AgentEvent`（本页） | `Transport.emit()` 推送回调 | 内部 —— 随版本可能变 | CLI / 流式 UI 需要细节 |
-| `agentao.host.HostEvent`（[4.7](./7-host-contract)） | `agent.events()` 异步 pull 迭代器 | **稳定**，schema 快照、CI 强制 | 生产审计、计费、多租户合规 |
+| `arbiter.transport.AgentEvent`（本页） | `Transport.emit()` 推送回调 | 内部 —— 随版本可能变 | CLI / 流式 UI 需要细节 |
+| `arbiter.host.HostEvent`（[4.7](./7-host-contract)） | `agent.events()` 异步 pull 迭代器 | **稳定**，schema 快照、CI 强制 | 生产审计、计费、多租户合规 |
 
 两个面**互补，不是二选一** —— 大多数生产部署**两者都用**：Transport 给 UI，`events()` 给审计。它们零代码路径共享。
 :::
@@ -89,7 +89,7 @@ TURN_END   -> (turn 结束；携带最终 assistant 文本 + status/error)
 
 这是**一套单一封闭的词表**：每一条 turn 结束路径都恰好提交其中一个取值，或对真实答案提交 `None`——不存在未被分类的结束。前两者表示 turn 正常结束但没有答案；中间两者表示 harness 停掉了一个不收敛的 turn；最后一个表示 provider 调用根本没产出一个 turn。（`max_iterations` 是第六种"结束但无完整答案"的方式，但它是刻意独立的一根轴——一个带自己退出码 4 和 `on_max_iterations` 交互的粘性 transport 标志，不是这里的取值。）
 
-优先用它来判断，而不要去字符串匹配 `final_text` —— harness 会在那里替换占位符或固定话术（包括现已被分类为 `llm_error` 的 `[LLM API error: …]` 提示），而 Stop hook 还可能装饰它，所以文本并不是可靠信号。被取消的 turn 不会通过 `incomplete_reason` 上报（它携带 `status: "cancelled"`）。`agentao run` 会把非 `None` 的值映射为非零退出码；其他宿主可以自行选择重试、追问或忽略。
+优先用它来判断，而不要去字符串匹配 `final_text` —— harness 会在那里替换占位符或固定话术（包括现已被分类为 `llm_error` 的 `[LLM API error: …]` 提示），而 Stop hook 还可能装饰它，所以文本并不是可靠信号。被取消的 turn 不会通过 `incomplete_reason` 上报（它携带 `status: "cancelled"`）。`arbiter run` 会把非 `None` 的值映射为非零退出码；其他宿主可以自行选择重试、追问或忽略。
 
 Replay 录制器靠它和 `TURN_BEGIN` 配对来界定一个 turn。它替代了运行时直接调用 replay adapter 的旧路径。
 
@@ -316,7 +316,7 @@ def event_to_json(event: AgentEvent) -> str:
 反向（从 JSON 重建 AgentEvent，多用于测试 replay）：
 
 ```python
-from agentao.transport import AgentEvent, EventType
+from arbiter.transport import AgentEvent, EventType
 
 def event_from_json(j: str) -> AgentEvent:
     obj = json.loads(j)

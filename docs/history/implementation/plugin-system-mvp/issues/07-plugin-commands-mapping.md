@@ -6,7 +6,7 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Goal
 
-把 plugin `commands` 映射为 Agentao skill-like prompt entries。
+把 plugin `commands` 映射为 Arbiter skill-like prompt entries。
 
 ## Scope
 

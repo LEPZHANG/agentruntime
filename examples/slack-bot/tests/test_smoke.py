@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import MagicMock, patch
 
-from agentao.permissions import PermissionMode
+from arbiter.permissions import PermissionMode
 
 from src.bot import (
     WRITE_ALLOWLIST_CHANNELS,
@@ -60,7 +60,7 @@ def test_handle_mention_calls_say_with_reply() -> None:
         posted.append({"text": text, "thread_ts": thread_ts})
 
     with patch(
-        "agentao.agent.Agentao._llm_call",
+        "arbiter.agent.Arbiter._llm_call",
         lambda self, msgs, tools, token: _fake_response(),
     ):
         result = asyncio.run(
@@ -93,18 +93,18 @@ def test_handle_mention_uses_channel_specific_permission_mode() -> None:
     async def fake_say(*, text, thread_ts=None):  # noqa: ANN001
         posted.append({"text": text, "thread_ts": thread_ts})
 
-    from agentao.agent import Agentao as _Agentao
+    from arbiter.agent import Arbiter as _Arbiter
 
-    real_init = _Agentao.__init__
+    real_init = _Arbiter.__init__
 
     def _capturing_init(self, *args, **kwargs):  # noqa: ANN001
         captured.append(kwargs.get("permission_engine"))
         real_init(self, *args, **kwargs)
 
     with patch(
-        "agentao.agent.Agentao._llm_call",
+        "arbiter.agent.Arbiter._llm_call",
         lambda self, msgs, tools, token: _fake_response(),
-    ), patch("agentao.agent.Agentao.__init__", _capturing_init):
+    ), patch("arbiter.agent.Arbiter.__init__", _capturing_init):
         # Allowlisted channel → workspace-write
         a_channel = next(iter(WRITE_ALLOWLIST_CHANNELS))
         asyncio.run(

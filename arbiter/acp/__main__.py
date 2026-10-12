@@ -1,0 +1,113 @@
+"""Entry point for ``python -m arbiter.acp``.
+
+Issue 01 does not wire ACP into the main ``arbiter`` CLI on purpose — that
+belongs to Issue 12. For now, running the module directly is enough to
+satisfy the "process can start in ACP stdio mode without entering interactive
+CLI mode" acceptance criterion and to support smoke testing.
+
+As subsequent issues land, each adds its own ``register(server)`` call below.
+"""
+
+import sys
+from typing import Optional
+
+from . import (
+    arbiter_set_model,
+    initialize,
+    session_cancel,
+    session_list_models,
+    session_load,
+    session_new,
+    session_prompt,
+    session_set_config_option,
+    session_set_mode,
+    session_set_model,
+)
+from .models import ResumeDirective
+from .server import AcpServer
+
+
+def _normalize_encoding_name(enc: str | None) -> str:
+    """Normalize an encoding name to lowercase with hyphens for comparison."""
+    return (enc or "").lower().replace("_", "-")
+
+
+def _is_utf8(stream) -> bool:  # noqa: ANN001
+    """Return True if *stream*'s encoding is UTF-8."""
+    return _normalize_encoding_name(getattr(stream, "encoding", None)) == "utf-8"
+
+
+def _ensure_acp_utf8_stdio() -> None:
+    """Force stdin/stdout/stderr to UTF-8 with strict error handling.
+
+    ACP is a JSON-RPC protocol over stdio — every byte on stdin and stdout
+    must be valid UTF-8.  Using ``errors="strict"`` ensures that encoding
+    problems surface immediately as exceptions rather than silently
+    corrupting the protocol stream (e.g. replacing characters with ``?``).
+
+    If reconfiguration fails or the streams cannot be made UTF-8, the
+    function writes a diagnostic to stderr and exits with code 1.  The
+    diagnostic intentionally avoids stdout so the JSON-RPC channel is
+    never polluted.
+    """
+    for name in ("stdin", "stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="strict")
+            except Exception:
+                pass  # checked below
+
+    bad = [
+        name
+        for name in ("stdin", "stdout")
+        if not _is_utf8(getattr(sys, name))
+    ]
+    if bad:
+        sys.stderr.write(
+            f"ACP requires UTF-8 stdio. Invalid streams: {', '.join(bad)}\n"
+        )
+        sys.stderr.write(
+            "Set PYTHONUTF8=1 or PYTHONIOENCODING=utf-8 and retry.\n"
+        )
+        sys.stderr.flush()
+        raise SystemExit(1)
+
+
+def main(resume: Optional[str] = None) -> None:
+    """Start the ACP stdio server.
+
+    ``resume`` mirrors the interactive ``--resume`` flag for ACP mode
+    (``arbiter --acp --resume [SESSION_ID]``):
+
+      - ``None``  — flag absent; always start fresh sessions.
+      - ``""``    — flag given with no id; resume the *latest* saved session
+                    on the first ``session/new``.
+      - a string — resume that specific session (UUID / prefix / timestamp).
+
+    The directive is one-shot: it is consumed by the first ``session/new``
+    and every later session on the connection behaves normally. The session
+    store is keyed by the client-provided ``cwd``, so resolution is deferred
+    to request time rather than performed here.
+    """
+    _ensure_acp_utf8_stdio()
+    resume_directive = (
+        ResumeDirective(session_id=resume or None) if resume is not None else None
+    )
+    # attaches to real sys.stdin / sys.stdout with guards
+    server = AcpServer(resume_directive=resume_directive)
+    initialize.register(server)
+    session_new.register(server)
+    session_prompt.register(server)
+    session_cancel.register(server)
+    session_load.register(server)
+    session_set_model.register(server)
+    session_set_config_option.register(server)
+    arbiter_set_model.register(server)
+    session_set_mode.register(server)
+    session_list_models.register(server)
+    server.run()
+
+
+if __name__ == "__main__":
+    main()

@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agentao.replay.schema import SUPPORTED_VERSIONS, render  # noqa: E402
+from arbiter.replay.schema import SUPPORTED_VERSIONS, render  # noqa: E402
 
 
 def _schema_path(version: str) -> Path:

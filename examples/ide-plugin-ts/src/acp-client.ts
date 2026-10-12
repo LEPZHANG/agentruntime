@@ -1,5 +1,5 @@
 /**
- * Minimal ACP client for driving `agentao --acp --stdio` from a VS Code
+ * Minimal ACP client for driving `arbiter --acp --stdio` from a VS Code
  * extension (or any Node host). Three-loop architecture: one reader, one
  * writer, main logic calls request() / respond().
  *
@@ -16,7 +16,7 @@ type JsonRpcId = number | string;
 type JsonObject = Record<string, unknown>;
 
 export interface ACPClientOptions {
-  command?: string;      // default: "agentao"
+  command?: string;      // default: "arbiter"
   args?: string[];       // default: ["--acp", "--stdio"]
   cwd: string;           // workspace root
   env?: NodeJS.ProcessEnv;
@@ -40,7 +40,7 @@ export class ACPClient {
   }
 
   async start(): Promise<void> {
-    const command = this.opts.command ?? "agentao";
+    const command = this.opts.command ?? "arbiter";
     const args = this.opts.args ?? ["--acp", "--stdio"];
     this.proc = spawn(command, args, {
       cwd: this.opts.cwd,
@@ -55,12 +55,12 @@ export class ACPClient {
     rl.on("line", (line) => this.dispatch(line));
 
     this.proc.stderr.on("data", (chunk: Buffer) => {
-      process.stderr.write(`[agentao] ${chunk.toString()}`);
+      process.stderr.write(`[arbiter] ${chunk.toString()}`);
     });
 
     this.proc.on("exit", (code, signal) => {
       const err = new Error(
-        `agentao subprocess exited (code=${code}, signal=${signal})`,
+        `arbiter subprocess exited (code=${code}, signal=${signal})`,
       );
       for (const { reject, timer } of this.pending.values()) {
         clearTimeout(timer);
@@ -72,7 +72,7 @@ export class ACPClient {
     await this.call("initialize", {
       protocolVersion: 1,
       clientCapabilities: {},
-      clientInfo: { name: "agentao-ide-plugin-example", version: "0.1.0" },
+      clientInfo: { name: "arbiter-ide-plugin-example", version: "0.1.0" },
     });
   }
 

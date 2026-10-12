@@ -8,9 +8,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from agentao.plan.session import PlanPhase, PlanSession
-from agentao.plan.controller import PlanController
-from agentao.permissions import PermissionMode
+from arbiter.plan.session import PlanPhase, PlanSession
+from arbiter.plan.controller import PlanController
+from arbiter.permissions import PermissionMode
 
 
 def _make_controller(tmp_path: Path):
@@ -54,7 +54,7 @@ def test_save_draft_returns_id(tmp_path):
     assert session.draft_id == draft_id
     assert session.current_plan_path.exists()
     content = session.current_plan_path.read_text(encoding="utf-8")
-    assert "# Agentao Plan" in content
+    assert "# Arbiter Plan" in content
     assert "Some content." in content
 
 

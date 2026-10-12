@@ -17,12 +17,12 @@ import sys
 
 import pytest
 
-from agentao.llm.client import LLMClient
+from arbiter.llm.client import LLMClient
 
 
 @pytest.fixture(autouse=True)
 def _reset_pkg_logger():
-    pkg = logging.getLogger("agentao")
+    pkg = logging.getLogger("arbiter")
     saved = list(pkg.handlers)
     pkg.handlers = []
     yield pkg
@@ -35,7 +35,7 @@ def _reset_pkg_logger():
 
 
 def _marker_handlers(pkg):
-    return [h for h in pkg.handlers if getattr(h, "_agentao_llm_file_handler", False)]
+    return [h for h in pkg.handlers if getattr(h, "_arbiter_llm_file_handler", False)]
 
 
 def test_external_stderr_handler_preserved(_reset_pkg_logger, tmp_path):
@@ -49,7 +49,7 @@ def test_external_stderr_handler_preserved(_reset_pkg_logger, tmp_path):
         api_key="test-key",
         base_url="https://api.example.com/v1",
         model="gpt-test",
-        log_file=str(tmp_path / "agentao.log"),
+        log_file=str(tmp_path / "arbiter.log"),
     )
 
     assert external in pkg.handlers, (
@@ -59,7 +59,7 @@ def test_external_stderr_handler_preserved(_reset_pkg_logger, tmp_path):
 
 def test_repeated_construction_yields_single_file_handler(_reset_pkg_logger, tmp_path):
     pkg = _reset_pkg_logger
-    log_path = str(tmp_path / "agentao.log")
+    log_path = str(tmp_path / "arbiter.log")
 
     for _ in range(5):
         LLMClient(
@@ -88,7 +88,7 @@ def test_external_handler_count_unchanged_across_reconstruction(
         if h in (external_a, external_b)
     )
 
-    log_path = str(tmp_path / "agentao.log")
+    log_path = str(tmp_path / "arbiter.log")
     for _ in range(3):
         LLMClient(
             api_key="test-key",
@@ -113,7 +113,7 @@ def test_log_file_writes_only_once_per_message(_reset_pkg_logger, tmp_path):
     """Constructing LLMClient N times must not cause N-fold duplicate
     lines in the log file (the regression that an unguarded fix would
     introduce)."""
-    log_path = tmp_path / "agentao.log"
+    log_path = tmp_path / "arbiter.log"
     for _ in range(4):
         LLMClient(
             api_key="test-key",

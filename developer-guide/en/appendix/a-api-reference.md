@@ -1,30 +1,30 @@
 # Appendix A · API Reference
 
-This is a **surface reference** — the public symbols that form Agentao's embedding contract. Anything not listed here is an implementation detail and may change without notice. For behavior and examples, follow the links back to the main guide.
+This is a **surface reference** — the public symbols that form Arbiter's embedding contract. Anything not listed here is an implementation detail and may change without notice. For behavior and examples, follow the links back to the main guide.
 
 Authoritative `__all__`:
 
-- `from agentao import ...` → `Agentao`, `SkillManager`
-- `from agentao.embedding import ...` → `build_from_environment`
-- `from agentao.transport import ...` → `AgentEvent`, `EventType`, `Transport`, `NullTransport`, `SdkTransport`, `build_compat_transport`
-- `from agentao.capabilities import ...` → `FileSystem`, `LocalFileSystem`, `FileEntry`, `FileStat`, `ShellExecutor`, `LocalShellExecutor`, `ShellRequest`, `ShellResult`, `BackgroundHandle`, `MemoryStore`, `SQLiteMemoryStore`, `MCPRegistry`, `FileBackedMCPRegistry`, `InMemoryMCPRegistry`
-- `from agentao.tools.base import ...` → `Tool`, `ToolRegistry`
-- `from agentao.permissions import ...` → `PermissionEngine`, `PermissionMode`, `PermissionDecision`
-- `from agentao.memory.manager import MemoryManager`
-- `from agentao.cancellation import ...` → `CancellationToken`, `AgentCancelledError`
-- `from agentao.acp_client import ...` → `ACPManager`, `ACPClient`, `AcpClientError`, `AcpErrorCode`, `AcpRpcError`, `AcpInteractionRequiredError`, `AcpClientConfig`, `AcpServerConfig`, `AcpConfigError`, `PromptResult`, `ServerState`, `load_acp_client_config` (and lower-level re-exports — see `agentao.acp_client.__init__.py` docstring for which are "stable embedding surface" vs. "implementation detail")
-- `from agentao.host import ...` → `ActivePermissions`, `EventStream`, `StreamSubscribeError`, `HostEvent`, `ToolLifecycleEvent`, `SubagentLifecycleEvent`, `PermissionDecisionEvent`, `RFC3339UTCString`, `export_host_event_json_schema`, `export_host_acp_json_schema` — host-facing harness contract, see [A.10](#a-10-embedded-host-contract)
+- `from arbiter import ...` → `Arbiter`, `SkillManager`
+- `from arbiter.embedding import ...` → `build_from_environment`
+- `from arbiter.transport import ...` → `AgentEvent`, `EventType`, `Transport`, `NullTransport`, `SdkTransport`, `build_compat_transport`
+- `from arbiter.capabilities import ...` → `FileSystem`, `LocalFileSystem`, `FileEntry`, `FileStat`, `ShellExecutor`, `LocalShellExecutor`, `ShellRequest`, `ShellResult`, `BackgroundHandle`, `MemoryStore`, `SQLiteMemoryStore`, `MCPRegistry`, `FileBackedMCPRegistry`, `InMemoryMCPRegistry`
+- `from arbiter.tools.base import ...` → `Tool`, `ToolRegistry`
+- `from arbiter.permissions import ...` → `PermissionEngine`, `PermissionMode`, `PermissionDecision`
+- `from arbiter.memory.manager import MemoryManager`
+- `from arbiter.cancellation import ...` → `CancellationToken`, `AgentCancelledError`
+- `from arbiter.acp_client import ...` → `ACPManager`, `ACPClient`, `AcpClientError`, `AcpErrorCode`, `AcpRpcError`, `AcpInteractionRequiredError`, `AcpClientConfig`, `AcpServerConfig`, `AcpConfigError`, `PromptResult`, `ServerState`, `load_acp_client_config` (and lower-level re-exports — see `arbiter.acp_client.__init__.py` docstring for which are "stable embedding surface" vs. "implementation detail")
+- `from arbiter.host import ...` → `ActivePermissions`, `EventStream`, `StreamSubscribeError`, `HostEvent`, `ToolLifecycleEvent`, `SubagentLifecycleEvent`, `PermissionDecisionEvent`, `RFC3339UTCString`, `export_host_event_json_schema`, `export_host_acp_json_schema` — host-facing harness contract, see [A.10](#a-10-embedded-host-contract)
 
-## A.1 `Agentao`
+## A.1 `Arbiter`
 
 The core class — see [Part 2.2](/en/part-2/2-constructor-reference) for the full constructor parameter table.
 
 ### Constructor
 
-See [Part 2.2](/en/part-2/2-constructor-reference) for the full parameter table. **Since 0.3.0**, `Agentao()` without `working_directory=` raises `TypeError` from Python signature dispatch — the soft-deprecation cycle ended. End-to-end embedding patterns live in [`docs/guides/embedding.md`](../../../docs/guides/embedding.md).
+See [Part 2.2](/en/part-2/2-constructor-reference) for the full parameter table. **Since 0.3.0**, `Arbiter()` without `working_directory=` raises `TypeError` from Python signature dispatch — the soft-deprecation cycle ended. End-to-end embedding patterns live in [`docs/guides/embedding.md`](../../../docs/guides/embedding.md).
 
 ```python
-Agentao(
+Arbiter(
     api_key: str | None = None,
     base_url: str | None = None,
     model: str | None = None,
@@ -72,23 +72,23 @@ Mutual-exclusion rules (raise `ValueError` if violated):
 
 Opt-in subsystem semantics (defaults are `None` since 0.2.16):
 
-- `replay_config=None` — no `<wd>/.agentao/replay.json` is read at construction time; the agent uses a no-op `ReplayConfig()` internally.
+- `replay_config=None` — no `<wd>/.arbiter/replay.json` is read at construction time; the agent uses a no-op `ReplayConfig()` internally.
 - `sandbox_policy=None` — `ToolRunner` runs shell commands without the macOS `sandbox-exec` wrapper.
 - `bg_store=None` — `check_background_agent` / `cancel_background_agent` are not registered, the chat loop's background-notification drain short-circuits, and the `run_in_background` field is **schema-level removed** from sub-agent tool definitions (the LLM cannot call a disabled feature). `/agent bg|dashboard|cancel|delete|logs|result` CLI subcommands short-circuit with a clear warning.
 
-`agentao.embedding.build_from_environment()` constructs CLI defaults for all three (anchored to the session's working directory) and passes them explicitly, so CLI / ACP behavior is preserved. Embedded hosts that don't ask for these features pay zero cost.
+`arbiter.embedding.build_from_environment()` constructs CLI defaults for all three (anchored to the session's working directory) and passes them explicitly, so CLI / ACP behavior is preserved. Embedded hosts that don't ask for these features pay zero cost.
 
-### `agentao.embedding.build_from_environment`
+### `arbiter.embedding.build_from_environment`
 
 ```python
 def build_from_environment(
     working_directory: Path | None = None,
     **overrides,
-) -> Agentao:
+) -> Arbiter:
     ...
 ```
 
-CLI-style auto-discovery factory: reads `.env`, `LLM_PROVIDER`-prefixed env vars, `~/.agentao/permissions.json` (project-scope file is intentionally not loaded — see [5.4](/en/part-5/4-permissions)), `<wd>/.agentao/mcp.json` + `~/.agentao/mcp.json` (user wins on name collision; project is add-only), memory roots; constructs `Agentao` with the discovered values. **Caller-supplied `**overrides` win** over auto-discovered ones. Raises `ValueError` on the same mutual-exclusion conflicts as the constructor (if `llm_client` is in `overrides`, the factory's discovered `api_key` / `base_url` / `model` are dropped before forwarding).
+CLI-style auto-discovery factory: reads `.env`, `LLM_PROVIDER`-prefixed env vars, `~/.arbiter/permissions.json` (project-scope file is intentionally not loaded — see [5.4](/en/part-5/4-permissions)), `<wd>/.arbiter/mcp.json` + `~/.arbiter/mcp.json` (user wins on name collision; project is add-only), memory roots; constructs `Arbiter` with the discovered values. **Caller-supplied `**overrides` win** over auto-discovered ones. Raises `ValueError` on the same mutual-exclusion conflicts as the constructor (if `llm_client` is in `overrides`, the factory's discovered `api_key` / `base_url` / `model` are dropped before forwarding).
 
 ### Methods
 
@@ -121,14 +121,14 @@ end of the user message:
 CLI `/image` command); wire images that carry no source degrade to
 `inline-image-N`. This section is the canonical description of the format —
 implementation in
-`agentao/runtime/chat_loop/_runner.py::_render_image_reference_fallback`.
+`arbiter/runtime/chat_loop/_runner.py::_render_image_reference_fallback`.
 
 ### Attributes
 
 | Attribute | Type | Notes |
 |-----------|------|-------|
 | `messages` | `list[dict]` | Conversation history in OpenAI chat format. Safe to read, mutate at your own risk. |
-| `tools` | `ToolRegistry` | The live registry. Prefer the contract APIs — `Agentao(extra_tools=[...])` or `agent.add_tool(...)` — which bind capabilities and validate; `agent.tools.register(...)` is the low-level path that skips both. See [5.1](/en/part-5/1-custom-tools). |
+| `tools` | `ToolRegistry` | The live registry. Prefer the contract APIs — `Arbiter(extra_tools=[...])` or `agent.add_tool(...)` — which bind capabilities and validate; `agent.tools.register(...)` is the low-level path that skips both. See [5.1](/en/part-5/1-custom-tools). |
 | `skill_manager` | `SkillManager` | `agent.skill_manager.activate_skill(name, task_description)` to turn a skill on. |
 | `transport` | `Transport` | The active transport; rebindable. |
 | `_current_token` | `CancellationToken | None` | Public by convention; read to call `.cancel()` from another thread. |
@@ -165,7 +165,7 @@ Any unset callback falls back to `NullTransport` behavior (allow, empty answer, 
 
 ### `build_compat_transport`
 
-Helper that builds a `Transport` from the legacy per-callback constructor args. Lives in `agentao.embedding.compat` and is the **documented migration surface** for hosts still on the pre-0.2.10 callback shape — call it explicitly to opt out of the constructor-level `DeprecationWarning`. You rarely need it directly otherwise; `Agentao(...)` uses it internally when you pass `confirmation_callback=` et al. (and emits a single `DeprecationWarning` per construction). The 8 legacy callback kwargs themselves will be removed from the `Agentao(...)` signature in **0.5.0**; `build_compat_transport()` itself remains available.
+Helper that builds a `Transport` from the legacy per-callback constructor args. Lives in `arbiter.embedding.compat` and is the **documented migration surface** for hosts still on the pre-0.2.10 callback shape — call it explicitly to opt out of the constructor-level `DeprecationWarning`. You rarely need it directly otherwise; `Arbiter(...)` uses it internally when you pass `confirmation_callback=` et al. (and emits a single `DeprecationWarning` per construction). The 8 legacy callback kwargs themselves will be removed from the `Arbiter(...)` signature in **0.5.0**; `build_compat_transport()` itself remains available.
 
 ### `AgentEvent` / `EventType`
 
@@ -199,7 +199,7 @@ class Tool(ABC):
     @abstractmethod
     def execute(self, **kwargs) -> str: ...
 
-    # populated by Agentao at registration time
+    # populated by Arbiter at registration time
     working_directory: Path | None
     output_callback: Callable[[str], None] | None
     filesystem: FileSystem | None
@@ -215,15 +215,15 @@ Custom tool subclasses that need to read/write files should call `self._get_fs()
 
 | Method | Purpose |
 |--------|---------|
-| `register(tool: Tool, *, replace: bool = False)` | Add a tool. `replace=False` collision warns and overwrites; `replace=True` overwrites silently (INFO audit). Low-level — no capability binding; prefer `Agentao(extra_tools=)` / `add_tool` (see [5.1](/en/part-5/1-custom-tools)) |
+| `register(tool: Tool, *, replace: bool = False)` | Add a tool. `replace=False` collision warns and overwrites; `replace=True` overwrites silently (INFO audit). Low-level — no capability binding; prefer `Arbiter(extra_tools=)` / `add_tool` (see [5.1](/en/part-5/1-custom-tools)) |
 | `unregister(name: str) -> bool` | Remove `name`; returns whether it existed. Pure dict op |
 | `get(name: str) -> Tool` | Raises `KeyError` with available-tools list |
 | `list_tools() -> list[Tool]` | |
 | `to_openai_format() -> list[dict]` | OpenAI function-calling schemas |
 
-### Capabilities (`agentao.capabilities`)
+### Capabilities (`arbiter.capabilities`)
 
-Runtime-checkable `Protocol`s that file/search/shell tools route IO through. Hosts inject custom implementations via `Agentao(filesystem=..., shell=...)` to redirect through Docker exec, virtual filesystems, audit proxies, or remote runners. The package also exports byte-equivalent `LocalFileSystem` / `LocalShellExecutor` defaults.
+Runtime-checkable `Protocol`s that file/search/shell tools route IO through. Hosts inject custom implementations via `Arbiter(filesystem=..., shell=...)` to redirect through Docker exec, virtual filesystems, audit proxies, or remote runners. The package also exports byte-equivalent `LocalFileSystem` / `LocalShellExecutor` defaults.
 
 ```python
 class FileSystem(Protocol):
@@ -282,7 +282,7 @@ PermissionEngine(
 )
 ```
 
-Both arguments are explicit since 0.2.16 — passing `project_root=None` (or omitting it) raises `TypeError`. User rules load from `<user_root>/permissions.json` (typically `~/.agentao/permissions.json` if `user_root=Path.home() / ".agentao"`); pass `user_root=None` to disable user-scope rules entirely. `project_root` is used only to detect (and warn on) a stray `<project_root>/.agentao/permissions.json` — that file is **not** loaded as a rule source (see [5.4](/en/part-5/4-permissions) for why). Switch the preset mode after construction with `set_mode()`.
+Both arguments are explicit since 0.2.16 — passing `project_root=None` (or omitting it) raises `TypeError`. User rules load from `<user_root>/permissions.json` (typically `~/.arbiter/permissions.json` if `user_root=Path.home() / ".arbiter"`); pass `user_root=None` to disable user-scope rules entirely. `project_root` is used only to detect (and warn on) a stray `<project_root>/.arbiter/permissions.json` — that file is **not** loaded as a rule source (see [5.4](/en/part-5/4-permissions) for why). Switch the preset mode after construction with `set_mode()`.
 
 | Method | Signature | Purpose |
 |--------|-----------|---------|
@@ -307,11 +307,11 @@ MemoryManager(
 The constructor takes pre-built `MemoryStore` instances (the embedding factory builds them and passes them in). Path-based construction moved to the store layer:
 
 ```python
-from agentao.memory import MemoryManager, SQLiteMemoryStore
+from arbiter.memory import MemoryManager, SQLiteMemoryStore
 
 mgr = MemoryManager(
-    project_store=SQLiteMemoryStore.open_or_memory(workdir / ".agentao" / "memory.db"),
-    user_store=SQLiteMemoryStore.open(home / ".agentao" / "memory.db"),
+    project_store=SQLiteMemoryStore.open_or_memory(workdir / ".arbiter" / "memory.db"),
+    user_store=SQLiteMemoryStore.open(home / ".arbiter" / "memory.db"),
 )
 ```
 
@@ -376,11 +376,11 @@ class MCPRegistry(Protocol):
     def list_servers(self) -> Dict[str, McpServerConfig]: ...
 ```
 
-Source of MCP server configs. The `Agentao(mcp_registry=...)` kwarg is the injection point; `mcp_manager=` and `mcp_registry=` are mutually exclusive (manager = construction outcome, registry = config source).
+Source of MCP server configs. The `Arbiter(mcp_registry=...)` kwarg is the injection point; `mcp_manager=` and `mcp_registry=` are mutually exclusive (manager = construction outcome, registry = config source).
 
 | Concrete class | Purpose |
 |---|---|
-| `FileBackedMCPRegistry(project_root, user_root=None)` | CLI/ACP default. Reads `<wd>/.agentao/mcp.json` + `<user_root>/mcp.json` on every `list_servers()`. **User wins on name collision**; project entries may only declare new server names (collisions log a warning and skip the project entry). |
+| `FileBackedMCPRegistry(project_root, user_root=None)` | CLI/ACP default. Reads `<wd>/.arbiter/mcp.json` + `<user_root>/mcp.json` on every `list_servers()`. **User wins on name collision**; project entries may only declare new server names (collisions log a warning and skip the project entry). |
 | `InMemoryMCPRegistry(servers=None)` | Programmatic counterpart for tests / embedded hosts. Constructor input is shallow-copied. |
 
 ## A.7 Cancellation
@@ -405,12 +405,12 @@ Raised inside the agent loop when a token is cancelled. Caught by `chat()`, whic
 
 ### `ACPManager`
 
-Typical host-side entry point for driving external ACP servers declared in `.agentao/acp.json`.
+Typical host-side entry point for driving external ACP servers declared in `.arbiter/acp.json`.
 In unattended environments (CI / workers / cron / queue consumers), this same object is what the guide calls the **Headless Runtime**: not a new protocol or class, just an operating profile of `ACPManager`.
 
 | Method | Signature | Purpose |
 |--------|-----------|---------|
-| `from_project` | `@classmethod from_project(project_root=None) -> ACPManager` | Read `.agentao/acp.json` |
+| `from_project` | `@classmethod from_project(project_root=None) -> ACPManager` | Read `.arbiter/acp.json` |
 | `server_names` | `-> list[str]` | Declared servers |
 | `start_all` | `start_all(only_auto=True)` | Spawn all auto-start servers |
 | `start_server(name)` / `stop_server(name)` / `restart_server(name)` | | |
@@ -506,13 +506,13 @@ load_acp_client_config(project_root: Path | None = None) -> AcpClientConfig
 
 When `project_root` is `None`, it defaults to `Path.cwd()`.
 
-Validate + load `.agentao/acp.json` without constructing a manager. Useful for config-lint tooling.
+Validate + load `.arbiter/acp.json` without constructing a manager. Useful for config-lint tooling.
 
 ## A.9 Skills
 
 ### `SkillManager`
 
-Loaded lazily via `from agentao import SkillManager`. Most callers reach it via `agent.skill_manager`.
+Loaded lazily via `from arbiter import SkillManager`. Most callers reach it via `agent.skill_manager`.
 
 | Method | Purpose |
 |--------|---------|
@@ -524,18 +524,18 @@ Loaded lazily via `from agentao import SkillManager`. Most callers reach it via 
 
 ## A.10 Embedded Host Contract
 
-*Stable since 0.3.1. Package renamed `agentao.harness` → `agentao.host` in 0.4.2.*
+*Stable since 0.3.1. Package renamed `arbiter.harness` → `arbiter.host` in 0.4.2.*
 
-The `agentao.host` package is the **stable host-facing API surface** for embedding Agentao. Internal runtime types (`AgentEvent`, `ToolExecutionResult`, `PermissionEngine`) are intentionally not part of this surface — they may change in any release. Hosts that target only `agentao.host` (plus the `Agentao(...)` constructor and the methods marked above) stay forward-compatible.
+The `arbiter.host` package is the **stable host-facing API surface** for embedding Arbiter. Internal runtime types (`AgentEvent`, `ToolExecutionResult`, `PermissionEngine`) are intentionally not part of this surface — they may change in any release. Hosts that target only `arbiter.host` (plus the `Arbiter(...)` constructor and the methods marked above) stay forward-compatible.
 
-> **Naming.** "Harness" still refers to *Agentao itself running embedded in a host application* (the conceptual framing in `docs/design/embedded-host-contract.md`); the contract package was renamed to `agentao.host` to make `from agentao.host import HostEvent` read consistently. The old `agentao.harness` import path and old symbol names (`HarnessEvent`, `HarnessReplaySink`, `export_harness_*`) remain as a deprecated alias through 0.5.0 and emit one `DeprecationWarning` on first import.
+> **Naming.** "Harness" still refers to *Arbiter itself running embedded in a host application* (the conceptual framing in `docs/design/embedded-host-contract.md`); the contract package was renamed to `arbiter.host` to make `from arbiter.host import HostEvent` read consistently. The old `arbiter.harness` import path and old symbol names (`HarnessEvent`, `HarnessReplaySink`, `export_harness_*`) remain as a deprecated alias through 0.5.0 and emit one `DeprecationWarning` on first import.
 
 Full reference: [`docs/reference/host-api.md`](../../../docs/reference/host-api.md). Design rationale: [`docs/design/embedded-host-contract.md`](../../../docs/design/embedded-host-contract.md).
 
 ### Public exports
 
 ```python
-from agentao.host import (
+from arbiter.host import (
     ActivePermissions,
     EventStream,
     StreamSubscribeError,
@@ -557,14 +557,14 @@ from agentao.host import (
 | `PermissionDecisionEvent` | Per-decision projection. Fires on `allow` / `deny` / `prompt`; consumers must drain even allow events. |
 | `HostEvent` | Discriminated union of the three event models (Pydantic discriminator: `event_type`). |
 | `RFC3339UTCString` | Constrained timestamp type. Canonical `Z` suffix only — `+00:00` offsets are rejected. |
-| `EventStream` | Runtime side of `Agentao.events()`. Producers call `publish()`; consumers iterate `subscribe()`. |
-| `StreamSubscribeError` | Raised when a second concurrent subscriber for the same `session_id` filter is requested (MVP supports one stream consumer per `Agentao` instance). |
+| `EventStream` | Runtime side of `Arbiter.events()`. Producers call `publish()`; consumers iterate `subscribe()`. |
+| `StreamSubscribeError` | Raised when a second concurrent subscriber for the same `session_id` filter is requested (MVP supports one stream consumer per `Arbiter` instance). |
 | `export_host_event_json_schema()` | Emit the canonical JSON schema for events + permissions. Used by `tests/test_host_schema.py` for byte-equality against `docs/schema/host.events.v1.json`. |
 | `export_host_acp_json_schema()` | Emit the canonical JSON schema for host-facing ACP payloads. Snapshot lives at `docs/schema/host.acp.v1.json`. |
 
 ### `agent.events(session_id=None)`
 
-Returns an async iterator over `HostEvent`. Pass `session_id=` to filter; pass `None` to subscribe to every session owned by this `Agentao` instance.
+Returns an async iterator over `HostEvent`. Pass `session_id=` to filter; pass `None` to subscribe to every session owned by this `Arbiter` instance.
 
 ```python
 async for ev in agent.events():
@@ -583,7 +583,7 @@ Delivery contract:
 - **No replay.** Events emitted before the first subscription are dropped.
 - Backpressure is host-pulled via a bounded queue — slow consumers block the producer for matching events rather than dropping them.
 - Cancelling the iterator releases queue/subscription resources.
-- MVP supports one public stream consumer per `Agentao` instance.
+- MVP supports one public stream consumer per `Arbiter` instance.
 
 ### `agent.active_permissions()`
 
@@ -594,7 +594,7 @@ snap = agent.active_permissions()
 # snap.mode            -> "workspace-write" (Literal-typed)
 # snap.rules           -> list[dict]
 # snap.loaded_sources  -> ["preset:workspace-write",
-#                          "user:/Users/me/.agentao/permissions.json",
+#                          "user:/Users/me/.arbiter/permissions.json",
 #                          "injected:host"]
 ```
 

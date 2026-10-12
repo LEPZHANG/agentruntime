@@ -5,11 +5,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from agentao import Agentao
+from arbiter import Arbiter
 
 
 def _use_live_llm() -> bool:
-    env = os.getenv("AGENTAO_TEST_LIVE_LLM")
+    env = os.getenv("ARBITER_TEST_LIVE_LLM")
     if env is not None:
         return env.strip().lower() in {"1", "true", "yes", "on"}
     return os.getenv("GITHUB_ACTIONS") != "true"
@@ -19,7 +19,7 @@ def test_multi_turn_tool_calls():
     """Test that agent can handle multiple rounds of tool calls."""
     load_dotenv()
 
-    agent = Agentao(
+    agent = Arbiter(
         api_key=os.getenv("OPENAI_API_KEY"),
         base_url=os.getenv("OPENAI_BASE_URL"),
         model=os.getenv("OPENAI_MODEL"),

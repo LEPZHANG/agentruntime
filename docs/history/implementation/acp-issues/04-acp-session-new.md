@@ -9,14 +9,14 @@ There is no ACP entry point for creating a new session, binding a working direct
 - Implement `session/new`
 - Accept `cwd`
 - Accept session-level MCP server config
-- Create Agentao instance with ACP transport
+- Create Arbiter instance with ACP transport
 
 ## Implementation Checklist
 
 - [ ] Parse `cwd` from request
 - [ ] Parse `mcpServers` from request
 - [ ] Generate ACP `sessionId`
-- [ ] Create `ACPTransport` and inject it into Agentao
+- [ ] Create `ACPTransport` and inject it into Arbiter
 - [ ] Create `PermissionEngine` for the session
 - [ ] Initialize MCP connections for the session where possible
 - [ ] Return `sessionId`

@@ -18,14 +18,14 @@ from __future__ import annotations
 
 import pytest
 
-from agentao import Agentao
-from agentao.host import Tool
-from agentao.tooling import BUILTIN_TOOL_NAMES
+from arbiter import Arbiter
+from arbiter.host import Tool
+from arbiter.tooling import BUILTIN_TOOL_NAMES
 
 
-def _make_agent(tmp_path, **kwargs) -> Agentao:
-    """Construct an Agentao with a dummy LLM config (no network at init)."""
-    return Agentao(
+def _make_agent(tmp_path, **kwargs) -> Arbiter:
+    """Construct an Arbiter with a dummy LLM config (no network at init)."""
+    return Arbiter(
         working_directory=tmp_path,
         api_key="x",
         base_url="http://localhost:0",

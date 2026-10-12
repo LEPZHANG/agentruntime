@@ -1,16 +1,16 @@
 # 2.3 Lifecycle
 
 > **What you'll learn**
-> - The 4-step standard lifecycle (`Agentao()` → `chat()` → … → `close()`)
+> - The 4-step standard lifecycle (`Arbiter()` → `chat()` → … → `close()`)
 > - Why a single agent isn't thread-safe and how to serialize correctly
 > - A FastAPI template that handles concurrent sessions without cross-talk
 
-One `Agentao` instance = one conversation. Understanding its lifecycle is essential for production embedding.
+One `Arbiter` instance = one conversation. Understanding its lifecycle is essential for production embedding.
 
 ## Standard lifecycle
 
 ```python
-agent = Agentao(...)          # 1. Construct (open MCP, load skills)
+agent = Arbiter(...)          # 1. Construct (open MCP, load skills)
 reply1 = agent.chat("hello")   # 2. First turn
 reply2 = agent.chat("continue")# 3. Same session, next turn
 # ...
@@ -95,7 +95,7 @@ from contextlib import contextmanager
 
 @contextmanager
 def agent_session(**kwargs):
-    agent = Agentao(**kwargs)
+    agent = Arbiter(**kwargs)
     try:
         yield agent
     finally:
@@ -149,7 +149,7 @@ agent.skill_manager.active_skills  # dict
 
 ## Concurrency model
 
-**A single `Agentao` instance is not thread-safe.** The same instance cannot serve two concurrent `chat()` calls.
+**A single `Arbiter` instance is not thread-safe.** The same instance cannot serve two concurrent `chat()` calls.
 
 Right approach: **one agent per session**.
 
@@ -166,17 +166,17 @@ Right approach: **one agent per session**.
 from asyncio import to_thread, Lock
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
-from agentao import Agentao
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
 
 app = FastAPI()
 
 # session_id -> (agent, lock)
 _sessions: dict = {}
 
-async def get_or_create(session_id: str, workdir: Path) -> tuple[Agentao, Lock]:
+async def get_or_create(session_id: str, workdir: Path) -> tuple[Arbiter, Lock]:
     if session_id not in _sessions:
-        agent = Agentao(
+        agent = Arbiter(
             working_directory=workdir,
             transport=SdkTransport(),  # no event subscribe for simplicity
         )

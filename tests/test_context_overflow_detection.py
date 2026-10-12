@@ -1,13 +1,13 @@
 """Regression table for is_context_too_long_error provider coverage + guard.
 
-Covers the two-tier classifier in agentao/context_manager.py: positive provider
+Covers the two-tier classifier in arbiter/context_manager.py: positive provider
 patterns must be detected as overflow; throttling/rate-limit errors must NOT be,
 even when they contain a fallback overflow phrase ("too many tokens").
 """
 
 import pytest
 
-from agentao.context_manager import is_context_too_long_error
+from arbiter.context_manager import is_context_too_long_error
 
 
 # (label, error_message) — each must be classified as a context overflow.

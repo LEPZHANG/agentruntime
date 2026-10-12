@@ -1,6 +1,6 @@
 # Headless Runtime (Week 1 + Week 2 + Week 3 + Week 4)
 
-Operator-facing contract for running Agentao as a **logically headless,
+Operator-facing contract for running Arbiter as a **logically headless,
 daemon-capable runtime**. This page is the authoritative description of
 what an embedding host may rely on right now. Subsequent weeks will add
 fields and surfaces; existing ones are frozen.
@@ -60,7 +60,7 @@ Every named ACP server in the manager has **one active turn slot**.
     `session/prompt` guard as belt-and-suspenders for the nonblocking
     turn path.
 - `AcpErrorCode.SERVER_BUSY` is the existing code from
-  `agentao/acp_client/client.py:54`; Week 1 only documents and pins
+  `arbiter/acp_client/client.py:54`; Week 1 only documents and pins
   it. No new error type is introduced.
 
 Consumers that want to "wait for capacity" must implement their own
@@ -80,7 +80,7 @@ from typing import List, Optional
 @dataclass(frozen=True)
 class ServerStatus:
     # Week 1 — core (frozen)
-    server: str                         # name in .agentao/acp.json
+    server: str                         # name in .arbiter/acp.json
     state: str                          # ServerState enum value (.value)
     pid: Optional[int]                  # None when no process is running
     has_active_turn: bool               # derived from manager's active turn slot
@@ -208,7 +208,7 @@ Consequences of this ordering:
   and it is not taken from the exception payload. This is an explicit
   product decision so embedders have a single authoritative clock.
   The regression suite asserts this by patching
-  `agentao.acp_client.manager.datetime` during a recorded error and
+  `arbiter.acp_client.manager.datetime` during a recorded error and
   verifying the snapshot reflects the patched `now()`.
 
 ### 4.1 What does **not** go into `last_error`
@@ -249,7 +249,7 @@ two-layer model over that decision.
 ### 6.1 `InteractionPolicy`
 
 ```python
-from agentao.acp_client import InteractionPolicy
+from arbiter.acp_client import InteractionPolicy
 
 InteractionPolicy(mode="reject_all")   # default
 InteractionPolicy(mode="accept_all")
@@ -272,7 +272,7 @@ per-call override   >   server default (nonInteractivePolicy)
 ```
 
 - **Server default** — `nonInteractivePolicy` in
-  `.agentao/acp.json` (structured object, §6.4). Missing = implicit
+  `.arbiter/acp.json` (structured object, §6.4). Missing = implicit
   `{"mode": "reject_all"}`.
 - **Per-call override** — `interaction_policy=` kwarg on
   `prompt_once` / `send_prompt`. Accepts `InteractionPolicy` or the
@@ -302,7 +302,7 @@ The `send_prompt_nonblocking` family **stays internal** (Week 1
 decision). It does not receive an `interaction_policy=` kwarg; the
 Week 3 policy surface is `prompt_once` + `send_prompt` only.
 
-### 6.4 Config shape (`.agentao/acp.json`)
+### 6.4 Config shape (`.arbiter/acp.json`)
 
 The structured object form is the only supported shape as of Week 3:
 
@@ -390,7 +390,7 @@ runtime decides whether to auto-rebuild or give up:
 Implementation notes:
 
 - The classifier is a pure function, `classify_process_death`,
-  exported from `agentao.acp_client`. It takes `exit_code`,
+  exported from `arbiter.acp_client`. It takes `exit_code`,
   `signaled`, `during_active_turn`, `restart_count`,
   `max_recoverable_restarts`, `handshake_fail_streak` and returns
   `"recoverable"` / `"fatal"`. Tests exercise every matrix row.

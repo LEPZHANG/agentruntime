@@ -1,24 +1,24 @@
-# Codex `/goal` — Teardown + Agentao Candidate Design
+# Codex `/goal` — Teardown + Arbiter Candidate Design
 
 **Status:** Two parts. **§§1–9 — mechanism teardown** of an *external* project
 (Codex), drafted 2026-06-23 from a direct, line-verified read of the goal slash
 command, the `ext/goal` extension crate, the protocol/state model, and the steering
-templates (purely descriptive; no recommendation). **§§10–11 — Agentao candidate
+templates (purely descriptive; no recommendation). **§§10–11 — Arbiter candidate
 design**: an exploratory relevance note (§10) plus a candidate design split with a
 drafted `/goal` surface (§11), both **explicitly marked NOT an approved plan / not
 implemented**. The teardown stands on its own; within the candidate design, **§11's
-concrete claims are grep-verified against `agentao/`** while **§10 stays exploratory
+concrete claims are grep-verified against `arbiter/`** while **§10 stays exploratory
 and unverified** — and the whole candidate still needs maintainer sign-off before it
 becomes a proposal.
 (If §11 ever graduates to an approved plan, split it into its own implementation-plan
 doc — keeping it here while it is still a candidate avoids fragmenting the EN/ZH pair.)
-**Audience:** Agentao maintainers studying long-running-task / autonomous-continuation
+**Audience:** Arbiter maintainers studying long-running-task / autonomous-continuation
 designs; anyone reverse-reviewing Codex.
 **Companion:** `codex-goal-mechanism-review.zh.md`.
 **Related:**
-- `codex-reverse-review.md` — prior reverse review of Codex against Agentao; same
-  "what does Agentao actually need, not mirror Codex's product shape" posture.
-- `metacognitive-boundary.md` — Agentao's own notion of an injectable per-turn
+- `codex-reverse-review.md` — prior reverse review of Codex against Arbiter; same
+  "what does Arbiter actually need, not mirror Codex's product shape" posture.
+- `metacognitive-boundary.md` — Arbiter's own notion of an injectable per-turn
   protocol; the closest conceptual neighbour to Codex's "steering" injection.
 
 **Source:** Codex local checkout at `../codex`, `main`@`97dce078c5` (2026-06-23).
@@ -269,28 +269,28 @@ paused/blocked goal triggers a "resume goal?" prompt.
 
 ---
 
-## 10. Exploratory relevance to Agentao (unverified — the maintainer's call)
+## 10. Exploratory relevance to Arbiter (unverified — the maintainer's call)
 
 This section stays exploratory — on its own it is **not** a proposal; the candidate
 design that builds on it is §11 (explicitly marked not-approved). Recorded as prompts
 for a grep-first evaluation:
 
-- The closest existing Agentao concept is the **injectable per-turn metacognitive
+- The closest existing Arbiter concept is the **injectable per-turn metacognitive
   boundary** (`metacognitive-boundary.md`) — Codex's "steering" is a concrete,
   shipped instance of "inject a host-controlled protocol fragment each turn." Whether
-  Agentao's boundary should grow a *goal-shaped* default is an open design question,
+  Arbiter's boundary should grow a *goal-shaped* default is an open design question,
   not a settled gap.
 - Codex's auto-continuation lives in the **host/app-server + TUI**, not the model
-  loop. Under Agentao's embedded-harness boundary, an equivalent "keep driving turns
+  loop. Under Arbiter's embedded-harness boundary, an equivalent "keep driving turns
   toward an objective" loop would most naturally be a **host responsibility**, with
   the harness exposing the per-turn injection and tool-injection primitives (turn/time
   budgets stay host-side; token accounting would be a future harness primitive — see
   §11) — mirroring the recurring "valuable kernel already exists as a host-contract
   primitive" finding.
-  This needs the usual `grep`-in-`agentao` verification before any claim that a real
+  This needs the usual `grep`-in-`arbiter` verification before any claim that a real
   gap exists.
 
-Before any of the above turns into a proposal: prove the gap in `agentao/` with
+Before any of the above turns into a proposal: prove the gap in `arbiter/` with
 concrete `file:line` evidence (or "no match"), and leave the pain/prioritization
 judgment to the maintainer.
 
@@ -319,16 +319,16 @@ concept. Verified against today's host contract, most already exist:
 
 | Primitive a host needs | Exists today? | Anchor |
 |---|---|---|
-| Drive multiple turns | ✅ `Agentao.chat()` / `arun()`, callable in a host loop | `agentao/agent.py` |
-| Inject per-turn continuation context | ✅ host prepends/joins it into the next message | `agentao/cli/input_loop.py:545` (CLI already does this) |
-| Inject goal tools (`get_goal`/…) | ✅ host `extra_tools` construction kwarg | `agentao/agent.py:84` |
+| Drive multiple turns | ✅ `Arbiter.chat()` / `arun()`, callable in a host loop | `arbiter/agent.py` |
+| Inject per-turn continuation context | ✅ host prepends/joins it into the next message | `arbiter/cli/input_loop.py:545` (CLI already does this) |
+| Inject goal tools (`get_goal`/…) | ✅ host `extra_tools` construction kwarg | `arbiter/agent.py:84` |
 | Persist goal state | ✅ host-side (out of scope for the harness) | — |
 
 So the host already has every primitive a **time / turn-count** goal loop needs. The
 one thing it lacks matters only for *token* budgets:
 
 **The one harness gap — and why the decision sidesteps it:** token usage is not
-surfaced on `agent.events()` / `agentao/host/models.py`, so codex-style **token
+surfaced on `agent.events()` / `arbiter/host/models.py`, so codex-style **token
 budgets** would need a new (goal-agnostic) per-turn usage signal. **Per the decision
 above, token budgets are out of scope.** Time / turn-count budgets are **pure
 host-side** (wall-clock measured between `chat()` calls; the host counts its own loop
@@ -338,9 +338,9 @@ signal is the single primitive to add, reusable by all hosts.)
 
 ### Layer 2 — CLI (reference host): implements `/goal` + the continuation loop
 
-Agentao has three host / front-end surfaces (in-process embedding, the CLI incl.
-`agentao run`, and ACP; `docs/design/embedding-vs-acp.md`); the **CLI** is the natural
-**reference** host for this design. It implements Agentao's own goal orchestration as a
+Arbiter has three host / front-end surfaces (in-process embedding, the CLI incl.
+`arbiter run`, and ACP; `docs/design/embedding-vs-acp.md`); the **CLI** is the natural
+**reference** host for this design. It implements Arbiter's own goal orchestration as a
 **host-owned outer loop**:
 
 ```text
@@ -353,7 +353,7 @@ while goal.active:
 This generalizes the existing one-shot precedent at `cli/input_loop.py:545` (the
 post-plan-mode auto-continuation). **Explicitly NOT built on** the plugin
 `Stop`/`force_continue` path — that is hard-capped at `_stop_reentry_cap` (default 3,
-`agentao/runtime/chat_loop/_runner.py:587`) as a runaway guard and injects a *visible*
+`arbiter/runtime/chat_loop/_runner.py:587`) as a runaway guard and injects a *visible*
 user message, both wrong for sustained goal pursuit. A host-owned loop is uncapped by
 design (the host owns the stop condition).
 
@@ -397,7 +397,7 @@ host) command surface + state model + continuation-loop integration. No token bu
 (per the decision above). `/goal` is a CLI slash command, **not** an LLM tool; other
 hosts implement their own surface per the developer-guide.
 
-**A. Command surface** (matches `agentao/cli/help_text.py` `/cmd [subcommand]` style):
+**A. Command surface** (matches `arbiter/cli/help_text.py` `/cmd [subcommand]` style):
 
 ```
 /goal [subcommand|<objective>]            manage the long-task goal (time/turn budget)
@@ -430,7 +430,7 @@ and codex's "run unbounded until complete" model was explicitly rejected
 safety caps ON** — values/whether-on are the maintainer's call:
 
 ```jsonc
-// .agentao/settings.json
+// .arbiter/settings.json
 "goal": {
   "default_max_turns": 25,         // applied when --turns is omitted
   "default_time_budget": "120m",   // applied when --for is omitted
@@ -452,7 +452,7 @@ shadow each other (recall `--for` / `--turns` are *first-to-trip-wins*, line 425
 
 `/goal <obj> --unbounded` explicitly opts out of the defaults.
 
-**D. State model** (persist to `.agentao/goal.json`, or hang off the session — open):
+**D. State model** (persist to `.arbiter/goal.json`, or hang off the session — open):
 
 ```python
 @dataclass
@@ -549,7 +549,7 @@ turn the host **stops driving**; status stays `limit_reached` until the user
 `clear` / `edit` / `/goal budget` re-budgets.
 
 **G. New helper needed:** a duration parser (`90s|30m|2h|1h30m → seconds`) — none exists
-in-tree (grep: no `parse_duration`); rejects unit-less numbers; lives in `agentao/cli/`.
+in-tree (grep: no `parse_duration`); rejects unit-less numbers; lives in `arbiter/cli/`.
 
 **H. Boundary guards (avoid collisions):**
 
@@ -560,7 +560,7 @@ in-tree (grep: no `parse_duration`); rejects unit-less numbers; lives in `agenta
 
 **Open for the maintainer:** (1) defaults — **values decided (§C): `25` turns /
 `120m`, caps on**; still open is whether the caps apply silently or surface a one-time
-notice on first goal; (2) state persistence location (`.agentao/goal.json` vs session);
+notice on first goal; (2) state persistence location (`.arbiter/goal.json` vs session);
 (3) flag names (`--for` / `--turns`).
 
 ### 11.2 Commit checklist (conditional — only if §11 is signed off)
@@ -574,12 +574,12 @@ notice on first goal; (2) state persistence location (`.agentao/goal.json` vs se
 
 | # | Commit | Lands in (anchor) | Tests | Dep |
 |---|---|---|---|---|
-| 1 | **Duration parser** (§G) | new `agentao/cli/duration.py` :: `parse_duration("90s\|30m\|2h\|1h30m") → int`; rejects unit-less / non-positive | new `tests/cli/test_duration.py` — units, compound, reject `"30"` / `"-5m"` / `""` | — |
-| 2 | **GoalState + persistence** (§D, §E) | new `agentao/cli/goal_state.py` :: `GoalState` dataclass + `GoalStatus` enum; `load()`/`save()` → `.agentao/goal.json` (or session — open); transition methods enforce the §E **state machine** (legal transitions only; *who* may trigger each — the authority split — is enforced by the callers, rows 3/4/5) | round-trip serialize; invalid-transition reject; paused-time-excluded accounting | — |
-| 3 | **`update_goal` injected tool** (§E.1) | new `agentao/tools/goal.py` :: guarded `update_goal(status)` (active-only → no-op + error after terminal); **not** registered in `agent.py::_register_tools()` — injected via `extra_tools` (`agent.py:84`); optional read-only `get_goal` | guard returns error when `status != active`; success path sets state; terminal-state immutability | 2 |
-| 4 | **`/goal` command** (§A, §C) | new `agentao/cli/commands/goal.py` (argparse subcommands + `--for` / `--turns` / `--unbounded` / `--clear`; confirm-on-replace of a non-terminal goal); edit `agentao/cli/help_text.py` (`/goal` entry); read `goal.{default_max_turns,default_time_budget,enabled}` from settings | new `tests/cli/test_goal_command.py` — flag parse, default application, confirm-on-replace, `--unbounded` opt-out | 1, 2 |
-| 5 | **Continuation loop** (§F) — *keystone* | edit `agentao/cli/input_loop.py` — generalize the `:545` one-shot precedent into the host-owned `while goal.status == active`: budget pre-check, inject `update_goal` via `extra_tools`, `CONTINUATION_PROMPT` / `WRAP_UP_PROMPT`, **exactly one** wrap-up turn on trip, `persist()` per turn; explicitly **NOT** `force_continue` (§H) | loop exits on complete/blocked/turn-cap/time-cap; wrap-up fires exactly once; turn-1 uses the original message, later turns use continuation; `--turns` independent of `max_iterations` | 2, 3, 4 |
-| 6 | **Config reference** (§C) | edit `docs/reference/configuration.md` — `goal` settings block + `.agentao/goal.json` path / schema / precedence | doc-only | 4 |
+| 1 | **Duration parser** (§G) | new `arbiter/cli/duration.py` :: `parse_duration("90s\|30m\|2h\|1h30m") → int`; rejects unit-less / non-positive | new `tests/cli/test_duration.py` — units, compound, reject `"30"` / `"-5m"` / `""` | — |
+| 2 | **GoalState + persistence** (§D, §E) | new `arbiter/cli/goal_state.py` :: `GoalState` dataclass + `GoalStatus` enum; `load()`/`save()` → `.arbiter/goal.json` (or session — open); transition methods enforce the §E **state machine** (legal transitions only; *who* may trigger each — the authority split — is enforced by the callers, rows 3/4/5) | round-trip serialize; invalid-transition reject; paused-time-excluded accounting | — |
+| 3 | **`update_goal` injected tool** (§E.1) | new `arbiter/tools/goal.py` :: guarded `update_goal(status)` (active-only → no-op + error after terminal); **not** registered in `agent.py::_register_tools()` — injected via `extra_tools` (`agent.py:84`); optional read-only `get_goal` | guard returns error when `status != active`; success path sets state; terminal-state immutability | 2 |
+| 4 | **`/goal` command** (§A, §C) | new `arbiter/cli/commands/goal.py` (argparse subcommands + `--for` / `--turns` / `--unbounded` / `--clear`; confirm-on-replace of a non-terminal goal); edit `arbiter/cli/help_text.py` (`/goal` entry); read `goal.{default_max_turns,default_time_budget,enabled}` from settings | new `tests/cli/test_goal_command.py` — flag parse, default application, confirm-on-replace, `--unbounded` opt-out | 1, 2 |
+| 5 | **Continuation loop** (§F) — *keystone* | edit `arbiter/cli/input_loop.py` — generalize the `:545` one-shot precedent into the host-owned `while goal.status == active`: budget pre-check, inject `update_goal` via `extra_tools`, `CONTINUATION_PROMPT` / `WRAP_UP_PROMPT`, **exactly one** wrap-up turn on trip, `persist()` per turn; explicitly **NOT** `force_continue` (§H) | loop exits on complete/blocked/turn-cap/time-cap; wrap-up fires exactly once; turn-1 uses the original message, later turns use continuation; `--turns` independent of `max_iterations` | 2, 3, 4 |
+| 6 | **Config reference** (§C) | edit `docs/reference/configuration.md` — `goal` settings block + `.arbiter/goal.json` path / schema / precedence | doc-only | 4 |
 | 7 | **Docs** (three audiences) | **(a) end user** — new `docs/guides/goal.md`: drive the CLI `/goal` (subcommands, budgets, examples), parallel to `session-replay.md` (`/replay`) / `memory-management.md` (`/memory`); **(b) host integrator, full** — new `developer-guide/{en,zh}/part-4/8-orchestration-continuation.md`: the orchestration-continuation pattern (outer loop + inject-context + inject-tools + host-side time/turn accounting), CLI as worked example, cross-linked from §5.8 — **source of truth**; **(c) embedding coding agent, distilled** — extend `docs/guides/embed-for-agents.md` with a short "a long-running goal/continuation loop is a *host* job" skeleton that **points to (b)** (no duplication), reinforcing the generic, true-today lesson: the harness ships the three primitives (drive-turn / inject-context / inject-tools — all existing, Layer 1 unchanged), **not** a goal feature; **(d)** edit `CLAUDE.md` slash-command list + a `--turns` ≠ `max_iterations` gotcha | doc-only; developer-guide EN+ZH paired, `docs/guides/*` single-file per repo convention | 5 |
 
 **Staged-rollout guard.** Keep `goal.enabled` **`false`** until commit 5 lands, so
@@ -589,5 +589,5 @@ exist yet. Flip it to the §C default (`true`) in commit 5 or a trailing commit.
 **Definition of done.** `uv run python -m pytest tests/` green including the new files;
 `/help` renders `/goal`; the EN+ZH doc pair is in sync; a regression test asserts the
 goal loop does **not** route through `force_continue` and that `--turns` is independent
-of `max_iterations` (the two §H boundary guards); the `agentao/cli/` import surface is
+of `max_iterations` (the two §H boundary guards); the `arbiter/cli/` import surface is
 unchanged on non-goal paths.

@@ -14,9 +14,9 @@ import re
 
 import pytest
 
-from agentao.cli import help_text
-from agentao.cli._utils import _SLASH_COMMAND_HINTS, _SLASH_COMMANDS
-from agentao.cli.input_loop import _EXIT_COMMANDS, _build_command_table
+from arbiter.cli import help_text
+from arbiter.cli._utils import _SLASH_COMMAND_HINTS, _SLASH_COMMANDS
+from arbiter.cli.input_loop import _EXIT_COMMANDS, _build_command_table
 
 # ``/plugin`` is an accepted singular alias of ``/plugins``; it is
 # deliberately not advertised in completions or /help.
@@ -52,10 +52,10 @@ def test_every_command_appears_in_help(table):
     prints — not the module's raw bytes.
 
     Greping the source file would count any lowercase token after a slash
-    anywhere in the module: ``.agentao/settings.json``, ``--clipboard
+    anywhere in the module: ``.arbiter/settings.json``, ``--clipboard
     --input``, doc prose. That makes the guard one edit away from silent —
     drop ``/tools`` from the help body while any string in the file
-    contains ``agentao/tools/`` and this would still pass.
+    contains ``arbiter/tools/`` and this would still pass.
     """
     mentioned = set(re.findall(r"/([a-z]+)", help_text.CLI_HELP_TEXT))
     dispatchable = (set(table) | set(_EXIT_COMMANDS)) - _UNADVERTISED_ALIASES
@@ -102,7 +102,7 @@ def test_handlers_are_bound_to_the_right_function(table):
     """Key-set comparisons never touch the values, so a swapped binding
     (``"clear": handle_new_command``) would go unnoticed. Spot-check the
     pairs where a mix-up is both plausible and damaging."""
-    from agentao.cli.commands import (
+    from arbiter.cli.commands import (
         handle_clear_command,
         handle_mode_command,
         handle_new_command,
@@ -162,7 +162,7 @@ class _Cli:
 
 @pytest.fixture
 def printed(monkeypatch):
-    from agentao.cli.commands import skills as skills_mod
+    from arbiter.cli.commands import skills as skills_mod
 
     out: list[str] = []
     monkeypatch.setattr(
@@ -172,7 +172,7 @@ def printed(monkeypatch):
 
 
 def test_skills_bare_lists(printed):
-    from agentao.cli.commands import handle_skills_command
+    from arbiter.cli.commands import handle_skills_command
 
     cli = _Cli()
     handle_skills_command(cli, "")
@@ -180,7 +180,7 @@ def test_skills_bare_lists(printed):
 
 
 def test_skills_activate_passes_manual_reason(printed):
-    from agentao.cli.commands import handle_skills_command
+    from arbiter.cli.commands import handle_skills_command
 
     cli = _Cli()
     handle_skills_command(cli, "activate alpha")
@@ -190,7 +190,7 @@ def test_skills_activate_passes_manual_reason(printed):
 
 
 def test_skills_deactivate_unknown_lists_available(printed):
-    from agentao.cli.commands import handle_skills_command
+    from arbiter.cli.commands import handle_skills_command
 
     handle_skills_command(_Cli(), "deactivate nope")
     assert "Unknown skill 'nope'" in printed[-1]
@@ -198,21 +198,21 @@ def test_skills_deactivate_unknown_lists_available(printed):
 
 
 def test_skills_missing_arg_shows_usage(printed):
-    from agentao.cli.commands import handle_skills_command
+    from arbiter.cli.commands import handle_skills_command
 
     handle_skills_command(_Cli(), "activate")
     assert "Usage: /skills activate" in printed[-1]
 
 
 def test_skills_unknown_subcommand(printed):
-    from agentao.cli.commands import handle_skills_command
+    from arbiter.cli.commands import handle_skills_command
 
     handle_skills_command(_Cli(), "bogus")
     assert "Unknown subcommand 'bogus'" in printed[-1]
 
 
 def test_skills_reload_reports_count(printed):
-    from agentao.cli.commands import handle_skills_command
+    from arbiter.cli.commands import handle_skills_command
 
     cli = _Cli()
     handle_skills_command(cli, "reload")

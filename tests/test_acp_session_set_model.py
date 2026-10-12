@@ -2,7 +2,7 @@
 
 Covers ``session/set_model``, ``session/set_mode``, and
 ``session/list_models``. Uses lightweight fakes rather than a real
-``Agentao`` runtime — the handlers only duck-type the agent.
+``Arbiter`` runtime — the handlers only duck-type the agent.
 """
 
 from __future__ import annotations
@@ -13,11 +13,11 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-from agentao.acp import session_list_models as acp_list_models
-from agentao.acp import session_set_mode as acp_set_mode
-from agentao.acp import session_set_model as acp_set_model
-from agentao.acp.models import AcpSessionState
-from agentao.acp.protocol import (
+from arbiter.acp import session_list_models as acp_list_models
+from arbiter.acp import session_set_mode as acp_set_mode
+from arbiter.acp import session_set_model as acp_set_model
+from arbiter.acp.models import AcpSessionState
+from arbiter.acp.protocol import (
     INVALID_PARAMS,
     INVALID_REQUEST,
     METHOD_SESSION_LIST_MODELS,
@@ -26,8 +26,8 @@ from agentao.acp.protocol import (
     METHOD_SESSION_UPDATE,
     SERVER_NOT_INITIALIZED,
 )
-from agentao.acp.server import JsonRpcHandlerError
-from agentao.permissions import PermissionEngine, PermissionMode
+from arbiter.acp.server import JsonRpcHandlerError
+from arbiter.permissions import PermissionEngine, PermissionMode
 
 from .support.acp_server import make_initialized_server, make_server
 

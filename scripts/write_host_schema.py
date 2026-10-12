@@ -1,4 +1,4 @@
-"""Regenerate ``agentao.host`` JSON Schema snapshots under ``docs/schema/``.
+"""Regenerate ``arbiter.host`` JSON Schema snapshots under ``docs/schema/``.
 
 Usage::
 
@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agentao.host.schema import (  # noqa: E402
+from arbiter.host.schema import (  # noqa: E402
     export_host_acp_json_schema,
     export_host_event_json_schema,
     normalized_schema_json,

@@ -1,8 +1,8 @@
 {
-  "$id": "urn:agentao:schema:replay-event:1.1",
+  "$id": "urn:arbiter:schema:replay-event:1.1",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "One JSONL line in a replay file. Source of truth: agentao/replay/events.py - regenerate via scripts/write_replay_schema.py.",
+  "description": "One JSONL line in a replay file. Source of truth: arbiter/replay/events.py - regenerate via scripts/write_replay_schema.py.",
   "oneOf": [
     {
       "properties": {
@@ -525,6 +525,6 @@
     "kind",
     "payload"
   ],
-  "title": "Agentao replay event (v1.1)",
+  "title": "Arbiter replay event (v1.1)",
   "type": "object"
 }

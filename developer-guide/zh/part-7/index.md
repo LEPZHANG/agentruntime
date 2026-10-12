@@ -5,7 +5,7 @@
 每个蓝图都回答同样的四个问题：
 
 1. **谁 & 为什么** —— 什么产品形态、解决什么痛点
-2. **架构** —— Agentao 坐在哪、跟谁通信
+2. **架构** —— Arbiter 坐在哪、跟谁通信
 3. **关键代码** —— 真正重要的那 50–150 行
 4. **陷阱** —— 上线第二天最容易出问题的地方
 
@@ -16,7 +16,7 @@
 - **数据工作台** —— 给分析师的交互会话；Shell + 沙箱 + 技能组合 · [§7.4](/zh/part-7/4-data-workbench)
 - **批处理调度** —— cron 驱动的 `prompt_once`，跑离线/夜间任务，没有终端用户 · [§7.5](/zh/part-7/5-batch-scheduler)、[G.4](/zh/appendix/g-glossary#g-4-集成模式)
 - **微信智能机器人（ilink-style）** —— 长轮询个人号 bot API；每条消息一个 agent；联系人级权限 · [§7.6](/zh/part-7/6-wechat-bot)
-- **多 Agent 看板调度** —— 外部衍生项目 `agentao-kanban`；用看板驱动 `planner` / `worker` / `reviewer` 三个 sub-agent；每张卡独立 git worktree · [§7.7](/zh/part-7/7-kanban-multiagent)
+- **多 Agent 看板调度** —— 外部衍生项目 `arbiter-kanban`；用看板驱动 `planner` / `worker` / `reviewer` 三个 sub-agent；每张卡独立 git worktree · [§7.7](/zh/part-7/7-kanban-multiagent)
 :::
 
 ## 七个蓝图
@@ -29,7 +29,7 @@
 | [7.4](./4-data-workbench) | 数据分析工作台 | 进程内 SDK | Shell + 沙箱 + 自定义技能 |
 | [7.5](./5-batch-scheduler) | 离线批处理 / 定时任务 | `prompt_once` | 技能 + 调度器 |
 | [7.6](./6-wechat-bot) | 微信智能机器人（ilink-style） | `asyncio` 长轮询 daemon | `WeChatClient` Protocol + 联系人级权限 |
-| [7.7](./7-kanban-multiagent) | 多 Agent 看板调度 *(外部仓库)* | 外部 orchestrator 驱动 agentao sub-agent + ACP CLI | `planner`/`worker`/`reviewer` 路由 + 每卡 git worktree |
+| [7.7](./7-kanban-multiagent) | 多 Agent 看板调度 *(外部仓库)* | 外部 orchestrator 驱动 arbiter sub-agent + ACP CLI | `planner`/`worker`/`reviewer` 路由 + 每卡 git worktree |
 
 ## 如何阅读本部分
 

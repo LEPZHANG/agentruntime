@@ -2,7 +2,7 @@
 
 ## Problem
 
-Agentao emits internal runtime events, but ACP clients expect `session/update` notifications using ACP update types.
+Arbiter emits internal runtime events, but ACP clients expect `session/update` notifications using ACP update types.
 
 ## Scope
 

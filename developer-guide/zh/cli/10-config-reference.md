@@ -7,14 +7,14 @@
 | 文件 | 项目路径 | 用户全局路径 | 谁在读 | Schema 参考 |
 |---|---|---|---|---|
 | **LLM 凭证** | `.env`（cwd） | shell env | `/model` `/provider` `/temperature` | [§2](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#2-env--llm-provider-配置) |
-| **运行时设置** | `.agentao/settings.json` | — | `/mode` 持久化、`/replay on/off` | [§3](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#3-agentaosettingsjson--运行时模式--内置子代理) |
-| **权限规则** | — *（项目文件被忽略）* | `~/.agentao/permissions.json` | `/mode` `/permission`、工具确认 UI | [§4](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#4-permissionsjson--工具权限规则) |
-| **Shell 沙箱** | `.agentao/sandbox.json` | `~/.agentao/sandbox.json` | `/sandbox` | [Part 6.2](/zh/part-6/2-shell-sandbox) |
-| **MCP 服务器** | `.agentao/mcp.json` | `~/.agentao/mcp.json` | `/mcp` | [§5](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#5-mcpjson--mcp-服务器注册表) |
-| **ACP 服务器** | `.agentao/acp.json` | — | `/acp` | [§6](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#6-acpjson--acp-子代理注册表) |
-| **Skill 启停** | `.agentao/skills_config.json` | — | `/skills enable` `/skills disable` | [§7](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#7-skills_configjson--每个项目的-skill-启停) |
-| **项目说明** | `AGENTAO.md`（cwd） | — | 每轮的系统提示 | [§8](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#8-agentaomd--项目说明) |
-| **记忆库** | `.agentao/memory.db` | `~/.agentao/memory.db` | `/memory`、`save_memory` 工具 | [§9](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#9-memorydb--持久化记忆库) |
+| **运行时设置** | `.arbiter/settings.json` | — | `/mode` 持久化、`/replay on/off` | [§3](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#3-arbitersettingsjson--运行时模式--内置子代理) |
+| **权限规则** | — *（项目文件被忽略）* | `~/.arbiter/permissions.json` | `/mode` `/permission`、工具确认 UI | [§4](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#4-permissionsjson--工具权限规则) |
+| **Shell 沙箱** | `.arbiter/sandbox.json` | `~/.arbiter/sandbox.json` | `/sandbox` | [Part 6.2](/zh/part-6/2-shell-sandbox) |
+| **MCP 服务器** | `.arbiter/mcp.json` | `~/.arbiter/mcp.json` | `/mcp` | [§5](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#5-mcpjson--mcp-服务器注册表) |
+| **ACP 服务器** | `.arbiter/acp.json` | — | `/acp` | [§6](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#6-acpjson--acp-子代理注册表) |
+| **Skill 启停** | `.arbiter/skills_config.json` | — | `/skills enable` `/skills disable` | [§7](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#7-skills_configjson--每个项目的-skill-启停) |
+| **项目说明** | `ARBITER.md`（cwd） | — | 每轮的系统提示 | [§8](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#8-arbitermd--项目说明) |
+| **记忆库** | `.arbiter/memory.db` | `~/.arbiter/memory.db` | `/memory`、`save_memory` 工具 | [§9](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#9-memorydb--持久化记忆库) |
 
 ## "改 X 改哪" 速查表
 
@@ -23,17 +23,17 @@
 | 默认模型 / API key | `.env`（`OPENAI_API_KEY`、`OPENAI_MODEL`、`OPENAI_BASE_URL`） |
 | 加第二个 provider | `.env`（`GEMINI_API_KEY` 等 — 见[第 2 章](./2-models-providers)） |
 | 默认温度 | `.env`（`LLM_TEMPERATURE`） |
-| 新会话默认权限模式 | `.agentao/settings.json` → `mode`*（"上次记住的模式"，[§3](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#3-agentaosettingsjson--运行时模式--内置子代理)）* |
-| 加放行 / 拒绝的 shell 命令 | `~/.agentao/permissions.json` |
-| 加放行 / 拒绝的 web 域名 | `~/.agentao/permissions.json` |
-| 默认沙箱 profile（macOS） | `.agentao/sandbox.json` 或 `~/.agentao/sandbox.json` → `default_profile` |
-| 默认上下文窗口大小 | 环境变量 `AGENTAO_CONTEXT_TOKENS` |
-| 默认是否录 replay | `.agentao/settings.json` → `replay.enabled` |
-| Replay 保留实例上限 | `.agentao/settings.json` → `replay.max_instances` |
-| 加 MCP 服务器 | `.agentao/mcp.json`（或 `/mcp add` — 写到同一文件） |
-| 加 ACP 服务器 | `.agentao/acp.json` |
-| 全局禁用某个有问题的 skill | `.agentao/skills_config.json`（或 `/skills disable <name>` — 同一文件） |
-| 项目级、agent 永远要遵守的事 | `AGENTAO.md`（或从 [`examples/personas/`](https://github.com/jin-bo/agentao/tree/main/examples/personas) 拷一个） |
+| 新会话默认权限模式 | `.arbiter/settings.json` → `mode`*（"上次记住的模式"，[§3](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#3-arbitersettingsjson--运行时模式--内置子代理)）* |
+| 加放行 / 拒绝的 shell 命令 | `~/.arbiter/permissions.json` |
+| 加放行 / 拒绝的 web 域名 | `~/.arbiter/permissions.json` |
+| 默认沙箱 profile（macOS） | `.arbiter/sandbox.json` 或 `~/.arbiter/sandbox.json` → `default_profile` |
+| 默认上下文窗口大小 | 环境变量 `ARBITER_CONTEXT_TOKENS` |
+| 默认是否录 replay | `.arbiter/settings.json` → `replay.enabled` |
+| Replay 保留实例上限 | `.arbiter/settings.json` → `replay.max_instances` |
+| 加 MCP 服务器 | `.arbiter/mcp.json`（或 `/mcp add` — 写到同一文件） |
+| 加 ACP 服务器 | `.arbiter/acp.json` |
+| 全局禁用某个有问题的 skill | `.arbiter/skills_config.json`（或 `/skills disable <name>` — 同一文件） |
+| 项目级、agent 永远要遵守的事 | `ARBITER.md`（或从 [`examples/personas/`](https://github.com/jin-bo/agentao/tree/main/examples/personas) 拷一个） |
 
 ## 运行时改动 vs. 配置文件
 
@@ -44,13 +44,13 @@
 | `/model <name>` | 否 | —（用 `.env` 里 `OPENAI_MODEL` 设默认） |
 | `/provider <name>` | 否 | —（设 provider env 三元组） |
 | `/temperature <n>` | 否 | `.env`（`LLM_TEMPERATURE`） |
-| `/mode <mode>` | 否 | `.agentao/settings.json`（"上次记住的"） |
-| `/context limit <n>` | 否 | —（仅当前进程；重启后读 `AGENTAO_CONTEXT_TOKENS`） |
+| `/mode <mode>` | 否 | `.arbiter/settings.json`（"上次记住的"） |
+| `/context limit <n>` | 否 | —（仅当前进程；重启后读 `ARBITER_CONTEXT_TOKENS`） |
 | `/sandbox profile <name>` | 否 | —（要持久化，改 `sandbox.json`） |
-| `/replay on` / `/replay off` | **是** | `.agentao/settings.json`（`replay.enabled`） |
-| `/skills disable <name>` / `/skills enable <name>` | **是** | `.agentao/skills_config.json` |
+| `/replay on` / `/replay off` | **是** | `.arbiter/settings.json`（`replay.enabled`） |
+| `/skills disable <name>` / `/skills enable <name>` | **是** | `.arbiter/skills_config.json` |
 | `/skills activate` / `/skills deactivate` | 否 | — |
-| `/mcp add` / `/mcp remove` | **是** | `.agentao/mcp.json`（项目） |
+| `/mcp add` / `/mcp remove` | **是** | `.arbiter/mcp.json`（项目） |
 | `/memory delete` / `/memory clear` | **是** | `memory.db`（软删） |
 
 绝大多数"感觉是临时的"命令就是设计成临时的。要让设置跨会话保留，去改文件。
@@ -59,39 +59,39 @@
 
 三件事记住：
 
-1. **Permissions 仅用户级**。项目级 `permissions.json` 一旦生效，clone 进来的任何 repo 都能覆盖你的安全策略，所以 loader **忽略**它（带 warning）。改个人规则就改 `~/.agentao/permissions.json`。
+1. **Permissions 仅用户级**。项目级 `permissions.json` 一旦生效，clone 进来的任何 repo 都能覆盖你的安全策略，所以 loader **忽略**它（带 warning）。改个人规则就改 `~/.arbiter/permissions.json`。
 2. **MCP 合并，但项目级仅可新增**。项目级条目能声明*新的* server name，不能把用户级定义的 `github` 重定向到不同 transport。同名冲突会跳过项目项 + warning。
 3. **Memory 按作用域独立**。Project DB 和 user DB 都注入 prompt，project 不覆盖 user。用 `/memory user` 和 `/memory project` 分别看。
 
 完整优先级规则见 [`docs/reference/configuration.zh.md` §1](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md#1-配置面总览)。
 
-## `AGENTAO.md` Persona Gallery
+## `ARBITER.md` Persona Gallery
 
-不想从空白开始写 `AGENTAO.md`，本仓在 [`examples/personas/`](https://github.com/jin-bo/agentao/tree/main/examples/personas) 下带了一个小型 persona gallery。每个 persona 就是一份 `AGENTAO.md`，拷进你的项目根目录即可。
+不想从空白开始写 `ARBITER.md`，本仓在 [`examples/personas/`](https://github.com/jin-bo/agentao/tree/main/examples/personas) 下带了一个小型 persona gallery。每个 persona 就是一份 `ARBITER.md`，拷进你的项目根目录即可。
 
 | Persona | 风格 | 适合 |
 |---|---|---|
-| [`daily-driver/`](https://github.com/jin-bo/agentao/blob/main/examples/personas/daily-driver/AGENTAO.md) | 证据优先、隐私意识、工作目录井然有序 | 日常研究 / 编码助手 |
-| [`kawaii-buddy/`](https://github.com/jin-bo/agentao/blob/main/examples/personas/kawaii-buddy/AGENTAO.md) | 可爱、中英混杂闲聊、关心你心情 | 情绪价值口袋助手 |
+| [`daily-driver/`](https://github.com/jin-bo/agentao/blob/main/examples/personas/daily-driver/ARBITER.md) | 证据优先、隐私意识、工作目录井然有序 | 日常研究 / 编码助手 |
+| [`kawaii-buddy/`](https://github.com/jin-bo/agentao/blob/main/examples/personas/kawaii-buddy/ARBITER.md) | 可爱、中英混杂闲聊、关心你心情 | 情绪价值口袋助手 |
 
 ```bash
-# 选一个，拷到你启动 agentao 的项目根
-cp examples/personas/daily-driver/AGENTAO.md /path/to/your/project/AGENTAO.md
+# 选一个，拷到你启动 arbiter 的项目根
+cp examples/personas/daily-driver/ARBITER.md /path/to/your/project/ARBITER.md
 ```
 
-`AGENTAO.md` 每轮都会重新组进系统提示 — 改完下一条消息生效，不必重启。Gallery 当起点用，不是契约；放心改写。
+`ARBITER.md` 每轮都会重新组进系统提示 — 改完下一条消息生效，不必重启。Gallery 当起点用，不是契约；放心改写。
 
 ## 内部状态文件
 
-`.agentao/` 下存在但**不要**手动编辑的文件：
+`.arbiter/` 下存在但**不要**手动编辑的文件：
 
 | 路径 | 用途 |
 |---|---|
-| `.agentao/background_tasks.json` | 子 agent 状态；内存里有镜像 |
-| `.agentao/replay/*.jsonl` | Replay 录制 |
-| `.agentao/sessions/` | 单次会话产物 |
-| `.agentao/plan.md`、`.agentao/plan-history/` | Plan 模式状态 |
-| `.agentao/tool-outputs/` | 工具输出缓存。落盘前会做密钥扫描——形似凭据的字符串以 `[REDACTED:<kind>]` 存储。会话文件与 `background_tasks.json` 则**有意不扫描**（它们在恢复会话时会回灌进对话） |
+| `.arbiter/background_tasks.json` | 子 agent 状态；内存里有镜像 |
+| `.arbiter/replay/*.jsonl` | Replay 录制 |
+| `.arbiter/sessions/` | 单次会话产物 |
+| `.arbiter/plan.md`、`.arbiter/plan-history/` | Plan 模式状态 |
+| `.arbiter/tool-outputs/` | 工具输出缓存。落盘前会做密钥扫描——形似凭据的字符串以 `[REDACTED:<kind>]` 存储。会话文件与 `background_tasks.json` 则**有意不扫描**（它们在恢复会话时会回灌进对话） |
 
 CLI 跑着的时候改它们会让状态对不上。非要改，先停 CLI。
 
@@ -100,23 +100,23 @@ CLI 跑着的时候改它们会让状态对不上。非要改，先停 CLI。
 两个非交互命令可以在不启动 agent 的前提下检查上表中的所有文件：
 
 ```bash
-agentao config validate      # 只看配置文件（.env / settings / permissions / mcp / replay / memory）
-agentao config validate --json
+arbiter config validate      # 只看配置文件（.env / settings / permissions / mcp / replay / memory）
+arbiter config validate --json
 
-agentao doctor               # 额外覆盖插件诊断、ACP schema、可选依赖探测
-agentao doctor --json
+arbiter doctor               # 额外覆盖插件诊断、ACP schema、可选依赖探测
+arbiter doctor --json
 ```
 
-可以放进 CI、`make check` 目标，或刚改完上表里某个文件后跑一下。Error（JSON 损坏、MCP 单条非 object、`LLM_TEMPERATURE` 解析失败等）退出 **1**；warning（fresh clone 少 API key、user/project MCP 同名碰撞）保持退出 **0** 以免 CI 误绊。完整说明见[第 12 章](./12-non-interactive#agentao-doctor-健康快照)。
+可以放进 CI、`make check` 目标，或刚改完上表里某个文件后跑一下。Error（JSON 损坏、MCP 单条非 object、`LLM_TEMPERATURE` 解析失败等）退出 **1**；warning（fresh clone 少 API key、user/project MCP 同名碰撞）保持退出 **0** 以免 CI 误绊。完整说明见[第 12 章](./12-non-interactive#arbiter-doctor-健康快照)。
 
 ## 接下来读什么
 
 | 想做的事 | 读 |
 |---|---|
 | 上面任意文件的完整 schema | [`docs/reference/configuration.zh.md`](https://github.com/jin-bo/agentao/blob/main/docs/reference/configuration.zh.md) |
-| 在 CI 中校验配置文件 | [12. 非交互入口 → `agentao config validate`](./12-non-interactive#agentao-config-validate-显式配置校验) |
+| 在 CI 中校验配置文件 | [12. 非交互入口 → `arbiter config validate`](./12-non-interactive#arbiter-config-validate-显式配置校验) |
 | 有意识地改默认权限规则 | [Part 5.4 · 权限引擎](/zh/part-5/4-permissions) |
-| 给项目写一份 `AGENTAO.md` | [Part 5.6 · 系统提示定制](/zh/part-5/6-system-prompt) |
+| 给项目写一份 `ARBITER.md` | [Part 5.6 · 系统提示定制](/zh/part-5/6-system-prompt) |
 
 ---
 

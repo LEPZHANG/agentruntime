@@ -1,14 +1,14 @@
-# Implement ACP Session Prompt With ContentBlock To Agentao Message Conversion
+# Implement ACP Session Prompt With ContentBlock To Arbiter Message Conversion
 
 ## Problem
 
-ACP prompt requests use structured content blocks, but Agentao currently accepts mostly string user input at its runtime boundary.
+ACP prompt requests use structured content blocks, but Arbiter currently accepts mostly string user input at its runtime boundary.
 
 ## Scope
 
 - Implement `session/prompt`
 - Convert ACP content blocks into internal user message text
-- Run Agentao chat loop for the session
+- Run Arbiter chat loop for the session
 
 ## Implementation Checklist
 

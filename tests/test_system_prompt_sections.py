@@ -8,15 +8,15 @@ SYSTEM_PROMPT_REDESIGN_PLAN.md.
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from agentao.plan import PlanPhase
+from arbiter.plan import PlanPhase
 
 
 def _make_agent(thinking_callback=None):
-    with patch("agentao.agent.LLMClient") as mock_llm_client:
+    with patch("arbiter.agent.LLMClient") as mock_llm_client:
         mock_llm_client.return_value.logger = Mock()
         mock_llm_client.return_value.model = "gpt-4"
-        from agentao.agent import Agentao
-        return Agentao(
+        from arbiter.agent import Arbiter
+        return Arbiter(
             thinking_callback=thinking_callback,
             working_directory=Path.cwd(),
         )
@@ -27,7 +27,7 @@ def _make_agent(thinking_callback=None):
 # ---------------------------------------------------------------------------
 
 STABLE_PREFIX_MARKERS = [
-    "You are Agentao",                    # Identity
+    "You are Arbiter",                    # Identity
     "=== Reliability Principles ===",
     "=== Task Classification ===",
     "=== Execution Protocol ===",

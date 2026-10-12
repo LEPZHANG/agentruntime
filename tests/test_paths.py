@@ -1,4 +1,4 @@
-"""Tests for agentao.paths — robust home-directory resolution.
+"""Tests for arbiter.paths — robust home-directory resolution.
 
 ``Path.home()`` raises ``RuntimeError`` when neither ``$HOME`` (nor
 ``USERPROFILE`` on Windows) nor the password database can yield a home
@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from agentao import paths
-from agentao.paths import (
+from arbiter import paths
+from arbiter.paths import (
     USER_DIR_NAME,
     _fallback_user_id,
     _is_private_to_current_user,
@@ -58,7 +58,7 @@ class TestUserHome:
         monkeypatch.setattr(Path, "home", staticmethod(_raise))
         monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
         result = user_home()
-        expected = tmp_path / f"agentao-{getpass.getuser()}"
+        expected = tmp_path / f"arbiter-{getpass.getuser()}"
         assert result == expected
         assert result.is_dir()
         if hasattr(os, "getuid"):
@@ -78,7 +78,7 @@ class TestUserHome:
         # private mkdtemp instead.
         monkeypatch.setattr(Path, "home", staticmethod(_raise))
         monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
-        candidate = tmp_path / f"agentao-{getpass.getuser()}"
+        candidate = tmp_path / f"arbiter-{getpass.getuser()}"
         candidate.mkdir(mode=0o777)
         os.chmod(candidate, 0o777)  # defeat umask
         result = user_home()
@@ -152,7 +152,7 @@ class TestUserRoot:
         monkeypatch.setattr(Path, "home", staticmethod(_raise))
         monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
         # Must not raise; lands under the per-user temp fallback home.
-        assert user_root() == tmp_path / f"agentao-{getpass.getuser()}" / USER_DIR_NAME
+        assert user_root() == tmp_path / f"arbiter-{getpass.getuser()}" / USER_DIR_NAME
 
     def test_uses_user_home(self, monkeypatch) -> None:
         # user_root must route through user_home (not Path.home directly), so

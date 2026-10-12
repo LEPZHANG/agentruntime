@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from agentao.memory.storage import SQLiteMemoryStore
-from agentao.memory.models import MemoryRecord, MemoryReviewItem, SessionSummaryRecord
+from arbiter.memory.storage import SQLiteMemoryStore
+from arbiter.memory.models import MemoryRecord, MemoryReviewItem, SessionSummaryRecord
 
 
 def _make_store(tmp_path: Path) -> SQLiteMemoryStore:
@@ -712,7 +712,7 @@ class TestPathConstructors:
 
         monkeypatch.setattr(SQLiteMemoryStore, "__init__", fake_init)
 
-        with caplog.at_level("WARNING", logger="agentao.memory.storage"):
+        with caplog.at_level("WARNING", logger="arbiter.memory.storage"):
             store = SQLiteMemoryStore.open_or_memory(tmp_path / "memory.db")
 
         assert store is not None

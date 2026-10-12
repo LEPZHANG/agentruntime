@@ -16,7 +16,7 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Deliverables
 
-- `agentao/skills/manager.py`
+- `arbiter/skills/manager.py`
 - skills integration 单测
 
 ## Dependencies
@@ -42,7 +42,7 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Acceptance Criteria
 
-1. plugin skill 能被 Agentao 发现
+1. plugin skill 能被 Arbiter 发现
 2. skill source 能标记 plugin origin
 
 ## Out Of Scope

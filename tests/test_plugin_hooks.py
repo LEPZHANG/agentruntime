@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from agentao.plugins.hooks import (
+from arbiter.plugins.hooks import (
     ClaudeHookPayloadAdapter,
     ClaudeHooksParser,
     PluginHookDispatcher,
@@ -17,7 +17,7 @@ from agentao.plugins.hooks import (
     prepare_user_turn,
     resolve_all_hook_rules,
 )
-from agentao.plugins.models import (
+from arbiter.plugins.models import (
     HookAttachmentRecord,
     LoadedPlugin,
     ParsedHookRule,
@@ -196,13 +196,13 @@ class TestToolAliasResolver:
 
     def test_reverse_lookup(self):
         resolver = ToolAliasResolver()
-        assert resolver.to_agentao_name("Read") == "read_file"
-        assert resolver.to_agentao_name("Bash") == "run_shell_command"
+        assert resolver.to_arbiter_name("Read") == "read_file"
+        assert resolver.to_arbiter_name("Bash") == "run_shell_command"
 
     def test_extra_aliases(self):
         resolver = ToolAliasResolver(extra={"my_tool": "MyTool"})
         assert resolver.to_claude_name("my_tool") == "MyTool"
-        assert resolver.to_agentao_name("MyTool") == "my_tool"
+        assert resolver.to_arbiter_name("MyTool") == "my_tool"
 
 
 # ======================================================================

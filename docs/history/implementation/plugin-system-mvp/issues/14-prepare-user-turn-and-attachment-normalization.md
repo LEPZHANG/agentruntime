@@ -18,7 +18,7 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Deliverables
 
-- `agentao/agent.py` prepare path
+- `arbiter/agent.py` prepare path
 - normalization helpers
 - tests
 

@@ -4,58 +4,58 @@
 
 **Title**
 
-Make Agentao a clean embeddable harness via in-place cleanup of construction side effects
+Make Arbiter a clean embeddable harness via in-place cleanup of construction side effects
 
 **Summary**
 
-Agentao's intended positioning is "an embeddable agent harness inside someone else's app, not a standalone runtime." Today `Agentao.__init__` is a 245-line constructor that implicitly reads env vars, dotenv, `Path.cwd()`, `Path.home()`, and several `.agentao/*.json` files. Embedded hosts (in-process Python, child process, remote service) cannot construct Agentao without inheriting all of those side effects.
+Arbiter's intended positioning is "an embeddable agent harness inside someone else's app, not a standalone runtime." Today `Arbiter.__init__` is a 245-line constructor that implicitly reads env vars, dotenv, `Path.cwd()`, `Path.home()`, and several `.arbiter/*.json` files. Embedded hosts (in-process Python, child process, remote service) cannot construct Arbiter without inheriting all of those side effects.
 
-This epic does the in-place cleanup: lift implicit environment, cwd/home, and `.agentao/*` reads out of `Agentao.__init__` into a thin `agentao.embedding.build_from_environment()` factory, then remove the remaining fallback reads in staged follow-up issues. By the end of M4, `Agentao(...)` is pure-injection construction. CLI and ACP route through the factory and see zero behavior change. Embedded hosts get a deterministic, side-effect-free construction surface.
+This epic does the in-place cleanup: lift implicit environment, cwd/home, and `.arbiter/*` reads out of `Arbiter.__init__` into a thin `arbiter.embedding.build_from_environment()` factory, then remove the remaining fallback reads in staged follow-up issues. By the end of M4, `Arbiter(...)` is pure-injection construction. CLI and ACP route through the factory and see zero behavior change. Embedded hosts get a deterministic, side-effect-free construction surface.
 
-We do NOT introduce a parallel `AgentSession` class — `Agentao` remains the single long-term embedding API. We do NOT async-ify the runtime internals — only the public `arun()` surface is async, runtime stays sync.
+We do NOT introduce a parallel `AgentSession` class — `Arbiter` remains the single long-term embedding API. We do NOT async-ify the runtime internals — only the public `arun()` surface is async, runtime stays sync.
 
 **Goals**
 
-- Make `Agentao(...)` a pure-injection construction surface with zero implicit env / disk / cwd reads after the capability, factory, fallback-removal, and opt-in subsystem issues land
-- Lift env / dotenv / cwd / home / `.agentao/*` reads into `agentao.embedding.factory.build_from_environment()`
+- Make `Arbiter(...)` a pure-injection construction surface with zero implicit env / disk / cwd reads after the capability, factory, fallback-removal, and opt-in subsystem issues land
+- Lift env / dotenv / cwd / home / `.arbiter/*` reads into `arbiter.embedding.factory.build_from_environment()`
 - Inject `FileSystem` and `ShellExecutor` capability into existing file/search/shell tools (no tool rewrites)
 - Add `schema_version` to `AgentEvent` for versioned wire schema
-- Invert `LLMClient` logger ownership so embedded hosts can inject their own logger without `getLogger("agentao")` being mutated
-- Add async public surface `Agentao.arun()` (runtime internals stay sync)
+- Invert `LLMClient` logger ownership so embedded hosts can inject their own logger without `getLogger("arbiter")` being mutated
+- Add async public surface `Arbiter.arun()` (runtime internals stay sync)
 - Force explicit `working_directory` in 0.3.0 (minor, BREAKING) after one patch release of soft deprecation in 0.2.16
 - Make `Replay` / `Sandbox` / `BgStore` opt-in (None = disabled) for embedded hosts
 
 **Non-goals for v1**
 
-- New parallel `AgentSession` class (rejected — `Agentao` is the long-term embedding API)
+- New parallel `AgentSession` class (rejected — `Arbiter` is the long-term embedding API)
 - Async runtime internals (`ToolRunner` / `ChatLoopRunner` stay sync)
 - `AsyncTransport` (only public `arun()` is async; internal `Transport` Protocol unchanged)
 - `MemoryStore` / `MCPRegistry` / `Logger` / `Tracer` Protocol abstraction (deferred to M5)
-- Removing `Agentao` 's existing transport / cancellation / replay primitives — they are reused as-is
+- Removing `Arbiter` 's existing transport / cancellation / replay primitives — they are reused as-is
 
 **Acceptance Criteria**
 
-- An embedded host can construct `Agentao(working_directory=Path(...), llm_config=..., filesystem=..., shell=...)` with **zero** implicit env / disk / cwd reads after M4 completes
-- `agentao.embedding.build_from_environment()` reproduces today's CLI behavior end-to-end
+- An embedded host can construct `Arbiter(working_directory=Path(...), llm_config=..., filesystem=..., shell=...)` with **zero** implicit env / disk / cwd reads after M4 completes
+- `arbiter.embedding.build_from_environment()` reproduces today's CLI behavior end-to-end
 - CLI launch (`./run.sh`) and ACP `session/new` behavior unchanged
 - File, search, and shell tools route through capability backends; in-memory fakes can replace them
 - `AgentEvent.schema_version == 1` ships in all wire payloads (ACP/SSE/host)
-- `LLMClient` no longer mutates `getLogger("agentao")` (level or handlers) when caller injects a logger
+- `LLMClient` no longer mutates `getLogger("arbiter")` (level or handlers) when caller injects a logger
 - `LLMClient(log_file=None, logger=injected)` constructs with zero package-root side effects
 - Embedded async host can `await agent.arun(...)` without manual thread bridging
-- After 0.3.0, `Agentao()` without `working_directory=` raises `TypeError`
+- After 0.3.0, `Arbiter()` without `working_directory=` raises `TypeError`
 
 **Dependencies / Reuse**
 
-- Existing runtime layering: `agentao/runtime/` (`ToolRunner`, `ChatLoopRunner`, `ToolExecutor`)
-- Existing transport abstraction: `agentao/transport/` (Protocol unchanged)
-- Existing tool base: `agentao/tools/base.py`
+- Existing runtime layering: `arbiter/runtime/` (`ToolRunner`, `ChatLoopRunner`, `ToolExecutor`)
+- Existing transport abstraction: `arbiter/transport/` (Protocol unchanged)
+- Existing tool base: `arbiter/tools/base.py`
 - Existing memory / permission / MCP / replay / sandbox subsystems retain public APIs; only their fallback paths are removed
 
 **Risks**
 
 - **Factory + fallback cleanup touches many files.** Mitigated by splitting into Issue 4 (factory + CLI/ACP migration, fallbacks intact), Issue 5 (subsystem fallback deletion), and Issue 9 (opt-in replay/sandbox/background subsystems).
-- **Hard break of `Agentao()` would surprise PyPI users and break repo's own `examples/`.** Mitigated by Issue 7 soft deprecation cycle (0.2.16 patch) before Issue 8 hard break (0.3.0 minor, standard SemVer breaking).
+- **Hard break of `Arbiter()` would surprise PyPI users and break repo's own `examples/`.** Mitigated by Issue 7 soft deprecation cycle (0.2.16 patch) before Issue 8 hard break (0.3.0 minor, standard SemVer breaking).
 - **Capability injection threads through every file/search/shell tool.** Mitigated by Issue 3 keeping default `LocalFileSystem` / `LocalShellExecutor` byte-equivalent to today.
 - **`Path.cwd()` removal interacts with CLI `cd` semantics.** Factory captures `Path.cwd()` once at startup; CLI users who rely on lazy cwd switching mid-process will see a change. Documented in Issue 8.
 
@@ -67,7 +67,7 @@ Add `schema_version` to `AgentEvent` for versioned wire payloads
 
 **Problem**
 
-`AgentEvent` is a dataclass with only `type` and `data` fields (`agentao/transport/events.py:42-76`). The wire payload that ACP / SSE / embedded host receives carries no schema version, so future schema changes cannot be negotiated. ACP has its own `ACP_PROTOCOL_VERSION = 1` (`agentao/acp/protocol.py:16`), but the runtime event payload itself is unversioned.
+`AgentEvent` is a dataclass with only `type` and `data` fields (`arbiter/transport/events.py:42-76`). The wire payload that ACP / SSE / embedded host receives carries no schema version, so future schema changes cannot be negotiated. ACP has its own `ACP_PROTOCOL_VERSION = 1` (`arbiter/acp/protocol.py:16`), but the runtime event payload itself is unversioned.
 
 **Scope**
 
@@ -79,8 +79,8 @@ Add `schema_version` to `AgentEvent` for versioned wire payloads
 
 - [ ] Add `schema_version: int = 1` field to `AgentEvent` dataclass
 - [ ] Add `to_dict()` method returning `{"type": ..., "schema_version": ..., "data": ...}`
-- [ ] Update `agentao/transport/sdk.py` to emit `schema_version` in serialized payload
-- [ ] Update `agentao/acp/transport.py` to forward `schema_version` in `session/update` notifications
+- [ ] Update `arbiter/transport/sdk.py` to emit `schema_version` in serialized payload
+- [ ] Update `arbiter/acp/transport.py` to forward `schema_version` in `session/update` notifications
 - [ ] Add `tests/test_event_schema_version.py` asserting default value on a concrete event and presence in wire output
 - [ ] Audit replay snapshot fixtures (`tests/test_replay*.py`), ACP wire-trace assertions, and any test using `==` on a serialized event dict for two-key `{type, data}` shape strictness — update to expect the three-key shape
 - [ ] Document the field on `AgentEvent` docstring as the runtime-payload version contract
@@ -99,12 +99,12 @@ Invert `LLMClient` logger ownership for embedded hosts
 
 **Problem**
 
-`LLMClient.__init__` writes to the `getLogger("agentao")` package root: it sets level to DEBUG and attaches a `RotatingFileHandler` (`agentao/llm/client.py:142-180`). The current code already tags its own handlers with `_agentao_llm_file_handler=True` and only evicts marked handlers on reconstruction, so it does **not** drop outsider handlers (e.g. AcpServer's stderr guard). The remaining problem is **inversion of control**: an embedded host that injects its own logger still has its package-root level and handler list mutated underneath it. There is no way to say "I own this logger; don't touch it."
+`LLMClient.__init__` writes to the `getLogger("arbiter")` package root: it sets level to DEBUG and attaches a `RotatingFileHandler` (`arbiter/llm/client.py:142-180`). The current code already tags its own handlers with `_arbiter_llm_file_handler=True` and only evicts marked handlers on reconstruction, so it does **not** drop outsider handlers (e.g. AcpServer's stderr guard). The remaining problem is **inversion of control**: an embedded host that injects its own logger still has its package-root level and handler list mutated underneath it. There is no way to say "I own this logger; don't touch it."
 
 **Scope**
 
 - Accept injected `logger` parameter
-- When caller provides a logger, do not mutate `getLogger("agentao")` package root (no level set, no handler attach/evict)
+- When caller provides a logger, do not mutate `getLogger("arbiter")` package root (no level set, no handler attach/evict)
 - `log_file` becomes optional (None = no file handler)
 
 **Implementation Checklist**
@@ -112,18 +112,18 @@ Invert `LLMClient` logger ownership for embedded hosts
 - [ ] Add `logger: logging.Logger | None = None` parameter to `LLMClient.__init__`
 - [ ] Make `log_file: str | None = None` (None means no file handler)
 - [ ] When `logger` is provided, skip `pkg_logger.setLevel()` / `pkg_logger.removeHandler()` / `addHandler()` entirely
-- [ ] Update `Agentao.__init__` to keep current CLI behavior: still pass `log_file=str(self.working_directory / "agentao.log")`
+- [ ] Update `Arbiter.__init__` to keep current CLI behavior: still pass `log_file=str(self.working_directory / "arbiter.log")`
 - [ ] Add `tests/test_llm_client_logger_injection.py`:
-  - assert `LLMClient(logger=mock)` does not touch `getLogger("agentao").level` or `.handlers`
+  - assert `LLMClient(logger=mock)` does not touch `getLogger("arbiter").level` or `.handlers`
   - assert repeated reconstruction with `logger=mock` is a no-op against the package root
   - assert `LLMClient(log_file=None)` does not attach any file handler
 - [ ] Document the new behavior in `LLMClient` docstring
 
 **Acceptance Criteria**
 
-- Embedded host can pass own logger and Agentao does not mutate `getLogger("agentao")`
+- Embedded host can pass own logger and Arbiter does not mutate `getLogger("arbiter")`
 - `LLMClient(log_file=None)` is a clean construction with zero package-root side effects
-- Existing CLI behavior (file at `<wd>/agentao.log`, package-root DEBUG level) unchanged when `logger=None`
+- Existing CLI behavior (file at `<wd>/arbiter.log`, package-root DEBUG level) unchanged when `logger=None`
 
 ## Issue 3
 
@@ -133,31 +133,31 @@ Add `FileSystem` / `ShellExecutor` capability protocols and inject into file/sea
 
 **Problem**
 
-File, search, and shell tools call local filesystem and process APIs directly (`agentao/tools/file_ops.py`, `agentao/tools/search.py`, `agentao/tools/shell.py`). Embedded hosts cannot route IO through Docker exec, audit logs, virtual FS, remote runners, etc. — the only escape today is monkey-patching.
+File, search, and shell tools call local filesystem and process APIs directly (`arbiter/tools/file_ops.py`, `arbiter/tools/search.py`, `arbiter/tools/shell.py`). Embedded hosts cannot route IO through Docker exec, audit logs, virtual FS, remote runners, etc. — the only escape today is monkey-patching.
 
 **Scope**
 
 - Define `FileSystem` and `ShellExecutor` as `Protocol`
 - Provide `LocalFileSystem` / `LocalShellExecutor` defaults with byte-equivalent current behavior
-- `Agentao.__init__` accepts optional capability instances
+- `Arbiter.__init__` accepts optional capability instances
 - Refactor `ReadFileTool`, `WriteFileTool`, `EditTool`, `ReadFolderTool`, `FindFilesTool`, `SearchTextTool`, `ShellTool` to call capabilities
 
 **Implementation Checklist**
 
-- [ ] Create `agentao/capabilities/__init__.py`
-- [ ] Create `agentao/capabilities/filesystem.py`:
+- [ ] Create `arbiter/capabilities/__init__.py`
+- [ ] Create `arbiter/capabilities/filesystem.py`:
   - [ ] `FileEntry`, `FileStat` dataclasses
   - [ ] `class FileSystem(Protocol)` with `read_bytes`, `write_text`, `list_dir`, `glob`, `stat`, `exists`, `is_dir`, `is_file`
   - [ ] `class LocalFileSystem` with byte-equivalent default implementations
-- [ ] Create `agentao/capabilities/shell.py`:
+- [ ] Create `arbiter/capabilities/shell.py`:
   - [ ] `ShellRequest`, `ShellResult`, `BackgroundHandle` dataclasses
   - [ ] `class ShellExecutor(Protocol)` with `run`, `run_background`
-  - [ ] `class LocalShellExecutor` reusing `agentao/tools/shell.py:_run_foreground` / `_run_background` logic
-- [ ] Refactor `agentao/tools/file_ops.py` to take a `FileSystem` and route through it
-- [ ] Refactor `agentao/tools/search.py` to take a `FileSystem` and route glob/search reads through it
-- [ ] Refactor `agentao/tools/shell.py` to take a `ShellExecutor` and route through it
-- [ ] Add `filesystem: FileSystem | None = None`, `shell: ShellExecutor | None = None` to `Agentao.__init__` (None = local default)
-- [ ] Update `agentao/tooling/registry.py::register_builtin_tools` to wire capabilities to tools
+  - [ ] `class LocalShellExecutor` reusing `arbiter/tools/shell.py:_run_foreground` / `_run_background` logic
+- [ ] Refactor `arbiter/tools/file_ops.py` to take a `FileSystem` and route through it
+- [ ] Refactor `arbiter/tools/search.py` to take a `FileSystem` and route glob/search reads through it
+- [ ] Refactor `arbiter/tools/shell.py` to take a `ShellExecutor` and route through it
+- [ ] Add `filesystem: FileSystem | None = None`, `shell: ShellExecutor | None = None` to `Arbiter.__init__` (None = local default)
+- [ ] Update `arbiter/tooling/registry.py::register_builtin_tools` to wire capabilities to tools
 - [ ] Add `tests/test_filesystem_capability_swap.py` with in-memory fake FS verifying tool calls route through it
 - [ ] Add `tests/test_shell_capability_swap.py` with mock executor capturing all shell invocations
 - [ ] Add `tests/test_local_filesystem_byte_equivalence.py`: snapshot fixture-tree listing / glob / stat output before refactor; assert exact equality after `LocalFileSystem` is in place — covers `os.scandir` ordering, `Path.glob` symlink follow, and exposed stat fields
@@ -173,32 +173,32 @@ File, search, and shell tools call local filesystem and process APIs directly (`
 
 **Title**
 
-Add `agentao/embedding/factory.py` and migrate CLI/ACP to it
+Add `arbiter/embedding/factory.py` and migrate CLI/ACP to it
 
 **Problem**
 
-`Agentao.__init__` reads env (`LLM_PROVIDER`, `*_API_KEY`, `*_BASE_URL`, `*_MODEL`), dotenv, `Path.cwd()`, `Path.home()`, `.agentao/permissions.json`, `.agentao/mcp.json`, `.agentao/sandbox.json`, `.agentao/replay.json` implicitly. Embedded hosts cannot construct Agentao without inheriting all those side effects. CLI / ACP currently rely on this implicit behavior.
+`Arbiter.__init__` reads env (`LLM_PROVIDER`, `*_API_KEY`, `*_BASE_URL`, `*_MODEL`), dotenv, `Path.cwd()`, `Path.home()`, `.arbiter/permissions.json`, `.arbiter/mcp.json`, `.arbiter/sandbox.json`, `.arbiter/replay.json` implicitly. Embedded hosts cannot construct Arbiter without inheriting all those side effects. CLI / ACP currently rely on this implicit behavior.
 
 **Scope**
 
-- Add `agentao.embedding.build_from_environment(...)` that captures all current implicit reads
+- Add `arbiter.embedding.build_from_environment(...)` that captures all current implicit reads
 - CLI and ACP entrypoints route through it
-- `Agentao.__init__` continues to accept old keyword arguments (compatibility path) — no breaking change in this issue
+- `Arbiter.__init__` continues to accept old keyword arguments (compatibility path) — no breaking change in this issue
 
 **Implementation Checklist**
 
-- [ ] Create `agentao/embedding/__init__.py` exporting `build_from_environment`
-- [ ] Create `agentao/embedding/factory.py::build_from_environment(working_directory: Path | None = None, **overrides) -> Agentao`
+- [ ] Create `arbiter/embedding/__init__.py` exporting `build_from_environment`
+- [ ] Create `arbiter/embedding/factory.py::build_from_environment(working_directory: Path | None = None, **overrides) -> Arbiter`
 - [ ] Inside factory:
   - [ ] `load_dotenv()` (reads `.env` from working_directory or fallback)
   - [ ] Read `LLM_PROVIDER` and provider-prefixed env vars → construct LLM config
   - [ ] `working_directory or Path.cwd()` resolved to absolute Path
-  - [ ] Load `<wd>/.agentao/permissions.json` + `~/.agentao/permissions.json` → construct `PermissionEngine`
-  - [ ] Load `<wd>/.agentao/mcp.json` + `~/.agentao/mcp.json` → MCP server config dict
-  - [ ] Compute memory roots `<wd>/.agentao` + `~/.agentao`
-  - [ ] Load replay / sandbox / bg_store config from `<wd>/.agentao/`
-  - [ ] Pass everything explicitly to `Agentao(...)`
-- [ ] `Agentao.__init__` accepts new explicit-injection keyword args alongside the existing legacy args. Precedence rule: an injected fully-constructed object always wins over its raw-config sibling; if both are supplied, raise `ValueError`:
+  - [ ] Load `<wd>/.arbiter/permissions.json` + `~/.arbiter/permissions.json` → construct `PermissionEngine`
+  - [ ] Load `<wd>/.arbiter/mcp.json` + `~/.arbiter/mcp.json` → MCP server config dict
+  - [ ] Compute memory roots `<wd>/.arbiter` + `~/.arbiter`
+  - [ ] Load replay / sandbox / bg_store config from `<wd>/.arbiter/`
+  - [ ] Pass everything explicitly to `Arbiter(...)`
+- [ ] `Arbiter.__init__` accepts new explicit-injection keyword args alongside the existing legacy args. Precedence rule: an injected fully-constructed object always wins over its raw-config sibling; if both are supplied, raise `ValueError`:
   - [ ] `llm_client: LLMClient | None` (preferred; injected wins) **or** existing `api_key` / `base_url` / `model` / `temperature` (legacy raw config — factory uses these)
   - [ ] `logger: logging.Logger | None` (forwarded to `LLMClient` per Issue 2)
   - [ ] `permission_engine: PermissionEngine | None`
@@ -207,10 +207,10 @@ Add `agentao/embedding/factory.py` and migrate CLI/ACP to it
   - [ ] `project_instructions: str | None` (when injected, suppress `_load_project_instructions` disk read — see Issue 5)
   - [ ] `mcp_manager: McpClientManager | None` (preferred) **or** existing `extra_mcp_servers: dict | None` (factory builds dict from disk)
   - [ ] `filesystem: FileSystem | None` / `shell: ShellExecutor | None`
-- [ ] Migrate `agentao/cli/app.py` and `agentao/cli/entrypoints.py` to call `build_from_environment()`
-- [ ] Migrate `agentao/acp/session_new.py` to call `build_from_environment(working_directory=request_cwd)`
-- [ ] Migrate `agentao/acp/session_load.py` similarly
-- [ ] Add `tests/test_factory_build_from_environment.py` with tmpdir fixtures simulating `.env` + `.agentao/*.json`
+- [ ] Migrate `arbiter/cli/app.py` and `arbiter/cli/entrypoints.py` to call `build_from_environment()`
+- [ ] Migrate `arbiter/acp/session_new.py` to call `build_from_environment(working_directory=request_cwd)`
+- [ ] Migrate `arbiter/acp/session_load.py` similarly
+- [ ] Add `tests/test_factory_build_from_environment.py` with tmpdir fixtures simulating `.env` + `.arbiter/*.json`
 - [ ] Add a CLI smoke test confirming `./run.sh` startup is unchanged
 
 **Acceptance Criteria**
@@ -236,34 +236,34 @@ Mostly deletion PR. No CLI / ACP behavior change because Issue 4 already passes 
 
 **Implementation Checklist**
 
-- [ ] `LLMClient.__init__`: delete `os.getenv` block (`agentao/llm/client.py:108-127`); make `api_key`, `base_url`, `model`, `temperature` required
+- [ ] `LLMClient.__init__`: delete `os.getenv` block (`arbiter/llm/client.py:108-127`); make `api_key`, `base_url`, `model`, `temperature` required
 - [ ] `MemoryManager.__init__`: delete `Path.home()` fallback; make `project_root` and `global_root` required
-- [ ] `PermissionEngine.__init__`: delete `Path.cwd()` fallback (`agentao/permissions.py:190-201`); make `project_root` required
-- [ ] `load_mcp_config()`: delete `Path.cwd()` fallback (`agentao/mcp/config.py:84-86`); make `project_root` required
-- [ ] Remove direct provider env reads from sub-agent construction (`agentao/agents/tools.py`); inherit resolved parent LLM config or use explicit factory-supplied provider config
+- [ ] `PermissionEngine.__init__`: delete `Path.cwd()` fallback (`arbiter/permissions.py:190-201`); make `project_root` required
+- [ ] `load_mcp_config()`: delete `Path.cwd()` fallback (`arbiter/mcp/config.py:84-86`); make `project_root` required
+- [ ] Remove direct provider env reads from sub-agent construction (`arbiter/agents/tools.py`); inherit resolved parent LLM config or use explicit factory-supplied provider config
 - [ ] **Skill auto-discovery skip path**: today `agent.py:142-144` always calls `SkillManager(working_directory=...)` which discovers project + bundled skills from disk. When `skill_manager` is injected via Issue 4, the constructor must skip the auto-discovery `SkillManager(...)` call entirely and use the injected instance verbatim
-- [ ] **Project-instructions skip path**: today `agent.py:255` unconditionally calls `self._load_project_instructions()` which reads `<wd>/AGENTAO.md`. When `project_instructions` is injected via Issue 4, `Agentao.__init__` must store the override and skip the disk read; `_load_project_instructions` becomes a fallback only used when the injection is `None`
+- [ ] **Project-instructions skip path**: today `agent.py:255` unconditionally calls `self._load_project_instructions()` which reads `<wd>/ARBITER.md`. When `project_instructions` is injected via Issue 4, `Arbiter.__init__` must store the override and skip the disk read; `_load_project_instructions` becomes a fallback only used when the injection is `None`
 - [ ] Audit and update any test that constructs `LLMClient()` / `MemoryManager()` / `PermissionEngine()` without args
-- [ ] Add `tests/test_agent_subsystem_injection.py`: construct `Agentao` directly with explicit subsystem injections and verify a chat round-trip works
+- [ ] Add `tests/test_agent_subsystem_injection.py`: construct `Arbiter` directly with explicit subsystem injections and verify a chat round-trip works
 - [ ] Add `tests/test_no_subsystem_fallback_reads.py`: monkeypatch `os.environ`, `Path.cwd()`, `Path.home()` to assert these subsystem constructors no longer read them
 - [ ] Add `tests/test_skill_manager_injection.py`: assert injected `skill_manager` is used as-is and no project-skill discovery happens
-- [ ] Add `tests/test_project_instructions_injection.py`: assert injected `project_instructions` is used as-is and `<wd>/AGENTAO.md` is never read
+- [ ] Add `tests/test_project_instructions_injection.py`: assert injected `project_instructions` is used as-is and `<wd>/ARBITER.md` is never read
 
 **Acceptance Criteria**
 
 - Constructing `LLMClient()` / `MemoryManager()` / `PermissionEngine()` without args raises `TypeError`
 - CLI and ACP behavior unchanged (factory is the only path that reads env / disk for these subsystems)
-- `Agentao` is constructable with explicit subsystem injections and no env / cwd / home side effects from these fallback paths
+- `Arbiter` is constructable with explicit subsystem injections and no env / cwd / home side effects from these fallback paths
 
 ## Issue 6
 
 **Title**
 
-Add async public surface `Agentao.arun()` (runtime internals stay sync)
+Add async public surface `Arbiter.arun()` (runtime internals stay sync)
 
 **Problem**
 
-`Agentao.chat()` is sync (`agentao/agent.py:459-477`). Async hosts must wrap calls in `loop.run_in_executor` themselves; cancellation, permission, and event interactions all suffer from the sync facade.
+`Arbiter.chat()` is sync (`arbiter/agent.py:459-477`). Async hosts must wrap calls in `loop.run_in_executor` themselves; cancellation, permission, and event interactions all suffer from the sync facade.
 
 **Scope**
 
@@ -272,9 +272,9 @@ Add `async def arun(...)`. Internal runtime stays sync; thread executor bridges 
 **Implementation Checklist**
 
 - [ ] Add `async def arun(self, user_message: str, max_iterations: int = 100, cancellation_token: CancellationToken | None = None) -> str`
-- [ ] Implementation: `await asyncio.get_running_loop().run_in_executor(None, self.chat, user_message, max_iterations, cancellation_token)`. The chat path today goes through `Agentao.chat()` → `ChatLoopRunner.run()` (`agentao/runtime/chat_loop.py`); reuse that pipeline as-is via the executor bridge, do not bypass into `ChatLoopRunner` internals
+- [ ] Implementation: `await asyncio.get_running_loop().run_in_executor(None, self.chat, user_message, max_iterations, cancellation_token)`. The chat path today goes through `Arbiter.chat()` → `ChatLoopRunner.run()` (`arbiter/runtime/chat_loop.py`); reuse that pipeline as-is via the executor bridge, do not bypass into `ChatLoopRunner` internals
 - [ ] Keep sync `chat()` on the existing sync path; `chat()` must not call `asyncio.run()` because it would fail inside already-running async hosts
-- [ ] Document in `Agentao` docstring: runtime internals are sync; async surface is the public contract for embedded hosts
+- [ ] Document in `Arbiter` docstring: runtime internals are sync; async surface is the public contract for embedded hosts
 - [ ] Document that `Transport` Protocol stays sync — host's async event handler should bridge at the transport level if needed
 - [ ] Add `tests/test_async_chat.py` running `asyncio.run(agent.arun(...))`
 - [ ] Verify cancellation, replay, max_iterations behave identically between sync and async paths
@@ -290,54 +290,54 @@ Add `async def arun(...)`. Internal runtime stays sync; thread executor bridges 
 
 **Title**
 
-Soft deprecate `Agentao()` without `working_directory` and migrate internal docs / examples / tests
+Soft deprecate `Arbiter()` without `working_directory` and migrate internal docs / examples / tests
 
 **Problem**
 
-After Issues 4-6, embedded hosts have a clean factory entry, but `Agentao(working_directory=None)` still falls back to `Path.cwd()` lazily — keeping the implicit cwd dependency for any caller that doesn't follow the new path. README, multiple docs, and bundled `examples/data-workbench` + `examples/batch-scheduler` all currently demonstrate `Agentao()`. Hard break would surprise PyPI users and break repo's own examples.
+After Issues 4-6, embedded hosts have a clean factory entry, but `Arbiter(working_directory=None)` still falls back to `Path.cwd()` lazily — keeping the implicit cwd dependency for any caller that doesn't follow the new path. README, multiple docs, and bundled `examples/data-workbench` + `examples/batch-scheduler` all currently demonstrate `Arbiter()`. Hard break would surprise PyPI users and break repo's own examples.
 
 **Scope**
 
-Emit `DeprecationWarning` when `Agentao()` is constructed without `working_directory`. Migrate internal README, docs, examples, and tests to the explicit form. Plan hard break for the next minor (0.3.0, Issue 8).
+Emit `DeprecationWarning` when `Arbiter()` is constructed without `working_directory`. Migrate internal README, docs, examples, and tests to the explicit form. Plan hard break for the next minor (0.3.0, Issue 8).
 
 **Implementation Checklist**
 
-- [ ] In `Agentao.__init__`, when `working_directory is None`, emit:
+- [ ] In `Arbiter.__init__`, when `working_directory is None`, emit:
   ```python
   warnings.warn(
-      "Agentao() without working_directory= is deprecated and will be required "
+      "Arbiter() without working_directory= is deprecated and will be required "
       "in 0.3.0. Pass an explicit Path, or use "
-      "agentao.embedding.build_from_environment() for CLI-style auto-detection "
-      "of cwd/.env/.agentao/.",
+      "arbiter.embedding.build_from_environment() for CLI-style auto-detection "
+      "of cwd/.env/.arbiter/.",
       DeprecationWarning,
       stacklevel=2,
   )
   ```
-- [ ] Sweep all `examples/` (not just data-workbench / batch-scheduler — also `headless_worker.py`, `saas-assistant`, `ticket-automation`, `ide-plugin-ts`) for any `Agentao(...)` construction missing `working_directory=`. Note: `examples/data-workbench/src/workbench.py:86` and `examples/batch-scheduler/src/daily_digest.py:48` already pass `working_directory=workdir` — verify and skip
-- [ ] Update bare `Agentao()` recommendations:
-  - [ ] `README.md:753` ("just `Agentao()` — it uses `NullTransport` automatically") — rewrite to explicit form or `build_from_environment()`
+- [ ] Sweep all `examples/` (not just data-workbench / batch-scheduler — also `headless_worker.py`, `saas-assistant`, `ticket-automation`, `ide-plugin-ts`) for any `Arbiter(...)` construction missing `working_directory=`. Note: `examples/data-workbench/src/workbench.py:86` and `examples/batch-scheduler/src/daily_digest.py:48` already pass `working_directory=workdir` — verify and skip
+- [ ] Update bare `Arbiter()` recommendations:
+  - [ ] `README.md:753` ("just `Arbiter()` — it uses `NullTransport` automatically") — rewrite to explicit form or `build_from_environment()`
   - [ ] `README.zh.md:745` (Chinese counterpart)
-  - [ ] `docs/guides/model-switching.md:317` (bare `Agentao()`)
-  - [ ] `docs/guides/chatagent-md.md:208` (bare `Agentao()`)
+  - [ ] `docs/guides/model-switching.md:317` (bare `Arbiter()`)
+  - [ ] `docs/guides/chatagent-md.md:208` (bare `Arbiter()`)
 - [ ] Update partial-arg examples missing `working_directory=`:
-  - [ ] `README.md:747` (`Agentao(transport=transport)`)
+  - [ ] `README.md:747` (`Arbiter(transport=transport)`)
   - [ ] `README.zh.md:739`
-  - [ ] `docs/guides/model-switching.md:177` (`Agentao(model="gpt-5.4")`)
-  - [ ] `docs/guides/logging.md:352` (`Agentao(api_key=..., model=...)`)
-- [ ] Update tests that construct `Agentao()` without args:
+  - [ ] `docs/guides/model-switching.md:177` (`Arbiter(model="gpt-5.4")`)
+  - [ ] `docs/guides/logging.md:352` (`Arbiter(api_key=..., model=...)`)
+- [ ] Update tests that construct `Arbiter()` without args:
   - [ ] `tests/test_multi_turn.py:21`
   - [ ] `tests/test_skills_prompt.py:14`
   - [ ] `tests/test_skill_integration.py:11`
-  - [ ] `tests/test_agentao_md.py:19,52`
+  - [ ] `tests/test_arbiter_md.py:19,52`
   - [ ] `tests/test_tool_confirmation.py:94`
   - [ ] `tests/test_date_in_prompt.py:15`
   - [ ] `tests/test_memory_renderer.py:356,391,424`
-- [ ] Add CHANGELOG entry: "0.2.16: `Agentao()` without `working_directory=` is deprecated; will be required in 0.3.0"
+- [ ] Add CHANGELOG entry: "0.2.16: `Arbiter()` without `working_directory=` is deprecated; will be required in 0.3.0"
 - [ ] Run `pytest -W error::DeprecationWarning tests/` to ensure no internal warning leakage
 
 **Acceptance Criteria**
 
-- `Agentao()` without `working_directory` triggers a clear `DeprecationWarning` with migration guidance
+- `Arbiter()` without `working_directory` triggers a clear `DeprecationWarning` with migration guidance
 - All bundled docs and examples use explicit form or factory
 - `pytest -W error::DeprecationWarning tests/` passes — internal code raises zero warnings
 - CLI and ACP route through factory and raise no warnings
@@ -346,7 +346,7 @@ Emit `DeprecationWarning` when `Agentao()` is constructed without `working_direc
 
 **Title**
 
-Hard break: `Agentao` requires `working_directory` (0.3.0)
+Hard break: `Arbiter` requires `working_directory` (0.3.0)
 
 **Problem**
 
@@ -358,23 +358,23 @@ Pure-collapse PR. Remove the deprecation warning, make `working_directory` a req
 
 **Implementation Checklist**
 
-- [ ] Remove `warnings.warn` block from `Agentao.__init__` (added in Issue 7)
+- [ ] Remove `warnings.warn` block from `Arbiter.__init__` (added in Issue 7)
 - [ ] Change signature: `def __init__(self, *, working_directory: Path, ...)`  — keyword-only, required
-- [ ] Delete `Path.cwd()` branch in `working_directory` property (`agentao/agent.py:291-306`); property always returns frozen value
+- [ ] Delete `Path.cwd()` branch in `working_directory` property (`arbiter/agent.py:291-306`); property always returns frozen value
 - [ ] Delete lazy-cwd providers in subsystems that depended on the lazy fallback:
   - [ ] `bg_store = BackgroundTaskStore(persistence_dir_provider=Path.cwd)` → frozen `persistence_dir=working_directory` (`agent.py:223`)
   - [ ] `sandbox_policy = SandboxPolicy(project_root_provider=Path.cwd)` → frozen `project_root=working_directory` (`agent.py:268`)
-- [ ] **CLI cwd-change audit**: grep for `os.chdir` across `agentao/cli*` and decide policy. If the CLI never `chdir`s after startup, document "factory captures cwd once at startup; mid-process `cd` is not retargeted" in the CHANGELOG migration section. If the CLI does `chdir` (e.g. via a `/cd` command), re-invoke `build_from_environment()` from that command path or explicitly disable mid-process retargeting
-- [ ] Bump `__version__` in `agentao/__init__.py:8` to `0.3.0`
+- [ ] **CLI cwd-change audit**: grep for `os.chdir` across `arbiter/cli*` and decide policy. If the CLI never `chdir`s after startup, document "factory captures cwd once at startup; mid-process `cd` is not retargeted" in the CHANGELOG migration section. If the CLI does `chdir` (e.g. via a `/cd` command), re-invoke `build_from_environment()` from that command path or explicitly disable mid-process retargeting
+- [ ] Bump `__version__` in `arbiter/__init__.py:8` to `0.3.0`
 - [ ] Update CHANGELOG with `BREAKING:` marker explaining the change and migration path, including the cwd-freeze semantic
 - [ ] Verify `pytest tests/` passes (Issue 7 should have left no implicit constructions)
 - [ ] Manually run `./run.sh` to confirm CLI startup, `/clear`, and post-`cd` behavior matches the documented policy
 
 **Acceptance Criteria**
 
-- `Agentao()` without `working_directory` raises `TypeError`, not warning
-- `agentao.embedding.build_from_environment()` continues to work transparently
-- CHANGELOG documents the migration step (`Agentao()` → `build_from_environment()` or `Agentao(working_directory=...)`)
+- `Arbiter()` without `working_directory` raises `TypeError`, not warning
+- `arbiter.embedding.build_from_environment()` continues to work transparently
+- CHANGELOG documents the migration step (`Arbiter()` → `build_from_environment()` or `Arbiter(working_directory=...)`)
 - All bundled tests pass
 - Version is `0.3.0`
 
@@ -386,28 +386,28 @@ Make `Replay` / `Sandbox` / `BackgroundTaskStore` opt-in (None = disabled)
 
 **Problem**
 
-`Agentao.__init__` always constructs `ReplayConfig`, `SandboxPolicy`, `BackgroundTaskStore` — which read `<wd>/.agentao/*.json` and the cwd (`agentao/agent.py:216-280`). Embedded hosts that don't want persistence or sandboxing cannot disable them cleanly.
+`Arbiter.__init__` always constructs `ReplayConfig`, `SandboxPolicy`, `BackgroundTaskStore` — which read `<wd>/.arbiter/*.json` and the cwd (`arbiter/agent.py:216-280`). Embedded hosts that don't want persistence or sandboxing cannot disable them cleanly.
 
 **Scope**
 
-Make all three optional in `Agentao.__init__`. None = disabled. Factory enables them per current CLI behavior.
+Make all three optional in `Arbiter.__init__`. None = disabled. Factory enables them per current CLI behavior.
 
 **Implementation Checklist**
 
-- [ ] Add `replay_config: ReplayConfig | None = None` parameter to `Agentao.__init__`
+- [ ] Add `replay_config: ReplayConfig | None = None` parameter to `Arbiter.__init__`
 - [ ] Add `sandbox_policy: SandboxPolicy | None = None`
 - [ ] Add `bg_store: BackgroundTaskStore | None = None`
 - [ ] When None: skip construction; runtime treats feature as off
 - [ ] When `bg_store is None`, do not register `check_background_agent` / `cancel_background_agent`
-- [ ] When `bg_store is None`, **omit `run_in_background` from the sub-agent tool schema entirely** (do not expose-then-error). Decision: schema-level removal beats runtime error because the LLM can't be tempted to call a disabled feature, and ACP / OpenAI clients won't see a phantom tool. Document in `Agentao` docstring that disabling `bg_store` shrinks the visible tool surface
-- [ ] Update factory to construct all three from `<wd>/.agentao/*` and pass them explicitly (preserves CLI behavior)
-- [ ] Add `tests/test_agent_subsystems_optional.py` constructing `Agentao` with all three None and verifying chat / tool execution still work
+- [ ] When `bg_store is None`, **omit `run_in_background` from the sub-agent tool schema entirely** (do not expose-then-error). Decision: schema-level removal beats runtime error because the LLM can't be tempted to call a disabled feature, and ACP / OpenAI clients won't see a phantom tool. Document in `Arbiter` docstring that disabling `bg_store` shrinks the visible tool surface
+- [ ] Update factory to construct all three from `<wd>/.arbiter/*` and pass them explicitly (preserves CLI behavior)
+- [ ] Add `tests/test_agent_subsystems_optional.py` constructing `Arbiter` with all three None and verifying chat / tool execution still work
 - [ ] Add tests asserting background tools are absent or disabled when `bg_store is None`
-- [ ] Document the opt-in semantics in `Agentao` docstring
+- [ ] Document the opt-in semantics in `Arbiter` docstring
 
 **Acceptance Criteria**
 
-- Embedded host can construct `Agentao` with replay / sandbox / bg_store all None and run a chat round-trip
+- Embedded host can construct `Arbiter` with replay / sandbox / bg_store all None and run a chat round-trip
 - CLI behavior preserved through factory
 - No silent default-on for these features in pure-injection mode
 - Background-agent tools cannot dereference `None` stores and expose clear disabled semantics
@@ -429,7 +429,7 @@ Define `MemoryStore` Protocol covering persistent memory and session-summary CRU
 **Implementation Checklist**
 
 - [ ] Audit `MemoryManager` public surface: write, search, soft-delete, session-summary CRUD, retrieval
-- [ ] Define `MemoryStore` Protocol in `agentao/capabilities/memory.py`
+- [ ] Define `MemoryStore` Protocol in `arbiter/capabilities/memory.py`
 - [ ] Implement `SqliteMemoryStore` (current behavior, lifted out of `MemoryManager`)
 - [ ] Refactor `MemoryManager` to take `store: MemoryStore` rather than path roots
 - [ ] Factory builds `SqliteMemoryStore` from path roots and passes to `MemoryManager`
@@ -439,7 +439,7 @@ Define `MemoryStore` Protocol covering persistent memory and session-summary CRU
 
 **Acceptance Criteria**
 
-- Embedded host can swap memory backend without changing `Agentao` or `MemoryManager`
+- Embedded host can swap memory backend without changing `Arbiter` or `MemoryManager`
 - CLI behavior unchanged
 - Protocol surface is documented as stable across future minor releases
 
@@ -451,16 +451,16 @@ Define `MCPRegistry` Protocol and refactor `McpClientManager`
 
 **Problem**
 
-`agentao/mcp/config.py` and `McpClientManager` assume disk-loaded MCP server config. Embedded hosts that want to register MCP servers programmatically (e.g., from a host's plugin system, dynamic discovery, remote registry) must monkey-patch.
+`arbiter/mcp/config.py` and `McpClientManager` assume disk-loaded MCP server config. Embedded hosts that want to register MCP servers programmatically (e.g., from a host's plugin system, dynamic discovery, remote registry) must monkey-patch.
 
 **Scope**
 
-Define `MCPRegistry` Protocol covering server enumeration + lifecycle. Default `FileBackedMCPRegistry` reads `.agentao/mcp.json` (current behavior).
+Define `MCPRegistry` Protocol covering server enumeration + lifecycle. Default `FileBackedMCPRegistry` reads `.arbiter/mcp.json` (current behavior).
 
 **Implementation Checklist**
 
-- [ ] Define `MCPRegistry` Protocol in `agentao/capabilities/mcp.py` (`list_servers`, `get_server`, `connect`, `disconnect`)
-- [ ] Implement `FileBackedMCPRegistry` reading `<wd>/.agentao/mcp.json` + `~/.agentao/mcp.json`
+- [ ] Define `MCPRegistry` Protocol in `arbiter/capabilities/mcp.py` (`list_servers`, `get_server`, `connect`, `disconnect`)
+- [ ] Implement `FileBackedMCPRegistry` reading `<wd>/.arbiter/mcp.json` + `~/.arbiter/mcp.json`
 - [ ] Refactor `McpClientManager` to consume `MCPRegistry` rather than raw config dict
 - [ ] Factory constructs `FileBackedMCPRegistry`
 - [ ] Embedded host can pass an in-memory or remote `MCPRegistry`
@@ -480,7 +480,7 @@ Add `docs/guides/embedding.md` and update existing docs to point at new patterns
 
 **Problem**
 
-After all surface changes, embedded host integration is non-obvious. Capability injection, factory vs. direct construction, async usage, and the migration from old `Agentao()` to the new explicit form are each documented today only inside source comments and this epic.
+After all surface changes, embedded host integration is non-obvious. Capability injection, factory vs. direct construction, async usage, and the migration from old `Arbiter()` to the new explicit form are each documented today only inside source comments and this epic.
 
 **Scope**
 
@@ -490,7 +490,7 @@ Add `docs/guides/embedding.md` covering end-to-end embedding. Update existing do
 
 - [ ] Add `docs/guides/embedding.md` with sections:
   - [ ] "Minimal embedded construction" (factory path)
-  - [ ] "Pure-injection construction" (`Agentao(workspace=..., llm_config=..., filesystem=..., shell=...)`)
+  - [ ] "Pure-injection construction" (`Arbiter(workspace=..., llm_config=..., filesystem=..., shell=...)`)
   - [ ] "Capability injection" (FileSystem / ShellExecutor examples)
   - [ ] "Async usage" (`await agent.arun()`)
   - [ ] "Replay / Sandbox / BgStore opt-in"
@@ -501,9 +501,9 @@ Add `docs/guides/embedding.md` covering end-to-end embedding. Update existing do
 
 **Acceptance Criteria**
 
-- An embedded host author can read `docs/guides/embedding.md` and integrate Agentao without source-diving
+- An embedded host author can read `docs/guides/embedding.md` and integrate Arbiter without source-diving
 - Migration across 0.2.15 → 0.2.16 → 0.3.0 is documented step-by-step
-- Existing docs no longer show pre-cleanup `Agentao()` patterns
+- Existing docs no longer show pre-cleanup `Arbiter()` patterns
 
 ## Suggested Milestones
 
@@ -515,13 +515,13 @@ Add `docs/guides/embedding.md` covering end-to-end embedding. Update existing do
 **M2: Capability injection + factory (the heart of the epic)**
 
 - Issue 3 — `FileSystem` / `ShellExecutor` capability for file/search/shell tools
-- Issue 4 — `agentao/embedding/factory.py` + CLI/ACP migration (fallbacks intact)
+- Issue 4 — `arbiter/embedding/factory.py` + CLI/ACP migration (fallbacks intact)
 - Issue 5 — Tighten subsystem fallbacks (depends on Issue 4)
 
 **M3: Async surface + soft deprecation**
 
-- Issue 6 — `Agentao.arun()`
-- Issue 7 — Soft deprecate `Agentao()` (depends on Issue 4 — factory must exist)
+- Issue 6 — `Arbiter.arun()`
+- Issue 7 — Soft deprecate `Arbiter()` (depends on Issue 4 — factory must exist)
 
 **M4: Opt-in subsystems + hard break (0.3.0)**
 
@@ -562,7 +562,7 @@ Issue 12 ─┘
 ## Cross-References
 
 - Strategy doc: `docs/history/implementation/embedded-harness-implementation-plan.md`
-- Source feature plan: `workspace/reports/agentao-embedded-harness-feature-review-2026-04-27.md`
+- Source feature plan: `workspace/reports/arbiter-embedded-harness-feature-review-2026-04-27.md`
 - Sibling epic (ACP): `docs/history/implementation/acp-github-epic.md`
 
 ### Issue ↔ PR mapping (vs. IMPLEMENTATION_PLAN)
@@ -574,8 +574,8 @@ Issue 12 ─┘
 | Issue 3 (FS / Shell capability) | PR 2 |
 | Issue 4 (factory + CLI/ACP migration) | PR 3a |
 | Issue 5 (delete subsystem fallbacks) | PR 3b |
-| Issue 6 (`Agentao.arun`) | PR 4 |
-| Issue 7 (soft deprecate `Agentao()`) | PR 5a |
+| Issue 6 (`Arbiter.arun`) | PR 4 |
+| Issue 7 (soft deprecate `Arbiter()`) | PR 5a |
 | Issue 8 (hard break, 0.3.0) | PR 5b |
 | Issue 9 (Replay / Sandbox / BgStore opt-in) | PR 6+ |
 | Issue 10 (`MemoryStore` Protocol) | PR 6+ |

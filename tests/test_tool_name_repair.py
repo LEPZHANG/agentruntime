@@ -5,16 +5,16 @@ from typing import Any, Dict
 
 import pytest
 
-from agentao.permissions import PermissionEngine
-from agentao.runtime.name_repair import repair_tool_name
-from agentao.runtime.tool_planning import (
+from arbiter.permissions import PermissionEngine
+from arbiter.runtime.name_repair import repair_tool_name
+from arbiter.runtime.tool_planning import (
     DOOM_LOOP_THRESHOLD,
     EMPTY_TOOL_NAME_MESSAGE,
     _EMPTY_NAME_PLACEHOLDER,
     ToolCallDecision,
     ToolCallPlanner,
 )
-from agentao.tools.base import Tool, ToolRegistry
+from arbiter.tools.base import Tool, ToolRegistry
 
 from tests.support.tool_calls import make_tool_call
 
@@ -366,8 +366,8 @@ def test_planner_strict_match_skips_repair(planner_with_browser_click, caplog):
 
 @pytest.fixture
 def runner_with_browser_click(tmp_path):
-    from agentao.runtime.tool_runner import ToolRunner
-    from agentao.transport import NullTransport
+    from arbiter.runtime.tool_runner import ToolRunner
+    from arbiter.transport import NullTransport
 
     registry = ToolRegistry()
     registry.register(FakeNamedTool("browser_click"))
@@ -415,7 +415,7 @@ class TestRunnerNormalizeToolCalls:
     ):
         # End-to-end: the cleaned list reaches both the history serializer
         # and the planner — names match across the round trip.
-        from agentao.runtime.chat_loop import _serialize_tool_call
+        from arbiter.runtime.chat_loop import _serialize_tool_call
 
         tcs = [make_tool_call("c-5", "BrowserClick_tool")]
         cleaned, _ = runner_with_browser_click.normalize_tool_calls(tcs)

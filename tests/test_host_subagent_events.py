@@ -12,8 +12,8 @@ from typing import Any, Dict, List
 
 import pytest
 
-from agentao.host.models import SubagentLifecycleEvent
-from agentao.host.projection import HostSubagentEmitter
+from arbiter.host.models import SubagentLifecycleEvent
+from arbiter.host.projection import HostSubagentEmitter
 
 
 class _FakeStream:
@@ -154,8 +154,8 @@ def test_background_pending_cancel_emits_terminal_so_no_orphan_spawn():
     lifecycle pair is closed."""
     from typing import List
 
-    from agentao.agents.tools import AgentToolWrapper
-    from agentao.host.projection import HostSubagentEmitter
+    from arbiter.agents.tools import AgentToolWrapper
+    from arbiter.host.projection import HostSubagentEmitter
 
     captured: List[Any] = []
 
@@ -233,8 +233,8 @@ def test_agent_tool_wrapper_task_summary_excludes_raw_user_task():
     now publishes a generic ``"sub-agent: <name>"`` label instead."""
     from typing import List
 
-    from agentao.agents.tools import AgentToolWrapper
-    from agentao.host.projection import HostSubagentEmitter
+    from arbiter.agents.tools import AgentToolWrapper
+    from arbiter.host.projection import HostSubagentEmitter
 
     captured: List[Any] = []
 

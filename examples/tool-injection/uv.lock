@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "agentao"
+name = "arbiter"
 source = { editable = "../../" }
 dependencies = [
     { name = "filelock" },
@@ -73,11 +73,11 @@ dev = [
 ]
 
 [[package]]
-name = "agentao-example-tool-injection"
+name = "arbiter-example-tool-injection"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "agentao" },
+    { name = "arbiter" },
     { name = "httpx" },
 ]
 
@@ -88,7 +88,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentao", editable = "../../" },
+    { name = "arbiter", editable = "../../" },
     { name = "httpx", specifier = ">=0.25.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
 ]

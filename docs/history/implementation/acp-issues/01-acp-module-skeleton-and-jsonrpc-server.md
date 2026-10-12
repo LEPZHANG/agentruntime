@@ -2,11 +2,11 @@
 
 ## Problem
 
-Agentao does not expose any ACP-compatible server endpoint today. There is no JSON-RPC server, no ACP method dispatcher, and no ACP-specific module boundary.
+Arbiter does not expose any ACP-compatible server endpoint today. There is no JSON-RPC server, no ACP method dispatcher, and no ACP-specific module boundary.
 
 ## Scope
 
-- Create `agentao/acp/`
+- Create `arbiter/acp/`
 - Add `protocol.py`
 - Add `server.py`
 - Add `session_manager.py`
@@ -17,10 +17,10 @@ Agentao does not expose any ACP-compatible server endpoint today. There is no JS
 
 ## Implementation Checklist
 
-- [ ] Create `agentao/acp/__init__.py`
-- [ ] Define ACP constants and supported protocol version in `agentao/acp/protocol.py`
-- [ ] Implement stdio read loop in `agentao/acp/server.py`
-- [ ] Implement thread-safe JSON-RPC write path in `agentao/acp/server.py`
+- [ ] Create `arbiter/acp/__init__.py`
+- [ ] Define ACP constants and supported protocol version in `arbiter/acp/protocol.py`
+- [ ] Implement stdio read loop in `arbiter/acp/server.py`
+- [ ] Implement thread-safe JSON-RPC write path in `arbiter/acp/server.py`
 - [ ] Implement request dispatcher by `method`
 - [ ] Implement standard JSON-RPC error handling
 - [ ] Ensure logs never pollute stdout JSON-RPC stream

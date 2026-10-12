@@ -1,6 +1,6 @@
-"""Reference host for the four ``agentao.host.protocols`` extension points.
+"""Reference host for the four ``arbiter.host.protocols`` extension points.
 
-Embedded hosts can replace any of Agentao's IO surfaces without forking.
+Embedded hosts can replace any of Arbiter's IO surfaces without forking.
 This module demonstrates each one with a small, runnable implementation:
 
 * :class:`InMemoryFileSystem` — dict-backed :class:`FileSystem`. Useful in
@@ -17,7 +17,7 @@ This module demonstrates each one with a small, runnable implementation:
   has to satisfy.
 
 The :func:`make_agent` factory shows the wiring: every protocol slot is
-populated, no ``.agentao/`` directory is touched, and a fake LLM client
+populated, no ``.arbiter/`` directory is touched, and a fake LLM client
 keeps the demo offline.
 """
 
@@ -33,16 +33,16 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional
 from unittest.mock import MagicMock
 
-from agentao import Agentao
-from agentao.host.protocols import (
+from arbiter import Arbiter
+from arbiter.host.protocols import (
     BackgroundHandle,
     FileEntry,
     FileStat,
     ShellRequest,
     ShellResult,
 )
-from agentao.memory import MemoryManager
-from agentao.memory.models import (
+from arbiter.memory import MemoryManager
+from arbiter.memory.models import (
     MemoryRecord,
     MemoryReviewItem,
     SessionSummaryRecord,
@@ -55,7 +55,7 @@ from agentao.memory.models import (
 
 
 class InMemoryFileSystem:
-    """:class:`agentao.host.protocols.FileSystem` backed by a dict.
+    """:class:`arbiter.host.protocols.FileSystem` backed by a dict.
 
     Stores file contents as bytes keyed by absolute path. Directory
     membership is implicit: a path is a directory if some stored key
@@ -217,7 +217,7 @@ class RecordingMCPRegistry:
     Useful for asserting the registry was actually consulted at agent
     construction. Real hosts return server configs from a plugin system
     or a service discovery backend; the :class:`Dict` shape matches
-    ``agentao.mcp.config.McpServerConfig``.
+    ``arbiter.mcp.config.McpServerConfig``.
     """
 
     def __init__(self, servers: Optional[Dict[str, Dict[str, Any]]] = None) -> None:
@@ -245,8 +245,8 @@ class DictMemoryStore:
     Demonstrates the round-trip surface a remote-backed adapter has to
     satisfy: persistent memory CRUD with soft-delete, session summaries,
     and the crystallization review queue. Behavior matches
-    :class:`agentao.memory.SQLiteMemoryStore` closely enough that
-    :class:`agentao.memory.MemoryManager` works against it without
+    :class:`arbiter.memory.SQLiteMemoryStore` closely enough that
+    :class:`arbiter.memory.MemoryManager` works against it without
     changes.
     """
 
@@ -401,12 +401,12 @@ class DictMemoryStore:
 
 
 # ---------------------------------------------------------------------------
-# Factory: an Agentao with all four protocols injected
+# Factory: an Arbiter with all four protocols injected
 # ---------------------------------------------------------------------------
 
 
 def _fake_llm_client() -> MagicMock:
-    """Mimic the ``LLMClient`` shape Agentao reads at construction."""
+    """Mimic the ``LLMClient`` shape Arbiter reads at construction."""
     fake = MagicMock(name="FakeLLMClient")
     fake.logger = MagicMock(name="FakeLLMLogger")
     fake.model = "fake-model"
@@ -423,7 +423,7 @@ def _fake_llm_client() -> MagicMock:
 class HostHandles:
     """Bundled references to every injected protocol implementation."""
 
-    agent: Agentao
+    agent: Arbiter
     filesystem: InMemoryFileSystem
     shell: AuditingShellExecutor
     mcp: RecordingMCPRegistry
@@ -436,7 +436,7 @@ def make_agent(
     files: Optional[Dict[str, bytes]] = None,
     mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> HostHandles:
-    """Construct an ``Agentao`` with every host protocol injected.
+    """Construct an ``Arbiter`` with every host protocol injected.
 
     The caller seeds the in-memory FS with ``files`` (path → bytes) and
     the registry with ``mcp_servers`` (server-name → config dict). The
@@ -448,7 +448,7 @@ def make_agent(
     mcp = RecordingMCPRegistry(servers=mcp_servers)
     store = DictMemoryStore()
 
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=working_directory,
         llm_client=_fake_llm_client(),
         filesystem=fs,

@@ -2,8 +2,8 @@
 
 import pytest
 
-from agentao.memory.render import MemoryPromptRenderer
-from agentao.memory.models import MemoryRecord, RecallCandidate
+from arbiter.memory.render import MemoryPromptRenderer
+from arbiter.memory.models import MemoryRecord, RecallCandidate
 
 
 @pytest.fixture
@@ -339,22 +339,22 @@ class TestIntegration:
         from unittest.mock import Mock, patch
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_proj = Path(tmpdir) / ".agentao"
+            tmp_proj = Path(tmpdir) / ".arbiter"
             tmp_global = Path(tmpdir) / "global"
-            with patch("agentao.agent.LLMClient") as mock_llm_cls, \
-                 patch("agentao.tooling.mcp_tools.load_mcp_config", return_value=[]), \
-                 patch("agentao.tooling.mcp_tools.McpClientManager"):
+            with patch("arbiter.agent.LLMClient") as mock_llm_cls, \
+                 patch("arbiter.tooling.mcp_tools.load_mcp_config", return_value=[]), \
+                 patch("arbiter.tooling.mcp_tools.McpClientManager"):
                 mock_llm = Mock()
                 mock_llm.logger = Mock()
                 mock_llm.model = "test-model"
                 mock_llm_cls.return_value = mock_llm
 
-                from agentao.agent import Agentao
-                from agentao.memory import MemoryManager
-                from agentao.tools.memory import SaveMemoryTool
+                from arbiter.agent import Arbiter
+                from arbiter.memory import MemoryManager
+                from arbiter.tools.memory import SaveMemoryTool
 
-                agent = Agentao(working_directory=Path(tmpdir))
-                from agentao.memory import SQLiteMemoryStore
+                agent = Arbiter(working_directory=Path(tmpdir))
+                from arbiter.memory import SQLiteMemoryStore
                 agent.memory_manager = MemoryManager(
                     project_store=SQLiteMemoryStore.open_or_memory(
                         tmp_proj / "memory.db"
@@ -379,21 +379,21 @@ class TestIntegration:
         from unittest.mock import Mock, patch
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_proj = Path(tmpdir) / ".agentao"
+            tmp_proj = Path(tmpdir) / ".arbiter"
             tmp_global = Path(tmpdir) / "global"
-            with patch("agentao.agent.LLMClient") as mock_llm_cls, \
-                 patch("agentao.tooling.mcp_tools.load_mcp_config", return_value=[]), \
-                 patch("agentao.tooling.mcp_tools.McpClientManager"):
+            with patch("arbiter.agent.LLMClient") as mock_llm_cls, \
+                 patch("arbiter.tooling.mcp_tools.load_mcp_config", return_value=[]), \
+                 patch("arbiter.tooling.mcp_tools.McpClientManager"):
                 mock_llm = Mock()
                 mock_llm.logger = Mock()
                 mock_llm.model = "test-model"
                 mock_llm_cls.return_value = mock_llm
 
-                from agentao.agent import Agentao
-                from agentao.memory import MemoryManager
+                from arbiter.agent import Arbiter
+                from arbiter.memory import MemoryManager
 
-                agent = Agentao(working_directory=Path(tmpdir))
-                from agentao.memory import SQLiteMemoryStore
+                agent = Arbiter(working_directory=Path(tmpdir))
+                from arbiter.memory import SQLiteMemoryStore
                 agent.memory_manager = MemoryManager(
                     project_store=SQLiteMemoryStore.open_or_memory(
                         tmp_proj / "memory.db"
@@ -406,7 +406,7 @@ class TestIntegration:
 
 
 # ---------------------------------------------------------------------------
-# Agentao._extract_context_hints — file path extraction from message blocks
+# Arbiter._extract_context_hints — file path extraction from message blocks
 # ---------------------------------------------------------------------------
 
 
@@ -420,16 +420,16 @@ class TestExtractContextHints:
         from pathlib import Path
         from unittest.mock import Mock, patch
 
-        with patch("agentao.agent.LLMClient") as mock_llm_cls, \
-             patch("agentao.tooling.mcp_tools.load_mcp_config", return_value=[]), \
-             patch("agentao.tooling.mcp_tools.McpClientManager"):
+        with patch("arbiter.agent.LLMClient") as mock_llm_cls, \
+             patch("arbiter.tooling.mcp_tools.load_mcp_config", return_value=[]), \
+             patch("arbiter.tooling.mcp_tools.McpClientManager"):
             mock_llm = Mock()
             mock_llm.logger = Mock()
             mock_llm.model = "test-model"
             mock_llm_cls.return_value = mock_llm
 
-            from agentao.agent import Agentao
-            return Agentao(working_directory=Path(tmpdir))
+            from arbiter.agent import Arbiter
+            return Arbiter(working_directory=Path(tmpdir))
 
     def test_extracts_paths_from_string_content(self, tmp_path):
         agent = self._make_agent(tmp_path)

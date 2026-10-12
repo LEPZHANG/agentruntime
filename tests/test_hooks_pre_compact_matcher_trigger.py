@@ -7,11 +7,11 @@ match too. The previous ``_glob_match`` helper would have failed both.
 
 from __future__ import annotations
 
-from agentao.plugins.hooks import (
+from arbiter.plugins.hooks import (
     ClaudeHookPayloadAdapter,
     PluginHookDispatcher,
 )
-from agentao.plugins.models import ParsedHookRule
+from arbiter.plugins.models import ParsedHookRule
 
 
 def _payload(tmp_path):

@@ -47,7 +47,7 @@ Context limit set to 500,000 tokens
 
 - 设置 `context_manager.max_tokens`，**仅本会话**
 - 影响自动压缩触发点（压缩在接近这个值之前就会启动）
-- 重启后复位 — 要持久化，设置环境变量 `AGENTAO_CONTEXT_TOKENS`（见 [10. 配置文件参考](./10-config-reference)）
+- 重启后复位 — 要持久化，设置环境变量 `ARBITER_CONTEXT_TOKENS`（见 [10. 配置文件参考](./10-config-reference)）
 
 最低值 1,000，再低 CLI 拒绝。
 
@@ -98,7 +98,7 @@ Compacted history: 54 → 19 messages, ~47,231 → ~12,880 tokens (6.4% of windo
 边界情况：
 
 - 少于 5 条消息 → `Not enough conversation history to compact yet.`（没什么可摘要的）。
-- 压缩推进不了 —— 熔断器开着、找不到安全的切分点、或摘要 LLM 调用失败 —— 会得到 `Compaction made no change …`，历史原样不动（看 `agentao.log`）。
+- 压缩推进不了 —— 熔断器开着、找不到安全的切分点、或摘要 LLM 调用失败 —— 会得到 `Compaction made no change …`，历史原样不动（看 `arbiter.log`）。
 - 和自动压缩一样有损：不在摘要里、也不在重新挂回的文件里的东西，从 agent 视角看就没了。
 
 ## `/status` 速查（完整在第 1 章）
@@ -111,7 +111,7 @@ Compacted history: 54 → 19 messages, ~47,231 → ~12,880 tokens (6.4% of windo
 |---|---|
 | 会话摘要里消息数巨大 | 考虑 `/clear` 轮换 |
 | Permission Mode 是 `full-access` | 考虑切回 `workspace-write` |
-| Loaded sources 列出意料之外的路径 | 审一下 `~/.agentao/permissions.json` 和内建 preset |
+| Loaded sources 列出意料之外的路径 | 审一下 `~/.arbiter/permissions.json` 和内建 preset |
 | Markdown rendering OFF 但你想 ON | `/markdown` 切换 |
 | Task List 显示有待办 | Agent 有未完成 todo — 让它继续 |
 | ACP servers `0/N running` | 服务器挂了或没启动 — `/acp status` 排查 |
@@ -154,5 +154,5 @@ Context manager 是 `agent.context_manager`。嵌入式宿主可以读 `cm.get_u
 :::
 
 ::: tip 真相源头
-命令语法：`/help`。`/context` 实现：[`agentao/cli/commands/context.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands/context.py)。`/compact` 实现：[`agentao/cli/commands/compact.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands/compact.py)。压缩逻辑：[`agentao/context_manager.py`](https://github.com/jin-bo/agentao/blob/main/agentao/context_manager.py)。
+命令语法：`/help`。`/context` 实现：[`arbiter/cli/commands/context.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands/context.py)。`/compact` 实现：[`arbiter/cli/commands/compact.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands/compact.py)。压缩逻辑：[`arbiter/context_manager.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/context_manager.py)。
 :::

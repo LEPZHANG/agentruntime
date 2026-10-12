@@ -1,7 +1,7 @@
 # Project Structure
 
 ```
-agentao/
+arbiter/
 │
 ├── 📄 Configuration Files
 │   ├── .env.example              # Environment configuration template
@@ -22,7 +22,7 @@ agentao/
 ├── 🧪 Testing
 │   └── test_imports.py           # Import verification test
 │
-└── 📦 agentao/ (Main Package)
+└── 📦 arbiter/ (Main Package)
     │
     ├── __init__.py               # Package initialization
     │
@@ -54,7 +54,7 @@ agentao/
 
 Generated Files (gitignored):
 ├── .venv/                        # Virtual environment (created by uv)
-└── .agentao_memory.json        # Memory storage (created at runtime)
+└── .arbiter_memory.json        # Memory storage (created at runtime)
 ```
 
 ## Module Descriptions
@@ -124,7 +124,7 @@ main.py
 ```
 User Input (CLI)
     ↓
-Agentao.chat()
+Arbiter.chat()
     ↓
 LLMClient.chat() + tools
     ↓

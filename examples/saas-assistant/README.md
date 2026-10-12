@@ -1,12 +1,12 @@
 # Blueprint A · SaaS Assistant
 
-A minimal FastAPI service that embeds Agentao behind a Bearer-token auth layer, streams the reply over SSE, serializes turns per session, and exposes a cancel endpoint.
+A minimal FastAPI service that embeds Arbiter behind a Bearer-token auth layer, streams the reply over SSE, serializes turns per session, and exposes a cancel endpoint.
 
 Corresponds to [Part 7.1 of the developer guide](../../developer-guide/en/part-7/1-saas-assistant).
 
 ## What it demonstrates
 
-- **Session pool** — one `Agentao` per `(tenant_id, session_id)` pair, cached in memory
+- **Session pool** — one `Arbiter` per `(tenant_id, session_id)` pair, cached in memory
 - **SSE streaming** — events relayed from `SdkTransport(on_event=…)` → asyncio queue → `StreamingResponse`
 - **Custom tools** — `ListProjectsTool` (read-only) and `CreateTaskTool` (`requires_confirmation=True`) wrapped around an in-memory product store
 - **Cancellation wiring** — client-disconnect watcher + explicit `/cancel` endpoint both fire the same `CancellationToken`

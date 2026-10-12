@@ -4,7 +4,7 @@ Three slow-marked test files exercise the post-build install path:
 ``tests/test_clean_install_smoke.py``, ``tests/test_dependency_split.py``,
 and ``tests/test_cli_missing_dep_message.py``. They all need:
 
-- the path to ``dist/agentao-*.whl`` (skip if absent — tests run before
+- the path to ``dist/arbiter-*.whl`` (skip if absent — tests run before
   ``uv build`` should not fail, just skip)
 - a fresh venv with stdlib ``venv`` so each test starts from a clean
   dependency closure.
@@ -31,7 +31,7 @@ DIST_DIR = REPO_ROOT / "dist"
 def find_wheel() -> Path | None:
     if not DIST_DIR.is_dir():
         return None
-    wheels = sorted(DIST_DIR.glob("agentao-*.whl"))
+    wheels = sorted(DIST_DIR.glob("arbiter-*.whl"))
     return wheels[-1] if wheels else None
 
 
@@ -39,7 +39,7 @@ def require_wheel() -> Path:
     """Return the wheel path or skip the calling test if none is built."""
     wheel = find_wheel()
     if wheel is None:
-        pytest.skip("no built wheel at dist/agentao-*.whl — run `uv build` first")
+        pytest.skip("no built wheel at dist/arbiter-*.whl — run `uv build` first")
     return wheel
 
 
@@ -54,7 +54,7 @@ class FreshVenv:
 
     root: Path
     python: Path
-    agentao_script: Path
+    arbiter_script: Path
 
     def pip_install(self, *specs: str) -> None:
         subprocess.run(
@@ -75,9 +75,9 @@ def make_venv(tmp_path: Path) -> FreshVenv:
     )
     bin_dir = venv_dir / ("Scripts" if os.name == "nt" else "bin")
     py_name = "python.exe" if os.name == "nt" else "python"
-    script_name = "agentao.exe" if os.name == "nt" else "agentao"
+    script_name = "arbiter.exe" if os.name == "nt" else "arbiter"
     return FreshVenv(
         root=venv_dir,
         python=bin_dir / py_name,
-        agentao_script=bin_dir / script_name,
+        arbiter_script=bin_dir / script_name,
     )

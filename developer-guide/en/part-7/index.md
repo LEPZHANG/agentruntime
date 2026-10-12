@@ -5,7 +5,7 @@ The first six parts are a reference. This part is a **cookbook** — seven end-t
 Each blueprint answers the same four questions:
 
 1. **Who & why** — what kind of product / what pain
-2. **Architecture** — where Agentao sits, what it talks to
+2. **Architecture** — where Arbiter sits, what it talks to
 3. **Key code** — the 50–150 lines that matter
 4. **Pitfalls** — what tends to break on day two
 
@@ -16,7 +16,7 @@ Each blueprint answers the same four questions:
 - **Data workbench** — interactive analyst session with shell + sandbox + skills · [§7.4](/en/part-7/4-data-workbench)
 - **Batch scheduler** — cron-driven `prompt_once` for offline / nightly jobs; no end-user · [§7.5](/en/part-7/5-batch-scheduler), [G.4](/en/appendix/g-glossary#g-4-integration-patterns)
 - **WeChat intelligent bot (ilink-style)** — long-polling personal-account bot API; one agent per message; contact-scoped permissions · [§7.6](/en/part-7/6-wechat-bot)
-- **Multi-agent kanban scheduling** — external derivative project (`agentao-kanban`); board-driven scheduler over `planner` / `worker` / `reviewer` sub-agents; per-card git worktree · [§7.7](/en/part-7/7-kanban-multiagent)
+- **Multi-agent kanban scheduling** — external derivative project (`arbiter-kanban`); board-driven scheduler over `planner` / `worker` / `reviewer` sub-agents; per-card git worktree · [§7.7](/en/part-7/7-kanban-multiagent)
 :::
 
 ## The seven blueprints
@@ -29,7 +29,7 @@ Each blueprint answers the same four questions:
 | [7.4](./4-data-workbench) | Data analyst workbench | In-process SDK | Shell + sandbox + custom skill |
 | [7.5](./5-batch-scheduler) | Offline batch / scheduled jobs | `prompt_once` | Skills + cron |
 | [7.6](./6-wechat-bot) | WeChat intelligent bot (ilink-style) | `asyncio` long-poll daemon | `WeChatClient` Protocol + contact-scoped permissions |
-| [7.7](./7-kanban-multiagent) | Multi-agent kanban scheduling *(external repo)* | External orchestrator over agentao sub-agents + ACP CLIs | `planner`/`worker`/`reviewer` routing + per-card git worktree |
+| [7.7](./7-kanban-multiagent) | Multi-agent kanban scheduling *(external repo)* | External orchestrator over arbiter sub-agents + ACP CLIs | `planner`/`worker`/`reviewer` routing + per-card git worktree |
 
 ## How to read this part
 

@@ -5,7 +5,7 @@
 > - The contract for each: what's blocking, what's fire-and-forget
 > - How `NullTransport` behaves and when it's the right default
 
-Transport is the **only interface** between the agent runtime and your host UI / business logic. Master its four methods and you can integrate Agentao into any UI framework.
+Transport is the **only interface** between the agent runtime and your host UI / business logic. Master its four methods and you can integrate Arbiter into any UI framework.
 
 ## Definition
 
@@ -155,10 +155,10 @@ if sub is not None:
         unsubscribe()
 ```
 
-`NullTransport` and `SdkTransport` get `subscribe()` by composing `agentao.transport.EventBroadcaster`. From-scratch transports (e.g. ACP) can opt in the same way:
+`NullTransport` and `SdkTransport` get `subscribe()` by composing `arbiter.transport.EventBroadcaster`. From-scratch transports (e.g. ACP) can opt in the same way:
 
 ```python
-from agentao.transport import EventBroadcaster
+from arbiter.transport import EventBroadcaster
 
 class MyTransport:
     def __init__(self):
@@ -185,7 +185,7 @@ class MyTransport:
 See [4.3](./3-sdk-transport):
 
 ```python
-from agentao.transport import SdkTransport
+from arbiter.transport import SdkTransport
 
 transport = SdkTransport(
     on_event=handle,
@@ -200,7 +200,7 @@ transport = SdkTransport(
 When you only care about **some events** and want explicit control:
 
 ```python
-from agentao.transport import NullTransport, EventType
+from arbiter.transport import NullTransport, EventType
 
 class MyTransport(NullTransport):
     def __init__(self, on_token):
@@ -251,7 +251,7 @@ class MyCustomTransport:
 ## Testing your Transport
 
 ```python
-from agentao.transport import AgentEvent, EventType
+from arbiter.transport import AgentEvent, EventType
 
 def test_my_transport():
     t = MyTransport()

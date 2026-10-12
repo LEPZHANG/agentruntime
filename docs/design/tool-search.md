@@ -2,16 +2,16 @@
 
 **Status:** Design draft. Decision captured 2026-05-24. Implementation deferred
 until a trigger condition (below) is met.
-**Audience:** agentao maintainers considering tool-list-budget pressure from
+**Audience:** arbiter maintainers considering tool-list-budget pressure from
 MCP / plugin growth.
 **Companion:** `tool-search.zh.md`.
 
 ## Problem
 
-`ToolRegistry.to_openai_format()` (`agentao/tools/base.py:244-263`) emits every
+`ToolRegistry.to_openai_format()` (`arbiter/tools/base.py:244-263`) emits every
 registered tool's `{name, description, parameters}` on every turn, sorted
 alphabetically for cache stability. Every native `Tool`, every `AsyncToolBase`,
-and every MCP-bridged tool (`agentao/mcp/tool.py:71-81`) flows through this one
+and every MCP-bridged tool (`arbiter/mcp/tool.py:71-81`) flows through this one
 list.
 
 This works at the current scale (~15 native tools, light MCP). It does not at:
@@ -30,7 +30,7 @@ Costs that grow linearly with tool count:
 3. **Schema injection cost.** MCP servers often emit verbose schemas — hundreds
    of tokens each — that the model rarely consults.
 
-agentao currently has **no mechanism** to register a tool for dispatch without
+arbiter currently has **no mechanism** to register a tool for dispatch without
 exposing it to the model in the initial schema.
 
 ## Codex's design (reference)
@@ -43,7 +43,7 @@ Codex's solution has four moving parts (verified by grep in the codex tree on
    - `Deferred` — registered for dispatch, hidden from the initial list,
      discoverable via `tool_search`.
    - `DirectModelOnly` — listed upfront but excluded from the code-mode nested
-     table (irrelevant to agentao; agentao has no code-mode).
+     table (irrelevant to arbiter; arbiter has no code-mode).
    - `Hidden` — registered for dispatch, never shown.
 
 2. **`tool_search` tool**
@@ -67,7 +67,7 @@ flows. That depends on Codex's plugin marketplace and is not relevant here.
 
 ## Decision
 
-agentao **adopts the design but defers implementation** until a real trigger
+arbiter **adopts the design but defers implementation** until a real trigger
 appears. The trigger is binary:
 
 > A specific embed reports measurable tool-list bloat — token-budget pressure,
@@ -80,7 +80,7 @@ change for a benefit no one has asked for.
 
 This stance is consistent with the [codex reverse review](codex-reverse-review.md):
 codex's design was driven by their connector marketplace and multi-agent v2.
-agentao has neither today.
+arbiter has neither today.
 
 ## Schema (when implemented)
 
@@ -101,12 +101,12 @@ class _BaseTool:
         return ToolExposure.DIRECT
 ```
 
-Skip `DirectModelOnly` — no code-mode in agentao.
+Skip `DirectModelOnly` — no code-mode in arbiter.
 
 ### 2. `ToolRegistry.to_openai_format()` filter
 
 Add one clause to the existing comprehension
-(`agentao/tools/base.py:259-263`):
+(`arbiter/tools/base.py:259-263`):
 
 ```python
 return [
@@ -121,7 +121,7 @@ The alphabetical-sort prefix-cache invariant is preserved.
 
 ### 3. The `tool_search` tool itself
 
-A first-class agentao `Tool` (not MCP, not plugin) that the registry
+A first-class arbiter `Tool` (not MCP, not plugin) that the registry
 auto-injects iff at least one registered tool has `exposure == DEFERRED`:
 
 ```python
@@ -164,7 +164,7 @@ re-injects via search results, not via persistent state.
 
 ### 5. Default decision rule for MCP
 
-Mirror codex's pattern with an agentao-appropriate threshold:
+Mirror codex's pattern with an arbiter-appropriate threshold:
 
 ```python
 DEFAULT_MCP_DEFER_THRESHOLD = 50  # codex uses 100; start lower
@@ -179,7 +179,7 @@ explicitly configures deferral. Hosts can override per-tool via the registry.
 Add to the embedded harness contract:
 
 ```python
-agent = Agentao(
+agent = Arbiter(
     ...,
     tool_exposure_policy=ToolExposurePolicy(
         auto_defer_mcp_threshold=50,
@@ -194,11 +194,11 @@ behavior change.
 ## What this document is NOT
 
 - **Not code mode.** Code mode is a separate codex design (one freeform `exec`
-  tool + embedded V8). agentao's chat-completions function-calling path does
+  tool + embedded V8). arbiter's chat-completions function-calling path does
   not support freeform tools without significant rework, and V8 embedding is
   not on the roadmap.
 - **Not a plugin marketplace.** Codex's `request_plugin_install` flow assumes
-  installable plugins from a marketplace. agentao's plugin model is local-file.
+  installable plugins from a marketplace. arbiter's plugin model is local-file.
 - **Not a vector search system.** BM25 is sufficient at the scale where this
   matters (tens to low hundreds of tools).
 - **Not an excuse to skip the tool-budget conversation.** If a host is hitting
@@ -209,11 +209,11 @@ behavior change.
 
 Implementation begins when **one** of these is observed:
 
-1. A real agentao embed reports >30 MCP tools simultaneously connected with
+1. A real arbiter embed reports >30 MCP tools simultaneously connected with
    measurable token-budget pressure.
 2. Selection-accuracy regression observed empirically (eval-suite evidence of
    wrong-tool selection rate rising with tool count).
-3. agentao adds first-class plugin tool registration where plugins routinely
+3. arbiter adds first-class plugin tool registration where plugins routinely
    contribute 5+ tools each.
 
 Until then this document records the design so implementation ships in days
@@ -221,7 +221,7 @@ rather than weeks when triggered.
 
 ## Open questions
 
-- **Threshold default.** Codex uses 100. agentao's user base trends toward
+- **Threshold default.** Codex uses 100. arbiter's user base trends toward
   smaller embeds; 50 may still be too high. Set when the first real signal
   arrives.
 - **Per-server granularity.** Should hosts defer "this MCP server" while
@@ -248,8 +248,8 @@ rather than weeks when triggered.
   - `codex-rs/core/src/tools/spec_plan.rs:762-781` — `append_tool_search_executor`.
   - `codex-rs/core/templates/search_tool/tool_description.md` — model-facing
     prompt copy.
-- **Agentao surfaces touched:**
-  - `agentao/tools/base.py:198-263` — `ToolRegistry.to_openai_format`.
-  - `agentao/mcp/tool.py:71-81` — `McpTool` schema bridging.
-- **Related agentao designs:** [codex-reverse-review.md](codex-reverse-review.md).
+- **Arbiter surfaces touched:**
+  - `arbiter/tools/base.py:198-263` — `ToolRegistry.to_openai_format`.
+  - `arbiter/mcp/tool.py:71-81` — `McpTool` schema bridging.
+- **Related arbiter designs:** [codex-reverse-review.md](codex-reverse-review.md).
 - **BM25 implementation:** `rank-bm25` (PyPI, MIT, pure Python).

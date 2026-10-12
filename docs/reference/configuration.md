@@ -1,12 +1,12 @@
 # Configuration Reference
 
-> **Purpose.** This is the *reference* for every configuration surface Agentao reads at startup or runtime: file paths, schema, defaults, and precedence. It deliberately does **not** explain *why* a feature exists or *how* to use it — each section links back to the corresponding feature doc for that.
+> **Purpose.** This is the *reference* for every configuration surface Arbiter reads at startup or runtime: file paths, schema, defaults, and precedence. It deliberately does **not** explain *why* a feature exists or *how* to use it — each section links back to the corresponding feature doc for that.
 >
 > If you find yourself writing a paragraph of motivation here, move it to the feature doc and leave a one-line link.
 
 中文版本：[CONFIGURATION.zh.md](configuration.zh.md)。Both docs share the same structure, section numbering, and field tables — when editing one, update the other in the same change.
 
-> **Quick check.** To verify any of the files below without booting an agent, run `agentao config validate` (or `agentao doctor` for plugin / ACP / optional-dep coverage as well). Both support `--json`; errors exit 1, warnings exit 0. See [developer-guide CLI ch. 12](https://github.com/jin-bo/agentao/blob/main/developer-guide/en/cli/12-non-interactive.md#agentao-doctor-health-snapshot).
+> **Quick check.** To verify any of the files below without booting an agent, run `arbiter config validate` (or `arbiter doctor` for plugin / ACP / optional-dep coverage as well). Both support `--json`; errors exit 1, warnings exit 0. See [developer-guide CLI ch. 12](https://github.com/jin-bo/agentao/blob/main/developer-guide/en/cli/12-non-interactive.md#arbiter-doctor-health-snapshot).
 
 ---
 
@@ -17,32 +17,32 @@ User-facing configuration files (the surfaces you may hand-edit):
 | # | Surface | Project path | User (global) path | Loader | Feature doc |
 |---|---|---|---|---|---|
 | 1 | LLM env | `.env` (cwd) | shell env | `dotenv.load_dotenv` → `discover_llm_kwargs` | — (see `.env.example`) |
-| 2 | Runtime mode + builtin agents | `.agentao/settings.json` | — | `embedding/factory.py::_load_settings`, `plan/controller.py::_load_settings` | [TOOL_CONFIRMATION_FEATURE.md](../guides/tool-confirmation.md) |
-| 3 | Tool permissions | — *(user-only; project file is ignored)* | `~/.agentao/permissions.json` | `permissions.py::PermissionEngine` | [TOOL_CONFIRMATION_FEATURE.md](../guides/tool-confirmation.md) |
-| 4 | MCP servers | `.agentao/mcp.json` *(add-only — cannot override user-scope names)* | `~/.agentao/mcp.json` | `mcp/FileBackedMCPRegistry` (see `mcp/config.py`) | `CLAUDE.md` § MCP |
-| 5 | ACP subagents | `.agentao/acp.json` | — *(project-only)* | `acp_client/config.py` | [acp-client.md](../guides/acp-client.md) / [acp-embedding.md](../guides/acp-embedding.md) |
-| 6 | Skills disable list | `.agentao/skills_config.json` | — | `skills/manager.py` | [SKILLS_GUIDE.md](../guides/skills.md) |
-| 7 | Project instructions | `AGENTAO.md` (cwd) | — | `agent.py::_build_system_prompt` | [CHATAGENT_MD_FEATURE.md](../guides/chatagent-md.md) |
-| 8 | Memory store | `.agentao/memory.db` | `~/.agentao/memory.db` | `memory/manager.py::MemoryManager` | [memory-management.md](../guides/memory-management.md) |
-| 9 | Run spec (`agentao run`) | any path passed to `--spec` (or stdin) | — | `cli/run_models.py::RunSpec`, `cli/run_template.py::render_spec` | [run-spec-parameters.md](../design/run-spec-parameters.md) |
+| 2 | Runtime mode + builtin agents | `.arbiter/settings.json` | — | `embedding/factory.py::_load_settings`, `plan/controller.py::_load_settings` | [TOOL_CONFIRMATION_FEATURE.md](../guides/tool-confirmation.md) |
+| 3 | Tool permissions | — *(user-only; project file is ignored)* | `~/.arbiter/permissions.json` | `permissions.py::PermissionEngine` | [TOOL_CONFIRMATION_FEATURE.md](../guides/tool-confirmation.md) |
+| 4 | MCP servers | `.arbiter/mcp.json` *(add-only — cannot override user-scope names)* | `~/.arbiter/mcp.json` | `mcp/FileBackedMCPRegistry` (see `mcp/config.py`) | `CLAUDE.md` § MCP |
+| 5 | ACP subagents | `.arbiter/acp.json` | — *(project-only)* | `acp_client/config.py` | [acp-client.md](../guides/acp-client.md) / [acp-embedding.md](../guides/acp-embedding.md) |
+| 6 | Skills disable list | `.arbiter/skills_config.json` | — | `skills/manager.py` | [SKILLS_GUIDE.md](../guides/skills.md) |
+| 7 | Project instructions | `ARBITER.md` (cwd) | — | `agent.py::_build_system_prompt` | [CHATAGENT_MD_FEATURE.md](../guides/chatagent-md.md) |
+| 8 | Memory store | `.arbiter/memory.db` | `~/.arbiter/memory.db` | `memory/manager.py::MemoryManager` | [memory-management.md](../guides/memory-management.md) |
+| 9 | Run spec (`arbiter run`) | any path passed to `--spec` (or stdin) | — | `cli/run_models.py::RunSpec`, `cli/run_template.py::render_spec` | [run-spec-parameters.md](../design/run-spec-parameters.md) |
 
 Internal state files (auto-managed; documented for awareness, not for editing):
 
 | Surface | Path | Owner | Notes |
 |---|---|---|---|
-| Background sub-agent task state | `.agentao/background_tasks.json` | `agents/bg_store.py::BackgroundTaskStore` | Anchored to `working_directory`; in-memory only when no `persistence_dir`. Hand-edits will desync running threads. A record with `status: "failed"` carries `incomplete_reason` when the run finished without raising but never answered — its presence is what separates "crashed" (no `result`) from "stopped short" (`result` still present and worth reading). Absent on records written before 0.4.15. **Not secret-scanned** — see the note below. |
-| Replay events | `.agentao/replay/*.jsonl` | `replay/` | See [session-replay.md](../guides/session-replay.md). |
-| Sessions / plans | `.agentao/sessions/`, `.agentao/plan-history/` | various | Per-session artifacts. **Not secret-scanned** — see the note below. |
-| Tool outputs | `.agentao/tool-outputs/` | `runtime/tool_result_formatter.py::_save_and_truncate` | Oversized tool output spilled to disk, referenced from the in-context excerpt. **Secret-scanned before write.** |
-| `/goal` continuation state | `.agentao/goal.json` | `cli/goal_state.py::GoalState` | One long-task goal (objective, status, time/turn caps, usage). Survives restarts; corrupt/missing → treated as no goal. See [goal.md](../guides/goal.md). |
+| Background sub-agent task state | `.arbiter/background_tasks.json` | `agents/bg_store.py::BackgroundTaskStore` | Anchored to `working_directory`; in-memory only when no `persistence_dir`. Hand-edits will desync running threads. A record with `status: "failed"` carries `incomplete_reason` when the run finished without raising but never answered — its presence is what separates "crashed" (no `result`) from "stopped short" (`result` still present and worth reading). Absent on records written before 0.4.15. **Not secret-scanned** — see the note below. |
+| Replay events | `.arbiter/replay/*.jsonl` | `replay/` | See [session-replay.md](../guides/session-replay.md). |
+| Sessions / plans | `.arbiter/sessions/`, `.arbiter/plan-history/` | various | Per-session artifacts. **Not secret-scanned** — see the note below. |
+| Tool outputs | `.arbiter/tool-outputs/` | `runtime/tool_result_formatter.py::_save_and_truncate` | Oversized tool output spilled to disk, referenced from the in-context excerpt. **Secret-scanned before write.** |
+| `/goal` continuation state | `.arbiter/goal.json` | `cli/goal_state.py::GoalState` | One long-task goal (objective, status, time/turn caps, usage). Survives restarts; corrupt/missing → treated as no goal. See [goal.md](../guides/goal.md). |
 
-> **Secret scanning is asymmetric, deliberately.** `.agentao/tool-outputs/` is passed through `security/secret_scan.py::scan_and_redact` before it reaches disk — credential-shaped strings become `[REDACTED:<kind>]`. `.agentao/sessions/*.json` (`embedding/sessions.py::save_session`) and `.agentao/background_tasks.json` are **not** scanned, and that is a trade rather than an oversight: both round-trip back into `agent.messages` on resume, so redacting them would silently corrupt a resumed conversation the same way redacting the live tool result would corrupt a live one. Redaction is applied where the output is terminal, withheld where it is re-read.
+> **Secret scanning is asymmetric, deliberately.** `.arbiter/tool-outputs/` is passed through `security/secret_scan.py::scan_and_redact` before it reaches disk — credential-shaped strings become `[REDACTED:<kind>]`. `.arbiter/sessions/*.json` (`embedding/sessions.py::save_session`) and `.arbiter/background_tasks.json` are **not** scanned, and that is a trade rather than an oversight: both round-trip back into `agent.messages` on resume, so redacting them would silently corrupt a resumed conversation the same way redacting the live tool result would corrupt a live one. Redaction is applied where the output is terminal, withheld where it is re-read.
 >
 > The tool result the model reads is likewise never redacted — patterns cannot tell a live credential from a test fixture. When a tool-output write *does* redact something, the excerpt handed to the model gains a note so it does not copy mangled text back into a real file: `(credential-shaped strings in the saved copy are replaced with [REDACTED:<kind>]; the excerpt below is verbatim)`.
 
 **Precedence rules** (applies only to surfaces with both project and user variants):
 
-- **Permissions** — user-scope file is the *only* rule source. A project-scope `.agentao/permissions.json` is **ignored** with a warning (a checked-in `{"tool": "*", "action": "allow"}` would defeat the user policy on the first match). After custom user rules, the active mode's **preset rules** run last (except in `full-access` / `plan` modes, where presets run **first** and cannot be overridden).
+- **Permissions** — user-scope file is the *only* rule source. A project-scope `.arbiter/permissions.json` is **ignored** with a warning (a checked-in `{"tool": "*", "action": "allow"}` would defeat the user policy on the first match). After custom user rules, the active mode's **preset rules** run last (except in `full-access` / `plan` modes, where presets run **first** and cannot be overridden).
 - **MCP** — both files are read. **Add-only for project scope**: a project entry may declare a *new* server name, but cannot override a user entry with the same name (warning + skip on collision). This prevents a checked-in `mcp.json` from silently redirecting a known server name (e.g. `github`) to a different transport.
 - **Memory** — project DB and user DB are read **independently**; both are visible in the prompt. Project does not override user.
 - All other user-facing surfaces are project-only — no merge.
@@ -67,18 +67,18 @@ Internal state files (auto-managed; documented for awareness, not for editing):
 | `LLM_MAX_TOKENS` | no | — | Provider-default if unset. Malformed value **raises** at startup (`int()`). |
 | `LLM_EXTRA_BODY` | no | — | JSON **object** forwarded verbatim to the LLM `.create()` call as the SDK's `extra_body` request option — the escape hatch for params the closed request build does not expose (`reasoning_effort`, `top_p`, `seed`, `response_format`, and provider-specific fields). Example: `LLM_EXTRA_BODY='{"reasoning_effort":"high"}'`. Unlike the two above, a malformed *or* valid-but-non-object value is **warned and skipped** (not a startup error). The host configures its own endpoint; the SDK/provider validates the values. Logged with credential-like keys redacted. See `docs/design/host-llm-extra-params.md`. |
 | `BOCHA_API_KEY` | no | — | `web_search` runs an ordered fallback chain that retreats to the next backend on **error** (not on an empty result): `jina` (if `JINA_API_KEY`) → `bocha` (if `BOCHA_API_KEY`) → `duckduckgo` (keyless, always the last resort). Each fallback is surfaced in the result and logged. Pinning `WebSearchTool(backend="bocha"\|"jina"\|"duckduckgo")` selects exactly that one backend with **no** auto-fallback. **Set at least one key:** with none, the chain is `duckduckgo` alone, and `html.duckduckgo.com` frequently answers a bot-challenge page (HTTP 202, no results container) rather than results — reported as a backend *error*, not as an empty result. |
-| `AGENTAO_WEB_FETCH_FALLBACK` | no | `none` | JS-rendering fallback for `web_fetch`. Allowed: `none` / `jina` / `crawl4ai`. Default `none` — the tool never silently proxies user-supplied URLs through a third party. `jina` sends the URL to `https://r.jina.ai` (disclosed in tool description + result `Fallback:` line). `crawl4ai` requires `pip install 'agentao[crawl4ai]'` + `playwright install chromium`. Read once at `WebFetchTool` construction; invalid values warn and degrade to `none`. |
-| `AGENTAO_WEB_FETCH_ALLOW_CIDRS` | no | — | Opt-in SSRF allowlist for `web_fetch`: comma/space-separated CIDRs (or bare IPs) that the URL policy permits **even though they are not globally routable**. The escape hatch for hosts behind a fake-IP proxy (Clash/V2Ray map every domain to a reserved range, typically `198.18.0.0/15`, which the guard otherwise blocks) or a trusted internal service. Applied to the initial URL **and every redirect hop**; the allowlist is *scoped* — listing `198.18.0.0/15` does **not** also permit `169.254.169.254`. **Relaxes a security control** — logged once at startup, surfaced in the tool description; keep it narrow, never `0.0.0.0/0`. Default empty = fully strict. (Cleaner fix: switch the proxy DNS from `fake-ip` to `redir-host`/real-IP.) See `agentao/security/url_policy.py`. |
-| `JINA_API_KEY` | no | — | Jina key, sent as `Authorization: Bearer <key>`. The two Jina endpoints differ: **`web_search`** (the `jina` backend via `s.jina.ai`) **requires** it — measured 2026-07-22 the endpoint answers `401 AuthenticationRequiredError` without one, so a keyless `jina` pin fails every query and a keyless auto chain simply omits `jina`. **`web_fetch`** with `AGENTAO_WEB_FETCH_FALLBACK=jina` (`r.jina.ai`) still works keyless; there the key only lifts the rate limit. |
-| `AGENTAO_SCRUB_CHILD_ENV` | no | on | Whether shell and MCP child processes inherit agentao's **own** provider credentials. Default (any value other than `0`/`false`/`no`/`off`) drops `HARNESS_ENV_KEYS` — `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `LLM_EXTRA_BODY`, … — from the child environment, so a prompt-injected `run_shell_command("env")` finds nothing worth stealing. The agent is a distinct principal from the user, and nothing the LLM decides to run needs the key that pays for the LLM. **Set to `0` to restore full inheritance** — required if you run `agentao run`, or any script that calls the provider, from inside the agent's own shell. Only agentao's keys are dropped; the user's other secrets (AWS, GitHub, `DATABASE_URL`) are untouched — scrubbing those is the host's call, and a host wanting a tighter environment can pass an explicit `env` via `ShellRequest`. Defense in depth, not a seal: `cat .env` still works. See `agentao/capabilities/process.py::build_child_env`. |
+| `ARBITER_WEB_FETCH_FALLBACK` | no | `none` | JS-rendering fallback for `web_fetch`. Allowed: `none` / `jina` / `crawl4ai`. Default `none` — the tool never silently proxies user-supplied URLs through a third party. `jina` sends the URL to `https://r.jina.ai` (disclosed in tool description + result `Fallback:` line). `crawl4ai` requires `pip install 'arbiter[crawl4ai]'` + `playwright install chromium`. Read once at `WebFetchTool` construction; invalid values warn and degrade to `none`. |
+| `ARBITER_WEB_FETCH_ALLOW_CIDRS` | no | — | Opt-in SSRF allowlist for `web_fetch`: comma/space-separated CIDRs (or bare IPs) that the URL policy permits **even though they are not globally routable**. The escape hatch for hosts behind a fake-IP proxy (Clash/V2Ray map every domain to a reserved range, typically `198.18.0.0/15`, which the guard otherwise blocks) or a trusted internal service. Applied to the initial URL **and every redirect hop**; the allowlist is *scoped* — listing `198.18.0.0/15` does **not** also permit `169.254.169.254`. **Relaxes a security control** — logged once at startup, surfaced in the tool description; keep it narrow, never `0.0.0.0/0`. Default empty = fully strict. (Cleaner fix: switch the proxy DNS from `fake-ip` to `redir-host`/real-IP.) See `arbiter/security/url_policy.py`. |
+| `JINA_API_KEY` | no | — | Jina key, sent as `Authorization: Bearer <key>`. The two Jina endpoints differ: **`web_search`** (the `jina` backend via `s.jina.ai`) **requires** it — measured 2026-07-22 the endpoint answers `401 AuthenticationRequiredError` without one, so a keyless `jina` pin fails every query and a keyless auto chain simply omits `jina`. **`web_fetch`** with `ARBITER_WEB_FETCH_FALLBACK=jina` (`r.jina.ai`) still works keyless; there the key only lifts the rate limit. |
+| `ARBITER_SCRUB_CHILD_ENV` | no | on | Whether shell and MCP child processes inherit arbiter's **own** provider credentials. Default (any value other than `0`/`false`/`no`/`off`) drops `HARNESS_ENV_KEYS` — `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `LLM_EXTRA_BODY`, … — from the child environment, so a prompt-injected `run_shell_command("env")` finds nothing worth stealing. The agent is a distinct principal from the user, and nothing the LLM decides to run needs the key that pays for the LLM. **Set to `0` to restore full inheritance** — required if you run `arbiter run`, or any script that calls the provider, from inside the agent's own shell. Only arbiter's keys are dropped; the user's other secrets (AWS, GitHub, `DATABASE_URL`) are untouched — scrubbing those is the host's call, and a host wanting a tighter environment can pass an explicit `env` via `ShellRequest`. Defense in depth, not a seal: `cat .env` still works. See `arbiter/capabilities/process.py::build_child_env`. |
 
 > Canonical example: `.env.example` in the repo root.
 
 ---
 
-## 3. `.agentao/settings.json` — runtime mode + builtin agents
+## 3. `.arbiter/settings.json` — runtime mode + builtin agents
 
-- **Path.** `<cwd>/.agentao/settings.json` (project-only, no user variant).
+- **Path.** `<cwd>/.arbiter/settings.json` (project-only, no user variant).
 - **Loaders.**
   - `embedding/factory.py::_load_settings` — reads `agents.enable_builtin` / `enable_builtin_agents` to default the constructor's `enable_builtin_agents` flag.
   - `plan/controller.py::_load_settings` — reads `mode` when restoring the active permission mode after a plan-mode session ends.
@@ -109,11 +109,11 @@ Internal state files (auto-managed; documented for awareness, not for editing):
 | `goal.default_max_turns` | int | `25` | positive int, or `0` for no turn cap | Turn cap applied when `/goal` is set without `--turns` (and not `--unbounded`). One *turn* = one outer continuation `chat()` — **not** `max_iterations` (which bounds the inner tool loop). Primary runaway guard. |
 | `goal.default_time_budget` | string | `"120m"` | duration `90s` / `30m` / `2h` / `1h30m`; empty/absent → no time cap default | Active wall-clock cap applied when `/goal` is set without `--for`. Sized **above** the turn cap so it guards only wall-clock pathology and does not shadow the turn cap (see `docs/design/codex-goal-mechanism-review.md` §11.1 C). |
 
-> `/goal` state itself is **not** stored in `settings.json` — it lives in `.agentao/goal.json` (see §1 file table). Per-goal caps set with `/goal <obj> --for/--turns` or `/goal budget` override these defaults; `--unbounded` opts out of them entirely.
+> `/goal` state itself is **not** stored in `settings.json` — it lives in `.arbiter/goal.json` (see §1 file table). Per-goal caps set with `/goal <obj> --for/--turns` or `/goal budget` override these defaults; `--unbounded` opts out of them entirely.
 
 See [TOOL_CONFIRMATION_FEATURE.md](../guides/tool-confirmation.md) for what each `mode` actually permits.
 
-> **Tool-set selection is construction-only — not a `settings.json` field (v1).** Which tools the model sees is chosen at `Agentao(...)` construction, not via any config file:
+> **Tool-set selection is construction-only — not a `settings.json` field (v1).** Which tools the model sees is chosen at `Arbiter(...)` construction, not via any config file:
 > - `enabled_tools={...}` — additive allowlist: keep only the named built-in / agent-path tools (`extra_tools`, MCP, plan-only always kept). `None` = disabled; the empty set still *enables* it. Mutually exclusive with `disable_tools`.
 > - `disable_tools={...}` — subtractive: skip named built-ins.
 > - `extra_tools=[...]` — inject pre-built `Tool` / `AsyncToolBase` instances.
@@ -125,9 +125,9 @@ See [TOOL_CONFIRMATION_FEATURE.md](../guides/tool-confirmation.md) for what each
 ## 4. `permissions.json` — per-tool permission rules
 
 - **Paths.**
-  1. `~/.agentao/permissions.json` (user-level) — the only file-based rule source.
-  2. `<cwd>/.agentao/permissions.json` (project-level) — **ignored** with a warning. See "Why no project scope?" below.
-- **Loader.** `permissions.py::PermissionEngine._load_file`. Missing file or malformed JSON → empty rule list (no startup error). A file that loads successfully contributes a `loaded_sources` label (`user:<path>`) returned from `PermissionEngine.active_permissions()` and `Agentao.active_permissions()` — see [`docs/reference/host-api.md`](host-api.md).
+  1. `~/.arbiter/permissions.json` (user-level) — the only file-based rule source.
+  2. `<cwd>/.arbiter/permissions.json` (project-level) — **ignored** with a warning. See "Why no project scope?" below.
+- **Loader.** `permissions.py::PermissionEngine._load_file`. Missing file or malformed JSON → empty rule list (no startup error). A file that loads successfully contributes a `loaded_sources` label (`user:<path>`) returned from `PermissionEngine.active_permissions()` and `Arbiter.active_permissions()` — see [`docs/reference/host-api.md`](host-api.md).
 - **Public getter.** `PermissionEngine.active_permissions()` returns a cached, JSON-safe `ActivePermissions` snapshot (`mode`, `rules`, `loaded_sources`). Hosts that layer policy on top can call `add_loaded_source("injected:<name>")` so the snapshot reflects their provenance. The cache is invalidated on `set_mode()` and `add_loaded_source()`.
 - **Evaluation order.**
   - Modes `read-only` / `workspace-write`: `[user rules] → [active mode preset rules]` (first match wins).
@@ -174,8 +174,8 @@ Full rule taxonomy, examples, and runtime semantics → [TOOL_CONFIRMATION_FEATU
 ## 5. `mcp.json` — MCP server registry
 
 - **Paths (load order).**
-  1. `~/.agentao/mcp.json` (user-level) — authoritative for any name it declares.
-  2. `<cwd>/.agentao/mcp.json` (project-level) — **add-only**: may declare new server names, but cannot override a user-scope name with the same key. Collisions log a warning and skip the project entry.
+  1. `~/.arbiter/mcp.json` (user-level) — authoritative for any name it declares.
+  2. `<cwd>/.arbiter/mcp.json` (project-level) — **add-only**: may declare new server names, but cannot override a user-scope name with the same key. Collisions log a warning and skip the project entry.
 - **Loader.** `mcp/config.py`. Env vars in values are expanded (`$VAR` form).
 
 ### Schema
@@ -204,9 +204,9 @@ Full rule taxonomy, examples, and runtime semantics → [TOOL_CONFIRMATION_FEATU
 | Streamable HTTP | `"http"` (or infer from `url`) | `url` | `headers`, `timeout`, `trust` |
 | SSE (legacy) | `"sse"` | `url` | `headers`, `timeout`, `trust` |
 
-> **`env` and the base environment.** A stdio server's `env` entries are applied on top of a **scrubbed** copy of agentao's environment: `mcp/client.py` builds the child env via `build_child_env()`, which drops agentao's own provider credentials (`HARNESS_ENV_KEYS`). An MCP server that previously relied on *inheriting* `GEMINI_API_KEY`, `OPENAI_API_KEY`, etc. now gets a 401 — pass the key explicitly in `env` (`{"GEMINI_API_KEY": "$GEMINI_API_KEY"}`, applied after the scrub) or set `AGENTAO_SCRUB_CHILD_ENV=0` (§2) to restore full inheritance. Everything else in the environment is inherited unchanged.
+> **`env` and the base environment.** A stdio server's `env` entries are applied on top of a **scrubbed** copy of arbiter's environment: `mcp/client.py` builds the child env via `build_child_env()`, which drops arbiter's own provider credentials (`HARNESS_ENV_KEYS`). An MCP server that previously relied on *inheriting* `GEMINI_API_KEY`, `OPENAI_API_KEY`, etc. now gets a 401 — pass the key explicitly in `env` (`{"GEMINI_API_KEY": "$GEMINI_API_KEY"}`, applied after the scrub) or set `ARBITER_SCRUB_CHILD_ENV=0` (§2) to restore full inheritance. Everything else in the environment is inherited unchanged.
 
-> **Default `User-Agent` (URL transports).** Streamable HTTP and SSE requests — including the content-type preflight — send `User-Agent: agentao-mcp/<version>` so agentao is identifiable in server logs and isn't filtered as an unknown client. Override it by setting a `User-Agent` entry in `headers` (any casing wins); stdio servers are unaffected.
+> **Default `User-Agent` (URL transports).** Streamable HTTP and SSE requests — including the content-type preflight — send `User-Agent: arbiter-mcp/<version>` so arbiter is identifiable in server logs and isn't filtered as an unknown client. Override it by setting a `User-Agent` entry in `headers` (any casing wins); stdio servers are unaffected.
 
 **Transport selection (`mcp/config.py :: resolve_transport`).** The optional
 `type` field selects the transport: `"stdio"` / `"sse"` / `"http"` (aliases
@@ -237,13 +237,13 @@ Tools are registered as `mcp_{server}_{tool}`. See `CLAUDE.md` → "MCP" section
 
 ---
 
-## 6. `.agentao/acp.json` — ACP subagent registry
+## 6. `.arbiter/acp.json` — ACP subagent registry
 
-- **Path.** `<cwd>/.agentao/acp.json` only. **No user-level variant** — ACP servers are explicitly project-scoped.
+- **Path.** `<cwd>/.arbiter/acp.json` only. **No user-level variant** — ACP servers are explicitly project-scoped.
 - **Loader.** `acp_client/config.py::load_acp_config` (parsed into `AcpServerConfig` via `acp_client/models.py::AcpServerConfig.from_dict`).
 - **Failure mode.** Missing `command` / `args` / `env` / `cwd` raises `AcpConfigError` at config load — startup errors out.
 - **Hot-reload.** The CLI watches the file's mtime; edits are picked up on the next inbox poll (`cli/acp_inbox.py`).
-- **Child environment.** An ACP server is a third-party binary spawned from config — the same trust position as an MCP server — so it starts from `capabilities/process.py::build_child_env()` and does **not** inherit agentao's own provider credentials. A server that used to work by inheriting `OPENAI_API_KEY` now gets a 401; declare the key in its `env` block instead, or set `AGENTAO_SCRUB_CHILD_ENV=0` to restore full inheritance process-wide.
+- **Child environment.** An ACP server is a third-party binary spawned from config — the same trust position as an MCP server — so it starts from `capabilities/process.py::build_child_env()` and does **not** inherit arbiter's own provider credentials. A server that used to work by inheriting `OPENAI_API_KEY` now gets a 401; declare the key in its `env` block instead, or set `ARBITER_SCRUB_CHILD_ENV=0` to restore full inheritance process-wide.
 
 ### Schema
 
@@ -285,9 +285,9 @@ Full ACP semantics → [acp-client.md](../guides/acp-client.md) and [acp-embeddi
 
 ---
 
-## 7. `.agentao/skills_config.json` — disabled-skills list
+## 7. `.arbiter/skills_config.json` — disabled-skills list
 
-- **Path.** `<cwd>/.agentao/skills_config.json` (project-only).
+- **Path.** `<cwd>/.arbiter/skills_config.json` (project-only).
 - **Loader.** `skills/manager.py`.
 
 ### Schema
@@ -306,9 +306,9 @@ See [SKILLS_GUIDE.md](../guides/skills.md) for skill discovery and activation ru
 
 ---
 
-## 8. `AGENTAO.md` — project instructions
+## 8. `ARBITER.md` — project instructions
 
-- **Path.** `<cwd>/AGENTAO.md`. Optional.
+- **Path.** `<cwd>/ARBITER.md`. Optional.
 - **Loader.** `agent.py::_build_system_prompt` — content is prepended to the system prompt when present.
 - **Schema.** Free-form Markdown; no required structure.
 
@@ -319,8 +319,8 @@ See [CHATAGENT_MD_FEATURE.md](../guides/chatagent-md.md) for prompt-composition 
 ## 9. Memory stores (`memory.db`)
 
 - **Paths.**
-  - Project: `<cwd>/.agentao/memory.db`
-  - User: `~/.agentao/memory.db`
+  - Project: `<cwd>/.arbiter/memory.db`
+  - User: `~/.arbiter/memory.db`
 - **Format.** SQLite; schema owned by `memory/manager.py::MemoryManager`. Not hand-edited.
 - **Precedence.** Both DBs are read independently; both are visible to the prompt renderer. Project memory does not override user memory.
 
@@ -328,10 +328,10 @@ Full schema, tables, and lifecycle → [memory-management.md](../guides/memory-m
 
 ---
 
-## 10. Run spec — `agentao run` invocation
+## 10. Run spec — `arbiter run` invocation
 
-- **Paths.** No fixed location — `agentao run --spec PATH` (YAML or JSON) or piped on stdin.
-- **Loader.** `agentao/cli/run.py::_load_spec` + `_parse_spec_text` → `RunSpec.model_validate`. Templating: `cli/run_template.py::render_spec`.
+- **Paths.** No fixed location — `arbiter run --spec PATH` (YAML or JSON) or piped on stdin.
+- **Loader.** `arbiter/cli/run.py::_load_spec` + `_parse_spec_text` → `RunSpec.model_validate`. Templating: `cli/run_template.py::render_spec`.
 - **Scope.** Per-invocation; not merged with any global file.
 
 ### Schema (top-level)
@@ -339,7 +339,7 @@ Full schema, tables, and lifecycle → [memory-management.md](../guides/memory-m
 | Key | Type | Notes |
 |---|---|---|
 | `prompt` | `str` | Required at run-time (after CLI merge + render). Templated. |
-| `instructions` | `str?` | Templated. When non-empty after `.strip()`, routes to `Agentao(project_instructions=…)` and short-circuits `AGENTAO.md`. |
+| `instructions` | `str?` | Templated. When non-empty after `.strip()`, routes to `Arbiter(project_instructions=…)` and short-circuits `ARBITER.md`. |
 | `parameters` | `list[RunParameter]?` | See sub-schema below. Duplicates rejected. |
 | `cwd` | `str?` | Working directory; defaults to `os.getcwd()`. |
 | `model` / `base_url` | `str?` | LLM overrides. |
@@ -388,7 +388,7 @@ Full schema, tables, and lifecycle → [memory-management.md](../guides/memory-m
   - `UndefinedError` (StrictUndefined) → "template uses undefined variable 'X' (declare it in spec.parameters)".
   - Anything else from `template.render()` (e.g. `ZeroDivisionError`, `TypeError`, `TemplateNotFound`) → "template error in spec.\<field\>: …".
 
-### Exit codes (`agentao run`)
+### Exit codes (`arbiter run`)
 
 | Code | Meaning |
 |---|---|

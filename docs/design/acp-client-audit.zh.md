@@ -1,11 +1,11 @@
-# Agentao — `acp_client/` 子包审计
+# Arbiter — `acp_client/` 子包审计
 
-**状态:** 评审记录。2026-07-23 以"六月同等标准"对 `agentao/acp_client/` 子包做的
-四维审计——这是 ACP **客户端**(Agentao **向外**连接它以子进程 stdio 方式拉起的
+**状态:** 评审记录。2026-07-23 以"六月同等标准"对 `arbiter/acp_client/` 子包做的
+四维审计——这是 ACP **客户端**(Arbiter **向外**连接它以子进程 stdio 方式拉起的
 项目本地 ACP server)。**本文是有证据支撑的发现清单 + 优先级建议,不是已批准的
 计划。** 该子包**不在** 2026-06-19 `optimization-opportunities-review.md` 的审计
 范围内(那一轮覆盖 runtime、打包、CLI 和 ACP **服务端**);本文补上这个缺口。
-**读者:** Agentao 维护者。
+**读者:** Arbiter 维护者。
 **配套:** `acp-client-audit.md`(权威英文版)。
 **相关:**
 - `optimization-opportunities-review.md` —— 六月审计,本文沿用其方法与分层
@@ -97,7 +97,7 @@
   调 `_open_ephemeral_client_locked`(`:789`)于 `turns.py:575`。其余提及都是注释。只有一个
   测试把它 monkeypatch 成 spy——而它连真实的 `_locked` 路径都拦不到。
 - **`recovery.py:166` `_note_handshake_failure`**(裸版,非 `_and_maybe_fatal`)—— 零生产
-  调用(grep 遍 `agentao/`);只有测试用它模拟 streak。
+  调用(grep 遍 `arbiter/`);只有测试用它模拟 streak。
 - **修复:** 删掉两个死 helper,并对 `deadline_at` 要么接线要么删除过期机制。删除会触及引用
   它们的测试——作为一次小而边界清晰的清理,不要和行为改动捆绑。
 
@@ -218,7 +218,7 @@ ephemeral 拆除。深度 8 的"re-session-在-`finally`-内"区域,正是并发
 - **N2 —— 无 SSRF 面。** `AcpServerConfig` 只接受 `command/args/env/cwd`;在 `acp_client/` grep
   `url|https?|headers|authorization|bearer|sse|streamable|websocket` → **无传输匹配**。纯 stdio;
   `url_policy.py` 不适用(仅在将来加 URL 传输时作为观察项)。
-- **N3 —— `agentao.log` 中密钥已脱敏。** `agentao.acp_client` logger 是 `agentao` 的子 logger,
+- **N3 —— `arbiter.log` 中密钥已脱敏。** `arbiter.acp_client` logger 是 `arbiter` 的子 logger,
   其文件 handler 带 `_RedactingFormatter`;debug 参数转储与子进程 stderr 都被脱敏。config 从不记录
   env *值*(错误用 `type(...).__name__`)。无手搓脱敏(正确——grep `secret_scan|redact` → 无匹配;
   这里不需要)。
@@ -269,7 +269,7 @@ AC3 的 spawn 模型改动与 AC5 的输出加固姿态是 harness-vs-product �
 | AC5 | 通读 `render.py`:plain `sys.stdout.write` `:117`,`escape` 处理 markup 而非 ANSI `:185/195/197`;`helpers.py` agent 分片不截断 |
 | AC6 | grep `_reclassify_as_handshake_fail`/`_note_handshake_success` → 5 处调用簇(`connection.py:170/263/400`、`turns.py:662/840`);对应 `create_session`/`initialize` 点 |
 | AC7 | `awk` 方法 span → `prompt_once` `452–712`(261 行),下一 def `_rollback_ephemeral_on_busy` 在 `:714` |
-| N1–N9 | 读 `build_child_env`;grep url/SSRF 传输(无);logger 父子关系 + `_RedactingFormatter`;追踪 ephemeral 竞争交错;NDJSON 原子写推理;`_we_started` 门;`agentao/` 全局 `import.*acp_client` |
+| N1–N9 | 读 `build_child_env`;grep url/SSRF 传输(无);logger 父子关系 + `_RedactingFormatter`;追踪 ephemeral 竞争交错;NDJSON 原子写推理;`_we_started` 门;`arbiter/` 全局 `import.*acp_client` |
 
 ---
 
@@ -311,7 +311,7 @@ AC8 仍记录待办(顺手项)。
   SIGTERM 时才回收整树;而**死于** SIGTERM 且不回收自己子进程的 server 仍会孤立它们。已修:让整树
   回收在 SIGTERM 阶段后**无条件**执行(组已空时为 no-op),并为"死于 SIGTERM"路径加了第二个有牙
   测试。评审还指出两个**接受的权衡**,因需改动本子包之外、留作记录性后续:(1)`start_new_session`
-  使 server 脱离 agentao 的控制终端,终端关闭的 `SIGHUP` 不再回收它——agentao **自身**异常终止时的
+  使 server 脱离 arbiter 的控制终端,终端关闭的 `SIGHUP` 不再回收它——arbiter **自身**异常终止时的
   健壮清理需要 CLI 层的 `SIGHUP`/`SIGTERM` handler 调 `stop_all()`(交互式 CLI 目前只靠 `finally`
   清理);(2)Windows 上强制 kill 现走 `taskkill /F /T`(≤5 秒)而非瞬时 `proc.kill()`,故在已然退化
   的强制路径上 handle 锁多持有一小会儿。两者都是正确的进程组整树回收所固有的。

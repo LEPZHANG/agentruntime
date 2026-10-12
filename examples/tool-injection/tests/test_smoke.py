@@ -88,13 +88,13 @@ def test_web_search_calls_jina_search(tmp_path):
     agent = make_agent(tmp_path)
     try:
         inject_search_at_runtime(agent, transport=transport)
-        out = agent.tools.get("web_search").execute(query="agentao embedded harness")
+        out = agent.tools.get("web_search").execute(query="arbiter embedded harness")
         assert "CONTENT for" in out
         assert len(record) == 1
         url = str(record[0].url)
         assert url.startswith("https://s.jina.ai/")
         # Query is URL-encoded into the path.
-        assert "agentao" in url and "%20" in url
+        assert "arbiter" in url and "%20" in url
     finally:
         agent.close()
 

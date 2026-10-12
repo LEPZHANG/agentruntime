@@ -9,10 +9,10 @@
 在读完整协议拆解之前，先跑一次真实握手，感受一下形态：
 
 ```bash
-pip install 'agentao[cli]>=0.4.0'
+pip install 'arbiter[cli]>=0.4.0'
 export OPENAI_API_KEY=sk-... OPENAI_BASE_URL=https://api.openai.com/v1 OPENAI_MODEL=gpt-5.4
 
-agentao --acp --stdio
+arbiter --acp --stdio
 ```
 
 此时进程通过 stdin 读 JSON-RPC 请求，stdout 写响应和通知。把下面 3 条 NDJSON（每行一条）粘进同一个终端：
@@ -25,7 +25,7 @@ agentao --acp --stdio
 
 你会依次看到：
 
-- `initialize` 响应——Agentao 宣告自己支持的能力（`loadSession`、`mcpCapabilities` 等）
+- `initialize` 响应——Arbiter 宣告自己支持的能力（`loadSession`、`mcpCapabilities` 等）
 - `session/new` 响应——返回新建的 `sessionId`
 - 一连串 `session/update` 通知——流式文本、工具调用开始、思考过程
 - 最后一个带 `stopReason` 的响应表示本轮结束
@@ -35,7 +35,7 @@ agentao --acp --stdio
 ```javascript
 import { spawn } from 'node:child_process';
 
-const proc = spawn('agentao', ['--acp', '--stdio']);
+const proc = spawn('arbiter', ['--acp', '--stdio']);
 let nextId = 1;
 
 function send(method, params) {
@@ -76,17 +76,17 @@ MCP 和 ACP 是**互补**而非竞争：
 
 | 协议 | 方向 | 典型客户端 | 典型服务端 | 角色 |
 |------|------|----------|----------|------|
-| **ACP** | Host ↔ Agent | IDE、Web UI、CLI | Agent 运行时（如 Agentao） | 把 Agent 暴露给 UI |
+| **ACP** | Host ↔ Agent | IDE、Web UI、CLI | Agent 运行时（如 Arbiter） | 把 Agent 暴露给 UI |
 | **MCP** | Agent ↔ Tools | Agent 运行时 | 工具/数据源（文件系统、GitHub、数据库…） | 把工具暴露给 Agent |
 
 ```
 ┌────────────┐   ACP    ┌────────────┐   MCP    ┌─────────────┐
 │   Client    │◄────────►│   Agent     │◄────────►│ MCP Tools  │
-│ (你的宿主)   │           │  (Agentao)  │           │ (资源/API) │
+│ (你的宿主)   │           │  (Arbiter)  │           │ (资源/API) │
 └────────────┘           └────────────┘           └─────────────┘
 ```
 
-Agentao 同时是 **ACP Server**（被宿主驱动）和 **MCP Client**（驱动外部工具）。
+Arbiter 同时是 **ACP Server**（被宿主驱动）和 **MCP Client**（驱动外部工具）。
 
 ## 为什么选 ACP
 
@@ -94,7 +94,7 @@ Agentao 同时是 **ACP Server**（被宿主驱动）和 **MCP Client**（驱动
 |------|--------------|
 | 非 Python 宿主 | stdio + JSON，任意语言都能集成 |
 | 进程隔离 | Agent 跑在子进程里，崩溃不影响宿主 |
-| 可替换 Agent 实现 | Agentao、Claude Code、Zed's built-in agent 等均符合同一协议 |
+| 可替换 Agent 实现 | Arbiter、Claude Code、Zed's built-in agent 等均符合同一协议 |
 | 可审计 | JSON 线上报文天然可被 dump / replay / diff |
 
 ## 协议特征
@@ -131,7 +131,7 @@ Client
 sequenceDiagram
     autonumber
     participant C as Client（宿主）
-    participant S as Server（agentao）
+    participant S as Server（arbiter）
 
     Note over C,S: 1. 握手
     C->>S: initialize {protocolVersion:1, clientCapabilities}
@@ -165,14 +165,14 @@ sequenceDiagram
 
 ## 扩展：`_agentao.cn/ask_user`
 
-协议标准里 Server 只能**请求权限**而不能**向用户追问文本**。Agentao 通过 `_meta["_agentao.cn/extensions"]`（ACP 标准的扩展通道）宣告了一个私有扩展方法 `_agentao.cn/ask_user`，用来从 Server 向 Client 反问任意问题。Client 可以：
+协议标准里 Server 只能**请求权限**而不能**向用户追问文本**。Arbiter 通过 `_meta["_agentao.cn/extensions"]`（ACP 标准的扩展通道）宣告了一个私有扩展方法 `_agentao.cn/ask_user`，用来从 Server 向 Client 反问任意问题。Client 可以：
 
 - 实现它：把问题弹给用户、拿到答复后返回字符串
 - 不实现：Agent 会 fallback 到 `"[ask_user: not available in non-interactive mode]"`
 
 ## ACP v1 的边界
 
-v1 协议的**明确限制**（Agentao 能力字段如实反映）：
+v1 协议的**明确限制**（Arbiter 能力字段如实反映）：
 
 - `promptCapabilities.image = true`（0.4.8+，仅接受内联 `{data, mimeType}` 块）、`audio = false`、`embeddedContext = false`
 - `mcpCapabilities.http = true`、`sse = true`——MCP 支持 stdio、Streamable HTTP 与 SSE
@@ -182,9 +182,9 @@ v1 协议的**明确限制**（Agentao 能力字段如实反映）：
 
 ## 下一步
 
-- **3.2** 手把手用 Agentao 当 ACP Server，含完整消息线
+- **3.2** 手把手用 Arbiter 当 ACP Server，含完整消息线
 - **3.3** 构建宿主 ACP Client 的骨架
-- **3.4** 反向：Agentao 调用其他 ACP Server
+- **3.4** 反向：Arbiter 调用其他 ACP Server
 - **3.5** Zed 真机集成
 
-→ [3.2 Agentao 作为 ACP Server](./2-agentao-as-server)
+→ [3.2 Arbiter 作为 ACP Server](./2-arbiter-as-server)

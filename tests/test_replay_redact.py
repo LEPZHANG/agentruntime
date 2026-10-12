@@ -2,9 +2,9 @@
 
 Covers:
 
-- the regex-based secret scanner in ``agentao.replay.redact``
+- the regex-based secret scanner in ``arbiter.replay.redact``
 - the per-field policy orchestrator ``sanitize_event`` in
-  ``agentao.replay.sanitize``
+  ``arbiter.replay.sanitize``
 - the recorder's cumulative redaction/dropped/truncated counters
 """
 
@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import json
 
-from agentao.replay.recorder import ReplayRecorder
-from agentao.replay.redact import SECRET_PATTERNS, scan_and_redact, scan_recursive
-from agentao.replay.sanitize import (
+from arbiter.replay.recorder import ReplayRecorder
+from arbiter.replay.redact import SECRET_PATTERNS, scan_and_redact, scan_recursive
+from arbiter.replay.sanitize import (
     ASK_USER_ANSWER_MAX_CHARS,
     TOOL_OUTPUT_CHUNK_MAX_CHARS,
     TOOL_RESULT_MAX_CHARS,
@@ -259,7 +259,7 @@ def test_sanitize_event_recursive_scan_into_tool_args():
 
 
 def test_sanitize_event_coerce_failure_drops_single_field(monkeypatch):
-    from agentao.replay import sanitize as sanmod
+    from arbiter.replay import sanitize as sanmod
 
     def fake_coerce(value):
         if isinstance(value, str) and "boom" in value:
@@ -345,7 +345,7 @@ def test_recorder_event_line_has_per_event_redaction_hits(tmp_path):
 
 def test_header_declares_latest_schema_version():
     """SCHEMA_VERSION tracks the highest supported version."""
-    from agentao.replay.events import SCHEMA_VERSION
+    from arbiter.replay.events import SCHEMA_VERSION
 
     assert SCHEMA_VERSION == "1.2"
 
@@ -361,7 +361,7 @@ def test_header_records_capture_flags_when_provided(tmp_path):
     rec.close()
     first = json.loads(rec.path.read_text().splitlines()[0])
     assert first["kind"] == "replay_header"
-    from agentao.replay.events import SCHEMA_VERSION
+    from arbiter.replay.events import SCHEMA_VERSION
 
     assert first["payload"]["schema_version"] == SCHEMA_VERSION
     assert first["payload"]["capture_flags"] == flags
@@ -419,7 +419,7 @@ def test_reader_handles_unknown_event_kind(tmp_path):
     assert "some_future_kind" in kinds
     # Recorder and reader never hard-check against EventKind.ALL, so the
     # unknown kind round-trips cleanly.
-    from agentao.replay.reader import ReplayReader
+    from arbiter.replay.reader import ReplayReader
 
     kinds_read = [e["kind"] for e in ReplayReader(rec.path).events()]
     assert "some_future_kind" in kinds_read
@@ -431,7 +431,7 @@ def test_reader_handles_unknown_event_kind(tmp_path):
 
 
 def test_config_applies_capture_flag_defaults(tmp_path):
-    from agentao.replay.config import (
+    from arbiter.replay.config import (
         CAPTURE_FLAG_DEFAULTS,
         load_replay_config,
     )
@@ -445,8 +445,8 @@ def test_config_applies_capture_flag_defaults(tmp_path):
 
 
 def test_config_merges_partial_capture_flags(tmp_path):
-    (tmp_path / ".agentao").mkdir()
-    (tmp_path / ".agentao" / "settings.json").write_text(
+    (tmp_path / ".arbiter").mkdir()
+    (tmp_path / ".arbiter" / "settings.json").write_text(
         json.dumps({
             "replay": {
                 "enabled": True,
@@ -454,7 +454,7 @@ def test_config_merges_partial_capture_flags(tmp_path):
             }
         })
     )
-    from agentao.replay.config import load_replay_config
+    from arbiter.replay.config import load_replay_config
 
     cfg = load_replay_config(tmp_path)
     # Explicit flag applied.
@@ -473,9 +473,9 @@ def test_config_merges_partial_capture_flags(tmp_path):
 def _drive_adapter_event(tmp_path, event_type, data):
     """Small helper: wire an AgentEvent through a ReplayAdapter and return
     the resulting replay events (minus the header)."""
-    from agentao.replay.adapter import ReplayAdapter
-    from agentao.replay.reader import ReplayReader
-    from agentao.transport import AgentEvent, NullTransport
+    from arbiter.replay.adapter import ReplayAdapter
+    from arbiter.replay.reader import ReplayReader
+    from arbiter.transport import AgentEvent, NullTransport
 
     rec = ReplayRecorder.create("sess", tmp_path)
     adapter = ReplayAdapter(NullTransport(), rec)
@@ -488,7 +488,7 @@ def _drive_adapter_event(tmp_path, event_type, data):
 
 
 def test_tool_result_event_roundtrips_small_result(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     events = _drive_adapter_event(
         tmp_path,
@@ -521,8 +521,8 @@ def test_tool_result_event_roundtrips_small_result(tmp_path):
 
 
 def test_tool_result_event_truncates_large_content_but_keeps_hash(tmp_path):
-    from agentao.replay.sanitize import TOOL_RESULT_MAX_CHARS
-    from agentao.transport import EventType
+    from arbiter.replay.sanitize import TOOL_RESULT_MAX_CHARS
+    from arbiter.transport import EventType
 
     big = "z" * (TOOL_RESULT_MAX_CHARS * 3)
     events = _drive_adapter_event(
@@ -535,7 +535,7 @@ def test_tool_result_event_truncates_large_content_but_keeps_hash(tmp_path):
             "content_hash": "HASH_OF_FULL",
             "original_chars": len(big),
             "saved_to_disk": True,
-            "disk_path": ".agentao/tool-outputs/example.txt",
+            "disk_path": ".arbiter/tool-outputs/example.txt",
             "status": "ok",
             "duration_ms": 10,
             "error": None,
@@ -551,11 +551,11 @@ def test_tool_result_event_truncates_large_content_but_keeps_hash(tmp_path):
     assert payload["content_hash"] == "HASH_OF_FULL"
     # Disk path round-trips so readers know where the real artifact lives.
     assert payload["saved_to_disk"] is True
-    assert payload["disk_path"] == ".agentao/tool-outputs/example.txt"
+    assert payload["disk_path"] == ".arbiter/tool-outputs/example.txt"
 
 
 def test_tool_result_event_scans_secrets_in_content(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     events = _drive_adapter_event(
         tmp_path,
@@ -582,7 +582,7 @@ def test_tool_result_event_scans_secrets_in_content(tmp_path):
 
 
 def test_llm_call_events_round_trip_through_adapter(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     started = _drive_adapter_event(
         tmp_path,
@@ -607,7 +607,7 @@ def test_llm_call_events_round_trip_through_adapter(tmp_path):
 
 
 def test_llm_call_delta_preserves_message_shape(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     delta_msgs = [
         {"role": "user", "content": "hi"},
@@ -630,7 +630,7 @@ def test_llm_call_delta_preserves_message_shape(tmp_path):
 
 
 def test_llm_call_delta_scans_secrets_inside_nested_messages(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     msgs = [
         {"role": "user", "content": "key=sk-proj-" + "A" * 30},
@@ -653,8 +653,8 @@ def test_llm_call_delta_scans_secrets_inside_nested_messages(tmp_path):
 
 def test_ask_user_emits_request_and_answer_events(tmp_path):
     """ReplayAdapter.ask_user must fire a request + answer pair."""
-    from agentao.replay.adapter import ReplayAdapter
-    from agentao.replay.reader import ReplayReader
+    from arbiter.replay.adapter import ReplayAdapter
+    from arbiter.replay.reader import ReplayReader
 
     class EchoTransport:
         def emit(self, e): pass
@@ -682,9 +682,9 @@ def test_ask_user_emits_request_and_answer_events(tmp_path):
 
 
 def test_ask_user_answer_is_truncated_and_scanned(tmp_path):
-    from agentao.replay.adapter import ReplayAdapter
-    from agentao.replay.reader import ReplayReader
-    from agentao.replay.sanitize import ASK_USER_ANSWER_MAX_CHARS
+    from arbiter.replay.adapter import ReplayAdapter
+    from arbiter.replay.reader import ReplayReader
+    from arbiter.replay.sanitize import ASK_USER_ANSWER_MAX_CHARS
 
     secret = "token=sk-proj-" + "Z" * 30
     big_answer = secret + " " + ("x" * (ASK_USER_ANSWER_MAX_CHARS * 2))
@@ -715,7 +715,7 @@ def test_ask_user_answer_is_truncated_and_scanned(tmp_path):
 
 
 def test_context_compressed_event_surfaces_pre_post_metrics(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     events = _drive_adapter_event(
         tmp_path,
@@ -737,7 +737,7 @@ def test_context_compressed_event_surfaces_pre_post_metrics(tmp_path):
 
 
 def test_background_notification_injected_event(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     events = _drive_adapter_event(
         tmp_path,
@@ -750,7 +750,7 @@ def test_background_notification_injected_event(tmp_path):
 
 
 def test_model_changed_event_round_trip(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     events = _drive_adapter_event(
         tmp_path,
@@ -770,7 +770,7 @@ def test_model_changed_event_round_trip(tmp_path):
 
 
 def test_skill_activated_and_deactivated_events(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     activated = _drive_adapter_event(
         tmp_path, EventType.SKILL_ACTIVATED, {"skill": "web-research"},
@@ -783,7 +783,7 @@ def test_skill_activated_and_deactivated_events(tmp_path):
 
 
 def test_memory_write_event_carries_versions(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     events = _drive_adapter_event(
         tmp_path,
@@ -797,7 +797,7 @@ def test_memory_write_event_carries_versions(tmp_path):
 
 
 def test_memory_delete_and_cleared_events_round_trip(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     del_events = _drive_adapter_event(
         tmp_path,
@@ -817,11 +817,11 @@ def test_memory_delete_and_cleared_events_round_trip(tmp_path):
 
 def test_readonly_mode_changed_event_fires_once_per_flip(tmp_path):
     """ToolRunner.set_readonly_mode emits once when the value actually flips."""
-    from agentao.replay.adapter import ReplayAdapter
-    from agentao.replay.reader import ReplayReader
-    from agentao.runtime.tool_runner import ToolRunner
-    from agentao.tools import ToolRegistry
-    from agentao.transport import NullTransport
+    from arbiter.replay.adapter import ReplayAdapter
+    from arbiter.replay.reader import ReplayReader
+    from arbiter.runtime.tool_runner import ToolRunner
+    from arbiter.tools import ToolRegistry
+    from arbiter.transport import NullTransport
 
     rec = ReplayRecorder.create("sess", tmp_path)
     adapter = ReplayAdapter(NullTransport(), rec)
@@ -858,7 +858,7 @@ def test_readonly_mode_changed_event_fires_once_per_flip(tmp_path):
 
 
 def test_permission_mode_changed_event_round_trip(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     events = _drive_adapter_event(
         tmp_path,
@@ -875,7 +875,7 @@ def test_permission_mode_changed_event_round_trip(tmp_path):
 
 
 def test_plugin_hook_fired_event_captures_verdict(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     events = _drive_adapter_event(
         tmp_path,
@@ -896,7 +896,7 @@ def test_plugin_hook_fired_event_captures_verdict(tmp_path):
 
 
 def test_session_summary_written_event_round_trip(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     events = _drive_adapter_event(
         tmp_path,
@@ -915,7 +915,7 @@ def test_session_summary_written_event_round_trip(tmp_path):
 
 
 def test_llm_call_completed_carries_usage_and_status(tmp_path):
-    from agentao.transport import EventType
+    from arbiter.transport import EventType
 
     events = _drive_adapter_event(
         tmp_path,
@@ -961,7 +961,7 @@ def test_tool_result_duration_ms_and_hash_are_deterministic():
 
 
 def test_show_flag_parser_handles_space_and_equals_forms():
-    from agentao.cli.replay_render import _parse_show_flags
+    from arbiter.cli.replay_render import _parse_show_flags
 
     flags = _parse_show_flags(["--raw"])
     assert flags.raw is True
@@ -978,7 +978,7 @@ def test_show_flag_parser_handles_space_and_equals_forms():
 
 
 def test_show_flag_parser_leaves_unknown_tokens_in_rest():
-    from agentao.cli.replay_render import _parse_show_flags
+    from arbiter.cli.replay_render import _parse_show_flags
 
     flags = _parse_show_flags(["50"])
     assert flags.rest == ["50"]
@@ -986,7 +986,7 @@ def test_show_flag_parser_leaves_unknown_tokens_in_rest():
 
 
 def test_group_events_splits_turns_and_top_level(tmp_path):
-    from agentao.cli.replay_render import _group_events_into_turns
+    from arbiter.cli.replay_render import _group_events_into_turns
 
     events = [
         {"kind": "replay_header", "payload": {}},
@@ -1012,7 +1012,7 @@ def test_group_events_splits_turns_and_top_level(tmp_path):
 
 
 def test_collect_tool_rows_aggregates_multiple_events_per_call():
-    from agentao.cli.replay_render import _collect_tool_rows
+    from arbiter.cli.replay_render import _collect_tool_rows
 
     events = [
         {"kind": "tool_started", "payload": {"tool": "shell", "call_id": "A", "tool_source": "builtin"}},
@@ -1032,7 +1032,7 @@ def test_collect_tool_rows_aggregates_multiple_events_per_call():
 
 
 def test_summarize_unknown_kind_returns_payload_key_preview():
-    from agentao.cli.replay_render import _summarize_replay_event
+    from arbiter.cli.replay_render import _summarize_replay_event
 
     s = _summarize_replay_event(
         {"kind": "future_feature_v12", "payload": {"alpha": 1, "beta": 2}},
@@ -1043,7 +1043,7 @@ def test_summarize_unknown_kind_returns_payload_key_preview():
 
 
 def test_summarize_tool_result_event_includes_size_and_flags():
-    from agentao.cli.replay_render import _summarize_replay_event
+    from arbiter.cli.replay_render import _summarize_replay_event
 
     s = _summarize_replay_event({
         "kind": "tool_result",
@@ -1061,7 +1061,7 @@ def test_summarize_tool_result_event_includes_size_and_flags():
 
 
 def test_summarize_replay_footer_reports_redaction_totals():
-    from agentao.cli.replay_render import _summarize_replay_event
+    from arbiter.cli.replay_render import _summarize_replay_event
 
     s = _summarize_replay_event({
         "kind": "replay_footer",
@@ -1084,10 +1084,10 @@ def test_render_replay_grouped_runs_end_to_end_on_real_recorder(tmp_path):
 
     from rich.console import Console
 
-    from agentao.cli.replay_render import _render_replay_grouped
-    from agentao.replay.adapter import ReplayAdapter
-    from agentao.replay.reader import ReplayReader
-    from agentao.transport import AgentEvent, EventType, NullTransport
+    from arbiter.cli.replay_render import _render_replay_grouped
+    from arbiter.replay.adapter import ReplayAdapter
+    from arbiter.replay.reader import ReplayReader
+    from arbiter.transport import AgentEvent, EventType, NullTransport
 
     rec = ReplayRecorder.create(
         "sess", tmp_path, capture_flags={"capture_llm_delta": True},
@@ -1141,10 +1141,10 @@ def test_render_replay_grouped_shows_full_final_text_without_chunks(tmp_path):
 
     from rich.console import Console
 
-    from agentao.cli.replay_render import _render_replay_grouped
-    from agentao.replay.adapter import ReplayAdapter
-    from agentao.replay.reader import ReplayReader
-    from agentao.transport import NullTransport
+    from arbiter.cli.replay_render import _render_replay_grouped
+    from arbiter.replay.adapter import ReplayAdapter
+    from arbiter.replay.reader import ReplayReader
+    from arbiter.transport import NullTransport
 
     rec = ReplayRecorder.create("sess", tmp_path)
     adapter = ReplayAdapter(NullTransport(), rec)
@@ -1171,10 +1171,10 @@ def test_render_replay_grouped_errors_only_filter_works(tmp_path):
 
     from rich.console import Console
 
-    from agentao.cli.replay_render import _render_replay_grouped
-    from agentao.replay.adapter import ReplayAdapter
-    from agentao.replay.reader import ReplayReader
-    from agentao.transport import AgentEvent, EventType, NullTransport
+    from arbiter.cli.replay_render import _render_replay_grouped
+    from arbiter.replay.adapter import ReplayAdapter
+    from arbiter.replay.reader import ReplayReader
+    from arbiter.transport import AgentEvent, EventType, NullTransport
 
     rec = ReplayRecorder.create("sess", tmp_path)
     adapter = ReplayAdapter(NullTransport(), rec)
@@ -1201,10 +1201,10 @@ def test_render_replay_grouped_surfaces_audit_details(tmp_path):
 
     from rich.console import Console
 
-    from agentao.cli.replay_render import _render_replay_grouped
-    from agentao.replay.adapter import ReplayAdapter
-    from agentao.replay.reader import ReplayReader
-    from agentao.transport import AgentEvent, EventType, NullTransport
+    from arbiter.cli.replay_render import _render_replay_grouped
+    from arbiter.replay.adapter import ReplayAdapter
+    from arbiter.replay.reader import ReplayReader
+    from arbiter.transport import AgentEvent, EventType, NullTransport
 
     rec = ReplayRecorder.create("sess", tmp_path)
     adapter = ReplayAdapter(NullTransport(), rec)
@@ -1256,8 +1256,8 @@ def test_render_replay_grouped_surfaces_audit_details(tmp_path):
 
 
 def test_config_coerces_non_bool_capture_flag_strings(tmp_path):
-    (tmp_path / ".agentao").mkdir()
-    (tmp_path / ".agentao" / "settings.json").write_text(
+    (tmp_path / ".arbiter").mkdir()
+    (tmp_path / ".arbiter" / "settings.json").write_text(
         json.dumps({
             "replay": {
                 "capture_flags": {
@@ -1267,7 +1267,7 @@ def test_config_coerces_non_bool_capture_flag_strings(tmp_path):
             }
         })
     )
-    from agentao.replay.config import load_replay_config
+    from arbiter.replay.config import load_replay_config
 
     cfg = load_replay_config(tmp_path)
     assert cfg.capture_flags["capture_llm_delta"] is False
@@ -1346,20 +1346,20 @@ def test_sanitize_full_capture_off_still_truncates():
 
 
 # ---------------------------------------------------------------------------
-# Legacy import path: agentao.tool_runner keeps working after the refactor
+# Legacy import path: arbiter.tool_runner keeps working after the refactor
 # ---------------------------------------------------------------------------
 
 
 def test_legacy_tool_runner_import_path():
-    """`from agentao.tool_runner import ToolRunner` keeps working.
+    """`from arbiter.tool_runner import ToolRunner` keeps working.
 
-    The module moved to ``agentao.runtime.tool_runner``; this guards
+    The module moved to ``arbiter.runtime.tool_runner``; this guards
     the shim that re-exports the public surface from the old path.
     """
-    import agentao.tool_runner as legacy
-    from agentao.runtime.tool_runner import ToolRunner as RuntimeToolRunner
+    import arbiter.tool_runner as legacy
+    from arbiter.runtime.tool_runner import ToolRunner as RuntimeToolRunner
 
-    from agentao.tool_runner import ToolRunner  # noqa: F401
+    from arbiter.tool_runner import ToolRunner  # noqa: F401
 
     assert ToolRunner is RuntimeToolRunner
     assert legacy.ToolRunner is RuntimeToolRunner

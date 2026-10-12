@@ -1,9 +1,9 @@
 # pi-mono Tools-Level Review
 
 **Status:** Decision record. Drafted 2026-05-04 as a companion to `pi-mono-borrow-review.md`.
-**Scope:** Implementation-level diff between same-purpose tools in agentao (`agentao/tools/`) and pi-mono coding-agent (`packages/coding-agent/src/core/tools/`). The earlier review covered protocol- and feature-level borrows (`shouldStopAfterTurn`, `terminate`, executionMode, etc.); this one stays inside the tool layer (read / write / edit / ls / glob / grep / shell).
+**Scope:** Implementation-level diff between same-purpose tools in arbiter (`arbiter/tools/`) and pi-mono coding-agent (`packages/coding-agent/src/core/tools/`). The earlier review covered protocol- and feature-level borrows (`shouldStopAfterTurn`, `terminate`, executionMode, etc.); this one stays inside the tool layer (read / write / edit / ls / glob / grep / shell).
 **Companion:** `pi-mono-tools-review.zh.md`.
-**Method:** Pair-by-pair comparison of 7 overlapping tools → 5 borrow candidates → reverse review against agentao's embedded-harness positioning → codex cross-validation of the surviving candidate → final disposition.
+**Method:** Pair-by-pair comparison of 7 overlapping tools → 5 borrow candidates → reverse review against arbiter's embedded-harness positioning → codex cross-validation of the surviving candidate → final disposition.
 
 ## TL;DR
 
@@ -14,17 +14,17 @@ Of 5 initial borrow candidates, **4 are dropped** under reverse review and **1 s
 | Edit Unicode normalization | ⭐⭐⭐ | Capability-gated only | **Default-on, last-fallback pyramid** |
 | Grep `-A/-B/-C` context lines | ⭐⭐⭐ | Measure first, likely defer | unchanged |
 | `withFileMutationQueue` per-path lock | ⭐⭐⭐ | **Drop** — wrong layer, no evidence of need | unchanged |
-| Structured `TruncationResult` | ⭐⭐ | **Drop** — pi-mono's own renderer needs it, agentao has no consumer | unchanged |
+| Structured `TruncationResult` | ⭐⭐ | **Drop** — pi-mono's own renderer needs it, arbiter has no consumer | unchanged |
 | Multi-edit `edits[]` batch + overlap detection | ⭐⭐ | **Drop** — conflicts with embedded-harness audit granularity | unchanged |
 
-The honest meta-finding: tools-level "what's good in pi-mono" was again biased toward CLI polish. agentao's embedded-harness positioning (per-call permission gating, capability injection, audit events) inverts the tradeoffs for several pi-mono ergonomics — multi-edit batching and structured truncation in particular are anti-features at this layer.
+The honest meta-finding: tools-level "what's good in pi-mono" was again biased toward CLI polish. arbiter's embedded-harness positioning (per-call permission gating, capability injection, audit events) inverts the tradeoffs for several pi-mono ergonomics — multi-edit batching and structured truncation in particular are anti-features at this layer.
 
 ## Background — what was compared
 
-agentao tool layer (Python, OO subclasses of `Tool` / `AsyncToolBase`):
-- `agentao/tools/shell.py` — `ShellTool` / `run_shell_command`
-- `agentao/tools/file_ops.py` — `ReadFileTool` / `WriteFileTool` / `EditTool` / `ReadFolderTool`
-- `agentao/tools/search.py` — `FindFilesTool` (glob) / `SearchTextTool` (grep)
+arbiter tool layer (Python, OO subclasses of `Tool` / `AsyncToolBase`):
+- `arbiter/tools/shell.py` — `ShellTool` / `run_shell_command`
+- `arbiter/tools/file_ops.py` — `ReadFileTool` / `WriteFileTool` / `EditTool` / `ReadFolderTool`
+- `arbiter/tools/search.py` — `FindFilesTool` (glob) / `SearchTextTool` (grep)
 
 pi-mono tool layer (TypeScript, factory functions returning `ToolDefinition`):
 - `packages/coding-agent/src/core/tools/bash.ts`
@@ -33,7 +33,7 @@ pi-mono tool layer (TypeScript, factory functions returning `ToolDefinition`):
 
 ### Architectural divergence (one table)
 
-| Dimension | agentao | pi-mono |
+| Dimension | arbiter | pi-mono |
 |---|---|---|
 | Abstraction | OO subclass of `Tool(ABC)` + `@property` metadata (`tools/base.py:140`) | Factory closure: `createXTool(cwd, options)` returning `ToolDefinition` (`index.ts:117`) |
 | Capability injection | `self.filesystem` / `self.shell` lazy accessors on `_BaseTool` (`base.py:43-55`) | `options.operations: BashOperations / ReadOperations …` interface arg |
@@ -43,31 +43,31 @@ pi-mono tool layer (TypeScript, factory functions returning `ToolDefinition`):
 | Render layer | None — tools return plain strings | Built-in TUI rendering (syntax highlight cache, unified diff, incremental updates) |
 | Truncation | Char-budget concatenation | Structured `TruncationResult { truncatedBy, outputLines, totalLines, firstLineExceedsLimit }` |
 
-Implication: many pi-mono tool features (structured truncation, multi-edit, render hooks) exist to feed pi-mono's TUI / streaming layer. agentao has no equivalent consumer at the tool layer; its consumers are `EventStream` / `ToolLifecycleEvent` / permission engine. That mismatch drives most of the "drop" verdicts below.
+Implication: many pi-mono tool features (structured truncation, multi-edit, render hooks) exist to feed pi-mono's TUI / streaming layer. arbiter has no equivalent consumer at the tool layer; its consumers are `EventStream` / `ToolLifecycleEvent` / permission engine. That mismatch drives most of the "drop" verdicts below.
 
 ## Per-tool diff (terse)
 
 ### Shell — `shell.py` ↔ `bash.ts`
 
-agentao ships macOS sandbox wrapping (`shell.py:71-113`), `is_background` mode returning PGID/PID, ANSI/CR collapsing, inactivity-based timeout. pi-mono adds `BashSpawnHook` (host can rewrite env/command), `onUpdate` streaming, temp-file overflow when output is huge.
+arbiter ships macOS sandbox wrapping (`shell.py:71-113`), `is_background` mode returning PGID/PID, ANSI/CR collapsing, inactivity-based timeout. pi-mono adds `BashSpawnHook` (host can rewrite env/command), `onUpdate` streaming, temp-file overflow when output is huge.
 
-**Read:** agentao = defensive (sandbox / allowlist). pi-mono = observable (streaming / hook). pi-mono's `BashSpawnHook` is redundant with agentao's `ShellExecutor` capability.
+**Read:** arbiter = defensive (sandbox / allowlist). pi-mono = observable (streaming / hook). pi-mono's `BashSpawnHook` is redundant with arbiter's `ShellExecutor` capability.
 
 ### Read — `ReadFileTool` ↔ `read.ts`
 
-agentao emits `cat -n` format with `File: …` header (`file_ops.py:101`), 2000-char-per-line cap, null-byte binary detection. pi-mono adds **image support** (MIME detection, auto-resize to 2000×2000, base64 encoding, `read.ts:209`); text path has no line numbers.
+arbiter emits `cat -n` format with `File: …` header (`file_ops.py:101`), 2000-char-per-line cap, null-byte binary detection. pi-mono adds **image support** (MIME detection, auto-resize to 2000×2000, base64 encoding, `read.ts:209`); text path has no line numbers.
 
 **Read:** image support is the only material capability gap. Defer until multimodal is on the roadmap.
 
 ### Write — `WriteFileTool` ↔ `write.ts`
 
-agentao has `append` flag; `requires_confirmation=True` plumbed to the chat loop. pi-mono always overwrites, explicit `mkdir -p`, `withFileMutationQueue` for concurrent-write safety, incremental syntax-highlight cache for live preview.
+arbiter has `append` flag; `requires_confirmation=True` plumbed to the chat loop. pi-mono always overwrites, explicit `mkdir -p`, `withFileMutationQueue` for concurrent-write safety, incremental syntax-highlight cache for live preview.
 
 **Read:** mutation queue is the only safety-relevant difference; reverse review concludes the right home for that lock is the `FileSystem` capability, not the tool wrapper. See "Reverse review" below.
 
 ### Edit — `EditTool` ↔ `edit.ts` + `edit-diff.ts`
 
-agentao: single `old_text/new_text/replace_all`, fallback to whitespace-stripped flexible match (`file_ops.py:219-241`); on miss, returns most-similar snippet via difflib (`file_ops.py:243-268`).
+arbiter: single `old_text/new_text/replace_all`, fallback to whitespace-stripped flexible match (`file_ops.py:219-241`); on miss, returns most-similar snippet via difflib (`file_ops.py:243-268`).
 
 pi-mono: `edits[]` array (multi-edit per call), Unicode normalization (smart quotes / dashes / NBSP / em-spaces → ASCII; `edit-diff.ts:34-55`), explicit overlap detection (`edit-diff.ts:239-243`), BOM/CRLF preservation, unified-diff preview.
 
@@ -75,19 +75,19 @@ pi-mono: `edits[]` array (multi-edit per call), Unicode normalization (smart quo
 
 ### List — `ReadFolderTool` ↔ `ls.ts`
 
-agentao supports `recursive`, displays `[DIR]/[FILE] name (N bytes)`, no entry cap. pi-mono is flat-only, default 500-entry cap + byte truncation, no size column.
+arbiter supports `recursive`, displays `[DIR]/[FILE] name (N bytes)`, no entry cap. pi-mono is flat-only, default 500-entry cap + byte truncation, no size column.
 
 **Read:** wash. Different defaults, both reasonable.
 
 ### Glob — `FindFilesTool` ↔ `find.ts`
 
-agentao: Python `pathlib.glob`, **mtime-sorted** for files modified <24 h, built-in `DEFAULT_SKIP_DIRS` blocklist (`.git / node_modules / .venv / …`) with "explicit reference opts in" (`search.py:46-60`). pi-mono: subprocess to `fd`, strict `.gitignore` adherence, no mtime sort, 1000-entry cap.
+arbiter: Python `pathlib.glob`, **mtime-sorted** for files modified <24 h, built-in `DEFAULT_SKIP_DIRS` blocklist (`.git / node_modules / .venv / …`) with "explicit reference opts in" (`search.py:46-60`). pi-mono: subprocess to `fd`, strict `.gitignore` adherence, no mtime sort, 1000-entry cap.
 
-**Read:** different design centers (Python-fallback portability vs subprocess-fast). agentao's recency sort is genuinely useful and absent in pi-mono.
+**Read:** different design centers (Python-fallback portability vs subprocess-fast). arbiter's recency sort is genuinely useful and absent in pi-mono.
 
 ### Grep — `SearchTextTool` ↔ `grep.ts`
 
-agentao: 3-tier fallback `git grep → ripgrep → Python` (`search.py:348-360`), 100-match hard cap, no context lines. pi-mono: ripgrep-only (mandatory dependency), **`-A/-B/-C` context lines** (`path-N- ctx` format), per-line and per-byte truncation, `fileCache` for context formatting.
+arbiter: 3-tier fallback `git grep → ripgrep → Python` (`search.py:348-360`), 100-match hard cap, no context lines. pi-mono: ripgrep-only (mandatory dependency), **`-A/-B/-C` context lines** (`path-N- ctx` format), per-line and per-byte truncation, `fileCache` for context formatting.
 
 **Read:** context lines is a real ergonomic gap, but the cost-benefit needs measurement (does the model actually re-read after grep often enough to justify doubling grep token budget?).
 
@@ -115,7 +115,7 @@ agentao: 3-tier fallback `git grep → ripgrep → Python` (`search.py:348-360`)
 
 **Concern:** "model re-reads after grep" is an assumption, not data. Adding context unconditionally doubles token cost on every grep. Real ROI depends on the actual rate; without measurement we're optimizing in the dark.
 
-**Verdict:** scan a week of `agentao.log`, count grep→read_file follow-ups; if >40 %, port. Otherwise defer.
+**Verdict:** scan a week of `arbiter.log`, count grep→read_file follow-ups; if >40 %, port. Otherwise defer.
 
 ### #3 File mutation queue — drop
 
@@ -123,15 +123,15 @@ agentao: 3-tier fallback `git grep → ripgrep → Python` (`search.py:348-360`)
 
 - **No evidence of actual concurrent writes.** `AsyncToolBase` landed (memory: `project_async_tool_landed.md`) and embedded harness landed (memory: `project_embedded_harness_landed.md`), but neither implies that hosts fan-out parallel edits today. Subagent lifecycle events ≠ parallel scheduling. Without a real concurrent-write workload, this lock is dead code.
 - **Wrong layer.** If concurrent writes do appear, the right home is the `FileSystem` capability (a Docker FS / virtual FS / audit-proxy implementation can choose its own concurrency semantics — locks, transactions, copy-on-write), not a tool-level decorator.
-- **In-process lock doesn't generalize.** Multiple agentao instances embedded in the same host (multi-process) can't share an in-process lock; that's an OS-level flock problem.
+- **In-process lock doesn't generalize.** Multiple arbiter instances embedded in the same host (multi-process) can't share an in-process lock; that's an OS-level flock problem.
 
-pi-mono needs this because pi-mono has no `FileSystem` abstraction and the tool wrapper is the only place to put it. agentao already has a cleaner home.
+pi-mono needs this because pi-mono has no `FileSystem` abstraction and the tool wrapper is the only place to put it. arbiter already has a cleaner home.
 
 **Verdict:** drop. Revisit only if (a) a real workload shows in-process concurrent writes and (b) the workload doesn't fit at the capability layer.
 
 ### #4 Structured TruncationResult — drop
 
-**Concern:** the structure exists in pi-mono to feed pi-mono's `renderResult` TUI layer. agentao has no equivalent consumer at the tool layer — the model reads the string. Adding more structure to string output costs prompt tokens; the model needs prompt-side instructions to parse it (more tokens). agentao's existing `Showing lines A–B` + `... (truncated)` already gives the model enough to compute the next offset.
+**Concern:** the structure exists in pi-mono to feed pi-mono's `renderResult` TUI layer. arbiter has no equivalent consumer at the tool layer — the model reads the string. Adding more structure to string output costs prompt tokens; the model needs prompt-side instructions to parse it (more tokens). arbiter's existing `Showing lines A–B` + `... (truncated)` already gives the model enough to compute the next offset.
 
 **Verdict:** drop. This is rendering infrastructure misread as model-facing structure.
 
@@ -160,7 +160,7 @@ After the reverse review, checked `../codex` for a comparable Unicode-fuzzy edit
 
 **Refinement of the original verdict:** the "silent semantic substitution" concern dissolves under codex's pyramid form. If the user's file has `"` and the prompt has `"`, exact match wins on tier 1 — normalization never runs. Normalization only catches cases that **were already going to fail** without it. That makes capability-gating unnecessary; default-on is correct **provided** the implementation is the strictness-pyramid form, not pi-mono's "enter fuzzy path → normalize unconditionally" form.
 
-**Final shape for the agentao port:**
+**Final shape for the arbiter port:**
 
 - Add normalization as a 4th fallback after the existing flexible-match in `file_ops.py:219-241`.
 - Port codex's codepoint table verbatim (the wider one).
@@ -181,7 +181,7 @@ After the reverse review, checked `../codex` for a comparable Unicode-fuzzy edit
 ## Implementation sketch — Edit Unicode normalization
 
 ```python
-# In agentao/tools/file_ops.py, extend the existing flexible-match block.
+# In arbiter/tools/file_ops.py, extend the existing flexible-match block.
 #
 # Mirrors the fuzzy behaviour of `git apply` — applied as the last
 # fallback after the existing exact / rstrip / trim tiers, so byte-identical
@@ -208,7 +208,7 @@ Wire as the 4th-tier fallback after the existing flexible (whitespace-stripped) 
 
 ## Lessons
 
-1. **CLI polish ≠ harness improvement.** Most pi-mono tool features (multi-edit, structured truncation, mutation queue) exist to feed its TUI / streaming layer. agentao's tool consumers are events and permissions, not a renderer; the same features cost more than they buy.
+1. **CLI polish ≠ harness improvement.** Most pi-mono tool features (multi-edit, structured truncation, mutation queue) exist to feed its TUI / streaming layer. arbiter's tool consumers are events and permissions, not a renderer; the same features cost more than they buy.
 2. **Cross-validate single-source borrows.** Adopting an idea from one project's edit tool risked inheriting that project's specific tradeoffs (pi-mono normalizes inside fuzzy path; codex normalizes only as last fallback). The codex check changed the implementation shape, not just the verdict.
-3. **The reverse-review pattern repeats.** As in the protocol-level review, the first-pass tools list was biased toward "what looks clever." Comparing against agentao's actual layers (`FileSystem` capability, `EventStream`, `PermissionDecisionEvent`) collapsed most candidates.
+3. **The reverse-review pattern repeats.** As in the protocol-level review, the first-pass tools list was biased toward "what looks clever." Comparing against arbiter's actual layers (`FileSystem` capability, `EventStream`, `PermissionDecisionEvent`) collapsed most candidates.
 4. **Document the lineage.** The codex `seek_sequence` comment names the convention as `git apply` behavior. Future maintainers benefit from that pointer; carry it.

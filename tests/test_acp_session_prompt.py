@@ -19,11 +19,11 @@ from typing import Any, Callable, List, Optional, Tuple
 
 import pytest
 
-from agentao.acp import initialize as acp_initialize
-from agentao.acp import session_new as acp_session_new
-from agentao.acp import session_prompt as acp_session_prompt
-from agentao.acp.models import AcpSessionState
-from agentao.acp.protocol import (
+from arbiter.acp import initialize as acp_initialize
+from arbiter.acp import session_new as acp_session_new
+from arbiter.acp import session_prompt as acp_session_prompt
+from arbiter.acp.models import AcpSessionState
+from arbiter.acp.protocol import (
     ACP_PROTOCOL_VERSION,
     INTERNAL_ERROR,
     INVALID_PARAMS,
@@ -33,10 +33,10 @@ from agentao.acp.protocol import (
     METHOD_SESSION_PROMPT,
     SERVER_NOT_INITIALIZED,
 )
-from agentao.acp.server import AcpServer, JsonRpcHandlerError
-from agentao.acp.transport import ACPTransport
-from agentao.cancellation import CancellationToken
-from agentao.transport.events import AgentEvent, EventType
+from arbiter.acp.server import AcpServer, JsonRpcHandlerError
+from arbiter.acp.transport import ACPTransport
+from arbiter.cancellation import CancellationToken
+from arbiter.transport.events import AgentEvent, EventType
 
 from .support.acp_agents import FakeAgent, make_factory
 from .support.acp_server import make_initialized_server, make_server

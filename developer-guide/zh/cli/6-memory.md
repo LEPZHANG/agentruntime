@@ -16,8 +16,8 @@ Agent 有一层持久化记忆。它在工作过程中把关于你和项目的�
 
 | 作用域 | 路径 | 内容 |
 |---|---|---|
-| Project | `.agentao/memory.db` | 项目级持久记忆 + 会话摘要 |
-| User | `~/.agentao/memory.db` | 跨项目的用户级记忆（角色、偏好、profile） |
+| Project | `.arbiter/memory.db` | 项目级持久记忆 + 会话摘要 |
+| User | `~/.arbiter/memory.db` | 跨项目的用户级记忆（角色、偏好、profile） |
 
 每个 DB 内：
 
@@ -182,9 +182,9 @@ LLM 只有**一个**记忆相关工具：`save_memory(key, value, tags?)`。它�
 ## 容易踩的坑
 
 - **Agent 会自己存你没让它存的东西** — 设计就是这样。存错了或噪声大，用 `/memory delete` 删；有规律的话直接告诉 agent（"别记关于 X 的东西"）。
-- **`/memory clear` 会清 user + 当前 project 两个 scope** — 这是软删除；其他项目自己的 `.agentao/memory.db` 不受影响。
+- **`/memory clear` 会清 user + 当前 project 两个 scope** — 这是软删除；其他项目自己的 `.arbiter/memory.db` 不受影响。
 - **记忆 ≠ skills** — skill 教 agent 怎么做某类任务；记忆告诉它关于你 / 项目的事实是什么。不要把"行为"固化成记忆 — 那是 skill 的事。
-- **手编 `memory.db`** — 知道自己在干嘛就行，schema 在 [`agentao/memory/manager.py`](https://github.com/jin-bo/agentao/blob/main/agentao/memory/manager.py)。多数人就用 `/memory delete` 即可。
+- **手编 `memory.db`** — 知道自己在干嘛就行，schema 在 [`arbiter/memory/manager.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/memory/manager.py)。多数人就用 `/memory delete` 即可。
 
 ## 接下来读什么
 
@@ -201,5 +201,5 @@ LLM 只有**一个**记忆相关工具：`save_memory(key, value, tags?)`。它�
 :::
 
 ::: tip 真相源头
-命令语法：`/help`。行为：[`agentao/cli/commands_ext/memory.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands_ext/memory.py)。存储与召回：[`agentao/memory/manager.py`](https://github.com/jin-bo/agentao/blob/main/agentao/memory/manager.py)。
+命令语法：`/help`。行为：[`arbiter/cli/commands_ext/memory.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands_ext/memory.py)。存储与召回：[`arbiter/memory/manager.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/memory/manager.py)。
 :::

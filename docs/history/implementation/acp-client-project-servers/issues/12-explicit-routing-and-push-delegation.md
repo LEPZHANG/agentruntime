@@ -9,7 +9,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 - **Part A — Explicit Server Routing**：✅ 已落地。
 - **Part B — Experimental Push Delegation**：❌ **已决定不实现**，原设计整体从代码库移除。
 
-Part B 依赖一个私有 `sessionUpdate: "task_complete"` 扩展，**不属于 ACP 标准枚举**（标准集合仅含 `user_message_chunk` / `agent_message_chunk` / `agent_thought_chunk` / `tool_call` / `tool_call_update` / `plan`）。为了不让 Agentao 作为 ACP client 的行为偏离标准，并避免对 server 端引入非标扩展义务，决定彻底去掉该能力，而不是保留一个默认关闭但私有的路径。以下关于 Part B 的章节作为历史设计保留，不再代表当前实现。
+Part B 依赖一个私有 `sessionUpdate: "task_complete"` 扩展，**不属于 ACP 标准枚举**（标准集合仅含 `user_message_chunk` / `agent_message_chunk` / `agent_thought_chunk` / `tool_call` / `tool_call_update` / `plan`）。为了不让 Arbiter 作为 ACP client 的行为偏离标准，并避免对 server 端引入非标扩展义务，决定彻底去掉该能力，而不是保留一个默认关闭但私有的路径。以下关于 Part B 的章节作为历史设计保留，不再代表当前实现。
 
 ## Goal
 
@@ -19,7 +19,7 @@ Part B 依赖一个私有 `sessionUpdate: "task_complete"` 扩展，**不属于 
    当用户消息中明确点名某个 ACP server 时，直接把该消息路由给对应 server，而不是继续走主 Agent 的普通 `chat()`。
 
 2. ~~**后台 ACP server 主动 push 通知并触发后续委派**~~ *(已取消，见 Status)*
-   当特定 server 开启实验性开关后，如果它通过 `session/update` 主动推送 `task_complete` 类型通知，Agentao 会在安全空闲点把结果注入主对话上下文，并自动触发一轮后续处理。
+   当特定 server 开启实验性开关后，如果它通过 `session/update` 主动推送 `task_complete` 类型通知，Arbiter 会在安全空闲点把结果注入主对话上下文，并自动触发一轮后续处理。
 
 ## Scope
 
@@ -90,13 +90,13 @@ class AcpExplicitRoute:
 
 ### Proposed Files
 
-- `agentao/acp_client/router.py`
+- `arbiter/acp_client/router.py`
   - `detect_explicit_route(text: str, server_names: list[str]) -> Optional[AcpExplicitRoute]`
 
-- `agentao/cli/app.py`
+- `arbiter/cli/app.py`
   - 在主输入分发、`self.agent.chat(user_input)` 之前插入预路由逻辑
 
-- `agentao/cli/commands_ext.py`
+- `arbiter/cli/commands_ext.py`
   - 抽取 `/acp send` 主体为可复用 helper
 
 ### Proposed Flow
@@ -125,7 +125,7 @@ detect_explicit_route()
 
 ### Config Shape
 
-在 `.agentao/acp.json` 的具体 server 下增加实验性开关：
+在 `.arbiter/acp.json` 的具体 server 下增加实验性开关：
 
 ```json
 {
@@ -307,7 +307,7 @@ v1 可先不实现复杂配额，只保留 hook 点。
 
 ### Config / Models
 
-- `agentao/acp_client/models.py`
+- `arbiter/acp_client/models.py`
   - 为 `AcpServerConfig` 增加实验开关解析
 
 建议新增字段：
@@ -326,27 +326,27 @@ experimental: dict[str, Any] = field(default_factory=dict)
 
 ### Routing
 
-- `agentao/acp_client/router.py`
+- `arbiter/acp_client/router.py`
   - 显式目标 server 检测
 
-- `agentao/cli/app.py`
+- `arbiter/cli/app.py`
   - 在普通用户输入分发处插入 route detect
 
-- `agentao/cli/commands_ext.py`
+- `arbiter/cli/commands_ext.py`
   - 提取共享 runner：
     - `run_acp_prompt_inline(cli, name, message)`
 
 ### Push Delegation
 
-- `agentao/acp_client/delegate.py`
+- `arbiter/acp_client/delegate.py`
   - queue + event dataclass
 
-- `agentao/acp_client/manager.py`
+- `arbiter/acp_client/manager.py`
   - 识别 `task_complete`
   - 仍推 inbox
   - 额外推 delegate queue
 
-- `agentao/cli/app.py`
+- `arbiter/cli/app.py`
   - safe idle 点调用 `drain_delegate_events()`
   - 合并事件
   - 注入 synthetic message

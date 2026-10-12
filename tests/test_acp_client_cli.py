@@ -9,19 +9,19 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agentao.acp_client.interaction import (
+from arbiter.acp_client.interaction import (
     InteractionKind,
     InteractionRegistry,
     PendingInteraction,
 )
-from agentao.acp_client.models import (
+from arbiter.acp_client.models import (
     AcpClientConfig,
     AcpProcessInfo,
     AcpServerConfig,
     ServerState,
 )
-from agentao.acp_client.manager import ACPManager
-from agentao.acp_client.process import ACPProcessHandle
+from arbiter.acp_client.manager import ACPManager
+from arbiter.acp_client.process import ACPProcessHandle
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +192,7 @@ class TestInlineInteractionSanitized:
     def _run_permission(self, details: dict) -> str:
         import io
         from rich.console import Console
-        from agentao.cli.commands_ext import acp as acp_mod
+        from arbiter.cli.commands_ext import acp as acp_mod
 
         buf = io.StringIO()
         fake_console = Console(file=buf, force_terminal=True, width=100)
@@ -386,7 +386,7 @@ class TestStderrRingBuffer:
     def test_get_stderr_tail_bounded(self) -> None:
         cfg = _make_config()
         handle = ACPProcessHandle("test", cfg)
-        from agentao.acp_client.process import _STDERR_RING_CAPACITY
+        from arbiter.acp_client.process import _STDERR_RING_CAPACITY
         for i in range(_STDERR_RING_CAPACITY + 50):
             handle._stderr_ring.append(f"line-{i}")
         assert len(handle._stderr_ring) == _STDERR_RING_CAPACITY
@@ -492,7 +492,7 @@ class TestACPClientSendResponse:
     """Verify ACPClient.send_response / send_error_response write NDJSON."""
 
     def test_send_response_writes_json(self) -> None:
-        from agentao.acp_client.client import ACPClient
+        from arbiter.acp_client.client import ACPClient
         handle = MagicMock()
         handle.stdin = MagicMock()
         handle.name = "test"
@@ -509,7 +509,7 @@ class TestACPClientSendResponse:
         assert msg["result"]["outcome"] == "answered"
 
     def test_send_error_response_writes_error(self) -> None:
-        from agentao.acp_client.client import ACPClient
+        from arbiter.acp_client.client import ACPClient
         handle = MagicMock()
         handle.stdin = MagicMock()
         handle.name = "test"
@@ -551,7 +551,7 @@ class TestWaitingForUserState:
     def test_reject_transitions_to_busy_when_turn_active(self) -> None:
         # With an active turn owning the terminal READY transition, the
         # handle should go back to BUSY so the prompt RPC can finalize.
-        from agentao.acp_client.manager import _TurnContext
+        from arbiter.acp_client.manager import _TurnContext
 
         mgr = _make_manager("srv")
         handle = mgr.get_handle("srv")

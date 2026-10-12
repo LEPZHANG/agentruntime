@@ -1,21 +1,21 @@
-# Codex Reverse Review for Agentao
+# Codex Reverse Review for Arbiter
 
 Date: 2026-05-12
 
 This note records the reverse review of the latest Codex changes against
-Agentao's current architecture. The goal is to identify what Agentao actually
+Arbiter's current architecture. The goal is to identify what Arbiter actually
 needs, not to mirror Codex's product shape.
 
 ## 2026-05-17 Follow-up: Diagnostics, Not Product Weight
 
 A later review against the 2026-05-17 Codex pull refined the conclusion. The
 important correction is that most of the apparent Codex-inspired work is either
-already present in Agentao or too early for Agentao's current scale.
+already present in Arbiter or too early for Arbiter's current scale.
 
 The current actionable scope is deliberately small:
 
-1. Add `agentao doctor --json`.
-2. Add `agentao config validate`.
+1. Add `arbiter doctor --json`.
+2. Add `arbiter config validate`.
 
 Both should be small wiring PRs over existing signals. They should not become a
 new app-server diagnostics subsystem, a stricter runtime startup path, or a
@@ -25,22 +25,22 @@ plugin marketplace project.
 
 This section records the code-grounded checks that drive the narrowed scope.
 
-| Area | Current Agentao state |
+| Area | Current Arbiter state |
 |------|-----------------------|
-| `doctor` / `config validate` CLI | Missing from `agentao/cli/`; this is a real gap. |
-| Factory error handling | `agentao/embedding/factory.py` intentionally has best-effort paths that swallow load/open errors. These should remain safe at runtime but become visible through validation. |
-| Permission snapshot | Already shipped. `Agentao.active_permissions()` returns `ActivePermissions(mode, rules, loaded_sources)`, backed by `PermissionEngine.active_permissions()` and `agentao/host/models.py`. No permission-profile rewrite is needed. |
+| `doctor` / `config validate` CLI | Missing from `arbiter/cli/`; this is a real gap. |
+| Factory error handling | `arbiter/embedding/factory.py` intentionally has best-effort paths that swallow load/open errors. These should remain safe at runtime but become visible through validation. |
+| Permission snapshot | Already shipped. `Arbiter.active_permissions()` returns `ActivePermissions(mode, rules, loaded_sources)`, backed by `PermissionEngine.active_permissions()` and `arbiter/host/models.py`. No permission-profile rewrite is needed. |
 | Correlation IDs | Partially present. Host projection and replay already carry `session_id`, `turn_id`, `tool_call_id`, and `call_id`. Cross LLM/tool/MCP/ACP trace stitching is not a current P0. |
-| Plugin diagnostics | Already has a base in `agentao/embedding/plugins/diagnostics.py` via `PluginDiagnostics` and `build_diagnostics()`. `doctor` should reuse it. |
+| Plugin diagnostics | Already has a base in `arbiter/embedding/plugins/diagnostics.py` via `PluginDiagnostics` and `build_diagnostics()`. `doctor` should reuse it. |
 | Tool surface | Small enough that `ToolOutput` artifact/visibility restructuring is not justified without a real consumer. |
 
-### P0: `agentao doctor --json`
+### P0: `arbiter doctor --json`
 
 Status — implemented 2026-05-16.
 
 Goal: aggregate existing health signals into one operator-facing command.
 
-This command should expose what Agentao already knows:
+This command should expose what Arbiter already knows:
 
 - plugin diagnostics from `PluginDiagnostics` / `build_diagnostics()`;
 - active permission snapshot from `active_permissions()`;
@@ -56,7 +56,7 @@ Non-goals:
 - no marketplace or plugin sharing behavior;
 - no new long-running daemon inspection protocol;
 - no new strict startup semantics;
-- no broad "system audit" beyond Agentao-owned inputs.
+- no broad "system audit" beyond Arbiter-owned inputs.
 
 Output contract:
 
@@ -65,21 +65,21 @@ Output contract:
 - diagnostics should be redaction-safe by default;
 - warnings and errors should include the source path when available.
 
-### P0: `agentao config validate`
+### P0: `arbiter config validate`
 
 Status — implemented 2026-05-16.
 
 Goal: make configuration problems visible without changing runtime startup
 semantics.
 
-The factory path stays best-effort because Agentao is embedded-host friendly:
+The factory path stays best-effort because Arbiter is embedded-host friendly:
 bad optional config, unreadable user memory, or malformed settings should not
 unexpectedly break hosts that inject their own subsystems. Validation is a
 separate explicit command that reports those failures.
 
 Minimum scope:
 
-- validate `.agentao/settings.json` shape and JSON parse errors;
+- validate `.arbiter/settings.json` shape and JSON parse errors;
 - validate environment-derived provider fields where relevant;
 - report permission config source parse/load errors;
 - report MCP config parse/load errors;
@@ -96,14 +96,14 @@ Non-goals:
 
 ### Implementation notes (both commands, landed 2026-05-16)
 
-- Both handlers live in ``agentao/cli/diagnostics_cli.py`` and are wired
-  through the lazy-import surface in ``agentao/cli/__init__.py``; the
-  ``[cli]`` missing-dep guard in :func:`agentao.cli.entrypoint` still applies
+- Both handlers live in ``arbiter/cli/diagnostics_cli.py`` and are wired
+  through the lazy-import surface in ``arbiter/cli/__init__.py``; the
+  ``[cli]`` missing-dep guard in :func:`arbiter.cli.entrypoint` still applies
   to them as it does to ``plugin list`` and ``skill list``.
-- Neither command instantiates an :class:`Agentao`; both work off the same
+- Neither command instantiates an :class:`Arbiter`; both work off the same
   on-disk signals the factory consults (``settings.json``, ``permissions.json``,
   ``mcp.json``, replay block, memory DB probes) plus
-  :func:`agentao.embedding.plugins.diagnostics.build_diagnostics` for plugins.
+  :func:`arbiter.embedding.plugins.diagnostics.build_diagnostics` for plugins.
 - Output is redaction-safe by design: the provider section reports
   ``api_key_present`` (a boolean) and the model/base URL, but never the key
   value itself; ``LLM_TEMPERATURE`` / ``LLM_MAX_TOKENS`` values are echoed only
@@ -113,17 +113,17 @@ Non-goals:
   and that case maps to ``exit 1``. Warnings keep ``ok = True`` so a missing
   API key (a normal fresh-clone state) never flunks CI.
 - ``config validate`` deliberately omits the ``plugins`` section — plugin
-  diagnostics already have a dedicated CLI (``agentao plugin list``) and a
+  diagnostics already have a dedicated CLI (``arbiter plugin list``) and a
   doctor section, so duplicating them here would just blur the "config" scope.
 - Tests live in ``tests/test_diagnostics_cli.py`` (23 cases). Each test
   monkeypatches ``Path.home`` to ``tmp_path`` so the developer's real
-  ``~/.agentao`` is not touched.
+  ``~/.arbiter`` is not touched.
 
 ### Explicitly Not Doing
 
 These are excluded until a real consumer or bug report creates pressure:
 
-- **Permission profile rewrite.** Agentao already has the lightweight
+- **Permission profile rewrite.** Arbiter already has the lightweight
   `ActivePermissions` snapshot it needs today.
 - **Structured `ToolOutput` overhaul.** The current tool count and consumers do
   not justify artifact/visibility metadata across all tools.
@@ -132,7 +132,7 @@ These are excluded until a real consumer or bug report creates pressure:
   later only if host integrations need LLM-to-MCP stitching.
 - **Plugin marketplace / share checkout.** The plugin system should stabilize
   locally before distribution is expanded.
-- **TUI-style large module split.** Agentao's CLI is already split across
+- **TUI-style large module split.** Arbiter's CLI is already split across
   `app`, `input_loop`, `session`, and `subcommands`; Codex's TUI refactor was
   debt repayment for a much larger UI.
 
@@ -140,10 +140,10 @@ These are excluded until a real consumer or bug report creates pressure:
 
 Codex's recent architecture work is mostly driven by Codex-specific scale:
 app-server, remote environments, multiple workspaces, Windows enterprise
-sandboxing, and a broader extension surface. Agentao should not copy that
+sandboxing, and a broader extension surface. Arbiter should not copy that
 weight by default.
 
-For Agentao, the immediate gaps are narrower:
+For Arbiter, the immediate gaps are narrower:
 
 1. Make `PreToolUse` hooks minimally decision-capable instead of
    fire-and-forget.
@@ -161,7 +161,7 @@ Status: mostly complete.
 
 Evidence:
 
-- `agentao/host/models.py` defines the public lifecycle models:
+- `arbiter/host/models.py` defines the public lifecycle models:
   `ToolLifecycleEvent`, `SubagentLifecycleEvent`, and
   `PermissionDecisionEvent`.
 - `turn_id` and `tool_call_id` are already present on the public event surface.
@@ -177,7 +177,7 @@ tight. This is maintenance, not a P0 architecture gap.
 Status: real gap — **resolved 2026-05-12** (see "Status — implemented" under
 P0 below). The description below is the pre-fix state, kept for context.
 
-`agentao/runtime/tool_executor.py::_dispatch_pre_tool_hook()` discards the
+`arbiter/runtime/tool_executor.py::_dispatch_pre_tool_hook()` discards the
 dispatcher's return value. `PluginHookDispatcher.dispatch_pre_tool_use(...)`
 runs the matching hooks and returns a list of attachment records, but the
 executor drops it and the dispatcher never parses any control fields out of
@@ -211,7 +211,7 @@ Status: partially present.
 
 Existing pieces:
 
-- `agentao/runtime/llm_call.py` emits `LLM_CALL_STARTED` and
+- `arbiter/runtime/llm_call.py` emits `LLM_CALL_STARTED` and
   `LLM_CALL_COMPLETED`.
 - LLM call completion already includes `duration_ms`.
 - Tool lifecycle events carry timestamps, so tool duration can be derived.
@@ -349,7 +349,7 @@ Add only the small set needed to debug host integrations:
 - stable compaction duration field for public/replay consumers
 
 `trace_id`, `turn_id`, and `tool_call_id` are already present or conceptually
-covered. Do not introduce a large SQLite telemetry subsystem unless Agentao's
+covered. Do not introduce a large SQLite telemetry subsystem unless Arbiter's
 deployment model changes.
 
 ### Status — implemented 2026-05-12
@@ -378,7 +378,7 @@ no new event types, no public host-schema bump):
   `LLM_CALL_COMPLETED` and `TURN_END` fields.
 
 Deliberately *not* done: `model_latency_ms` is not re-exposed on the public
-`agentao.host` Pydantic models — the host contract does not currently project
+`arbiter.host` Pydantic models — the host contract does not currently project
 LLM-call events at all, and adding that surface is a larger decision than this
 increment. Hosts that want latency today subscribe to the transport
 `LLM_CALL_COMPLETED` event (same as cost/usage tracking already does).
@@ -386,7 +386,7 @@ increment. Hosts that want latency today subscribe to the transport
 ## P2: Permission Abstraction and Redaction
 
 Read denial is worth modeling in the permission abstraction, but OS-level
-Windows deny-read parity is not a current priority. Agentao's current sandbox
+Windows deny-read parity is not a current priority. Arbiter's current sandbox
 focus remains local-first and macOS-first.
 
 P2 work:
@@ -407,7 +407,7 @@ Do not prioritize these based on Codex alone:
   `permissionDecision` only; exit-code-2 parity can come later);
 - TUI restructuring just because Codex split its TUI modules.
 
-These may become useful later, but current Agentao needs do not justify the
+These may become useful later, but current Arbiter needs do not justify the
 complexity.
 
 ## Final Priority
@@ -422,4 +422,4 @@ duration, and turn tool count.
 
 P2: model read-deny and verify ACP/remote redaction.
 
-Everything else should be deferred until Agentao has a concrete product need.
+Everything else should be deferred until Arbiter has a concrete product need.

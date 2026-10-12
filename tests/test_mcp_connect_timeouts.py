@@ -12,12 +12,12 @@ import asyncio
 from contextlib import AsyncExitStack
 from unittest.mock import MagicMock, patch
 
-from agentao.mcp.client import (
+from arbiter.mcp.client import (
     _DEFAULT_SSE_READ_TIMEOUT,
     McpClient,
     ServerStatus,
 )
-from agentao.mcp.config import resolve_timeouts
+from arbiter.mcp.config import resolve_timeouts
 from tests.support.mcp import run_async
 
 
@@ -56,8 +56,8 @@ def _connect_sse_capturing(config):
     async def run():
         async with AsyncExitStack() as stack:
             client._exit_stack = stack
-            with patch("agentao.mcp.client.sse_client", fake_sse_client), patch(
-                "agentao.mcp.client.ClientSession", fake_client_session
+            with patch("arbiter.mcp.client.sse_client", fake_sse_client), patch(
+                "arbiter.mcp.client.ClientSession", fake_client_session
             ), patch.object(McpClient, "_preflight_content_type", no_preflight):
                 await client._connect_sse(startup_timeout, request_timeout)
 

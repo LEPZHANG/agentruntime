@@ -30,7 +30,7 @@ tests around six invariants:
    ``session/load`` can co-exist with sessions created by ``session/new``.
 
 Plus a single end-to-end stdio subprocess test that brings up a real
-``python -m agentao --acp --stdio`` process, opens two sessions in one
+``python -m arbiter --acp --stdio`` process, opens two sessions in one
 ``initialize``-d connection, and asserts that both responses come back
 with distinct ids.
 
@@ -57,27 +57,27 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pytest
 
-from agentao.acp import initialize as acp_initialize
-from agentao.acp import session_cancel as acp_session_cancel
-from agentao.acp import session_load as acp_session_load
-from agentao.acp import session_new as acp_session_new
-from agentao.acp import session_prompt as acp_session_prompt
-from agentao.acp.models import AcpSessionState
-from agentao.acp.protocol import (
+from arbiter.acp import initialize as acp_initialize
+from arbiter.acp import session_cancel as acp_session_cancel
+from arbiter.acp import session_load as acp_session_load
+from arbiter.acp import session_new as acp_session_new
+from arbiter.acp import session_prompt as acp_session_prompt
+from arbiter.acp.models import AcpSessionState
+from arbiter.acp.protocol import (
     ACP_PROTOCOL_VERSION,
     METHOD_INITIALIZE,
     METHOD_SESSION_CANCEL,
     METHOD_SESSION_NEW,
     METHOD_SESSION_PROMPT,
 )
-from agentao.acp.server import AcpServer, _PendingRequest
-from agentao.acp.transport import (
+from arbiter.acp.server import AcpServer, _PendingRequest
+from arbiter.acp.transport import (
     ACPTransport,
     PERMISSION_ALLOW_ALWAYS,
     PERMISSION_REJECT_ALWAYS,
 )
-from agentao.cancellation import CancellationToken
-from agentao.session import save_session
+from arbiter.cancellation import CancellationToken
+from arbiter.session import save_session
 
 from .support.acp_agents import (
     StallingFakeAgent,
@@ -97,7 +97,7 @@ class FakeAgent(_FakeAgent):
     """Multi-session local variant: ``track_messages=True`` by default.
 
     The multi-session message-isolation tests assert per-session
-    conversation state, which requires ``chat`` to mirror real Agentao
+    conversation state, which requires ``chat`` to mirror real Arbiter
     by appending user/assistant entries to ``self.messages``. Other ACP
     test files use the support default (``track_messages=False``)
     because their assertions on ``messages`` would regress.
@@ -557,7 +557,7 @@ class _PermissionGrantingServer:
     """
 
     def __init__(self, option_id: str) -> None:
-        from agentao.acp.session_manager import AcpSessionManager
+        from arbiter.acp.session_manager import AcpSessionManager
         self.sessions = AcpSessionManager()
         self.option_id = option_id
         self.calls: List[Tuple[str, dict]] = []
@@ -660,7 +660,7 @@ class TestMessageHistoryIsolation:
     ):
         """A turn on session A appends to agent A's history only —
         agent B's ``messages`` list stays untouched. This is the
-        property that justifies binding one ``Agentao`` runtime per
+        property that justifies binding one ``Arbiter`` runtime per
         session in :func:`session_new.handle_session_new`."""
         server, (sid_a, agent_a, _), (sid_b, agent_b, _) = two_sessions
 
@@ -882,7 +882,7 @@ class TestSessionLoadCoexistence:
 # ===========================================================================
 
 
-def _agentao_repo_root() -> Path:
+def _arbiter_repo_root() -> Path:
     here = Path(__file__).resolve()
     return here.parent.parent
 
@@ -892,7 +892,7 @@ def _agentao_repo_root() -> Path:
     reason="subprocess stdio framing is platform-specific; covered on Linux/macOS",
 )
 class TestStdioMultiSessionSubprocess:
-    """Spawn a real ``python -m agentao --acp --stdio`` and verify that
+    """Spawn a real ``python -m arbiter --acp --stdio`` and verify that
     two sessions can coexist over the same connection.
 
     This is the only test in the file that crosses a process boundary.
@@ -904,14 +904,14 @@ class TestStdioMultiSessionSubprocess:
     def _spawn_acp(self) -> subprocess.Popen:
         env = os.environ.copy()
         env.setdefault("PYTHONUNBUFFERED", "1")
-        # session/new constructs a real Agentao runtime which checks for
+        # session/new constructs a real Arbiter runtime which checks for
         # credentials during LLMClient init.
         env.setdefault("OPENAI_API_KEY", "test-dummy-key")
         env.setdefault("OPENAI_BASE_URL", "https://api.openai.com/v1")
         env.setdefault("OPENAI_MODEL", "gpt-5.4")
         return subprocess.Popen(
-            [sys.executable, "-m", "agentao", "--acp", "--stdio"],
-            cwd=str(_agentao_repo_root()),
+            [sys.executable, "-m", "arbiter", "--acp", "--stdio"],
+            cwd=str(_arbiter_repo_root()),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -963,7 +963,7 @@ class TestStdioMultiSessionSubprocess:
             proc.kill()
             stdout, stderr = proc.communicate()
             pytest.fail(
-                f"agentao --acp --stdio timed out\n"
+                f"arbiter --acp --stdio timed out\n"
                 f"stdout={stdout}\nstderr={stderr}"
             )
 
@@ -993,5 +993,5 @@ class TestStdioMultiSessionSubprocess:
 
         # Process exited cleanly because we closed stdin (EOF after our lines).
         assert proc.returncode == 0, (
-            f"agentao exited with code {proc.returncode}\nstderr={stderr}"
+            f"arbiter exited with code {proc.returncode}\nstderr={stderr}"
         )

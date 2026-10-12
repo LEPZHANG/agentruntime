@@ -6,7 +6,7 @@ otherwise repeat 2-4 lines of ``SQLiteMemoryStore.open_or_memory(...)``
 boilerplate. This helper keeps the per-test footprint to one line.
 
 Production code constructs stores via the embedding factory
-(``agentao.embedding.build_from_environment``), which performs the same
+(``arbiter.embedding.build_from_environment``), which performs the same
 project-falls-back-to-memory / user-disabled-on-error contract.
 """
 
@@ -15,14 +15,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from agentao.memory import MemoryManager, SQLiteMemoryStore
+from arbiter.memory import MemoryManager, SQLiteMemoryStore
 
 
 def make_memory_manager(
     tmp_path,
     *,
     with_user: bool = False,
-    project_subdir: str = ".agentao",
+    project_subdir: str = ".arbiter",
     user_subdir: str = "global",
 ) -> MemoryManager:
     """Build a :class:`MemoryManager` rooted at ``tmp_path``.

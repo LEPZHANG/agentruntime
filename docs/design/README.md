@@ -19,14 +19,14 @@ links stable. Use this index to find the **review records / backlog** vs the
 Start here — strategy and the host/ACP surface boundary.
 
 - **path-a-roadmap** — embed-first strategy (locked 2026-04-30); the anchor most other records test against.
-- **embedding-vs-acp** — decision tree: which integration surface (embed / `agentao run` / ACP) do I use?
+- **embedding-vs-acp** — decision tree: which integration surface (embed / `arbiter run` / ACP) do I use?
 - **embedded-host-contract** *(en only)* — the public host-contract design (events, ActivePermissions, ACP schema).
 
 ## Active & proposed designs · 活跃与提案中的设计
 
 The live backlog of work — proposed, in progress, or impl-deferred. New build work usually starts from one of these.
 
-- **cli-host-agent-factory** — *shipped* — instance-scoped `agent_factory` on `AgentaoCLI` / `cli.main()` so thin Python hosts reach `extra_tools` and the existing runtime construction contract without monkey-patching; validates the returned runtime (#132, 2026-07-19).
+- **cli-host-agent-factory** — *shipped* — instance-scoped `agent_factory` on `ArbiterCLI` / `cli.main()` so thin Python hosts reach `extra_tools` and the existing runtime construction contract without monkey-patching; validates the returned runtime (#132, 2026-07-19).
 - **acp-g4-plan-modes-commands** — *proposal* — surface plan / modes / commands as ACP `session/update` (chat-target now-work).
 - **deepchat-acp-patch-revision** — *impl in progress* — DeepChat/TensorChat ACP integration; what upstreams vs stays in the fork.
 - **host-fs-policy** — *proposal* — path-domain write boundary over the single fs chokepoint (incl. shell).
@@ -42,7 +42,7 @@ Shipped behavior — read as reference for what exists today.
 - **host-tool-injection** — `extra_tools` / `disable_tools` (v1 landed).
 - **runtime-tool-injection** — `add_tool` / `remove_tool` (v1 landed).
 - **host-llm-extra-params** — host LLM request passthrough `extra_body` (v1).
-- **run-spec-parameters** — `agentao run` spec parameters & instructions (shipped 2026-05-25).
+- **run-spec-parameters** — `arbiter run` spec parameters & instructions (shipped 2026-05-25).
 - **mcp-streamable-http** — MCP Streamable HTTP transport; bare `url` now defaults to it (**breaking**, SSE is opt-in via `type: "sse"`). Shipped 0.4.14, 2026-07-02.
 
 ## Review & decision records · 评审与决策记录 *(the "backlog" class)*
@@ -51,24 +51,24 @@ Retrospective analyses — competitive/borrow reviews, conformance gap reviews, 
 
 - **dynamic-workflows-review** *(zh only)* — Claude Code Dynamic Workflows adoption assessment. **rev 5: don't adopt, don't design an alternative, change no code.** Records one verified fact (same tool instance serializes within a batch; whether that default may be bypassed is undefined) plus §3.5, a candidate implementation plan that activates only if a real use case demands it — explicitly not a commitment (2026-07-19).
 - **code-mode-ptc-review** *(zh only)* — Code Mode / Programmatic Tool Calling decision record; 4 peer impls compared, current decision **not to start** pending demand (2026-07-09, 4th impl added 07-11).
-- **codex-goal-mechanism-review** — two parts: Codex `/goal` mechanism teardown (§§1–9, descriptive) + agentao candidate design (§§10–11, **not approved**) (2026-06-23).
+- **codex-goal-mechanism-review** — two parts: Codex `/goal` mechanism teardown (§§1–9, descriptive) + arbiter candidate design (§§10–11, **not approved**) (2026-06-23).
 - **subagent-discovery-entrypoint-review** — sub-agent discovery asymmetry across the three entry points; corrects the skill-vs-plugin conflation the original report assumed (2026-06-23).
 - **refactor-audit-2026-07** — full-tree refactor audit **plus an adversarial reverse review of its own findings**: 7 candidates → 3 shipped (#139/#140 + replay v1.2 render), 4 declined with evidence. Formally declines `optimization-opportunities-review`'s Tier 3 on churn data. Read the *declined* half first (2026-07-24/25).
 - **optimization-opportunities-review** — multi-dimension audit (complexity / per-turn perf / duplication / packaging); Tier 1–3 findings, evidence-backed (2026-06-19). **Tier 1–2 shipped in v0.4.12; Tier 3 declined — see refactor-audit-2026-07 §5.**
 - **vendor-sdk-convergence-review** — Claude/OpenAI Agent SDKs converged on Path A's pitch; §16.4 trigger determination (2026-06-18).
-- **acp-server-conformance-review** — agentao ACP server vs official ACP v1; gaps G1–G6 + chat/automation target decision (2026-06-18).
+- **acp-server-conformance-review** — arbiter ACP server vs official ACP v1; gaps G1–G6 + chat/automation target decision (2026-06-18).
 - **core-boundary-review** — core vs host package-boundary audit (codex parallel, 2026-05).
 - **codex-reverse-review** *(en only)* — reverse-review discipline record (2026-05-12).
 - **pi-mono-borrow-review** — pi-mono v0.66→v0.73 borrow analysis; demand-gated precedent anchor.
 - **pi-mono-tools-review** — pi-mono tools-level companion review.
-- **pi-mono-openai-stream-fix** — pi-mono OpenAI-compat stream fix + agentao-side gap analysis.
+- **pi-mono-openai-stream-fix** — pi-mono OpenAI-compat stream fix + arbiter-side gap analysis.
 - **system-prompt-profile** — host-injectable collaboration posture (review record; impl deferred).
 
 ---
 
 ### Where does a new doc go? · 新文档放哪一组？
 
-- Analyzing another repo / auditing agentao / recording a decision → **Review & decision records**.
+- Analyzing another repo / auditing arbiter / recording a decision → **Review & decision records**.
 - Proposing or speccing work not yet shipped → **Active & proposed designs** (mark status in the `Status:` line).
 - Documenting shipped behavior → **Landed contracts**.
 

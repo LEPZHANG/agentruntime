@@ -1,9 +1,9 @@
-"""slack-bolt app: each ``app_mention`` runs one ``Agentao`` turn.
+"""slack-bolt app: each ``app_mention`` runs one ``Arbiter`` turn.
 
 Channel-scoped permissions: the channel id of the inbound mention
 selects a rule preset (``read-only`` for general channels, full
 write-mode for an explicit allowlist). The bot then constructs a
-fresh ``Agentao`` per mention with that engine injected, runs one
+fresh ``Arbiter`` per mention with that engine injected, runs one
 ``arun()``, and posts the reply back as a thread reply.
 
 Heavy-handed simplifications for an example:
@@ -23,9 +23,9 @@ import tempfile
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
 
-from agentao import Agentao
-from agentao.llm import LLMClient
-from agentao.permissions import PermissionEngine, PermissionMode
+from arbiter import Arbiter
+from arbiter.llm import LLMClient
+from arbiter.permissions import PermissionEngine, PermissionMode
 
 
 # The channels in this set get full workspace-write power; any other
@@ -39,7 +39,7 @@ def make_permission_engine_for_channel(
 ) -> PermissionEngine:
     """Build a ``PermissionEngine`` rooted at ``project_root``.
 
-    The engine reads ``<project_root>/.agentao/permissions.json`` if
+    The engine reads ``<project_root>/.arbiter/permissions.json`` if
     present and falls back to no project rules otherwise — so the
     caller need not pre-create that file.
     """
@@ -75,8 +75,8 @@ async def handle_mention(
     the test seam — production reads from env, smoke tests inject a
     fake.
     """
-    work_dir = Path(tempfile.mkdtemp(prefix="agentao-slack-"))
-    agent = Agentao(
+    work_dir = Path(tempfile.mkdtemp(prefix="arbiter-slack-"))
+    agent = Arbiter(
         working_directory=work_dir,
         llm_client=llm_client_factory(),
         permission_engine=make_permission_engine_for_channel(

@@ -1,9 +1,9 @@
 # Core 边界审查（对照 codex，2026 年 5 月）
 
-**状态：** 决策记录。2026-05-07 起草，经过四轮把 agentao 的 `agentao/*` 包结构对照 OpenAI codex 最近解耦后的 `codex-rs/core` crate 反复核对，每条结论都跟当前代码 grep 验证过。
-**读者：** 准备做下一轮"哪些东西该出 core"重构的 agentao 维护者。
+**状态：** 决策记录。2026-05-07 起草，经过四轮把 arbiter 的 `arbiter/*` 包结构对照 OpenAI codex 最近解耦后的 `codex-rs/core` crate 反复核对，每条结论都跟当前代码 grep 验证过。
+**读者：** 准备做下一轮"哪些东西该出 core"重构的 arbiter 维护者。
 **对应：** `core-boundary-review.md`（英文版）。
-**方法：** codex 现状摸底 → agentao core 审计 → 用真实 import 反向核对 → 对两个被标出的子包（`plugins/`、`session.py`）做深入调研 → 修订优先表。
+**方法：** codex 现状摸底 → arbiter core 审计 → 用真实 import 反向核对 → 对两个被标出的子包（`plugins/`、`session.py`）做深入调研 → 修订优先表。
 **相关：**
 - `docs/design/embedded-host-contract.md` —— 锁定本文遵循的"嵌入式 harness"定位。
 - `docs/design/path-a-roadmap.md` —— 整体路线图；本文只覆盖一个切片。
@@ -12,7 +12,7 @@
 
 ## TL;DR
 
-按 ROI 排序，**4 件事不该留在 agentao core**。前几轮意见里有 3 件经查证是错的，从待办清单退役。
+按 ROI 排序，**4 件事不该留在 arbiter core**。前几轮意见里有 3 件经查证是错的，从待办清单退役。
 
 **做（按顺序）：**
 
@@ -29,7 +29,7 @@
    **实际落地（2026-05-07）：**
    - `Transport.subscribe(listener)` 加入 Protocol（可选方法）；新的 `EventBroadcaster` helper 由 `NullTransport` / `SdkTransport` / `ACPTransport` 组合复用。
    - 新增 `EventType.TURN_BEGIN` / `EventType.TURN_END` 两类事件。runtime `turn.py` 通过 `agent.transport.emit(...)` emit；当 `ReplayAdapter` 已经 splice 进 transport 时，`_mirror` 把它们翻译成 `begin_turn`/`end_turn` 写入 recorder。manager 内部不需要单独的 listener 簿记，splice 本身就完成了路由。
-   - 新增 `agentao/replay/manager.py::ReplayManager`：拥有 recorder + adapter + host_replay_sink + config；`start(session_id)` / `end()` / `reload_config()` lifecycle。
+   - 新增 `arbiter/replay/manager.py::ReplayManager`：拥有 recorder + adapter + host_replay_sink + config；`start(session_id)` / `end()` / `reload_config()` lifecycle。
    - `agent.py`：4 个内部属性收敛为 1 个（`replay_manager`）；4 个只读 `@property` 视图（`_replay_recorder`、`_replay_adapter`、`_host_replay_sink`、`_replay_config`）作为 deprecation shim 保留；6 个 facade 方法（`start_replay`、`end_replay`、`reload_replay_config`、`_latest_session_summary_id`、`_emit_context_compressed`、`_emit_session_summary_if_new`）作为薄 delegate 保留（route 到 manager + observability 辅助函数）；`close()` 改为调用 `self.replay_manager.end()`。10 个顶层 replay import 改成 `TYPE_CHECKING` 限定。
    - `runtime/llm_call.py:59` 通过 `agent.replay_manager.config.capture_flags` 读取 `capture_flags`（无 manager 时返回 `{}`）。
    - `runtime/chat_loop.py` 5 处 `agent._emit_*` 调用未改 —— 它们走 agent 的 deprecation shim，shim 内部 lazy import `replay/observability.py`。文档"统一事件 emit"的意图已达成（shim 已经在 `transport.emit(...)`）。
@@ -39,27 +39,27 @@
    **测试：** 2549 通过、2 跳过，无回归。
 
    **没有发生的事：** 文档原想象 recorder 直接成为 inner transport 的纯 subscriber。实际上当前 transport-wrap（`ReplayAdapter` 包住 `agent.transport`）功能上就是一个在 inner emit *之后*运行的 subscriber——把它改造成 `transport.subscribe(listener)` 监听者，要么得重写 `_mirror` 全部 487 行、要么搞双层 wrap，而测试面用 `ReplayAdapter(transport, rec)` 直接构造。落地的设计保留 `ReplayAdapter` 作为翻译单元，`Transport.subscribe()` 留给*未来*非 replay 观察者使用（当前没有消费者）。
-2. ✅ **已完成。** **`Agentao.__init__` 的 callback 签名收紧。** 把 8 个 deprecated callback（常见的 7 个 + `on_max_iterations_callback`）从公开构造函数移走，统一走 `embedding/compat.py`。`build_compat_transport` 已经在 `transport/sdk.py:82`，这是 API 边界收紧，不是物理搬家。1 天。
+2. ✅ **已完成。** **`Arbiter.__init__` 的 callback 签名收紧。** 把 8 个 deprecated callback（常见的 7 个 + `on_max_iterations_callback`）从公开构造函数移走，统一走 `embedding/compat.py`。`build_compat_transport` 已经在 `transport/sdk.py:82`，这是 API 边界收紧，不是物理搬家。1 天。
 
    **实际落地（2026-05-07）：**
-   - 新增 `agentao/embedding/compat.py`：作为公开的迁移入口模块，从 `transport/sdk.py` 重导出 `build_compat_transport`（实现没有物理搬家，符合文档原意）。模块 docstring 写明推荐迁移路径——首选直接构造 `SdkTransport`，否则调用 `embedding.compat.build_compat_transport(...)` 把旧 8-callback 包成 transport 后通过 `transport=` 传给 `Agentao(...)`。
-   - `Agentao.__init__` 仍接受 8 个 deprecated kwargs（向后兼容，0.5.0 移除），但**只要任意一个被设置就 emit 一次 `DeprecationWarning`**：列出全部 8 个名字，并指向 `embedding.compat.build_compat_transport`。预先构造 transport 的（推荐路径）不会触发 warning。内部仍然调用 `build_compat_transport`，保证现有测试 / CLI 不需要改。
+   - 新增 `arbiter/embedding/compat.py`：作为公开的迁移入口模块，从 `transport/sdk.py` 重导出 `build_compat_transport`（实现没有物理搬家，符合文档原意）。模块 docstring 写明推荐迁移路径——首选直接构造 `SdkTransport`，否则调用 `embedding.compat.build_compat_transport(...)` 把旧 8-callback 包成 transport 后通过 `transport=` 传给 `Arbiter(...)`。
+   - `Arbiter.__init__` 仍接受 8 个 deprecated kwargs（向后兼容，0.5.0 移除），但**只要任意一个被设置就 emit 一次 `DeprecationWarning`**：列出全部 8 个名字，并指向 `embedding.compat.build_compat_transport`。预先构造 transport 的（推荐路径）不会触发 warning。内部仍然调用 `build_compat_transport`，保证现有测试 / CLI 不需要改。
    - docstring 加上迁移配方和 0.5.0 移除说明。
-   - `transport/__init__.py` 和 `transport/sdk.py` 不变 —— `build_compat_transport` 在 `agentao.transport`（旧路径）和 `agentao.embedding.compat`（推荐路径）下都可 import。
+   - `transport/__init__.py` 和 `transport/sdk.py` 不变 —— `build_compat_transport` 在 `arbiter.transport`（旧路径）和 `arbiter.embedding.compat`（推荐路径）下都可 import。
 
    **测试：** 2549 通过、2 跳过。4 个走旧 callback 路径的测试（`test_tool_confirmation.py`、`test_reliability_prompt.py`）现在会触发新 `DeprecationWarning`（pytest warnings summary 中可见），但不 fail——它们本来就是测 deprecated 路径，与 0.5.0 kwarg 移除一起再迁移。
 
-   **没有发生的事：** 文档 "API tightening" 的最终意图是从签名上彻底删掉这些 kwargs，但那是硬 breaking change，要等 0.5.0。这次 PR 让 deprecation 真正生效（warning + 明确迁移目标）；签名手术与 `harness/` / `agentao/session.py` 一起在 0.5.0 alias-removal release 里完成。
-3. **`agentao/session.py` → `agentao/embedding/sessions.py`。** 纯磁盘持久化（305 行，`.agentao/sessions/*.json` 的 save/load/list/delete + 轮转）。`agent.py` / `runtime/` 都不 import 它。**生产侧 5 处 import + 7 处调用**总计；其中 **6 处需要新增显式 `project_root` plumbing**：`cli/session.py:55`、`cli/commands.py:532,560,567,575,590,609`。第 7 处 `acp/session_load.py:176` 已经在传 `project_root=cwd`（`cwd` 是 L160 `_parse_cwd(...)` 得到的局部变量），只需把 import path 切到新模块。**测试 4 处**：`tests/test_session.py:10,11,131`、`tests/test_acp_multi_session.py:80`、`tests/test_acp_session_load.py:55`、`tests/test_acp_mcp_injection.py:42`。迁移顺序：**(1) 一次变更里同时新增 `agentao/embedding/sessions.py` 并把 `agentao/session.py` 替换为包装 shim** —— 旧路径在整个迁移期间通过 shim 保持可用。(2) 更新生产 caller 显式向新路径传 `project_root`。(3) **然后才**在新路径上把 `project_root` 改为必填、删 `Path.cwd()` fallback（shim 上的 fallback 保留到 0.5.0）。测试侧 import 改写延后到 0.5.0 删 shim 时与 `harness/` 别名一起处理。1 天。
+   **没有发生的事：** 文档 "API tightening" 的最终意图是从签名上彻底删掉这些 kwargs，但那是硬 breaking change，要等 0.5.0。这次 PR 让 deprecation 真正生效（warning + 明确迁移目标）；签名手术与 `harness/` / `arbiter/session.py` 一起在 0.5.0 alias-removal release 里完成。
+3. **`arbiter/session.py` → `arbiter/embedding/sessions.py`。** 纯磁盘持久化（305 行，`.arbiter/sessions/*.json` 的 save/load/list/delete + 轮转）。`agent.py` / `runtime/` 都不 import 它。**生产侧 5 处 import + 7 处调用**总计；其中 **6 处需要新增显式 `project_root` plumbing**：`cli/session.py:55`、`cli/commands.py:532,560,567,575,590,609`。第 7 处 `acp/session_load.py:176` 已经在传 `project_root=cwd`（`cwd` 是 L160 `_parse_cwd(...)` 得到的局部变量），只需把 import path 切到新模块。**测试 4 处**：`tests/test_session.py:10,11,131`、`tests/test_acp_multi_session.py:80`、`tests/test_acp_session_load.py:55`、`tests/test_acp_mcp_injection.py:42`。迁移顺序：**(1) 一次变更里同时新增 `arbiter/embedding/sessions.py` 并把 `arbiter/session.py` 替换为包装 shim** —— 旧路径在整个迁移期间通过 shim 保持可用。(2) 更新生产 caller 显式向新路径传 `project_root`。(3) **然后才**在新路径上把 `project_root` 改为必填、删 `Path.cwd()` fallback（shim 上的 fallback 保留到 0.5.0）。测试侧 import 改写延后到 0.5.0 删 shim 时与 `harness/` 别名一起处理。1 天。
 4. **权限文件 I/O 上移 `embedding/`。** ✅ **已落地。** 这是 engine API 重新设计，不是搬代码。`PermissionEngine.__init__` 之前自己调 `self._load_rules()` 读 `<user_root>/permissions.json`。4 处构造点都传 `project_root` + `user_root` 并依赖 engine 自己加载：`embedding/factory.py:141`、`agents/tools.py:585`、`acp/session_new.py:306`、`acp/session_load.py:199`。
 
    **实际落地（2026-05-07）：**
-   - 新增 `agentao/embedding/permission_loader.py`，对外暴露 `load_permission_rules(*, project_root, user_root) -> (rules, sources)`，作为公开迁移面——一方调用方与嵌入 host 都通过它来预加载。
+   - 新增 `arbiter/embedding/permission_loader.py`，对外暴露 `load_permission_rules(*, project_root, user_root) -> (rules, sources)`，作为公开迁移面——一方调用方与嵌入 host 都通过它来预加载。
    - `PermissionEngine.__init__` 增加两个 keyword-only kwargs：`rules: Optional[List[Dict]]` 与 `loaded_sources: Optional[List[str]]`。当传入 `rules` 时（推荐路径），引擎**完全不读盘**，直接使用调用方预加载结果。
-   - `_load_rules` 与 `_load_file` 已从 `PermissionEngine` 删除——文件 I/O 在物理上离开 `agentao/permissions.py`（同时清掉了不再用的 `json`、`logging` 导入）。老式 `PermissionEngine(project_root=..., user_root=...)` 形式仍然兼容：当 `rules is None` 时，构造器懒加载 `agentao.embedding.permission_loader.load_permission_rules` 并使用其返回。懒加载保证 `permissions.py` 模块加载图不依赖 `embedding/` 任何子包。
-   - `embedding/__init__.py` 重新导出 `load_permission_rules`，让 host 可以从 `agentao.embedding` 直接导入。
+   - `_load_rules` 与 `_load_file` 已从 `PermissionEngine` 删除——文件 I/O 在物理上离开 `arbiter/permissions.py`（同时清掉了不再用的 `json`、`logging` 导入）。老式 `PermissionEngine(project_root=..., user_root=...)` 形式仍然兼容：当 `rules is None` 时，构造器懒加载 `arbiter.embedding.permission_loader.load_permission_rules` 并使用其返回。懒加载保证 `permissions.py` 模块加载图不依赖 `embedding/` 任何子包。
+   - `embedding/__init__.py` 重新导出 `load_permission_rules`，让 host 可以从 `arbiter.embedding` 直接导入。
    - 4 处一方调用点都改为先预加载：`embedding/factory.py`、`agents/tools.py`（子 agent 权限设置）、`acp/session_new.py`、`acp/session_load.py`。每处都用 `rules=` / `loaded_sources=` 构造引擎，所以生产时永远不走老式 auto-load 路径。
-   - 测试保留老式 auto-load 路径——117+ 个测试位点用 `PermissionEngine(project_root=tmp_path, ...)` 当便利构造，并不测试文件加载本身，因此**没有**加 DeprecationWarning（加了反而会变成无意义噪声）。一个测试（`tests/test_active_permissions.py::test_active_permissions_does_not_re_read_disk`）原本 spy `engine._load_file` 来验证热路径无重复读盘，因为 `_load_file` 已删除，spy 改为 `agentao.embedding.permission_loader.load_permission_rules`；测试意图（active_permissions 不重复读盘）保持不变。
+   - 测试保留老式 auto-load 路径——117+ 个测试位点用 `PermissionEngine(project_root=tmp_path, ...)` 当便利构造，并不测试文件加载本身，因此**没有**加 DeprecationWarning（加了反而会变成无意义噪声）。一个测试（`tests/test_active_permissions.py::test_active_permissions_does_not_re_read_disk`）原本 spy `engine._load_file` 来验证热路径无重复读盘，因为 `_load_file` 已删除，spy 改为 `arbiter.embedding.permission_loader.load_permission_rules`；测试意图（active_permissions 不重复读盘）保持不变。
 
    **测试：** 2549 通过，2 跳过，无回归。
 
@@ -68,14 +68,14 @@
 **推迟（需要更深拆解或等 wheel 拆分阶段）：**
 
 5. **`plugins/` 部分外移。** `plugins/models.py` + `hooks.py` **该留 core**（runtime 依赖它们）。`plugins/manager.py` + `manifest.py` + `diagnostics.py` 的 import 图里 `runtime/` 摸不到，可以外移。但 `plugins/skills.py` 和 `plugins/agents.py` 里**混了**runtime-path 的 validator 和 CLI-only 的 resolver，必须先拆开。2–3 天，敏感。
-6. **`acp/` 拆 wheel。** ACP → core 是单向的（`acp/models.py:25`、`acp/session_new.py:43`，惰性 / TYPE_CHECKING）。第二轮 grep 漏掉一个反向 import：`host/schema.py:21` 顶层 import `..acp.schema`，用来支撑公开的 `export_host_acp_json_schema()` 导出函数。✅ **边界整改已落地**——实现搬到 `agentao/acp/schema_export.py::build_host_acp_json_schema`，`host/schema.py::export_host_acp_json_schema` 改成在函数体内惰性 import 的薄包装。`import agentao.host` 不再把 `agentao.acp` 拉进 `sys.modules`；对外 API 不变。真正的 wheel 拆分（把 `agentao-acp` 单独发包）依然延后——那是发包侧工作，不是代码问题。
+6. **`acp/` 拆 wheel。** ACP → core 是单向的（`acp/models.py:25`、`acp/session_new.py:43`，惰性 / TYPE_CHECKING）。第二轮 grep 漏掉一个反向 import：`host/schema.py:21` 顶层 import `..acp.schema`，用来支撑公开的 `export_host_acp_json_schema()` 导出函数。✅ **边界整改已落地**——实现搬到 `arbiter/acp/schema_export.py::build_host_acp_json_schema`，`host/schema.py::export_host_acp_json_schema` 改成在函数体内惰性 import 的薄包装。`import arbiter.host` 不再把 `arbiter.acp` 拉进 `sys.modules`；对外 API 不变。真正的 wheel 拆分（把 `arbiter-acp` 单独发包）依然延后——那是发包侧工作，不是代码问题。
 7. **`harness/` 别名删除。** 已经排在 0.5.0。
 
 **从清单移除（事实错误）：**
 
 - "host/ 和 harness/ 重复" —— 实为已规划好的 0.4.2→0.5.0 rename shim（`host/__init__.py:30-34` 写得很清楚）。
 - "build_compat_transport 在 cli/" —— 已经在 `transport/sdk.py:82`。剩下的问题是签名，不是位置（由 #2 覆盖）。
-- "MCP list ops 下放 `MCPRegistry.list_servers()`" —— 伪耦合。agentao 没有任何 LLM-facing 的 MCP list 工具；`/mcp list` 当前已经直调 `mcp_manager.get_server_status()`（`cli/commands.py:331`）。换成 `list_servers()` 反而会丢失连接状态和已注册 tool 数。codex 的 `#21281`（MCP enumeration → app-server）不能直接搬到 agentao——codex 那边有 LLM-callable 的 list op 要砍，agentao 从来就没有这个症状。详见 §4 行 G。
+- "MCP list ops 下放 `MCPRegistry.list_servers()`" —— 伪耦合。arbiter 没有任何 LLM-facing 的 MCP list 工具；`/mcp list` 当前已经直调 `mcp_manager.get_server_status()`（`cli/commands.py:331`）。换成 `list_servers()` 反而会丢失连接状态和已注册 tool 数。codex 的 `#21281`（MCP enumeration → app-server）不能直接搬到 arbiter——codex 那边有 LLM-callable 的 list op 要砍，arbiter 从来就没有这个症状。详见 §4 行 G。
 
 ---
 
@@ -83,7 +83,7 @@
 
 最初这份意见是经过三轮才到能用的形态：
 
-- **第 1 轮**：列出 codex core 做的所有事，对照 agentao 的目录树，标出看起来不对的。产出一份 6 项的优先表。
+- **第 1 轮**：列出 codex core 做的所有事，对照 arbiter 的目录树，标出看起来不对的。产出一份 6 项的优先表。
 - **第 2 轮（反向评审）**：同伴把第 1 轮逐条对照真实代码 fact-check，发现 6 处事实错误——其中 2 项工作已经做过、1 项被当成腐坏代码的其实是有文档的 shim、callback 数数错了、文件位置说错了、还有 1 项被标的子包（`acp/`）实际 core 一行都不 import。
 - **第 3 轮**：修订优先表，框架保留，错的删掉。
 - **第 4 轮（本文）**：对第 2 轮指出的两个盲点（`plugins/`、顶层 `session.py`）做带 grep 验证的深入调研。
@@ -111,13 +111,13 @@ codex 的 `codex-rs/core` crate 收敛成了**推理循环 + tool dispatch + 策
 
 一句话规则：**core 产生事件；sibling 负责持久化、枚举、摘要、渲染**。
 
-下面用这把尺子量 agentao。
+下面用这把尺子量 arbiter。
 
 ---
 
-## 3. Agentao core 审计（已验证）
+## 3. Arbiter core 审计（已验证）
 
-agentao 没有显式 `core/` 目录；事实上的 core 入口是 `agentao/agent.py`（765 行）。逐子包对照：
+arbiter 没有显式 `core/` 目录；事实上的 core 入口是 `arbiter/agent.py`（765 行）。逐子包对照：
 
 | 子包 | codex 类比 | 结论 |
 |---|---|---|
@@ -131,11 +131,11 @@ agentao 没有显式 `core/` 目录；事实上的 core 入口是 `agentao/agent
 | `agents/AgentManager` | core ✅（LLM-callable subagent） | 留 |
 | `skills/SkillManager` | core ✅（注入），加载下放 | 留 |
 | `memory/MemoryManager` | TYPE_CHECKING 注入式，已经可换实现 | 留 |
-| `mcp/McpClientManager` | core 薄壳，agentao 不存在 LLM-facing list op | 留（详见 §4 行 G） |
+| `mcp/McpClientManager` | core 薄壳，arbiter 不存在 LLM-facing list op | 留（详见 §4 行 G） |
 | `host/` (events、schema、projection) | core ✅（公共合约包，0.4.2 从 `harness/` rename 而来） | 留 |
 | `harness/` | Deprecation shim，0.5.0 删除（`__init__.py:1-25`） | #7（已计划） |
 | `replay/`（顶层 import —— `agent.py:25,31,36` 共 3 条 import 语句，闭合 `)` 在 L30/L35/L40；构造参数 L91；4 个实例属性 L339-345；6 个 facade 方法 L516-583；`close()` teardown L502） | App-server 等价位；不该在 core | #1 |
-| `acp/` + `acp_client/` | App-server 等价位 | 推迟（#6）；ACP import core（惰性 / TYPE_CHECKING `Agentao`），core 不反向 import ACP |
+| `acp/` + `acp_client/` | App-server 等价位 | 推迟（#6）；ACP import core（惰性 / TYPE_CHECKING `Arbiter`），core 不反向 import ACP |
 | `cli/` (22 文件 / 7175 行) | tui crate 等价位；逻辑上 OK，签名上经 8 个 callback 耦合 | #2 |
 | `embedding/` (`build_from_environment`) | 工厂层，不是 core | 维持独立 |
 | `sandbox/profiles` | 小；codex 类比是 `codex-sandboxing` crate | 推迟 |
@@ -153,12 +153,12 @@ agentao 没有显式 `core/` 目录；事实上的 core 入口是 `agentao/agent
 |---|---|---|---|
 | A | `host/` 和 `harness/` 重复或未对齐 | `host/__init__.py:30-34` 写明 0.4.2 rename，`harness/__init__.py:1-25` 是带 `DeprecationWarning` 的 shim，0.5.0 删除 | 错警；rename 是有意的 |
 | B | `build_compat_transport` 在 `cli/`，应挪到 embedding | 已经在 `transport/sdk.py:82` | 真正的问题是签名（#2），不是位置 |
-| C | `replay/` "在 core"，因为 import + chat_loop 订阅它 | 真实耦合涉及四类：(1) 顶层 import —— `agent.py:25,31,36` 共 3 条 import 语句（闭合 `)` 在 L30/L35/L40），(2) `Agentao.__init__` `replay_config` 参数 + 4 个属性 L91/339-345 + `close()` `end_replay()` L502，(3) 6 个 facade 方法 L516-583，(4) `chat_loop` 6 处 `_emit_*` 调用 + 2 处属性读（`turn.py:82`、`llm_call.py:59`） | #1 是 3–5 天；构造期/状态删除必须和 runtime 迁移一个 PR 落 |
+| C | `replay/` "在 core"，因为 import + chat_loop 订阅它 | 真实耦合涉及四类：(1) 顶层 import —— `agent.py:25,31,36` 共 3 条 import 语句（闭合 `)` 在 L30/L35/L40），(2) `Arbiter.__init__` `replay_config` 参数 + 4 个属性 L91/339-345 + `close()` `end_replay()` L502，(3) 6 个 facade 方法 L516-583，(4) `chat_loop` 6 处 `_emit_*` 调用 + 2 处属性读（`turn.py:82`、`llm_call.py:59`） | #1 是 3–5 天；构造期/状态删除必须和 runtime 迁移一个 PR 落 |
 | D | `__init__` 有 7 个 deprecated callback | 实际是 8 个（漏了 L71/247/260 的 `on_max_iterations_callback`） | 数错了一个；#2 工作项仍成立 |
-| E | `acp/` 与 core 逻辑耦合 | 方向要分清：`acp/models.py:25` 和 `acp/session_new.py:43` import `agentao.agent.Agentao`（惰性 / TYPE_CHECKING），所以 ACP → core 是真实依赖。**core → ACP** 才是空的（grep `agent.py` / `runtime/` / `tools/` 找 `acp` 零命中），这正是 wheel 拆分要的方向 | 优先级降到"wheel 拆分阶段"；TL;DR 措辞已收紧 |
+| E | `acp/` 与 core 逻辑耦合 | 方向要分清：`acp/models.py:25` 和 `acp/session_new.py:43` import `arbiter.agent.Arbiter`（惰性 / TYPE_CHECKING），所以 ACP → core 是真实依赖。**core → ACP** 才是空的（grep `agent.py` / `runtime/` / `tools/` 找 `acp` 零命中），这正是 wheel 拆分要的方向 | 优先级降到"wheel 拆分阶段"；TL;DR 措辞已收紧 |
 | F | CLI 是 18 文件 / 6057 行 | 实际 22 文件 / 7175 行（漏了 `commands_ext/` 子目录） | 数数错误 |
-| G | "MCP list ops 是 LLM-facing 的；CLI/ACP 直调 `MCPRegistry.list_servers()` 即可去掉" | grep `tools/`、`tooling/` 全部 LLM 工具注册路径 → 不存在 LLM-facing 的 MCP list 工具。`/mcp list` 当前已经直调 `mcp_manager.get_server_status()`（`cli/commands.py:331`），不经 LLM。`MCPRegistry.list_servers()`（`mcp/registry.py:45`）只返回配置；换过去会丢失连接状态和每 server 的 tool 数。codex `#21281`（MCP enumeration → app-server）是在删 codex 那边*真实存在*的 LLM op；agentao 从来没这个症状 | 伪耦合——把 codex 标题硬套到 agentao 而没核 agentao 实际入口。从优先表整条删除 |
-| H | "replay/ 在 `Agentao` 上有 4 个 facade 方法" | 实际 6 个：3 个 lifecycle（`start_replay` / `end_replay` / `reload_replay_config`，L516-528）+ 3 个 observability（`_latest_session_summary_id` / `_emit_context_compressed` / `_emit_session_summary_if_new`，L557-583） | 漏数 2 个；#1 工作面不变但描述要校准 |
+| G | "MCP list ops 是 LLM-facing 的；CLI/ACP 直调 `MCPRegistry.list_servers()` 即可去掉" | grep `tools/`、`tooling/` 全部 LLM 工具注册路径 → 不存在 LLM-facing 的 MCP list 工具。`/mcp list` 当前已经直调 `mcp_manager.get_server_status()`（`cli/commands.py:331`），不经 LLM。`MCPRegistry.list_servers()`（`mcp/registry.py:45`）只返回配置；换过去会丢失连接状态和每 server 的 tool 数。codex `#21281`（MCP enumeration → app-server）是在删 codex 那边*真实存在*的 LLM op；arbiter 从来没这个症状 | 伪耦合——把 codex 标题硬套到 arbiter 而没核 arbiter 实际入口。从优先表整条删除 |
+| H | "replay/ 在 `Arbiter` 上有 4 个 facade 方法" | 实际 6 个：3 个 lifecycle（`start_replay` / `end_replay` / `reload_replay_config`，L516-528）+ 3 个 observability（`_latest_session_summary_id` / `_emit_context_compressed` / `_emit_session_summary_if_new`，L557-583） | 漏数 2 个；#1 工作面不变但描述要校准 |
 | I | "session.py 改造涉及五处 import" | 生产 5 处 import + 7 处调用总计；其中 6 处需要新增 `project_root` plumbing（`cli/session.py:55`、`cli/commands.py:532,560,567,575,590,609`），第 7 处 `acp/session_load.py:176` 已经在传 `project_root=cwd`，只需切 import path；**测试 4 个文件**（`test_session.py`、`test_acp_multi_session.py`、`test_acp_session_load.py`、`test_acp_mcp_injection.py`）。Deprecation shim 用包装函数保留旧的宽松签名并委托给 `embedding.sessions` | 重新估时为 ~1 天（原"半天"）；按 call site 显式传 `project_root` 是工作量大头；测试 import 改写延后到 0.5.0 与 `harness/` 别名一起 |
 | J | "权限文件 I/O 是半天的工厂层搬移" | `PermissionEngine.__init__` 自己调 `self._load_rules()` 并读 `<user_root>/permissions.json`。4 处 caller 都按 `(project_root, user_root)` 构造（`embedding/factory.py:141`、`agents/tools.py:585`、`acp/session_new.py:306`、`acp/session_load.py:199`）。搬移要求构造函数改造 + 4 处 caller 一起改 | engine API 重新设计而非外观搬动；改为 1–1.5 天，风险中等 |
 
@@ -187,7 +187,7 @@ agentao 没有显式 `core/` 目录；事实上的 core 入口是 `agentao/agent
 
 codex 把 plugin **加载**（manifest 解析、市场同步、安装）和 plugin **hook dispatch**（lifecycle 事件触发、信任元数据强制）拆分。加载去了 `core-plugins`；hook dispatch **留在 core**（#19905 compact lifecycle hooks、#20321 hook trust metadata）。
 
-按这个模子量 agentao：
+按这个模子量 arbiter：
 
 - `models.py`（322 行）—— `runtime/chat_loop.py:26` 需要 `StopHookResult`。**留**。
 - `hooks.py`（1236 行）—— 每次 tool 调用、每轮 chat loop 都要。**留**。
@@ -204,27 +204,27 @@ codex 把 plugin **加载**（manifest 解析、市场同步、安装）和 plug
 **阶段 5a（敏感，2–3 天）：** ✅ **已完成。** 在 `plugins/skills.py` 和 `plugins/agents.py` 内部把 validator（runtime 路径）和 resolver（CLI）分开。Validator 留 core；resolver 外移到新的 `plugins/resolvers/` 或 embedding。`plugins/mcp.py` 不需要做这层拆分——它没有 validator 面。
 
 **实际落地内容（2026-05-07）：**
-- 新增 `agentao/plugins/resolvers/` 包：`resolvers/skills.py` 收纳 `resolve_plugin_entries` 加 8 个私有 helper（`_resolve_skills`、`_parse_skill_md`、`_resolve_commands`、`_scan_commands_dir`、`_md_file_to_entry`、`_metadata_to_entry`、`_check_internal_collisions`、`_parse_yaml_frontmatter`）；`resolvers/agents.py` 收纳 `resolve_plugin_agents` 加 4 个私有 helper。`__init__.py` 重导出 `resolve_plugin_entries` / `resolve_plugin_agents`，模块 docstring 把 runtime/loader 拆分原由和 5b 外移计划写清。
-- `agentao/plugins/skills.py` 和 `agentao/plugins/agents.py` 瘦身成只剩 validator——每个模块只导出一个 `validate_no_external_collisions` 函数。模块 docstring 注明 runtime 调用路径（`SkillManager.register_plugin_skills` / `AgentManager.register_plugin_agents`）并指向 resolver 包。
+- 新增 `arbiter/plugins/resolvers/` 包：`resolvers/skills.py` 收纳 `resolve_plugin_entries` 加 8 个私有 helper（`_resolve_skills`、`_parse_skill_md`、`_resolve_commands`、`_scan_commands_dir`、`_md_file_to_entry`、`_metadata_to_entry`、`_check_internal_collisions`、`_parse_yaml_frontmatter`）；`resolvers/agents.py` 收纳 `resolve_plugin_agents` 加 4 个私有 helper。`__init__.py` 重导出 `resolve_plugin_entries` / `resolve_plugin_agents`，模块 docstring 把 runtime/loader 拆分原由和 5b 外移计划写清。
+- `arbiter/plugins/skills.py` 和 `arbiter/plugins/agents.py` 瘦身成只剩 validator——每个模块只导出一个 `validate_no_external_collisions` 函数。模块 docstring 注明 runtime 调用路径（`SkillManager.register_plugin_skills` / `AgentManager.register_plugin_agents`）并指向 resolver 包。
 - 顺手删了死代码：旧 `plugins/skills.py` 里定义的 `PluginSkillCollisionError` 全仓库 grep 无任何引用——拆分时直接删掉，不带进任一侧。
-- `agentao/cli/subcommands.py` 的两处 CLI import 站点（`_plugin_list_cli` 和 `_load_and_register_plugins`）改指 `..plugins.resolvers.skills` / `..plugins.resolvers.agents`。Runtime 调用方（`agentao/skills/manager.py:378`、`agentao/agents/manager.py:106`）继续从 `agentao.plugins.skills` / `agentao.plugins.agents` 导入 `validate_no_external_collisions`——这两个路径现在已经是纯 validator，不再加载任何 resolution 代码。
+- `arbiter/cli/subcommands.py` 的两处 CLI import 站点（`_plugin_list_cli` 和 `_load_and_register_plugins`）改指 `..plugins.resolvers.skills` / `..plugins.resolvers.agents`。Runtime 调用方（`arbiter/skills/manager.py:378`、`arbiter/agents/manager.py:106`）继续从 `arbiter.plugins.skills` / `arbiter.plugins.agents` 导入 `validate_no_external_collisions`——这两个路径现在已经是纯 validator，不再加载任何 resolution 代码。
 - 三个测试文件迁移 import：`tests/test_plugin_skills.py` 和 `tests/test_plugin_agents.py` 把 import 拆向 resolver 模块和 validator 模块；`tests/test_plugin_loader.py` 改了两处 `resolve_plugin_entries` import。
-- `plugins/skills.py` / `plugins/agents.py` **没有**留向后兼容 shim。Resolver 和 validator 都是包内私有面（不在 `agentao.plugins.__all__` 里），调用方全是一方代码——加重导出 shim 只会变成"形状不对的噪声"。
+- `plugins/skills.py` / `plugins/agents.py` **没有**留向后兼容 shim。Resolver 和 validator 都是包内私有面（不在 `arbiter.plugins.__all__` 里），调用方全是一方代码——加重导出 shim 只会变成"形状不对的噪声"。
 
 **测试：** 2549 通过、2 跳过。无回归。
 
 **没做的事：** 阶段 5b 紧随其后落地（见下文 5b 章节）。本轮拆分把 5b 变成纯机械搬迁的前置——resolver 不再混 validator，loader 整体搬到 `embedding/plugins/` 时不会牵扯到 runtime 路径。
 
-**阶段 5b（机械，1 天）：** ✅ **已完成。** 5a 落地后，把 `manager.py` + `manifest.py` + `diagnostics.py` + `mcp.py` + 新 resolver 一起外移到 `agentao-plugins-loader/`（或 `embedding/plugins/`）。`runtime/` 和 `agent.py` 一行 import 都不用改。
+**阶段 5b（机械，1 天）：** ✅ **已完成。** 5a 落地后，把 `manager.py` + `manifest.py` + `diagnostics.py` + `mcp.py` + 新 resolver 一起外移到 `arbiter-plugins-loader/`（或 `embedding/plugins/`）。`runtime/` 和 `agent.py` 一行 import 都不用改。
 
 **实际落地内容（2026-05-07）：**
-- 8 个文件用 `git mv` 搬到 `agentao/embedding/plugins/`（loader + resolvers）；`agentao/plugins/` 只剩 models/hooks/validators。新包 `__init__.py` 重导出 loader 面。
-- 搬迁文件内部的跨包 import 从 `from .models` / `from ..models` 改成绝对 `from agentao.plugins.models`，相对路径搬完已不再解析。
-- 旧路径不留向后兼容 shim。Loader 符号从来不在 `agentao.plugins.__all__`，调用方全是一方代码——同 5a。
+- 8 个文件用 `git mv` 搬到 `arbiter/embedding/plugins/`（loader + resolvers）；`arbiter/plugins/` 只剩 models/hooks/validators。新包 `__init__.py` 重导出 loader 面。
+- 搬迁文件内部的跨包 import 从 `from .models` / `from ..models` 改成绝对 `from arbiter.plugins.models`，相对路径搬完已不再解析。
+- 旧路径不留向后兼容 shim。Loader 符号从来不在 `arbiter.plugins.__all__`，调用方全是一方代码——同 5a。
 
 **测试：** 2549 通过、2 跳过。`runtime/` 和 `agent.py` 的 import 一行未改，正如文档预言。
 
-**没做的事：** 没做物理 wheel 拆分。如果将来某次发版要把 loader 单独出 `agentao-plugins-loader` 分发包，那是叠在本次搬迁之上的打包变更，不是代码变更。
+**没做的事：** 没做物理 wheel 拆分。如果将来某次发版要把 loader 单独出 `arbiter-plugins-loader` 分发包，那是叠在本次搬迁之上的打包变更，不是代码变更。
 
 **为什么推迟：** validator/resolver 拆分要小心穿过 `SkillManager.__init__` / `AgentManager.__init__`。在赶进度时改这块容易在没明显测试信号的情况下破坏 plugin 发现路径。#1–#4 ROI 更高，先落地。
 
@@ -234,11 +234,11 @@ codex 把 plugin **加载**（manifest 解析、市场同步、安装）和 plug
 
 | 层级 | 路径 | 受众 | 说明 |
 |---|---|---|---|
-| 公开 runtime 模型 | `agentao.plugins`、`agentao.plugins.models` | 对外 + 第一方 | 唯一进 `agentao.plugins.__all__` 的项。 |
-| 第一方 runtime 助手 | `agentao.plugins.skills`、`agentao.plugins.agents`、`agentao.plugins.hooks` | 仅第一方 | runtime 热路径上的 validator + hook 派发。不在 `__all__`。 |
-| 第一方 loader | `agentao.embedding.plugins.{manager, manifest, diagnostics, mcp}`、`agentao.embedding.plugins.resolvers.*` | 仅第一方（CLI / `_load_and_register_plugins`） | agent 初始化与 CLI 子命令中走的路径。会拉 YAML。不得出现在 runtime 热路径上。 |
+| 公开 runtime 模型 | `arbiter.plugins`、`arbiter.plugins.models` | 对外 + 第一方 | 唯一进 `arbiter.plugins.__all__` 的项。 |
+| 第一方 runtime 助手 | `arbiter.plugins.skills`、`arbiter.plugins.agents`、`arbiter.plugins.hooks` | 仅第一方 | runtime 热路径上的 validator + hook 派发。不在 `__all__`。 |
+| 第一方 loader | `arbiter.embedding.plugins.{manager, manifest, diagnostics, mcp}`、`arbiter.embedding.plugins.resolvers.*` | 仅第一方（CLI / `_load_and_register_plugins`） | agent 初始化与 CLI 子命令中走的路径。会拉 YAML。不得出现在 runtime 热路径上。 |
 
-**边界契约测试：** `tests/test_plugin_boundary_contract.py` 在干净子进程里断言 `import agentao.plugins` 不会传递性加载 loader 包或 YAML。这把 runtime/loader 拆分从约定变成可执行不变量。
+**边界契约测试：** `tests/test_plugin_boundary_contract.py` 在干净子进程里断言 `import arbiter.plugins` 不会传递性加载 loader 包或 YAML。这把 runtime/loader 拆分从约定变成可执行不变量。
 
 ---
 
@@ -246,22 +246,22 @@ codex 把 plugin **加载**（manifest 解析、市场同步、安装）和 plug
 
 ### 是什么
 
-`agentao/session.py`（305 行，纯 I/O）：
+`arbiter/session.py`（305 行，纯 I/O）：
 
-- `save_session` → 写 `.agentao/sessions/{ts}.json`
+- `save_session` → 写 `.arbiter/sessions/{ts}.json`
 - `load_session` / `list_sessions` / `delete_session` / `delete_all_sessions`
 - `strip_system_reminders`、`format_session_time_local` 工具函数
 - `_MAX_SESSIONS = 10` 自动轮转
 
 ### 反向 import 全图（grep 验证）
 
-过滤掉 `plan/.session` 和 `cli/.session` 噪音（不同模块）后，顶层 `agentao/session.py` 真实消费者：**生产 5 处 + 测试 4 处**。
+过滤掉 `plan/.session` 和 `cli/.session` 噪音（不同模块）后，顶层 `arbiter/session.py` 真实消费者：**生产 5 处 + 测试 4 处**。
 
 **生产（5）：**
 
 | 调用方 | 用法 |
 |---|---|
-| `acp/session_load.py:68` | `from agentao.session import load_session`（模块顶层） |
+| `acp/session_load.py:68` | `from arbiter.session import load_session`（模块顶层） |
 | `cli/session.py:52` | `from ..session import save_session`（在 `on_session_end` 内 lazy import） |
 | `cli/commands.py:519` | `from ..session import (delete_all_sessions, delete_session, format_session_time_local, list_sessions)`（`/sessions` 内 lazy） |
 | `cli/commands.py:588` | `from ..session import list_sessions, load_session`（`/resume` 内 lazy） |
@@ -271,12 +271,12 @@ codex 把 plugin **加载**（manifest 解析、市场同步、安装）和 plug
 
 | 调用方 | 用法 |
 |---|---|
-| `tests/test_session.py:10,11,131` | `import agentao.session as session_module`；`from agentao.session import (...)`；`from agentao.session import _rotate_sessions` |
-| `tests/test_acp_multi_session.py:80` | `from agentao.session import save_session` |
-| `tests/test_acp_session_load.py:55` | `from agentao.session import save_session` |
-| `tests/test_acp_mcp_injection.py:42` | `from agentao.session import save_session` |
+| `tests/test_session.py:10,11,131` | `import arbiter.session as session_module`；`from arbiter.session import (...)`；`from arbiter.session import _rotate_sessions` |
+| `tests/test_acp_multi_session.py:80` | `from arbiter.session import save_session` |
+| `tests/test_acp_session_load.py:55` | `from arbiter.session import save_session` |
+| `tests/test_acp_mcp_injection.py:42` | `from arbiter.session import save_session` |
 
-九处全部位于 CLI / ACP / 测试，**`agent.py` 和 `runtime/*.py` 都不 import 它**。grep 验证。Deprecation shim 在原路径暴露包装函数，保留旧的宽松签名（`project_root: Optional[Path] = None`）并在缺省时补 `Path.cwd()` 后委托给 `embedding.sessions.*`，9 处运行时继续可用；3 个 ACP 测试 import 改写延后到 0.5.0 与 `harness/` 别名一起处理。**`tests/test_session.py` 是唯一例外**：它的 `isolated_session_dir` fixture monkeypatch 旧模块上的私有 `_session_dir`，而包装 shim 机制在结构上无法跨模块边界转发对私有 helper 的 monkeypatch（shim 的 wrapper 调 `embedding.sessions.save_session`，后者按词法作用域查找自己模块里的 `_session_dir`）。该 fixture 的 patch 目标必须**立即**改成 `agentao.embedding.sessions._session_dir`，是单行改动；公开签名和断言不变。
+九处全部位于 CLI / ACP / 测试，**`agent.py` 和 `runtime/*.py` 都不 import 它**。grep 验证。Deprecation shim 在原路径暴露包装函数，保留旧的宽松签名（`project_root: Optional[Path] = None`）并在缺省时补 `Path.cwd()` 后委托给 `embedding.sessions.*`，9 处运行时继续可用；3 个 ACP 测试 import 改写延后到 0.5.0 与 `harness/` 别名一起处理。**`tests/test_session.py` 是唯一例外**：它的 `isolated_session_dir` fixture monkeypatch 旧模块上的私有 `_session_dir`，而包装 shim 机制在结构上无法跨模块边界转发对私有 helper 的 monkeypatch（shim 的 wrapper 调 `embedding.sessions.save_session`，后者按词法作用域查找自己模块里的 `_session_dir`）。该 fixture 的 patch 目标必须**立即**改成 `arbiter.embedding.sessions._session_dir`，是单行改动；公开签名和断言不变。
 
 ### 和 `host/` 的 session 概念有重叠吗？
 
@@ -284,31 +284,31 @@ codex 把 plugin **加载**（manifest 解析、市场同步、安装）和 plug
 
 ### 和 codex 的对照
 
-codex 通过 #21278 把消息历史外移（独立 `message-history` crate），通过 `thread-store` 处理线程元数据。agentao 的 `session.py` 大致是这两件事的并集——消息历史 *加上* title/timestamp/active-skills，每个 session 一个 JSON。
+codex 通过 #21278 把消息历史外移（独立 `message-history` crate），通过 `thread-store` 处理线程元数据。arbiter 的 `session.py` 大致是这两件事的并集——消息历史 *加上* title/timestamp/active-skills，每个 session 一个 JSON。
 
 正是 codex 推出 core 的那种"事务性持久化"。
 
 ### 额外发现：`Path.cwd()` fallback
 
-`session.py:29`：传入 `project_root=None` 时通过 `Path.cwd()` 兜底。这是**全局状态读取**——发生在本应纯函数的代码里——和嵌入式 harness "无全局状态"原则冲突（见 `project_agentao_embedded_harness` memory）。fallback 是历史 CLI 兼容性留下的，搬移时该顺手删。
+`session.py:29`：传入 `project_root=None` 时通过 `Path.cwd()` 兜底。这是**全局状态读取**——发生在本应纯函数的代码里——和嵌入式 harness "无全局状态"原则冲突（见 `project_arbiter_embedded_harness` memory）。fallback 是历史 CLI 兼容性留下的，搬移时该顺手删。
 
 ### 建议
 
-挪到 `agentao/embedding/sessions.py`。**顺序很重要**——如果先把 `project_root` 改成必填、再去更新 CLI/ACP 调用点，每次 save / list / resume / delete 都会立即 TypeError：
+挪到 `arbiter/embedding/sessions.py`。**顺序很重要**——如果先把 `project_root` 改成必填、再去更新 CLI/ACP 调用点，每次 save / list / resume / delete 都会立即 TypeError：
 
-1. **一次变更**：新增 `agentao/embedding/sessions.py`（305 → 删 cwd fallback 后约 280 行）**并把 `agentao/session.py` 替换为下面第 3 步描述的包装 shim**。这次变更后两个文件同时存在，旧 import 路径不会断窗。新路径在这一步保持 `project_root` 可选，便于后续迁移再收紧。
+1. **一次变更**：新增 `arbiter/embedding/sessions.py`（305 → 删 cwd fallback 后约 280 行）**并把 `arbiter/session.py` 替换为下面第 3 步描述的包装 shim**。这次变更后两个文件同时存在，旧 import 路径不会断窗。新路径在这一步保持 `project_root` 可选，便于后续迁移再收紧。
 2. 改五处生产 import，**并在每处显式向新路径传入 `project_root`**（shim 只服务于外部用户和测试）：
    - `cli/session.py:55` —— `save_session(..., project_root=cli.agent.working_directory)`（在 `on_session_end` 里）。
    - `cli/commands.py:532, 560, 590` —— `list_sessions(project_root=cli.agent.working_directory)`（`/sessions` 和 `/resume`）。
    - `cli/commands.py:567` —— `delete_all_sessions(project_root=cli.agent.working_directory)`。
    - `cli/commands.py:575` —— `delete_session(sub_arg, project_root=cli.agent.working_directory)`。
    - `cli/commands.py:609` —— `load_session(match["id"], project_root=cli.agent.working_directory)`。
-   - `acp/session_load.py:176` —— 已经传 `project_root=cwd`（`cwd` 是 L160 `_parse_cwd(params.get("cwd"))` 得到的局部变量）；除了把 import 路径改到 `agentao.embedding.sessions`，调用本身不需要改。
+   - `acp/session_load.py:176` —— 已经传 `project_root=cwd`（`cwd` 是 L160 `_parse_cwd(params.get("cwd"))` 得到的局部变量）；除了把 import 路径改到 `arbiter.embedding.sessions`，调用本身不需要改。
    - `cli/replay_commands.py:22` —— 只 import `strip_system_reminders`（纯函数，没有 `project_root`），除了 import 路径外不需要改。
-3. 在原位 `agentao/session.py` 留 deprecation shim 并发 `DeprecationWarning`。**形似 `harness/` → `host/`，但机制不同**：纯 `from agentao.embedding.sessions import *` re-export 会继承新路径上的「`project_root` 必填」签名，把现有 caller 全打挂。正确做法是 shim 里写包装函数，**保留旧的宽松签名**（`project_root: Optional[Path] = None`），在每个包装函数内部做 `project_root = project_root or Path.cwd()`，再委托给 `agentao.embedding.sessions.{save,load,list,delete,...}_session(...)`。这样外部用户和 4 个测试文件继续可用，又不让 `Path.cwd()` 这个全局污染回新路径。
-4. 测试位点：3 个 ACP 测试（`tests/test_acp_multi_session.py`、`tests/test_acp_session_load.py`、`tests/test_acp_mcp_injection.py`）只调公开函数，通过 shim 继续可用，0.5.0 删 shim 时再迁移。**`tests/test_session.py` 是例外** —— 它的 `isolated_session_dir` fixture monkeypatch 私有 `_session_dir` helper，包装 shim 机制无法跨模块边界转发对私有 helper 的 patch（shim 的 wrapper 调 `embedding.sessions.save_session`，后者按词法作用域查找自己模块的 `_session_dir`）。该 fixture 的 patch 目标必须**立即**改成 `agentao.embedding.sessions._session_dir`；断言和公开签名不变。
+3. 在原位 `arbiter/session.py` 留 deprecation shim 并发 `DeprecationWarning`。**形似 `harness/` → `host/`，但机制不同**：纯 `from arbiter.embedding.sessions import *` re-export 会继承新路径上的「`project_root` 必填」签名，把现有 caller 全打挂。正确做法是 shim 里写包装函数，**保留旧的宽松签名**（`project_root: Optional[Path] = None`），在每个包装函数内部做 `project_root = project_root or Path.cwd()`，再委托给 `arbiter.embedding.sessions.{save,load,list,delete,...}_session(...)`。这样外部用户和 4 个测试文件继续可用，又不让 `Path.cwd()` 这个全局污染回新路径。
+4. 测试位点：3 个 ACP 测试（`tests/test_acp_multi_session.py`、`tests/test_acp_session_load.py`、`tests/test_acp_mcp_injection.py`）只调公开函数，通过 shim 继续可用，0.5.0 删 shim 时再迁移。**`tests/test_session.py` 是例外** —— 它的 `isolated_session_dir` fixture monkeypatch 私有 `_session_dir` helper，包装 shim 机制无法跨模块边界转发对私有 helper 的 patch（shim 的 wrapper 调 `embedding.sessions.save_session`，后者按词法作用域查找自己模块的 `_session_dir`）。该 fixture 的 patch 目标必须**立即**改成 `arbiter.embedding.sessions._session_dir`；断言和公开签名不变。
 5. **然后**才在 `embedding/sessions.py` 这一新 API 上把 `project_root` 改为必填（无默认），并在新路径上删掉 `Path.cwd()` fallback。shim 上的 fallback 保留到 0.5.0。
-6. 0.5.0 时和 `harness/` 别名一起把 `agentao/session.py` 删了；把 4 个测试文件迁到 `agentao.embedding.sessions` 并显式传 `project_root`。
+6. 0.5.0 时和 `harness/` 别名一起把 `arbiter/session.py` 删了；把 4 个测试文件迁到 `arbiter.embedding.sessions` 并显式传 `project_root`。
 
 **工作量：** 1 天（从"半天"上调——按 call site 显式传 `project_root` 是工作量的大头）。**ROI：** 高——每删掉一个"顶层在主包里、但 core 不 import"的模块，core 边界就清晰一分。
 
@@ -319,22 +319,22 @@ codex 通过 #21278 把消息历史外移（独立 `message-history` crate），
 | # | 动作 | 工作量 | 风险 | ROI |
 |---|---|---|---|---|
 | 1 | replay → Transport subscriber：删 10 个顶层 import 名 + **构造参数 `replay_config` + 4 个实例属性（L91/339-345）** + **6 个 facade 方法**（L516-583）+ `close()` teardown（L502），改写 `chat_loop` 6 处 `agent._emit_*(...)`，迁移 2 处属性读（`turn.py:82`、`llm_call.py:59`）；recorder 由 `embedding/` 工厂作为 Transport subscriber 装配 | 3–5 天 | 中 | 🟢 高 |
-| 2 | 收紧 `Agentao.__init__`：8 个 deprecated callback 移到 `embedding/compat.py` | 1 天 | 低 | 🟢 高 |
+| 2 | 收紧 `Arbiter.__init__`：8 个 deprecated callback 移到 `embedding/compat.py` | 1 天 | 低 | 🟢 高 |
 | 3 | `session.py` → `embedding/sessions.py`；按 call site 显式传 `project_root`（生产 7 处调用中 6 处需要新 plumbing，第 7 处 ACP load 只需切 import path）；shim 保留 `Path.cwd()` fallback + 可选 `project_root` 直到 0.5.0；新路径上删除两者 | 1 天 | 低 | 🟢 高 |
 | 4 | Permissions 文件 I/O 上移 `embedding/`——**engine API 重新设计**（构造函数改造 + 4 处 caller 更新） | 1–1.5 天 | 中 | 🟡 中 |
 | 5a | ✅ `plugins/skills.py`、`plugins/agents.py`——拆 validator/resolver | 2–3 天 | 中 | 🟡 中 |
 | 5b | ✅ 5a 落地后外移 `plugins/{manager, manifest, diagnostics, mcp, resolvers}` | 1 天 | 低 | ⚪ 长期 |
 | 6 | `acp/` 拆 wheel —— 边界整改 ✅（host→acp 惰性委托），发包延后 | — | 低 | ⚪ 长期（整改后无逻辑耦合） |
-| 7 | 0.5.0 删 `agentao.harness/` 别名 | 半小时 | 零 | ⚪ 已计划 |
+| 7 | 0.5.0 删 `arbiter.harness/` 别名 | 半小时 | 零 | ⚪ 已计划 |
 
 从优先表删除的项：
 
-- **MCP list ops**（早期草稿的 #4）—— 伪耦合。agentao 没有 LLM-facing MCP list 工具；`/mcp list` 当前已经直调 `mcp_manager.get_server_status()`。详见 §4 行 G。
+- **MCP list ops**（早期草稿的 #4）—— 伪耦合。arbiter 没有 LLM-facing MCP list 工具；`/mcp list` 当前已经直调 `mcp_manager.get_server_status()`。详见 §4 行 G。
 
 仍待审的开放问题：
 
-- `agentao/security/` —— 里面到底是什么？codex 把它分到 `guardian/` + `codex-sandboxing` 是否更干净？
-- `agentao/sandbox/profiles` —— 小到可以不动，但值得确认没有"应该在 capabilities/"的协议。
+- `arbiter/security/` —— 里面到底是什么？codex 把它分到 `guardian/` + `codex-sandboxing` 是否更干净？
+- `arbiter/sandbox/profiles` —— 小到可以不动，但值得确认没有"应该在 capabilities/"的协议。
 
 ---
 
@@ -354,9 +354,9 @@ codex 通过 #21278 把消息历史外移（独立 `message-history` crate），
 
 ## 9. 本文有意不覆盖的内容
 
-- **`Agentao` 类本身要不要改名 `Core` 并瘦身。** 765 行的 facade 是真的，但大部分行是构造时的 wiring；缩面是 #1–#5 的下游产物，不是独立任务。
-- **多 agent 定位。** codex 的 spawn/wait/close 原语和 agentao 的嵌入式 harness 故事不匹配。前几轮已经决了，本文不复议。
-- **Memory MCP 化。** codex 出了 `memories-mcp`(#20622)。对 agentao 来说，只有"跨 host 共享 memory"成为真实诉求时才有意义；当前不是缺口。
-- **Goal/budget 工具。** codex 有，agentao 故意没有（host 拥有 budget）。在 borrow review 里决了。
+- **`Arbiter` 类本身要不要改名 `Core` 并瘦身。** 765 行的 facade 是真的，但大部分行是构造时的 wiring；缩面是 #1–#5 的下游产物，不是独立任务。
+- **多 agent 定位。** codex 的 spawn/wait/close 原语和 arbiter 的嵌入式 harness 故事不匹配。前几轮已经决了，本文不复议。
+- **Memory MCP 化。** codex 出了 `memories-mcp`(#20622)。对 arbiter 来说，只有"跨 host 共享 memory"成为真实诉求时才有意义；当前不是缺口。
+- **Goal/budget 工具。** codex 有，arbiter 故意没有（host 拥有 budget）。在 borrow review 里决了。
 
 这些不在本文范围，让本文保持是一份**边界审查**，不是路线图。

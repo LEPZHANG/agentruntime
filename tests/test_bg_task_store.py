@@ -3,7 +3,7 @@
 Covers:
 - ``agents/store.py`` save/load round-trips, version handling, atomic writes
 - ``BackgroundTaskStore.recover`` reclassifying interrupted tasks
-- Each ``Agentao`` instance recovering its own store at construction time
+- Each ``Arbiter`` instance recovering its own store at construction time
 - Two stores rooted at different project dirs do not see each other's tasks
 """
 
@@ -13,13 +13,13 @@ from pathlib import Path
 
 import pytest
 
-from agentao.agent import Agentao
-from agentao.embedding import build_from_environment
-from agentao.agents.bg_store import (
+from arbiter.agent import Arbiter
+from arbiter.embedding import build_from_environment
+from arbiter.agents.bg_store import (
     BackgroundTaskStore,
     _reset_recovery_guard_for_tests,
 )
-from agentao.agents.store import (
+from arbiter.agents.store import (
     _STORE_VERSION,
     load_bg_task_store,
     save_bg_task_store,
@@ -137,7 +137,7 @@ def _make_task(status: str) -> dict:
 
 def _seed_persisted_store(project_root: Path, tasks: dict) -> None:
     """Write tasks to the canonical store path under ``project_root``."""
-    save_bg_task_store(project_root / ".agentao" / "background_tasks.json", tasks)
+    save_bg_task_store(project_root / ".arbiter" / "background_tasks.json", tasks)
 
 
 def test_recover_marks_pending_as_failed(tmp_path):
@@ -203,7 +203,7 @@ def test_recover_writes_corrected_state_back_to_disk(tmp_path):
 
     store.recover()
 
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert on_disk["p1"]["status"] == "failed"
     assert on_disk["c1"]["status"] == "completed"
 
@@ -227,7 +227,7 @@ def test_delete_updates_persisted_store(tmp_path):
     msg = store.delete("delete-me")
 
     assert "Deleted background agent" in msg
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert "delete-me" not in on_disk
 
 
@@ -247,18 +247,18 @@ def test_two_stores_with_different_dirs_have_independent_files(tmp_path):
     a.register("only-in-a", "worker", "task")
     b.register("only-in-b", "worker", "task")
 
-    a_disk = load_bg_task_store(a_root / ".agentao" / "background_tasks.json")
-    b_disk = load_bg_task_store(b_root / ".agentao" / "background_tasks.json")
+    a_disk = load_bg_task_store(a_root / ".arbiter" / "background_tasks.json")
+    b_disk = load_bg_task_store(b_root / ".arbiter" / "background_tasks.json")
 
     assert "only-in-a" in a_disk and "only-in-b" not in a_disk
     assert "only-in-b" in b_disk and "only-in-a" not in b_disk
 
 
 # ---------------------------------------------------------------------------
-# Agentao construction wires up the store and runs recovery
+# Arbiter construction wires up the store and runs recovery
 # ---------------------------------------------------------------------------
 
-def test_agentao_init_recovers_persisted_interrupted_tasks(tmp_path, monkeypatch):
+def test_arbiter_init_recovers_persisted_interrupted_tasks(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-dummy-key")
     monkeypatch.setenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
     monkeypatch.setenv("OPENAI_MODEL", "gpt-5.4")
@@ -268,7 +268,7 @@ def test_agentao_init_recovers_persisted_interrupted_tasks(tmp_path, monkeypatch
         "r1": _make_task("running"),
     })
 
-    # ``Agentao(...)`` no longer constructs a default
+    # ``Arbiter(...)`` no longer constructs a default
     # ``BackgroundTaskStore`` — that's the factory's job. Use the
     # factory to exercise the CLI-equivalent recovery path.
     agent = build_from_environment(working_directory=tmp_path)
@@ -284,7 +284,7 @@ def test_agentao_init_recovers_persisted_interrupted_tasks(tmp_path, monkeypatch
 def test_second_recover_on_same_path_does_not_reclassify_live_tasks(tmp_path):
     """A second store anchored to the same persistence file must not reclassify
     pending/running tasks the first store wrote — those threads may still be alive."""
-    # First store: simulate Agentao init order (recover then register live task).
+    # First store: simulate Arbiter init order (recover then register live task).
     first = BackgroundTaskStore(persistence_dir=tmp_path)
     first.recover()
     first.register("live-task", "worker", "long-running")
@@ -296,7 +296,7 @@ def test_second_recover_on_same_path_does_not_reclassify_live_tasks(tmp_path):
     assert second.recover() is False
 
     # Disk state for the live task is still "running", not "failed".
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert on_disk["live-task"]["status"] == "running"
     assert on_disk["live-task"].get("error") is None
 
@@ -322,7 +322,7 @@ def test_second_store_flush_does_not_drop_first_stores_tasks(tmp_path):
     # Now the second store registers its own task and flushes.
     second.register("second-task", "worker", "task B")
 
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     # First store's task must still be on disk after second's flush.
     assert "first-task" in on_disk
     assert on_disk["first-task"]["status"] == "running"
@@ -330,8 +330,8 @@ def test_second_store_flush_does_not_drop_first_stores_tasks(tmp_path):
     assert "second-task" in on_disk
 
 
-def test_two_agentao_instances_each_own_their_store(tmp_path, monkeypatch):
-    """Two Agentao instances pointed at different project roots must have
+def test_two_arbiter_instances_each_own_their_store(tmp_path, monkeypatch):
+    """Two Arbiter instances pointed at different project roots must have
     independent stores."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-dummy-key")
     monkeypatch.setenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
@@ -357,7 +357,7 @@ def test_register_writes_store_file(tmp_path):
     store = BackgroundTaskStore(persistence_dir=tmp_path)
     store.register("flush-test-001", "test-agent", "do stuff")
 
-    store_path = tmp_path / ".agentao" / "background_tasks.json"
+    store_path = tmp_path / ".arbiter" / "background_tasks.json"
     assert store_path.exists()
 
     data = json.loads(store_path.read_text(encoding="utf-8"))
@@ -384,13 +384,13 @@ def test_concurrent_stores_register_independently(tmp_path):
     a.register("a-task", "worker-a", "task A")
     b.register("b-task", "worker-b", "task B")
 
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert "a-task" in on_disk, "store B's flush dropped store A's task"
     assert "b-task" in on_disk
 
     # Subsequent state changes on either side preserve both records.
     a.mark_running("a-task")
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert on_disk["a-task"]["status"] == "running"
     assert on_disk["b-task"]["status"] == "pending"
 
@@ -408,7 +408,7 @@ def test_concurrent_store_delete_does_not_drop_sibling_task(tmp_path):
 
     a.delete("a-task")
 
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert "a-task" not in on_disk
     assert "b-task" in on_disk
 
@@ -427,9 +427,9 @@ def test_cancel_pending_sibling_owned_task_refuses_and_does_not_persist(tmp_path
     assert second.get("sibling-pending")["status"] == "pending"
 
     msg = second.cancel("sibling-pending")
-    assert "owned by another Agentao instance" in msg
+    assert "owned by another Arbiter instance" in msg
 
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert on_disk["sibling-pending"]["status"] == "pending"
     assert first.get("sibling-pending")["status"] == "pending"
 
@@ -448,9 +448,9 @@ def test_cancel_running_sibling_owned_task_without_token_reports_failure(tmp_pat
     assert second.get("sibling-running")["status"] == "running"
 
     msg = second.cancel("sibling-running")
-    assert "running in another Agentao instance" in msg
+    assert "running in another Arbiter instance" in msg
 
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert on_disk["sibling-running"]["status"] == "running"
 
 
@@ -531,7 +531,7 @@ def test_owned_task_state_not_clobbered_by_refresh(tmp_path):
     # write that hasn't yet been re-merged). The owning store must trust
     # its own in-memory state, not the disk copy.
     save_bg_task_store(
-        tmp_path / ".agentao" / "background_tasks.json",
+        tmp_path / ".arbiter" / "background_tasks.json",
         {"mine": {**_make_task("pending"), "agent_name": "worker"}},
     )
 
@@ -551,7 +551,7 @@ def test_orphan_reclassification_after_concurrent_sibling_register(tmp_path):
     assert second.recover() is False  # guarded
     second.register("sibling", "worker", "concurrent")
 
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert on_disk["orphan"]["status"] == "failed"
     assert on_disk["orphan"]["error"] == "process exited before task finished"
     assert "sibling" in on_disk
@@ -581,7 +581,7 @@ def test_delete_refreshes_sibling_state_before_status_check(tmp_path):
     assert "Deleted background agent" in msg
 
     # The task is gone from disk.
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert "shared-task" not in on_disk
 
 
@@ -598,20 +598,20 @@ def test_owning_store_does_not_resurrect_sibling_deleted_task(tmp_path):
     b.recover()
     b.delete("doomed")
 
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert "doomed" not in on_disk
 
     # A's next flush (triggered by an unrelated registration) must not
     # resurrect the deleted record.
     a.register("fresh", "worker", "later")
 
-    on_disk = load_bg_task_store(tmp_path / ".agentao" / "background_tasks.json")
+    on_disk = load_bg_task_store(tmp_path / ".arbiter" / "background_tasks.json")
     assert "doomed" not in on_disk
     assert "fresh" in on_disk
 
 
 def test_persistence_dir_provider_follows_cwd_lazily(tmp_path):
-    """Default Agentao() sessions construct the bg_store with a provider so
+    """Default Arbiter() sessions construct the bg_store with a provider so
     that a process chdir after construction retargets persistence to the
     new project. The provider is consulted on every flush/read, so file
     and shell tools (which follow lazy cwd) and the bg-task history stay
@@ -626,8 +626,8 @@ def test_persistence_dir_provider_follows_cwd_lazily(tmp_path):
         persistence_dir_provider=lambda: cwd_holder["cwd"],
     )
     store.register("task-a", "worker", "in project A")
-    assert (project_a / ".agentao" / "background_tasks.json").exists()
-    assert not (project_b / ".agentao" / "background_tasks.json").exists()
+    assert (project_a / ".arbiter" / "background_tasks.json").exists()
+    assert not (project_b / ".arbiter" / "background_tasks.json").exists()
 
     # Simulate chdir into project_b after construction. Subsequent
     # operations must flush under project_b — pre-fix they would still
@@ -635,8 +635,8 @@ def test_persistence_dir_provider_follows_cwd_lazily(tmp_path):
     cwd_holder["cwd"] = project_b
     store.register("task-b", "worker", "in project B")
 
-    assert (project_b / ".agentao" / "background_tasks.json").exists()
-    b_state = load_bg_task_store(project_b / ".agentao" / "background_tasks.json")
+    assert (project_b / ".arbiter" / "background_tasks.json").exists()
+    b_state = load_bg_task_store(project_b / ".arbiter" / "background_tasks.json")
     assert "task-b" in b_state
     # Project A's task must not have leaked into project B's snapshot
     # (Codex review regression).
@@ -647,7 +647,7 @@ def test_cwd_change_does_not_leak_state_into_new_project(tmp_path):
     """Codex review regression: when a provider-backed store sees the
     cwd change to a new project, in-memory ``_tasks`` and ``_owned_ids``
     from the old project must not be flushed into the new project's
-    ``.agentao/background_tasks.json``, and ``list()`` in the new cwd
+    ``.arbiter/background_tasks.json``, and ``list()`` in the new cwd
     must not surface old-project tasks. Equivalently: after rebind,
     only the new project's on-disk snapshot drives state."""
     project_a = tmp_path / "project_a"
@@ -664,7 +664,7 @@ def test_cwd_change_does_not_leak_state_into_new_project(tmp_path):
     store.register("task-a", "worker", "in project A")
     store.update("task-a", status="completed", result="done in A")
     a_state_before = load_bg_task_store(
-        project_a / ".agentao" / "background_tasks.json"
+        project_a / ".arbiter" / "background_tasks.json"
     )
     assert "task-a" in a_state_before
 
@@ -681,7 +681,7 @@ def test_cwd_change_does_not_leak_state_into_new_project(tmp_path):
     # write project A's task into project B's file.
     store.register("task-b", "worker", "in project B")
     b_state = load_bg_task_store(
-        project_b / ".agentao" / "background_tasks.json"
+        project_b / ".arbiter" / "background_tasks.json"
     )
     assert "task-a" not in b_state
     assert "task-b" in b_state
@@ -689,7 +689,7 @@ def test_cwd_change_does_not_leak_state_into_new_project(tmp_path):
     # Project A's file must remain intact — the old project's history
     # is preserved exactly as it was, not silently overwritten.
     a_state_after = load_bg_task_store(
-        project_a / ".agentao" / "background_tasks.json"
+        project_a / ".arbiter" / "background_tasks.json"
     )
     assert a_state_after == a_state_before
 
@@ -710,7 +710,7 @@ def test_persistence_dir_and_provider_are_mutually_exclusive(tmp_path):
 
 def test_in_flight_task_update_after_rebind_lands_in_original_project(tmp_path):
     """Codex review regression: an in-flight background task whose owner
-    Agentao session sees a process cwd change must still have its
+    Arbiter session sees a process cwd change must still have its
     eventual mark_running()/update() persist to the *original* project's
     file and push a completion notification. Pre-fix, the rebind cleared
     ``_tasks``/``_owned_ids`` and the worker thread's update silently
@@ -730,7 +730,7 @@ def test_in_flight_task_update_after_rebind_lands_in_original_project(tmp_path):
     # state of a worker thread mid-execution.
     store.register("inflight", "worker", "long-running task")
     store.mark_running("inflight")
-    a_path = project_a / ".agentao" / "background_tasks.json"
+    a_path = project_a / ".arbiter" / "background_tasks.json"
     assert load_bg_task_store(a_path)["inflight"]["status"] == "running"
 
     # The user navigates the agent to a different project. No new
@@ -749,7 +749,7 @@ def test_in_flight_task_update_after_rebind_lands_in_original_project(tmp_path):
     assert a_state["inflight"]["result"] == "finished work"
 
     # project_b must not have a stray inflight row leaking from project_a.
-    b_path = project_b / ".agentao" / "background_tasks.json"
+    b_path = project_b / ".arbiter" / "background_tasks.json"
     if b_path.exists():
         assert "inflight" not in load_bg_task_store(b_path)
 
@@ -785,10 +785,10 @@ def test_inflight_task_pinned_path_survives_multiple_rebinds(tmp_path):
     # project_a.
     store.update("pinned", status="completed", result="ok")
 
-    a_state = load_bg_task_store(project_a / ".agentao" / "background_tasks.json")
+    a_state = load_bg_task_store(project_a / ".arbiter" / "background_tasks.json")
     assert a_state["pinned"]["status"] == "completed"
     for proj in (project_b, project_c):
-        path = proj / ".agentao" / "background_tasks.json"
+        path = proj / ".arbiter" / "background_tasks.json"
         if path.exists():
             assert "pinned" not in load_bg_task_store(path)
 
@@ -816,7 +816,7 @@ def test_inflight_task_hidden_from_other_projects_view(tmp_path):
     # Worker still completes successfully — task survived internally.
     store.update("hidden", status="completed", result="done")
     assert (
-        load_bg_task_store(project_a / ".agentao" / "background_tasks.json")[
+        load_bg_task_store(project_a / ".arbiter" / "background_tasks.json")[
             "hidden"
         ]["status"]
         == "completed"

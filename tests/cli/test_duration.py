@@ -1,8 +1,8 @@
-"""Tests for the ``/goal`` duration parser (agentao/cli/duration.py)."""
+"""Tests for the ``/goal`` duration parser (arbiter/cli/duration.py)."""
 
 import pytest
 
-from agentao.cli.duration import DurationParseError, parse_duration
+from arbiter.cli.duration import DurationParseError, parse_duration
 
 
 @pytest.mark.parametrize(

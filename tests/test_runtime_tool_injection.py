@@ -1,4 +1,4 @@
-"""Runtime tool injection: ``Agentao.add_tool`` / ``remove_tool``.
+"""Runtime tool injection: ``Arbiter.add_tool`` / ``remove_tool``.
 
 Covers the contract from ``docs/design/runtime-tool-injection.md``:
 
@@ -18,13 +18,13 @@ import logging
 
 import pytest
 
-from agentao import Agentao
-from agentao.host import Tool
-from agentao.tools.base import ToolRegistry
+from arbiter import Arbiter
+from arbiter.host import Tool
+from arbiter.tools.base import ToolRegistry
 
 
-def _make_agent(tmp_path, **kwargs) -> Agentao:
-    return Agentao(
+def _make_agent(tmp_path, **kwargs) -> Arbiter:
+    return Arbiter(
         working_directory=tmp_path,
         api_key="x",
         base_url="http://localhost:0",

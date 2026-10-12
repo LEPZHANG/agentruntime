@@ -1,0 +1,94 @@
+"""Permission-rule file loader.
+
+:func:`load_permission_rules` reads ``<user_root>/permissions.json`` and
+returns the parsed rule list plus the source labels the engine surfaces
+through :meth:`PermissionEngine.active_permissions`. Project-scope
+``<project_root>/.arbiter/permissions.json`` is intentionally NOT
+loaded — see :class:`arbiter.permissions.PermissionEngine` for the
+reasoning — but its presence triggers a one-line warning so users
+discover the policy.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+_logger = logging.getLogger(__name__)
+
+
+def load_permission_rules(
+    *,
+    project_root: Path,
+    user_root: Optional[Path],
+) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """Load permission rules from the user-scope file and K8S ConfigMap path.
+
+    Priority (first match wins):
+      1. ``/etc/arbiter/permissions.json`` — K8S ConfigMap mount
+      2. ``<user_root>/permissions.json`` — user-scope file
+
+    Args:
+        project_root: Project directory. Used only to warn on a stray
+            ``<project_root>/.arbiter/permissions.json`` that the engine
+            no longer honors.
+        user_root: User-scope directory whose ``permissions.json`` is
+            the secondary rule source. ``None`` skips the read entirely.
+
+    Returns:
+        ``(rules, loaded_sources)``. ``rules`` is the parsed rule list
+        (empty when no file was loaded). ``loaded_sources`` contains a
+        ``"k8s:<path>"`` and/or ``"user:<path>"`` entry for each file
+        that existed and parsed cleanly.
+    """
+    sources: List[str] = []
+    rules: List[Dict[str, Any]] = []
+
+    # 1. K8S ConfigMap path — checked first so cluster operators can
+    #    enforce policy even when a user-scope file exists on the image.
+    k8s_path = Path("/etc/arbiter/permissions.json")
+    if k8s_path.is_file():
+        k8s_rules, k8s_loaded = _read_rule_file(k8s_path)
+        if k8s_loaded:
+            sources.append(f"k8s:{k8s_path}")
+            rules = k8s_rules
+
+    # 2. User-scope file — only consulted when no K8S rules were loaded
+    #    (the K8S ConfigMap takes full priority when present).
+    if not rules and user_root is not None:
+        user_path = user_root / "permissions.json"
+        user_rules, user_loaded = _read_rule_file(user_path)
+        if user_loaded:
+            sources.append(f"user:{user_path}")
+            rules = user_rules
+
+    project_path = project_root / ".arbiter" / "permissions.json"
+    if project_path.exists():
+        _logger.warning(
+            "Ignoring %s: project-scope permission rules are no longer "
+            "honored (a checked-in allow-rule could grant the agent "
+            "capabilities the user never approved). Move custom rules to "
+            "the user-scope file or a K8S ConfigMap.",
+            project_path,
+        )
+
+    return rules, sources
+
+
+def _read_rule_file(path: Path) -> Tuple[List[Dict[str, Any]], bool]:
+    """Return ``(rules, loaded)``.
+
+    ``loaded`` is ``True`` only when the file existed and parsed
+    cleanly — even if the rule list inside is empty. Non-existent or
+    malformed files return ``loaded=False`` so
+    :meth:`active_permissions` reports only sources actually consulted.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return [], False
+    if not isinstance(data, dict):
+        return [], False
+    return data.get("rules", []), True

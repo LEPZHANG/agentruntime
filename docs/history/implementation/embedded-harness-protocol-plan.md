@@ -11,14 +11,14 @@
 
 ## Already in master (verified, not re-opened by this addendum)
 
-- `Agentao.arun()` async public surface — `agentao/agent.py:556`. Bridges to sync `chat()` via `loop.run_in_executor(None, self.chat, ...)` (`agentao/agent.py:580`).
-- `Agentao.__init__(*, working_directory: Path)` is required, keyword-only — `agentao/agent.py:74`. Docstring states "required since 0.3.0; was a deprecated optional in 0.2.16."
-- Factory: `agentao/embedding/factory.py::build_from_environment` owns env / dotenv / cwd / home discovery and forwards explicit subsystems to `Agentao(...)`.
-- `MemoryStore` Protocol — `agentao/capabilities/memory.py:33`, re-exported through `agentao/capabilities/__init__.py`. `MemoryManager.__init__` accepts a `MemoryStore` instance directly (`agentao/memory/manager.py:57`).
-- `FileSystem` / `ShellExecutor` capabilities and lazy `LocalFileSystem` / `LocalShellExecutor` defaults in `Tool` — `agentao/tools/base.py:32-44`, `agentao/capabilities/{filesystem,shell}.py`.
-- `BackgroundTaskStore`, `SandboxPolicy`, `ReplayConfig`, `MCPRegistry` are all explicit-injection kwargs on `Agentao.__init__` (`agentao/agent.py:83-91`); the factory wires CLI defaults from `<wd>/.agentao/*`.
+- `Arbiter.arun()` async public surface — `arbiter/agent.py:556`. Bridges to sync `chat()` via `loop.run_in_executor(None, self.chat, ...)` (`arbiter/agent.py:580`).
+- `Arbiter.__init__(*, working_directory: Path)` is required, keyword-only — `arbiter/agent.py:74`. Docstring states "required since 0.3.0; was a deprecated optional in 0.2.16."
+- Factory: `arbiter/embedding/factory.py::build_from_environment` owns env / dotenv / cwd / home discovery and forwards explicit subsystems to `Arbiter(...)`.
+- `MemoryStore` Protocol — `arbiter/capabilities/memory.py:33`, re-exported through `arbiter/capabilities/__init__.py`. `MemoryManager.__init__` accepts a `MemoryStore` instance directly (`arbiter/memory/manager.py:57`).
+- `FileSystem` / `ShellExecutor` capabilities and lazy `LocalFileSystem` / `LocalShellExecutor` defaults in `Tool` — `arbiter/tools/base.py:32-44`, `arbiter/capabilities/{filesystem,shell}.py`.
+- `BackgroundTaskStore`, `SandboxPolicy`, `ReplayConfig`, `MCPRegistry` are all explicit-injection kwargs on `Arbiter.__init__` (`arbiter/agent.py:83-91`); the factory wires CLI defaults from `<wd>/.arbiter/*`.
 
-This addendum does not re-define these and does not add new "PR 3b / PR 5b" tightening items. Any residual non-factory fallbacks (e.g. `LLMClient` log-file resolution at `agentao/llm/client.py:208,216`) are out of scope here and tracked, if at all, in their own issues.
+This addendum does not re-define these and does not add new "PR 3b / PR 5b" tightening items. Any residual non-factory fallbacks (e.g. `LLMClient` log-file resolution at `arbiter/llm/client.py:208,216`) are out of scope here and tracked, if at all, in their own issues.
 
 ---
 
@@ -32,9 +32,9 @@ These remain out of scope and do not block AsyncTool:
 - `LLMCapability`, streaming `LLMDelta`, provider-normalized reasoning deltas.
 - `ToolGovernanceResult` beyond the existing confirmation flow.
 - `MetacognitiveBoundary` runtime protocol — design captured in `docs/design/metacognitive-boundary.md`; implementation deferred.
-- A public `AgentaoContext` / run-context object exposed to tools — deferred until the first concrete `AsyncTool` consumer needs run-local metadata. AsyncTool ships without a `ctx` parameter.
+- A public `ArbiterContext` / run-context object exposed to tools — deferred until the first concrete `AsyncTool` consumer needs run-local metadata. AsyncTool ships without a `ctx` parameter.
 - Migrating `McpTool` (currently `McpTool(Tool)`, sync→async bridge through `McpClientManager`) to AsyncTool. Natural follow-up once at least one in-tree `AsyncTool` consumer exists.
-- Converting `agentao.tools.base.Tool` itself into a structural `Protocol`. It remains a base class.
+- Converting `arbiter.tools.base.Tool` itself into a structural `Protocol`. It remains a base class.
 - Re-opening the `MemoryStore` Protocol contract.
 
 ---
@@ -47,9 +47,9 @@ The only remaining P0-relevant protocol decision: **how an async-executing tool 
 
 The current runtime does not consume tools through `name/description/parameters/execute` only. It also reads:
 
-- `tool.to_openai_format()` — `ToolRegistry.to_openai_format(plan_mode=...)` iterates and calls each tool's method (`agentao/tools/base.py:182`).
-- `tool.is_read_only` — `ToolCallPlanner._decide` consults it for `readonly_mode` (`agentao/runtime/tool_planning.py:225`); `ToolExecutor` echoes it in deny messages (`agentao/runtime/tool_executor.py:152`).
-- `tool.working_directory`, `tool.output_callback`, `tool.filesystem`, `tool.shell` — set/read by `Agentao` at registration time and inside execution (`agentao/tools/base.py:17-44`).
+- `tool.to_openai_format()` — `ToolRegistry.to_openai_format(plan_mode=...)` iterates and calls each tool's method (`arbiter/tools/base.py:182`).
+- `tool.is_read_only` — `ToolCallPlanner._decide` consults it for `readonly_mode` (`arbiter/runtime/tool_planning.py:225`); `ToolExecutor` echoes it in deny messages (`arbiter/runtime/tool_executor.py:152`).
+- `tool.working_directory`, `tool.output_callback`, `tool.filesystem`, `tool.shell` — set/read by `Arbiter` at registration time and inside execution (`arbiter/tools/base.py:17-44`).
 
 A Protocol that only declared `name / description / parameters / requires_confirmation / async_execute` would let an `AsyncTool` fixture register into `ToolRegistry` and crash on the first schema export or readonly_mode pass — before `async_execute` is ever called.
 
@@ -57,7 +57,7 @@ P0 therefore ships AsyncToolBase as a true drop-in sibling. To avoid cargo-culti
 
 ### Shape
 
-`agentao/tools/base.py` — extract the shared base:
+`arbiter/tools/base.py` — extract the shared base:
 
 ```python
 from abc import ABC, abstractmethod
@@ -161,7 +161,7 @@ Rules:
 Allowing `AsyncToolBase` into the registry requires updating annotations along the registration / planning / execution path so type checkers and readers see the actual contract. Concretely a new alias:
 
 ```python
-# agentao/tools/base.py
+# arbiter/tools/base.py
 RegistrableTool = Tool | AsyncToolBase
 ```
 
@@ -170,27 +170,27 @@ and propagate:
 - `ToolRegistry.tools: Dict[str, RegistrableTool]`,
 - `ToolRegistry.register(tool: RegistrableTool) -> None`,
 - `ToolRegistry.get(...) -> RegistrableTool`,
-- `ToolRegistry.list_tools() -> List[RegistrableTool]` (`agentao/tools/base.py:174`),
-- `ToolCallPlan.tool: RegistrableTool` (`agentao/runtime/tool_planning.py:75`),
-- sub-agent surfaces that flow through the same registry: `AgentManager.create_agent_tools(..., all_tools: Dict[str, RegistrableTool], ...)` (`agentao/agents/manager.py:144`) and `AgentToolWrapper.__init__(..., all_tools: Dict[str, RegistrableTool], ...)` (`agentao/agents/tools.py:235`; class defined at `:221`),
+- `ToolRegistry.list_tools() -> List[RegistrableTool]` (`arbiter/tools/base.py:174`),
+- `ToolCallPlan.tool: RegistrableTool` (`arbiter/runtime/tool_planning.py:75`),
+- sub-agent surfaces that flow through the same registry: `AgentManager.create_agent_tools(..., all_tools: Dict[str, RegistrableTool], ...)` (`arbiter/agents/manager.py:144`) and `AgentToolWrapper.__init__(..., all_tools: Dict[str, RegistrableTool], ...)` (`arbiter/agents/tools.py:235`; class defined at `:221`),
 - any executor / formatter signature that currently reads `plan.tool: Tool`.
 
 Without this, the duck-typed dispatch works at runtime but every annotation lies, and IDE/`mypy` flag every `tool.async_execute` access on AsyncTool subclasses. The alias keeps the union opt-in: code that genuinely only deals with sync tools (e.g. inside `Tool.execute`-only helpers) keeps the narrower `Tool` annotation.
 
 ### Dispatch — host-loop-aware bridge
 
-The naive "per-call `asyncio.run()` on the chat thread" is **not** suitable as the only path. `arun()` already isolates the host's main loop from the chat thread by running `chat()` inside `loop.run_in_executor(None, ...)` (`agentao/agent.py:580`). A fresh loop created on the chat thread cannot touch resources bound to the host loop — e.g. an `aiohttp.ClientSession`, an async DB client, an `anyio` task group, anything created on the host loop. Async tools that hold such resources are common, not exotic. Deferring this would be a foreseeable trap.
+The naive "per-call `asyncio.run()` on the chat thread" is **not** suitable as the only path. `arun()` already isolates the host's main loop from the chat thread by running `chat()` inside `loop.run_in_executor(None, ...)` (`arbiter/agent.py:580`). A fresh loop created on the chat thread cannot touch resources bound to the host loop — e.g. an `aiohttp.ClientSession`, an async DB client, an `anyio` task group, anything created on the host loop. Async tools that hold such resources are common, not exotic. Deferring this would be a foreseeable trap.
 
 P0 therefore captures the host loop at `arun()` entry and threads it down to the dispatcher:
 
-1. `Agentao.arun(...)`: capture `host_loop = asyncio.get_running_loop()` before scheduling `run_in_executor`. Make `host_loop` available to the chat runtime — concretely either as a new field on the `CancellationToken` already threaded into `chat()`, or as a dedicated `runtime_loop` kwarg threaded through `ChatLoopRunner` → `ToolRunner` → `ToolExecutor`. Either way, only the dispatcher needs to read it.
+1. `Arbiter.arun(...)`: capture `host_loop = asyncio.get_running_loop()` before scheduling `run_in_executor`. Make `host_loop` available to the chat runtime — concretely either as a new field on the `CancellationToken` already threaded into `chat()`, or as a dedicated `runtime_loop` kwarg threaded through `ChatLoopRunner` → `ToolRunner` → `ToolExecutor`. Either way, only the dispatcher needs to read it.
 
 2. `ToolExecutor`, when dispatching an `AsyncToolBase` instance:
 
    ```python
    # ToolRunner.execute and ToolExecutor.execute_batch both accept
-   # ``cancellation_token=None`` (see agentao/runtime/tool_runner.py:108,
-   # agentao/runtime/tool_executor.py:68). The dispatcher must therefore
+   # ``cancellation_token=None`` (see arbiter/runtime/tool_runner.py:108,
+   # arbiter/runtime/tool_executor.py:68). The dispatcher must therefore
    # tolerate a None token without an AttributeError. Two equivalent
    # patterns; pick one in the implementation PR:
    #
@@ -230,7 +230,7 @@ P0 therefore captures the host loop at `arun()` entry and threads it down to the
 
 When `fut.cancel()` is invoked from the token callback, `fut.result()` raises `concurrent.futures.CancelledError` — that is the exception class used by `concurrent.futures.Future.result()`, and it inherits from `concurrent.futures._base.Error` → `Exception` (unchanged across 3.8+). It is **not** the same class as `asyncio.CancelledError`; since Python 3.8 those have been distinct (`asyncio.CancelledError` was moved to inherit from `BaseException` and lives in `asyncio.exceptions`, while `concurrent.futures.CancelledError` continues to inherit from `Exception`). Implementers must catch `concurrent.futures.CancelledError` explicitly — catching `asyncio.CancelledError` would not match the bridge's failure mode.
 
-The current `ToolExecutor` execution body wraps the tool call in `except Exception as exc: ... status = "error"` (`agentao/runtime/tool_executor.py:243-251`). Because `concurrent.futures.CancelledError` *is* an `Exception`, leaving it to fall through that handler would silently misclassify token-driven cancels as `status="error"`. The async dispatch helper must therefore catch it **before** that handler and route through the **existing** cancelled path — `ToolExecutor` already produces `ToolExecutionResult(..., status="cancelled", ...)` and emits `TOOL_COMPLETE` with `status="cancelled"` for permission-deny / readonly-mode cancellations (`agentao/runtime/tool_executor.py:164,175,192`). AsyncTool cancellation reuses that contract.
+The current `ToolExecutor` execution body wraps the tool call in `except Exception as exc: ... status = "error"` (`arbiter/runtime/tool_executor.py:243-251`). Because `concurrent.futures.CancelledError` *is* an `Exception`, leaving it to fall through that handler would silently misclassify token-driven cancels as `status="error"`. The async dispatch helper must therefore catch it **before** that handler and route through the **existing** cancelled path — `ToolExecutor` already produces `ToolExecutionResult(..., status="cancelled", ...)` and emits `TOOL_COMPLETE` with `status="cancelled"` for permission-deny / readonly-mode cancellations (`arbiter/runtime/tool_executor.py:164,175,192`). AsyncTool cancellation reuses that contract.
 
 #### Where the cancel branch lives in `_execute_one` — and why it needs an explicit ack
 
@@ -289,7 +289,7 @@ try:
         duration_ms = round((time.monotonic() - t0) * 1000)
         # Match the existing executor convention of putting a short
         # human-readable reason in the error field (cf. ":162").
-        # ``token.reason`` is already set by Agentao.arun() / chat
+        # ``token.reason`` is already set by Arbiter.arun() / chat
         # loop callers (e.g. "async-cancel", "user-cancel").
         reason = token.reason if token is not None and token.reason else "async-cancel"
         self._emit_complete(fn, call_id, "cancelled", duration_ms, reason)
@@ -309,18 +309,18 @@ Three properties this gives us:
 
 1. **No double-emit.** `TOOL_COMPLETE` is emitted exactly once per call: success goes through the existing tail, cancel goes through this branch, errors go through the existing `except Exception` handler.
 2. **Cleanup-ordered cancel report.** By the time `TOOL_COMPLETE(status="cancelled")` is emitted, the user coroutine's own `finally` has run on the host loop (or the bounded timeout elapsed with a logged warning). This is what makes the "no dangling future" / "coroutine received `CancelledError`" assertions stable rather than flaky.
-3. **Error-field convention preserved.** Existing executor cancelled paths put a short reason in the `error` field (`agentao/runtime/tool_executor.py:162` uses `"denied by permission engine"`); AsyncTool token cancels mirror that with `token.reason` (typically `"async-cancel"` from `Agentao.arun()` at `agentao/agent.py:585`, or `"user-cancel"` for synchronous CLI Ctrl+C), falling back to `"async-cancel"` if the token has no reason set.
+3. **Error-field convention preserved.** Existing executor cancelled paths put a short reason in the `error` field (`arbiter/runtime/tool_executor.py:162` uses `"denied by permission engine"`); AsyncTool token cancels mirror that with `token.reason` (typically `"async-cancel"` from `Arbiter.arun()` at `arbiter/agent.py:585`, or `"user-cancel"` for synchronous CLI Ctrl+C), falling back to `"async-cancel"` if the token has no reason set.
 
 The chat loop already treats `token.is_cancelled` as the trigger to unwind the turn (raising `AgentCancelledError` at the `chat()` boundary).
 
 #### Cancellation — concrete mechanism
 
-The current `CancellationToken` (`agentao/cancellation.py:15-51`) is a `threading.Event` wrapper exposing `is_cancelled` / `check()` / `cancel()` only. There is no callback / watcher API, and `arun()` only forwards `asyncio.CancelledError` into `token.cancel("async-cancel")` (`agentao/agent.py:585`). A dispatcher blocked in `fut.result()` therefore never observes the token flip on its own — the previous draft's "dispatcher calls `fut.cancel()`" sentence was unimplementable.
+The current `CancellationToken` (`arbiter/cancellation.py:15-51`) is a `threading.Event` wrapper exposing `is_cancelled` / `check()` / `cancel()` only. There is no callback / watcher API, and `arun()` only forwards `asyncio.CancelledError` into `token.cancel("async-cancel")` (`arbiter/agent.py:585`). A dispatcher blocked in `fut.result()` therefore never observes the token flip on its own — the previous draft's "dispatcher calls `fut.cancel()`" sentence was unimplementable.
 
 This addendum makes a small, contained change: extend `CancellationToken` with a callback registry.
 
 ```python
-# agentao/cancellation.py
+# arbiter/cancellation.py
 class CancellationToken:
     ...
     def add_done_callback(self, fn: Callable[[], None]) -> Callable[[], None]:
@@ -358,11 +358,11 @@ This addendum is satisfied when:
 
 - An `AsyncToolBase` concrete subclass can be registered into `ToolRegistry` without an adapter, and survives `ToolRegistry.to_openai_format(plan_mode=...)` and `ToolCallPlanner._decide`'s `is_read_only` read. (Test: register, call those two paths, assert no AttributeError.)
 - The type boundary is published: `RegistrableTool = Tool | AsyncToolBase` exists, and every surface listed in the "Type boundary" section uses it. The project does not currently configure `mypy` / `pyright` (verified in `pyproject.toml` dev deps), so verification is two lighter checks:
-  - (a) `python -m compileall agentao/tools/base.py agentao/runtime/tool_planning.py agentao/runtime/tool_executor.py agentao/agents/manager.py agentao/agents/tools.py` succeeds.
+  - (a) `python -m compileall arbiter/tools/base.py arbiter/runtime/tool_planning.py arbiter/runtime/tool_executor.py arbiter/agents/manager.py arbiter/agents/tools.py` succeeds.
   - (b) A unit test uses `typing.get_type_hints` to assert each of the following resolves to `RegistrableTool` (or `Dict[str, RegistrableTool]` / `List[RegistrableTool]` as appropriate):
     - `ToolRegistry.register["tool"]`,
     - `ToolRegistry.get["return"]`,
-    - `ToolRegistry.tools` — note that the current code keeps `self.tools` only as an instance assignment (`agentao/tools/base.py:145`), so `get_type_hints(ToolRegistry)` cannot see it. The implementation PR must hoist the annotation to class body (`class ToolRegistry: tools: Dict[str, RegistrableTool]` plus the existing `__init__` assignment) so this check is reachable.
+    - `ToolRegistry.tools` — note that the current code keeps `self.tools` only as an instance assignment (`arbiter/tools/base.py:145`), so `get_type_hints(ToolRegistry)` cannot see it. The implementation PR must hoist the annotation to class body (`class ToolRegistry: tools: Dict[str, RegistrableTool]` plus the existing `__init__` assignment) so this check is reachable.
     - `ToolRegistry.list_tools["return"]`,
     - `ToolCallPlan` field `tool` (via `get_type_hints(ToolCallPlan)["tool"]`),
     - `AgentManager.create_agent_tools["all_tools"]`,
@@ -370,7 +370,7 @@ This addendum is satisfied when:
 
   Adding mypy is explicitly out of scope for this addendum; if a later PR introduces it, this acceptance step can be tightened.
 - `_BaseTool` extraction preserves `Tool`'s surface byte-equivalent: every existing `Tool` subclass (file_ops, shell, web, search, memory, agents, skill, etc.) imports and runs without code changes. Verified by `pytest tests/` continuing to pass with no edits to existing tool modules.
-- Public import surface published: `agentao/tools/__init__.py` re-exports `AsyncToolBase` and `RegistrableTool` alongside the existing `Tool` / `ToolRegistry` (`agentao/tools/__init__.py:3`), and `__all__` lists them. A smoke test asserts `from agentao.tools import AsyncToolBase, RegistrableTool` succeeds, that `RegistrableTool` is the alias defined in `agentao.tools.base`, and that an in-test `AsyncToolBase` subclass can be instantiated. (`_BaseTool` is intentionally *not* re-exported — it stays private.)
+- Public import surface published: `arbiter/tools/__init__.py` re-exports `AsyncToolBase` and `RegistrableTool` alongside the existing `Tool` / `ToolRegistry` (`arbiter/tools/__init__.py:3`), and `__all__` lists them. A smoke test asserts `from arbiter.tools import AsyncToolBase, RegistrableTool` succeeds, that `RegistrableTool` is the alias defined in `arbiter.tools.base`, and that an in-test `AsyncToolBase` subclass can be instantiated. (`_BaseTool` is intentionally *not* re-exported — it stays private.)
 - `CancellationToken.add_done_callback(...)` exists and (a) runs the callback synchronously when `cancel()` is called from another thread, (b) runs immediately if the token is already cancelled, (c) returns an idempotent unregister callable. Covered by direct unit tests on `cancellation.py`.
 - One end-to-end test via `await agent.arun(...)` exercises an `AsyncToolBase` whose `async_execute` asserts `asyncio.get_running_loop() is host_loop` (i.e. the coroutine actually ran on the host loop, not on a fresh chat-thread loop).
 - One end-to-end test via sync `agent.chat(...)` exercises a **loop-independent** `AsyncToolBase` and verifies the fresh-loop fallback path completes successfully. The test docstring explicitly notes the sync-path scope limitation.
@@ -386,7 +386,7 @@ The broader P0 acceptance criteria remain in `EMBEDDED_HARNESS_IMPLEMENTATION_PL
 
 Driven by concrete consumers beyond the current CLI/ACP/examples surface, future P1/P2 work may introduce:
 
-- a public `AgentaoContext` / run-context object once the first `AsyncToolBase` genuinely needs run-local metadata,
+- a public `ArbiterContext` / run-context object once the first `AsyncToolBase` genuinely needs run-local metadata,
 - migration of `McpTool` to `AsyncToolBase` (removes the `McpClientManager` sync bridge),
 - a dedicated `AsyncToolRunner` if the chat-thread blocking model becomes a bottleneck,
 - run lifecycle objects, structured event streams, async transport,

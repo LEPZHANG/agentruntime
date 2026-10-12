@@ -11,18 +11,18 @@ from types import SimpleNamespace
 
 import pytest
 
-from agentao.cli.commands_ext import (
+from arbiter.cli.commands_ext import (
     collect_crystallize_evidence,
     render_available_skills_summary,
     render_crystallize_context,
 )
-from agentao.memory.crystallizer import (
+from arbiter.memory.crystallizer import (
     FEEDBACK_SYSTEM_PROMPT,
     feedback_prompt,
     refine_prompt,
     suggest_prompt,
 )
-from agentao.skills.drafts import (
+from arbiter.skills.drafts import (
     SkillDraft,
     SkillEvidence,
     SkillFeedbackEntry,
@@ -91,7 +91,7 @@ def test_save_and_load_roundtrip_preserves_evidence_and_feedback(tmp_path: Path)
 
 def test_load_old_schema_backfills_defaults(tmp_path: Path):
     """Drafts written by the pre-enhancement code must still load."""
-    path = tmp_path / ".agentao" / "crystallize" / "skill_draft.json"
+    path = tmp_path / ".arbiter" / "crystallize" / "skill_draft.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     legacy = {
         "session_id": "",
@@ -437,7 +437,7 @@ def test_render_available_skills_total_length_respects_budget(tmp_path: Path):
     truncated block consistently overran the budget by ~110 chars. The
     rendered total length (including the hint) must stay <= 2000.
     """
-    from agentao.cli.commands_ext.crystallize import _AVAILABLE_SKILLS_BUDGET
+    from arbiter.cli.commands_ext.crystallize import _AVAILABLE_SKILLS_BUDGET
 
     skills = [
         (f"skill-{i:02d}", "Long " + "x" * 140, 1_000_000 + i)

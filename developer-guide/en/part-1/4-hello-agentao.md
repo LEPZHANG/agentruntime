@@ -1,4 +1,4 @@
-# 1.4 Hello Agentao in 5 min
+# 1.4 Hello Arbiter in 5 min
 
 Goal: get a minimal Python embedding running. Pure SDK path, **no custom code**.
 
@@ -6,17 +6,17 @@ Goal: get a minimal Python embedding running. Pure SDK path, **no custom code**.
 
 ::: tip ⚡ Runnable end-to-end (≈ 3 minutes)
 **Outcome** — agent thinks, runs `glob` + `run_shell_command`, prints the 3 largest files under cwd.
-**Stack** — `pip install 'agentao>=0.4.0'` + 3 env vars + 6 lines of Python.
+**Stack** — `pip install 'arbiter>=0.4.0'` + 3 env vars + 6 lines of Python.
 **Run** — `python hello.py` (after pasting the snippet from Step 3 below).
 :::
 
 ## Step 1 · Install (1 minute)
 
 ```bash
-pip install 'agentao>=0.4.0'
+pip install 'arbiter>=0.4.0'
 ```
 
-`pip install agentao` ships the embedding-only core. Add extras (`[web]`, `[cli]`, `[i18n]`, …) later as needed — see [1.5 Requirements](./5-requirements).
+`pip install arbiter` ships the embedding-only core. Add extras (`[web]`, `[cli]`, `[i18n]`, …) later as needed — see [1.5 Requirements](./5-requirements).
 
 ## Step 2 · Configure credentials (1 minute)
 
@@ -34,9 +34,9 @@ Save as `hello.py`:
 
 ```python
 from pathlib import Path
-from agentao import Agentao
+from arbiter import Arbiter
 
-agent = Agentao(working_directory=Path.cwd())
+agent = Arbiter(working_directory=Path.cwd())
 print(agent.chat("List the 3 largest files under the current directory."))
 agent.close()
 ```
@@ -45,7 +45,7 @@ agent.close()
 python hello.py
 ```
 
-You'll see Agentao think, call `run_shell_command` / `glob`, and print a final answer like:
+You'll see Arbiter think, call `run_shell_command` / `glob`, and print a final answer like:
 
 ```text
 The three largest files under the current directory are:
@@ -56,7 +56,7 @@ The three largest files under the current directory are:
 
 ## What just happened
 
-- `Agentao(...)` created **one stateful session** — history, tools, and memory are bound to this instance
+- `Arbiter(...)` created **one stateful session** — history, tools, and memory are bound to this instance
 - `chat()` ran the full LLM loop: think → call tool → observe → think → answer
 - `working_directory` rooted file/shell tools at the current dir. **Always pass an explicit `Path` in production** so concurrent instances don't share `Path.cwd()`
 - `close()` released MCP subprocesses and DB handles — wrap in `try/finally` in real code
@@ -65,14 +65,14 @@ The three largest files under the current directory are:
 
 ```python
 from pathlib import Path
-from agentao import Agentao
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
 
 def stream(ev):
     if ev.type.name == "LLM_TEXT":
         print(ev.data["chunk"], end="", flush=True)
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path.cwd(),
     transport=SdkTransport(on_event=stream),
 )
@@ -80,13 +80,13 @@ agent.chat("List the 3 largest files under the current directory.")
 agent.close()
 ```
 
-That's the whole pattern. Tool confirmations, custom tools, permissions, memory — every other feature extends from these two calls (`Agentao(...)` + `chat(...)`).
+That's the whole pattern. Tool confirmations, custom tools, permissions, memory — every other feature extends from these two calls (`Arbiter(...)` + `chat(...)`).
 
 ## Troubleshooting
 
 | Symptom | Likely cause |
 |---------|--------------|
-| `ImportError: cannot import name 'Agentao'` | Forgot `pip install agentao`, or imported from `agentao.agent` (not the public path) |
+| `ImportError: cannot import name 'Arbiter'` | Forgot `pip install arbiter`, or imported from `arbiter.agent` (not the public path) |
 | `ValueError: OPENAI_API_KEY is not set` | All three of `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL` are required |
 | Agent says `Tool execution cancelled by user` | Default permissions denied a write — see [5.4](/en/part-5/4-permissions) |
 | `chat()` never returns | Likely tool loop or no `ask_user` callback — see [Appendix F.2](/en/appendix/f-faq#f-2-runtime-behavior) |
@@ -99,6 +99,6 @@ Full FAQ: [Appendix F](/en/appendix/f-faq).
 |----------------|------|
 | Wire one of your business APIs as a tool | [5.1 Custom Tools](/en/part-5/1-custom-tools) |
 | Embed in FastAPI / Flask with SSE streaming | [2.7 FastAPI / Flask Embedding](/en/part-2/7-fastapi-flask-embed) |
-| Drive Agentao from Node / Go / Rust / IDE | [Part 3 · ACP](/en/part-3/) |
+| Drive Arbiter from Node / Go / Rust / IDE | [Part 3 · ACP](/en/part-3/) |
 | Verify environment requirements first | [1.5 Requirements](./5-requirements) |
 | Understand the core nouns (Agent / Tool / Skill / …) | [1.2 Core Concepts](./2-core-concepts) |

@@ -15,14 +15,14 @@ from typing import Tuple
 
 import pytest
 
-from agentao.acp_client import (
+from arbiter.acp_client import (
     AcpClientError,
     AcpErrorCode,
     AcpInteractionRequiredError,
     AcpRpcError,
     PromptResult,
 )
-from agentao.acp_client.models import ServerState
+from arbiter.acp_client.models import ServerState
 
 from .support.acp_client import make_interaction_mock_manager as _make_mgr
 
@@ -166,7 +166,7 @@ class TestPromptResult:
 
 class TestPackageExports:
     def test_embedding_surface_present(self) -> None:
-        import agentao.acp_client as pkg
+        import arbiter.acp_client as pkg
 
         stable = {
             "ACPManager",
@@ -191,7 +191,7 @@ class TestPackageExports:
         must remain importable for backward compatibility. Prefer the
         concrete submodule — these are re-exported as a compatibility
         shim, not part of the stable contract."""
-        import agentao.acp_client as pkg
+        import arbiter.acp_client as pkg
 
         legacy = [
             "ACPClient",
@@ -208,7 +208,7 @@ class TestPackageExports:
         ]
         for name in legacy:
             assert hasattr(pkg, name), (
-                f"{name!r} must remain importable from agentao.acp_client "
+                f"{name!r} must remain importable from arbiter.acp_client "
                 "as a backward-compat shim"
             )
 
@@ -217,7 +217,7 @@ class TestConnectionInfoHasSessionCwd:
     def test_field_present_and_defaults_none(self) -> None:
         # AcpConnectionInfo is internal: imported from the submodule,
         # not from the package root.
-        from agentao.acp_client.client import AcpConnectionInfo
+        from arbiter.acp_client.client import AcpConnectionInfo
 
         info = AcpConnectionInfo()
         assert info.session_cwd is None
@@ -529,7 +529,7 @@ class TestSessionReuseSemantics:
     def test_different_mcp_servers_triggers_fresh_session(
         self, tmp_path: Path
     ) -> None:
-        from agentao.acp_client.client import _fingerprint_mcp_servers
+        from arbiter.acp_client.client import _fingerprint_mcp_servers
 
         mgr = _make_mgr(tmp_path)
         try:
@@ -624,7 +624,7 @@ class TestSessionDefaultsRestoredAfterOverride:
             mgr.stop_all()
 
     def test_mcp_none_reverts_to_empty(self, tmp_path: Path) -> None:
-        from agentao.acp_client.client import _fingerprint_mcp_servers
+        from arbiter.acp_client.client import _fingerprint_mcp_servers
 
         mgr = _make_mgr(tmp_path)
         try:
@@ -714,7 +714,7 @@ class TestEphemeralSetupFailureCleanup:
         mgr = _make_mgr(tmp_path)
         try:
             # Force initialize to raise so the ephemeral setup aborts.
-            from agentao.acp_client.client import ACPClient
+            from arbiter.acp_client.client import ACPClient
 
             def _boom(self, *a, **kw):
                 raise AcpClientError(
@@ -748,7 +748,7 @@ class TestSelectRejectOption:
     """Unit tests for the reject-option selector (server-provided options)."""
 
     def setup_method(self) -> None:
-        from agentao.acp_client.manager import _select_reject_option
+        from arbiter.acp_client.manager import _select_reject_option
 
         self.select = _select_reject_option
 
@@ -838,7 +838,7 @@ class TestClientCreateSessionFailureClearsMetadata:
         fingerprint when the underlying ``session/new`` RPC fails — so
         downstream code never reuses stale metadata after a rejected
         cwd/mcp override."""
-        from agentao.acp_client.client import ACPClient
+        from arbiter.acp_client.client import ACPClient
 
         mgr = _make_mgr(tmp_path)
         try:

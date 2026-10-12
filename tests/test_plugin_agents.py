@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from agentao.plugins.agents import validate_no_external_collisions
-from agentao.embedding.plugins.resolvers.agents import resolve_plugin_agents
-from agentao.plugins.models import (
+from arbiter.plugins.agents import validate_no_external_collisions
+from arbiter.embedding.plugins.resolvers.agents import resolve_plugin_agents
+from arbiter.plugins.models import (
     LoadedPlugin,
     PluginAgentDefinition,
     PluginManifest,
@@ -290,7 +290,7 @@ class TestCollisionDetection:
 
 class TestAgentManagerRegistration:
     def test_register_plugin_agents(self, tmp_path):
-        from agentao.agents.manager import AgentManager
+        from arbiter.agents.manager import AgentManager
 
         mgr = AgentManager()
         initial_count = len(mgr.definitions)
@@ -319,7 +319,7 @@ class TestAgentManagerRegistration:
         assert len(mgr.definitions) == initial_count + 1
 
     def test_collision_with_builtin(self):
-        from agentao.agents.manager import AgentManager
+        from arbiter.agents.manager import AgentManager
 
         mgr = AgentManager()
         if not mgr.definitions:
@@ -337,7 +337,7 @@ class TestAgentManagerRegistration:
         assert "collides" in errors[0].message.lower()
 
     def test_plugin_agents_appear_in_listing(self, tmp_path):
-        from agentao.agents.manager import AgentManager
+        from arbiter.agents.manager import AgentManager
 
         mgr = AgentManager()
         defn = PluginAgentDefinition(

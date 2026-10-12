@@ -1,8 +1,8 @@
-# Implement ACP Session Cancel Using Existing Agentao Cancellation Flow
+# Implement ACP Session Cancel Using Existing Arbiter Cancellation Flow
 
 ## Problem
 
-ACP clients must be able to cancel an active turn. Agentao already has cancellation primitives, but they are not exposed as ACP session methods.
+ACP clients must be able to cancel an active turn. Arbiter already has cancellation primitives, but they are not exposed as ACP session methods.
 
 ## Scope
 

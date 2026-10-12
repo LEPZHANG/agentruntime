@@ -17,9 +17,9 @@ import httpx
 import openai
 import pytest
 
-from agentao.llm import client as client_mod
-from agentao.llm._retry import _is_image_unsupported, _is_temperature_unsupported
-from agentao.llm.client import (
+from arbiter.llm import client as client_mod
+from arbiter.llm._retry import _is_image_unsupported, _is_temperature_unsupported
+from arbiter.llm.client import (
     LLMClient,
     MAX_RETRY_ATTEMPTS,
     _classify_retry,
@@ -205,7 +205,7 @@ class TestComputeBackoffDelay:
         assert _compute_backoff_delay(0, "10") == 10.0
 
     def test_retry_after_capped_at_max(self):
-        from agentao.llm.client import MAX_BACKOFF_SECONDS
+        from arbiter.llm.client import MAX_BACKOFF_SECONDS
         assert _compute_backoff_delay(0, "999") == MAX_BACKOFF_SECONDS
 
     def test_exponential_grows_then_caps(self, monkeypatch):
@@ -227,7 +227,7 @@ class TestComputeBackoffDelay:
         # Once the exponential base saturates at MAX_BACKOFF_SECONDS, adding
         # jitter on top would breach the per-step ceiling that the policy
         # advertises. Worst-case jitter (random()=1.0) must still be capped.
-        from agentao.llm.client import MAX_BACKOFF_SECONDS
+        from arbiter.llm.client import MAX_BACKOFF_SECONDS
         monkeypatch.setattr(client_mod.random, "random", lambda: 1.0)
         # attempt large enough that base saturates at the cap
         assert _compute_backoff_delay(20) == pytest.approx(MAX_BACKOFF_SECONDS)

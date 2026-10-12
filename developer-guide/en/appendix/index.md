@@ -5,7 +5,7 @@ Reference material you reach for while building. All seven appendices (A–G) ar
 | # | Appendix | Purpose |
 |---|----------|---------|
 | [A](./a-api-reference) | API reference | Public symbols, constructors, methods — one surface |
-| [B](./b-config-keys) | Configuration keys index | Env vars + `.agentao/*.json` in one table |
+| [B](./b-config-keys) | Configuration keys index | Env vars + `.arbiter/*.json` in one table |
 | [C](./c-acp-messages) | ACP message fields | Field-level lookup for every ACP method & notification |
 | [D](./d-error-codes) | `AcpErrorCode` reference | Structured failure classification for ACP clients |
 | [E](./e-migration) | Framework migration | Moving from LangChain / AutoGen / CrewAI |
@@ -22,7 +22,7 @@ Reference material you reach for while building. All seven appendices (A–G) ar
 | What you need | Where to go |
 |---------------|-------------|
 | Constructor parameters, public methods, stable import paths | [Appendix A · API Reference](./a-api-reference) |
-| Environment variables, `.agentao/*.json`, configuration defaults | [Appendix B · Configuration Keys](./b-config-keys) |
+| Environment variables, `.arbiter/*.json`, configuration defaults | [Appendix B · Configuration Keys](./b-config-keys) |
 | ACP request, response, and notification fields | [Appendix C · ACP Messages](./c-acp-messages) |
 | ACP error codes and client handling strategy | [Appendix D · Error Codes](./d-error-codes) |
 | Migrating from LangChain / AutoGen / CrewAI | [Appendix E · Migration](./e-migration) |

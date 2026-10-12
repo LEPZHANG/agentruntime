@@ -1,16 +1,16 @@
 import logging
 import sys
 
-from agentao.logging_utils import capture_third_party_output
+from arbiter.logging_utils import capture_third_party_output
 
 
 def test_capture_third_party_output_redirects_stderr(monkeypatch, caplog, capsys):
-    target_logger = logging.getLogger("agentao.test.logging_utils")
+    target_logger = logging.getLogger("arbiter.test.logging_utils")
 
     def runner():
         print("third-party stderr line", file=sys.stderr)
 
-    with caplog.at_level(logging.DEBUG, logger="agentao.test.logging_utils"):
+    with caplog.at_level(logging.DEBUG, logger="arbiter.test.logging_utils"):
         capture_third_party_output(
             runner=runner,
             target_logger=target_logger,
@@ -23,12 +23,12 @@ def test_capture_third_party_output_redirects_stderr(monkeypatch, caplog, capsys
 
 
 def test_capture_third_party_output_redirects_named_logger(caplog, capsys):
-    target_logger = logging.getLogger("agentao.test.logging_utils")
+    target_logger = logging.getLogger("arbiter.test.logging_utils")
 
     def runner():
         logging.getLogger("thirdparty").info("startup complete")
 
-    with caplog.at_level(logging.DEBUG, logger="agentao.test.logging_utils"):
+    with caplog.at_level(logging.DEBUG, logger="arbiter.test.logging_utils"):
         capture_third_party_output(
             runner=runner,
             source_logger_names=("thirdparty",),
@@ -52,7 +52,7 @@ def test_capture_third_party_output_restores_logger_state():
     capture_third_party_output(
         runner=lambda: None,
         source_logger_names=("thirdparty.restore",),
-        target_logger=logging.getLogger("agentao.test.logging_utils"),
+        target_logger=logging.getLogger("arbiter.test.logging_utils"),
     )
 
     assert source_logger.handlers == [original_handler]

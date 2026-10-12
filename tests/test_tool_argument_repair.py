@@ -6,8 +6,8 @@ from typing import Any, Dict
 
 import pytest
 
-from agentao.permissions import PermissionEngine
-from agentao.runtime.arg_repair import (
+from arbiter.permissions import PermissionEngine
+from arbiter.runtime.arg_repair import (
     TAG_BRACKET_BALANCE,
     TAG_DOUBLE_ENCODED,
     TAG_EMPTY,
@@ -17,8 +17,8 @@ from agentao.runtime.arg_repair import (
     TAG_TRAILING_COMMA,
     parse_tool_arguments,
 )
-from agentao.runtime.tool_planning import ToolCallDecision, ToolCallPlanner
-from agentao.tools.base import Tool, ToolRegistry
+from arbiter.runtime.tool_planning import ToolCallDecision, ToolCallPlanner
+from arbiter.tools.base import Tool, ToolRegistry
 
 from tests.support.tool_calls import make_tool_call
 
@@ -391,9 +391,9 @@ def test_doom_loop_emits_placeholder_for_every_tool_call_in_batch(tmp_path):
     still emit a tool_result for *every* tool_call in the assistant
     message — strict Chat-Completions APIs reject the next request if
     any assistant tool_call is missing its matching tool result."""
-    from agentao.runtime.tool_runner import ToolRunner
-    from agentao.transport import NullTransport
-    from agentao.runtime.tool_planning import DOOM_LOOP_THRESHOLD
+    from arbiter.runtime.tool_runner import ToolRunner
+    from arbiter.transport import NullTransport
+    from arbiter.runtime.tool_planning import DOOM_LOOP_THRESHOLD
 
     registry = ToolRegistry()
     registry.register(FakeDangerousTool())
@@ -436,8 +436,8 @@ def test_parse_failure_doom_loop_emits_placeholder_for_every_tool_call_in_batch(
     tmp_path,
 ):
     """Same invariant as above, but for the parse-failure doom path."""
-    from agentao.runtime.tool_runner import ToolRunner
-    from agentao.transport import NullTransport
+    from arbiter.runtime.tool_runner import ToolRunner
+    from arbiter.transport import NullTransport
 
     registry = ToolRegistry()
     registry.register(FakeDangerousTool())

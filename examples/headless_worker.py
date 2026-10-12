@@ -1,4 +1,4 @@
-"""Minimal runnable headless consumer for the Agentao ACP runtime.
+"""Minimal runnable headless consumer for the Arbiter ACP runtime.
 
 This sample is the authoritative Week 1 regression fixture referenced
 throughout ``docs/features/headless-runtime.md`` and the
@@ -20,7 +20,7 @@ Running from the repository root::
 
 The example ships its own mock ACP server (a small Python script
 written to ``tempfile.mkdtemp()`` on each run) so it never depends on
-a user's ``.agentao/acp.json``. It is intended as a CI smoke job:
+a user's ``.arbiter/acp.json``. It is intended as a CI smoke job:
 exit code ``0`` means every required path worked.
 """
 
@@ -35,7 +35,7 @@ import time
 from pathlib import Path
 from typing import List
 
-from agentao.acp_client import (
+from arbiter.acp_client import (
     ACPManager,
     AcpClientConfig,
     AcpClientError,
@@ -280,7 +280,7 @@ def run_cancel_turn(mgr: ACPManager) -> None:
 
 
 def main() -> int:
-    workdir = Path(tempfile.mkdtemp(prefix="agentao-headless-worker-"))
+    workdir = Path(tempfile.mkdtemp(prefix="arbiter-headless-worker-"))
     print(f"[headless_worker] workdir={workdir}")
     mgr = _build_manager(workdir)
     try:

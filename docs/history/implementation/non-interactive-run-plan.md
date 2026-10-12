@@ -1,4 +1,4 @@
-# Non-Interactive `agentao run` — Design Plan
+# Non-Interactive `arbiter run` — Design Plan
 
 **Date:** 2026-05-08
 **Status:** Draft (M0 scope)
@@ -7,20 +7,20 @@
 
 ## TL;DR
 
-Add an `agentao run` subcommand that:
+Add an `arbiter run` subcommand that:
 
 1. accepts a structured run spec from stdin or `--spec <file>`,
 2. merges it with explicit CLI flags,
-3. executes one Agentao turn,
+3. executes one Arbiter turn,
 4. emits a machine-readable result.
 
 ```bash
-agentao run --format json < task.yaml
-agentao run --spec task.yaml --format text
-agentao run --prompt "Summarize this directory" --format json
+arbiter run --format json < task.yaml
+arbiter run --spec task.yaml --format text
+arbiter run --prompt "Summarize this directory" --format json
 ```
 
-`agentao run` is the automation surface. The interactive REPL and `agentao -p`
+`arbiter run` is the automation surface. The interactive REPL and `arbiter -p`
 remain. After this work, `-p` is reimplemented as a thin shim over the same
 pipeline so they share one exit-code table.
 
@@ -28,7 +28,7 @@ pipeline so they share one exit-code table.
 
 ## Why This Exists
 
-`agentao -p` is intentionally simple. For automation it falls short:
+`arbiter -p` is intentionally simple. For automation it falls short:
 
 - runtime settings are split across flags, env vars, cwd, and CLI defaults;
 - stdin is treated as prompt text, not a structured task object;
@@ -36,10 +36,10 @@ pipeline so they share one exit-code table.
   token usage, or failure reason;
 - CI cannot reuse one task template with small per-run overrides.
 
-`agentao run` provides a stable contract for this case:
+`arbiter run` provides a stable contract for this case:
 
 ```text
-run spec + CLI overrides → one Agentao turn → structured result
+run spec + CLI overrides → one Arbiter turn → structured result
 ```
 
 ---
@@ -66,11 +66,11 @@ any existing transport or engine signature.
 
 ## Non-Goals
 
-- No general YAML/JSON stdin on every Agentao subcommand.
+- No general YAML/JSON stdin on every Arbiter subcommand.
 - No GJSON/JQ-style transform language.
 - No OpenAPI-style flag metadata.
 - No exposing internal replay/debug payloads as the run-result schema.
-- No interactive approvals from `agentao run`. Failures are explicit.
+- No interactive approvals from `arbiter run`. Failures are explicit.
 - No `approve_all` shortcut. Full bypass uses
   `permission_mode: full-access` — honest and audit-visible.
 - No parallel permission matcher. Spec-level rules reuse `PermissionEngine`.
@@ -81,7 +81,7 @@ any existing transport or engine signature.
   pass-throughs `Agent.add_event_observer` / `remove_event_observer`);
   see Design Decisions.
 - No replacement for ACP. ACP is the long-lived protocol surface;
-  `agentao run` is a one-shot local process surface.
+  `arbiter run` is a one-shot local process surface.
 
 ---
 
@@ -90,7 +90,7 @@ any existing transport or engine signature.
 ### Spec via stdin
 
 ```bash
-agentao run --format json < task.yaml
+arbiter run --format json < task.yaml
 ```
 
 ```yaml
@@ -106,7 +106,7 @@ replay: true
 ### Override spec values with flags
 
 ```bash
-agentao run \
+arbiter run \
   --model gpt-5.5 \
   --permission-mode workspace-write \
   --format json \
@@ -125,7 +125,7 @@ defaults must not erase fields from the spec.
 ### Spec from file
 
 ```bash
-agentao run --spec .agentao/tasks/review.yaml --format json
+arbiter run --spec .arbiter/tasks/review.yaml --format json
 ```
 
 If `--spec` and piped stdin are both provided, fail with a clear error
@@ -134,11 +134,11 @@ If `--spec` and piped stdin are both provided, fail with a clear error
 ### Inline prompt convenience
 
 ```bash
-agentao run --prompt "Summarize the current directory" --format json
+arbiter run --prompt "Summarize the current directory" --format json
 ```
 
 Useful when callers want structured output but no YAML file. Does not replace
-`agentao -p`; it just shares the result contract.
+`arbiter -p`; it just shares the result contract.
 
 ---
 
@@ -181,8 +181,8 @@ output:
   Forwarded via `**overrides` to `build_from_environment(...)`. Secrets
   (`api_key`) are **never** accepted in the spec — they stay in the
   environment or in a host-injected client.
-- `permission_mode`: existing Agentao modes
-  (`agentao/permissions.py:71-76`). Default matches the interactive CLI
+- `permission_mode`: existing Arbiter modes
+  (`arbiter/permissions.py:71-76`). Default matches the interactive CLI
   (`workspace-write`). CI examples should set `read-only` explicitly.
 - `interaction_policy`: M0 accepts only `reject`. ASK without an
   `permissions.allow` match → `permission_required` (exit `3`).
@@ -190,7 +190,7 @@ output:
   applied when the field is omitted. Future values reserved.
 - `permissions.allow` / `permissions.deny`: injected into the existing
   `PermissionEngine` for this run only. Same matcher and rule shape as
-  `~/.agentao/permissions.json` (see `agentao/permissions.py::_matches`).
+  `~/.arbiter/permissions.json` (see `arbiter/permissions.py::_matches`).
   See **Permissions** under Design Decisions for priority and provenance.
 - `max_iterations`: existing chat-loop cap. Defaults to `100`
   (`Agent.chat(max_iterations=100)`) when neither spec nor flag sets it.
@@ -231,7 +231,7 @@ do not count as user intent.
 ### `--format text`
 
 Final assistant text only on stdout. Diagnostics on stderr. This is the
-closest analog to `agentao -p`, sharing the new pipeline.
+closest analog to `arbiter -p`, sharing the new pipeline.
 
 ### `--format json`
 
@@ -247,7 +247,7 @@ Success:
   "cwd": "/abs/path/to/project",
   "model": "gpt-5.5",
   "final_text": "The tests fail because ...",
-  "replay_path": ".agentao/replays/session-id.jsonl",
+  "replay_path": ".arbiter/replays/session-id.jsonl",
   "usage": {
     "prompt_tokens": 12000,
     "completion_tokens": 900,
@@ -273,7 +273,7 @@ Failure:
     "tool_name": "run_shell_command",
     "tool_call_id": "call_01HX..."
   },
-  "replay_path": ".agentao/replays/session-id.jsonl",
+  "replay_path": ".arbiter/replays/session-id.jsonl",
   "warnings": []
 }
 ```
@@ -339,9 +339,9 @@ For exit `3`, `error.type` distinguishes:
 Structured JSON is emitted for all controlled runtime failures.
 Invalid-usage failures may write only stderr.
 
-`agentao -p` migrates onto this same table. Today `-p` returns `2` for
+`arbiter -p` migrates onto this same table. Today `-p` returns `2` for
 max-iterations (`cli/entrypoints.py:60`); after this change it returns `4`,
-matching `agentao run`. **Breaking change**, called out in release notes.
+matching `arbiter run`. **Breaking change**, called out in release notes.
 
 ---
 
@@ -367,7 +367,7 @@ interactive contexts. Returning `False` from `confirm_tool` marks the plan
 **M0 mechanism (no new exception types, no `Transport` signature change):**
 
 1. New `NonInteractiveTransport(SdkTransport)` lives in
-   `agentao/transport/non_interactive.py`. It records rejections and the
+   `arbiter/transport/non_interactive.py`. It records rejections and the
    max-iterations flag on instance attributes, and **cancels a
    `CancellationToken` the run pipeline owns and passes into
    `agent.chat(cancellation_token=...)`** (the pipeline must construct the
@@ -426,7 +426,7 @@ interactive contexts. Returning `False` from `confirm_tool` marks the plan
            return "[interaction_required]"
 
        def on_max_iterations(self, max_iterations, pending_tools):
-           # Reuse the same Transport hook agentao -p uses today
+           # Reuse the same Transport hook arbiter -p uses today
            # (cli/entrypoints.py:25-37). Recording the flag lets the
            # pipeline map to exit 4 without inventing a MaxIterationsError.
            self.max_iterations_hit = True
@@ -444,7 +444,7 @@ interactive contexts. Returning `False` from `confirm_tool` marks the plan
    not reach into a private attribute:
 
    ```python
-   # agentao/agent.py
+   # arbiter/agent.py
    def add_event_observer(self, callback):
        return self._host_events.add_observer(callback)
 
@@ -549,7 +549,7 @@ interactive contexts. Returning `False` from `confirm_tool` marks the plan
   `acp/transport.py`, `cli/app.py`).
 - No new `Transport.on_permission_decision` hook on the abstract base.
 - No new `MaxIterationsError` — the existing `on_max_iterations` Transport
-  hook is reused exactly as `agentao -p` already uses it.
+  hook is reused exactly as `arbiter -p` already uses it.
 - The chat loop's existing `CancellationToken` mechanism is reused — the
   same one SIGINT already uses.
 
@@ -641,7 +641,7 @@ catches `action:` in YAML).
 
 ### D3. Transport must be constructor-injected
 
-`Agentao.__init__` passes `self.transport` into `ToolRunner`, which stores it
+`Arbiter.__init__` passes `self.transport` into `ToolRunner`, which stores it
 on `ToolExecutor` and `ToolResultFormatter` (`agent.py:404`). A post-
 construct `agent.transport = NonInteractiveTransport(...)` would not reach
 those held references.
@@ -652,9 +652,9 @@ accepts `transport=` in `**overrides`, `embedding/factory.py:215-222`).
 After construction, the pipeline binds the cancel function:
 `transport.bind_cancel(token.cancel)`.
 
-### D4. `agentao -p` is a thin shim
+### D4. `arbiter -p` is a thin shim
 
-`agentao -p <text>` ≡ `agentao run --format text --prompt <text>`. The
+`arbiter -p <text>` ≡ `arbiter run --format text --prompt <text>`. The
 current `run_print_mode` body becomes a stub that calls into the same
 `cli.run.execute(...)` entry point. Exit-code unification follows
 automatically — no parallel max-iterations branch.
@@ -682,14 +682,14 @@ Two-phase rollout. Each phase is independently shippable and reviewable.
 
 ### Phase 1 — Models, parser, transport, engine extension
 
-- New module `agentao/cli/run_models.py`:
+- New module `arbiter/cli/run_models.py`:
   - `RunSpec`, `RunOutputOptions`, `RunPermissionRule`,
     `RunPermissionDomainRule`, `RunResult`.
   - `RunSpec` and rule models: `extra="forbid"`. `RunResult`:
     `extra="ignore"` (forward-compat).
   - `RunPermissionRule.to_engine_dict(action)` converts to engine dict
     shape; `action` injected here, never authored by users.
-- New module `agentao/transport/non_interactive.py`:
+- New module `arbiter/transport/non_interactive.py`:
   - `NonInteractiveTransport(SdkTransport)` per D1 (~30 LOC).
   - No changes to `Transport` base, no changes to existing transports, no
     new exception types.
@@ -710,7 +710,7 @@ Two-phase rollout. Each phase is independently shippable and reviewable.
 
 ### Phase 2 — CLI subcommand and pipeline
 
-- New module `agentao/cli/run.py`:
+- New module `arbiter/cli/run.py`:
   - argparse subparser: `--spec`, `--prompt`, `--format`, `--model`,
     `--base-url`, `--permission-mode`, `--interaction-policy`,
     `--max-iterations`, `--skill`, `--replay`.
@@ -770,7 +770,7 @@ Two-phase rollout. Each phase is independently shippable and reviewable.
         step 3; build `RunResult`, compute `usage` delta, serialize per
         `--format`, map exit code (`0` / `3` / `4` / `130`). Catch
         generic exceptions from `chat()` at the entrypoint as exit `1`.
-- Reimplement `agentao -p` as a shim per D4. Document the `2 → 4`
+- Reimplement `arbiter -p` as a shim per D4. Document the `2 → 4`
   max-iterations exit-code change in release notes.
 
 ---
@@ -802,7 +802,7 @@ Minimum coverage:
   (matches `"ask_user requires interaction in non-interactive mode"`).
 - Unknown `interaction_policy` value (e.g., `approve_all`) exits `2`.
 - Spec `permissions.deny` blocks a tool under `workspace-write` when
-  `~/.agentao/permissions.json` already contains an `allow:*` (regression
+  `~/.arbiter/permissions.json` already contains an `allow:*` (regression
   guard for `_run_scope_rules` ordering — without it the user `allow:*`
   would shadow the spec deny).
 - Spec `permissions.deny` blocks a tool under `full-access` (regression
@@ -853,7 +853,7 @@ Minimum coverage:
   returns false, no event is emitted, and the pipeline would silently
   miss the DENY).
 - `replay: false` in the spec runs with no replay output even when a
-  project `.agentao/replay.toml` enables replay (regression guard for
+  project `.arbiter/replay.toml` enables replay (regression guard for
   the explicit `replay_config=` injection in Phase 2 — without it the
   factory's disk auto-load would still attach a manager).
 - ASK `tool_call_id` correlation: a batch with two ASK plans for the
@@ -873,7 +873,7 @@ Minimum coverage:
   swallows it).
 - Missing requested skill fails before chat starts.
 - Replay-enabled result includes `replay_path`.
-- `agentao -p` returns `4` (not `2`) when max iterations are hit
+- `arbiter -p` returns `4` (not `2`) when max iterations are hit
   (regression guard for the exit-code unification).
 
 ---
@@ -905,7 +905,7 @@ Minimum coverage:
   original process cwd). The user's explicit `cwd` choice **is** the
   workspace boundary they're declaring for this run; `permission_mode`
   rules apply within it. This matches the interactive CLI, where the
-  user can already `cd` anywhere before launching `agentao`. The
+  user can already `cd` anywhere before launching `arbiter`. The
   resolved absolute path is included in `RunResult.cwd` for auditability.
 - **Transport:** `NonInteractiveTransport` constructor-injected (D3).
   No new sentinel exceptions, no `Transport.confirm_tool` signature change,

@@ -1,4 +1,4 @@
-# Refactor Agentao To Support Per-Session Working Directories
+# Refactor Arbiter To Support Per-Session Working Directories
 
 ## Problem
 
@@ -12,10 +12,10 @@ Current runtime code relies on `Path.cwd()` in several places. ACP sessions requ
 ## Implementation Checklist
 
 - [ ] Audit all runtime `Path.cwd()` usage
-- [ ] Add optional `working_directory` to `Agentao.__init__`
+- [ ] Add optional `working_directory` to `Arbiter.__init__`
 - [ ] Route system prompt cwd rendering through session context
 - [ ] Update file, shell, memory, and session persistence paths as needed
-- [ ] Define project-local `.agentao/` behavior under ACP sessions
+- [ ] Define project-local `.arbiter/` behavior under ACP sessions
 - [ ] Add tests for multiple sessions with different cwd values
 
 ## Acceptance Criteria

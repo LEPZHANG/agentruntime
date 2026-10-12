@@ -1,18 +1,18 @@
 # Adding New Components
 
-How to add a new **tool** or a new **skill** to the Agentao codebase.
+How to add a new **tool** or a new **skill** to the Arbiter codebase.
 
-This is about extending Agentao itself. If you are an embedding host injecting tools at
+This is about extending Arbiter itself. If you are an embedding host injecting tools at
 construction time instead, see [../design/host-tool-injection.md](../design/host-tool-injection.md).
 
 ## A tool
 
-1. Create `agentao/tools/<module>.py` and implement `Tool` (or `AsyncToolBase` for async).
-   Both live in `agentao/tools/base.py`; `RegistrableTool = Tool | AsyncToolBase`.
+1. Create `arbiter/tools/<module>.py` and implement `Tool` (or `AsyncToolBase` for async).
+   Both live in `arbiter/tools/base.py`; `RegistrableTool = Tool | AsyncToolBase`.
 2. Set `requires_confirmation=True` for anything dangerous: arbitrary shell, network
    requests, file writes, deletions. This is what routes the tool through
    `PermissionEngine` — see [tool-confirmation.md](tool-confirmation.md).
-3. Register in `agentao/tooling/registry.py::register_builtin_tools()`.
+3. Register in `arbiter/tooling/registry.py::register_builtin_tools()`.
 
 Note that `agent.py::_register_tools()` is a thin delegation — the real wiring lives in
 `register_builtin_tools()`, so registering in `agent.py` is the wrong place.

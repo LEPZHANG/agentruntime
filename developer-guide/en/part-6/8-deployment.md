@@ -28,7 +28,7 @@ WORKDIR /app
 COPY --from=builder --chown=agent:agent /app/.venv /app/.venv
 COPY --chown=agent:agent your_app/ ./your_app/
 COPY --chown=agent:agent skills/ ./skills/
-COPY --chown=agent:agent AGENTAO.md ./
+COPY --chown=agent:agent ARBITER.md ./
 
 RUN mkdir -p /data /tmp/agent && chown agent:agent /data /tmp/agent
 USER agent
@@ -40,7 +40,7 @@ ENV PYTHONPATH=/app \
     HOME=/tmp/agent
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-    CMD python -c "from agentao import Agentao; print('ok')" || exit 1
+    CMD python -c "from arbiter import Arbiter; print('ok')" || exit 1
 
 CMD ["python", "-m", "your_app.server"]
 ```
@@ -79,7 +79,7 @@ services:
     cpus: 1.0
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "from agentao import Agentao"]
+      test: ["CMD", "python", "-c", "from arbiter import Arbiter"]
       interval: 30s
       timeout: 5s
 ```
@@ -122,7 +122,7 @@ spec:
           mountPath: /tmp
         livenessProbe:
           exec:
-            command: ["python", "-c", "from agentao import Agentao"]
+            command: ["python", "-c", "from arbiter import Arbiter"]
           periodSeconds: 30
       volumes:
       - name: tmp
@@ -140,7 +140,7 @@ spec:
 
 ## What you can canary
 
-Agentao products have more canary dimensions than typical services:
+Arbiter products have more canary dimensions than typical services:
 
 | Dimension | How | Risk |
 |-----------|-----|------|
@@ -149,13 +149,13 @@ Agentao products have more canary dimensions than typical services:
 | **Skills** | Fork `skills/` per tenant | Low |
 | **Permission rules** | Gradual tightening | High — tightening can block valid tools |
 | **Sandbox profile** | Change `default_profile` in sandbox.json | High — misconfig stops the shell tool |
-| **AGENTAO.md** | Project-level change | Medium — affects instruction-following |
+| **ARBITER.md** | Project-level change | Medium — affects instruction-following |
 
-**Rhythm**: model and skills can canary **weekly**; rule / sandbox / AGENTAO.md changes need **full tests + canary + rollback plan**.
+**Rhythm**: model and skills can canary **weekly**; rule / sandbox / ARBITER.md changes need **full tests + canary + rollback plan**.
 
 ## Model switching
 
-Agentao supports runtime model swap ([2.3](/en/part-2/3-lifecycle)):
+Arbiter supports runtime model swap ([2.3](/en/part-2/3-lifecycle)):
 
 ```python
 # Some users on the new model
@@ -179,7 +179,7 @@ Agent changes often **show no user-visible issue but accumulate** (behavior drif
 | Model perf regression | Swap back old model id | < 1 min |
 | Skill bug | git revert + restart | < 10 min |
 
-**Practice**: keep key configs in git (`.agentao/*.json`, `skills/`, `AGENTAO.md`). Every change is a commit, instantly revertable.
+**Practice**: keep key configs in git (`.arbiter/*.json`, `skills/`, `ARBITER.md`). Every change is a commit, instantly revertable.
 
 ## Session migration (graceful pod shutdown)
 
@@ -204,7 +204,7 @@ Clients reopen sessions via `session/load` (ACP) or your SDK-side `add_message()
 | Stage | Tests |
 |-------|-------|
 | Build | Unit tests (tools, skill YAML format) |
-| Pre-package | System prompt length, AGENTAO.md no-secret scan |
+| Pre-package | System prompt length, ARBITER.md no-secret scan |
 | Pre-deploy | Red-team prompt injection ([6.5](./5-secrets-injection)) |
 | Staging | Full user journey smoke tests |
 | Production | Continuous canary session (hourly fixed prompt, diff output) |

@@ -1,0 +1,271 @@
+"""``build_from_environment()`` — the CLI-style auto-discovery factory.
+
+Pulls in everything ``Arbiter.__init__`` used to read implicitly:
+
+- ``.env`` via :func:`dotenv.load_dotenv`
+- ``LLM_PROVIDER`` and provider-prefixed env vars
+- ``working_directory or Path.cwd()`` resolved to absolute
+- ``~/.arbiter/permissions.json`` (project-scope file is intentionally
+  not loaded — see :class:`arbiter.permissions.PermissionEngine`)
+- ``<wd>/.arbiter/mcp.json`` + ``~/.arbiter/mcp.json`` (user wins on
+  name collision; project entries may only declare new server names)
+- memory roots (``<wd>/.arbiter`` + ``~/.arbiter``)
+
+Then constructs subsystems explicitly and forwards them to
+:class:`Arbiter`. This factory is the single entry point that
+touches the surrounding environment, so embedded hosts can construct
+:class:`Arbiter` directly with explicit injections instead.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import sqlite3
+import json
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+from .._env import safe_load_dotenv
+
+if TYPE_CHECKING:
+    from ..agent import Arbiter
+
+logger = logging.getLogger(__name__)
+
+
+def _load_settings(wd: Path) -> Dict[str, Any]:
+    path = wd / ".arbiter" / "settings.json"
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _builtin_agents_enabled(settings: Dict[str, Any]) -> bool:
+    agents = settings.get("agents")
+    if isinstance(agents, dict) and isinstance(agents.get("enable_builtin"), bool):
+        return agents["enable_builtin"]
+    if isinstance(settings.get("enable_builtin_agents"), bool):
+        return settings["enable_builtin_agents"]
+    return False
+
+
+def resolve_provider_name() -> str:
+    """The configured LLM provider id, normalized.
+
+    Reads ``LLM_PROVIDER`` (default ``OPENAI``) and applies the canonical
+    ``.strip().upper()`` casing used to build the ``{PROVIDER}_API_KEY`` /
+    ``{PROVIDER}_BASE_URL`` / ``{PROVIDER}_MODEL`` lookups. Peers and tests
+    that need the provider id should call this rather than re-implementing
+    the default literal + casing; :func:`discover_llm_kwargs` builds the
+    value extraction on top of it.
+    """
+    return os.getenv("LLM_PROVIDER", "OPENAI").strip().upper()
+
+
+def discover_llm_kwargs() -> Dict[str, Any]:
+    """Resolve the LLM kwargs from environment variables.
+
+    Reads ``LLM_PROVIDER`` (default ``OPENAI``) and the provider-prefixed
+    ``{PROVIDER}_API_KEY`` / ``{PROVIDER}_BASE_URL`` /
+    ``{PROVIDER}_MODEL``, plus the provider-agnostic ``LLM_TEMPERATURE``,
+    ``LLM_MAX_TOKENS`` and ``LLM_EXTRA_BODY``. Missing values are omitted
+    from the returned dict so the caller can ``setdefault`` / merge without
+    colliding with explicit ``None`` overrides.
+
+    ``LLM_EXTRA_BODY`` is a JSON **object** (forwarded as the SDK's
+    ``extra_body`` request option). Unlike ``LLM_TEMPERATURE`` /
+    ``LLM_MAX_TOKENS`` — which call ``float()`` / ``int()`` and **raise** on
+    malformed values — a malformed *or* valid-but-non-object
+    ``LLM_EXTRA_BODY`` is intentionally tolerated: it is warned and skipped
+    so the env-warning policy governs the env path rather than a confusing
+    downstream ``TypeError`` at construction. An empty / whitespace-only
+    value is treated as unset (skipped **silently**, no warning) — a common
+    "disable this var" idiom should not log on every startup.
+
+    Test code that wants to mirror the factory's contract (e.g. the
+    suite's autouse credential-stub fixture) should call this rather
+    than re-implementing the prefix scheme.
+    """
+    provider = resolve_provider_name()
+    out: Dict[str, Any] = {}
+    if (v := os.getenv(f"{provider}_API_KEY")) is not None:
+        out["api_key"] = v
+    if (v := os.getenv(f"{provider}_BASE_URL")) is not None:
+        out["base_url"] = v
+    if (v := os.getenv(f"{provider}_MODEL")) is not None:
+        out["model"] = v
+    if (v := os.getenv("LLM_TEMPERATURE")) is not None:
+        out["temperature"] = float(v)
+    if (v := os.getenv("LLM_MAX_TOKENS")) is not None:
+        out["max_tokens"] = int(v)
+    if (v := os.getenv("LLM_EXTRA_BODY")) is not None and v.strip():
+        try:
+            parsed = json.loads(v)
+        except (ValueError, TypeError):
+            logger.warning(
+                "LLM_EXTRA_BODY is not valid JSON; ignoring it."
+            )
+        else:
+            if isinstance(parsed, dict):
+                out["extra_body"] = parsed
+            else:
+                logger.warning(
+                    "LLM_EXTRA_BODY must be a JSON object (got %s); ignoring it.",
+                    type(parsed).__name__,
+                )
+    return out
+
+
+def build_from_environment(
+    working_directory: Optional[Path] = None,
+    **overrides: Any,
+) -> "Arbiter":
+    """Build an :class:`Arbiter` instance from the surrounding environment.
+
+    Args:
+        working_directory: Project root used for ``.arbiter/`` lookups.
+            When ``None``, falls back to ``Path.cwd()``. The result is
+            always resolved to an absolute path before forwarding to
+            ``Arbiter(working_directory=...)`` so the runtime is frozen
+            (no later cwd-implicit reads).
+        **overrides: Any keyword accepted by ``Arbiter.__init__`` —
+            takes priority over the values discovered from disk / env.
+            ``llm_client``, ``permission_engine``, ``memory_manager``,
+            ``skill_manager``, ``project_instructions``, ``mcp_manager``,
+            ``filesystem``, ``shell``, ``transport``, ``logger``,
+            ``temperature``, ``max_context_tokens``, ``plan_session``
+            are all valid here.
+
+    Returns:
+        A fully-constructed :class:`Arbiter` instance bound to
+        ``working_directory``.
+    """
+    # Local imports keep the embedding package light — pulling
+    # ``Arbiter`` (and through it the LLM stack) at module import time
+    # would defeat the point of having a thin entry surface.
+    from ..agent import Arbiter
+    from ..agents.bg_store import BackgroundTaskStore
+    from ..mcp import FileBackedMCPRegistry
+    from ..memory import MemoryManager, SQLiteMemoryStore
+    from ..paths import user_root
+    from ..permissions import PermissionEngine
+    from ..replay import ReplayManager, load_replay_config
+    from ..sandbox import SandboxPolicy
+    from .permission_loader import load_permission_rules
+
+    wd = (working_directory or Path.cwd()).expanduser().resolve()
+    settings = _load_settings(wd)
+
+    dotenv_path = wd / ".env"
+    if dotenv_path.is_file():
+        safe_load_dotenv(dotenv_path)
+    else:
+        safe_load_dotenv()
+
+    # Skip env-driven LLM discovery when the caller supplies a pre-built
+    # ``llm_client``: those env values are unused on that path, and a
+    # malformed ``LLM_TEMPERATURE`` / ``LLM_MAX_TOKENS`` would otherwise
+    # raise here even though the values are about to be discarded.
+    discovered_llm = (
+        discover_llm_kwargs() if "llm_client" not in overrides else {}
+    )
+
+    permission_engine = overrides.pop("permission_engine", None)
+    if permission_engine is None:
+        ur = user_root()
+        rules, loaded_sources = load_permission_rules(
+            project_root=wd, user_root=ur,
+        )
+        hardline_enabled = os.getenv("ARBITER_HARDLINE_ENABLED", "1") != "0"
+        permission_engine = PermissionEngine(
+            project_root=wd,
+            user_root=ur,
+            rules=rules,
+            loaded_sources=loaded_sources,
+            enable_hardline=hardline_enabled,
+        )
+
+    memory_manager = overrides.pop("memory_manager", None)
+    if memory_manager is None:
+        # Project store always succeeds — degrades to ``:memory:`` on disk
+        # error (matches the pre-#16 behavior in restricted environments
+        # like ACP subprocess launches). User store is optional and
+        # disabled with a warning if it cannot be opened, since user-scope
+        # memory is cross-project state and silently re-routing to project
+        # would conflate the scopes.
+        memory_path = os.getenv("ARBITER_MEMORY_DB_PATH")
+        if memory_path:
+            project_store = SQLiteMemoryStore.open_or_memory(Path(memory_path))
+        else:
+            project_store = SQLiteMemoryStore.open_or_memory(
+                wd / ".arbiter" / "memory.db"
+            )
+        user_store: Optional[SQLiteMemoryStore] = None
+        user = user_root()
+        if user is not None:
+            try:
+                user_store = SQLiteMemoryStore.open(user / "memory.db")
+            except (OSError, sqlite3.Error) as exc:
+                logger.warning(
+                    "User memory store at %s unavailable (%s: %s); "
+                    "user-scope memory disabled for this session.",
+                    user / "memory.db",
+                    type(exc).__name__,
+                    exc,
+                )
+        memory_manager = MemoryManager(
+            project_store=project_store,
+            user_store=user_store,
+        )
+
+    # Wire CLI defaults for the opt-in subsystems. Caller can disable
+    # any of them by passing an explicit ``None`` — the ``in overrides``
+    # check sees the key, skips the default, and forwards ``None``.
+    if "bg_store" not in overrides:
+        overrides["bg_store"] = BackgroundTaskStore(persistence_dir=wd)
+    if "sandbox_policy" not in overrides:
+        overrides["sandbox_policy"] = SandboxPolicy(project_root=wd)
+    # Replay state lives outside the agent core (per the May 2026 core-
+    # boundary review). Pop ``replay_config`` from overrides so it does
+    # not flow through the deprecated ctor kwarg path; the manager is
+    # attached post-construction below. Best-effort: a missing/malformed
+    # replay config must not abort session startup.
+    replay_config = overrides.pop("replay_config", None)
+    if replay_config is None:
+        try:
+            replay_config = load_replay_config(wd)
+        except Exception:
+            replay_config = None
+    if "enable_builtin_agents" not in overrides:
+        overrides["enable_builtin_agents"] = _builtin_agents_enabled(settings)
+    # Issue #17: default MCP registry reads the same on-disk files the
+    # pre-Protocol path consulted. Embedded hosts that want
+    # programmatic registration pass ``mcp_registry=`` (or
+    # ``mcp_registry=None`` to opt out of file discovery entirely).
+    if "mcp_registry" not in overrides and "mcp_manager" not in overrides:
+        overrides["mcp_registry"] = FileBackedMCPRegistry(
+            project_root=wd,
+            user_root=user_root(),
+        )
+
+    # When the caller supplied an ``llm_client``, do not surface the
+    # factory-discovered raw provider kwargs — the constructor would
+    # reject the combination as a programmer error.
+    kwargs: Dict[str, Any] = dict(
+        working_directory=wd,
+        permission_engine=permission_engine,
+        memory_manager=memory_manager,
+    )
+    if "llm_client" not in overrides:
+        kwargs.update(discovered_llm)
+    kwargs.update(overrides)
+
+    agent = Arbiter(**kwargs)
+    if replay_config is not None:
+        agent.replay_manager = ReplayManager(agent, config=replay_config)
+    return agent

@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.10"
 
 [[package]]
-name = "agentao"
+name = "arbiter"
 source = { editable = "../../" }
 dependencies = [
     { name = "filelock" },
@@ -66,11 +66,11 @@ dev = [
 ]
 
 [[package]]
-name = "agentao-example-pytest-fixture"
+name = "arbiter-example-pytest-fixture"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "agentao" },
+    { name = "arbiter" },
 ]
 
 [package.optional-dependencies]
@@ -80,7 +80,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentao", editable = "../../" },
+    { name = "arbiter", editable = "../../" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
 ]
 provides-extras = ["dev"]

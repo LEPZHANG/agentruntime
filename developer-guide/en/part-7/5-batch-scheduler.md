@@ -31,7 +31,7 @@ cron / k8s CronJob
        ▼
 Python entrypoint
        │
-       ├─ Agentao instance (fresh each run, closed cleanly)
+       ├─ Arbiter instance (fresh each run, closed cleanly)
        │    ├─ Skill: "daily-digest"
        │    ├─ Tools: web_fetch (read-only curated feeds), write_file
        │    └─ PermissionEngine: READ_ONLY + explicit write allowlist
@@ -50,9 +50,9 @@ Python entrypoint
 import os, sys, json, traceback
 from pathlib import Path
 from datetime import date
-from agentao import Agentao
-from agentao.transport import SdkTransport
-from agentao.transport.events import EventType
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
+from arbiter.transport.events import EventType
 
 def run():
     today = date.today().isoformat()
@@ -66,7 +66,7 @@ def run():
             tokens_used += len(ev.data.get("chunk", "")) // 4
 
     transport = SdkTransport(on_event=on_event)
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=workdir,
         transport=transport,
         max_context_tokens=64_000,
@@ -131,7 +131,7 @@ Write to `./digest.md`. Structure:
 ```
 # Daily Digest — YYYY-MM-DD
 
-## Agentao commits
+## Arbiter commits
 - SHA  short message
 
 ## Tech highlights
@@ -193,10 +193,10 @@ Or wire `digest.md` to a Slack webhook, S3 bucket, etc.
 
 ## Using `ACPManager.prompt_once()` (when the agent isn't Python)
 
-If the scheduled job lives in Node or Go, you can drive Agentao via ACP with a one-shot helper — build an `ACPClient` (see 7.2), send one `session/prompt`, collect the final message, tear down. For the Python-to-Python case where you're **invoking a different ACP agent** from your job, use `ACPManager.prompt_once()`:
+If the scheduled job lives in Node or Go, you can drive Arbiter via ACP with a one-shot helper — build an `ACPClient` (see 7.2), send one `session/prompt`, collect the final message, tear down. For the Python-to-Python case where you're **invoking a different ACP agent** from your job, use `ACPManager.prompt_once()`:
 
 ```python
-from agentao.acp_client import ACPManager
+from arbiter.acp_client import ACPManager
 
 result = ACPManager().prompt_once(
     name="external-reviewer",

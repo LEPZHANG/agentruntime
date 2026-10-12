@@ -6,7 +6,7 @@ was split into focused modules (modes, hardline, sensitive-write).
 
 import json
 
-from agentao.permissions import PermissionEngine
+from arbiter.permissions import PermissionEngine
 
 
 def make_engine(tmp_path, monkeypatch, project_rules=None, user_rules=None):
@@ -17,10 +17,10 @@ def make_engine(tmp_path, monkeypatch, project_rules=None, user_rules=None):
     is preserved here so collision/precedence tests can still assert
     that a stray project file does not leak into the rule set.
     """
-    user_root = tmp_path / "home" / ".agentao"
+    user_root = tmp_path / "home" / ".arbiter"
 
     if project_rules is not None:
-        cfg = tmp_path / ".agentao"
+        cfg = tmp_path / ".arbiter"
         cfg.mkdir(exist_ok=True)
         (cfg / "permissions.json").write_text(
             json.dumps({"rules": project_rules}), encoding="utf-8",

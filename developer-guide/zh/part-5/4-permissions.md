@@ -5,7 +5,7 @@
 > - 4 种预设模式（`READ_ONLY` / `WORKSPACE_WRITE` / `FULL_ACCESS` / `PLAN`）
 > - `web_fetch` 的域名规则语义（allowlist / blocklist、精确 vs 后缀匹配）
 
-**PermissionEngine 是 Agentao 的第一道防线**——它在工具真正执行前做规则判决，把"明显安全"和"明显危险"两类请求自动处理掉，只让边缘情况进入 `confirm_tool()`（[第 4.5 节](/zh/part-4/5-tool-confirmation-ui)）。
+**PermissionEngine 是 Arbiter 的第一道防线**——它在工具真正执行前做规则判决，把"明显安全"和"明显危险"两类请求自动处理掉，只让边缘情况进入 `confirm_tool()`（[第 4.5 节](/zh/part-4/5-tool-confirmation-ui)）。
 
 ## 两层防御模型
 
@@ -46,7 +46,7 @@ class PermissionDecision(Enum):
 **切换模式**：
 
 ```python
-from agentao.permissions import PermissionMode
+from arbiter.permissions import PermissionMode
 
 agent.permission_engine.set_mode(PermissionMode.READ_ONLY)
 ```
@@ -58,11 +58,11 @@ agent.permission_engine.set_mode(PermissionMode.READ_ONLY)
 **加载位置**：
 
 ```
-~/.agentao/permissions.json      ← 用户级（唯一基于文件的来源）
+~/.arbiter/permissions.json      ← 用户级（唯一基于文件的来源）
 ```
 
 ::: warning 项目级文件被忽略
-`<cwd>/.agentao/permissions.json` **不会**被加载——引擎会打 warning 并跳过。一条 checked-in 的 `{"tool": "*", "action": "allow"}` 会因引擎首个命中即返回而**当场作废整个用户策略**，所以项目级文件不能授予任何能力。权限是用户/host 的事，不是 cwd 的事 —— 与 OS 权限模型、IDE workspace-trust 同构。如果确需项目感知策略，请由 host 注入：见 [4.7.6 active_permissions](/zh/part-4/7-host-contract#4-7-6-agent-active-permissions-策略快照)。
+`<cwd>/.arbiter/permissions.json` **不会**被加载——引擎会打 warning 并跳过。一条 checked-in 的 `{"tool": "*", "action": "allow"}` 会因引擎首个命中即返回而**当场作废整个用户策略**，所以项目级文件不能授予任何能力。权限是用户/host 的事，不是 cwd 的事 —— 与 OS 权限模型、IDE workspace-trust 同构。如果确需项目感知策略，请由 host 注入：见 [4.7.6 active_permissions](/zh/part-4/7-host-contract#4-7-6-agent-active-permissions-策略快照)。
 :::
 
 **基本结构**：
@@ -156,7 +156,7 @@ agent.permission_engine.set_mode(PermissionMode.READ_ONLY)
 
 ## 预设规则速览
 
-WORKSPACE_WRITE 模式自带规则（源码 `agentao/permissions.py:68-118`）：
+WORKSPACE_WRITE 模式自带规则（源码 `arbiter/permissions.py:68-118`）：
 
 ```json
 [
@@ -184,8 +184,8 @@ WORKSPACE_WRITE 模式自带规则（源码 `agentao/permissions.py:68-118`）�
 把自定义 Engine 传给 Agent：
 
 ```python
-from agentao import Agentao
-from agentao.permissions import PermissionEngine, PermissionMode
+from arbiter import Arbiter
+from arbiter.permissions import PermissionEngine, PermissionMode
 
 engine = PermissionEngine(project_root=Path("/data/tenant-a"))
 engine.set_mode(PermissionMode.WORKSPACE_WRITE)
@@ -195,7 +195,7 @@ engine.rules.insert(0, {
     "action": "ask" if tenant.free_tier else "allow",
 })
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path("/data/tenant-a"),
     permission_engine=engine,
 )
@@ -210,7 +210,7 @@ snap = agent.active_permissions()
 # snap.mode            -> "workspace-write"
 # snap.rules           -> [...]                 # list[dict]，JSON-safe
 # snap.loaded_sources  -> ["preset:workspace-write",
-#                          "user:/Users/me/.agentao/permissions.json"]
+#                          "user:/Users/me/.arbiter/permissions.json"]
 ```
 
 `loaded_sources` 是稳定字符串标签：`preset:<mode>`、`user:<path>`、`injected:<name>`。（`project:<path>` 标签已不再发出 —— 见上方 warning。）MVP **不** 暴露逐规则 provenance —— 需要规则级 provenance 的宿主应将 `loaded_sources` 与自己注入的策略元数据组合。
@@ -288,7 +288,7 @@ CI 里你没人来点"允许"，所以应明确允许/拒绝，杜绝 "ask"：
 **验证规则是否生效**：
 
 ```python
-from agentao.permissions import PermissionDecision
+from arbiter.permissions import PermissionDecision
 
 # 手动测试几个关键场景
 for tool, args in [

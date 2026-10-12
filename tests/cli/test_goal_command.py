@@ -7,14 +7,14 @@ with a fake CLI/agent so no real LLM is needed.
 
 import pytest
 
-from agentao.cli.commands.goal import (
+from arbiter.cli.commands.goal import (
     _classify,
     _parse_goal_flags,
     _parse_turns,
     _resolve_budget,
 )
-from agentao.cli.duration import DurationParseError, parse_duration
-from agentao.cli.goal_state import GoalState, GoalStatus
+from arbiter.cli.duration import DurationParseError, parse_duration
+from arbiter.cli.goal_state import GoalState, GoalStatus
 
 
 # ── flag parsing ──────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ class _FakeCLI:
 
 
 def _run(goal, tmp_path, fake_turn):
-    from agentao.cli.input_loop import run_goal_continuation
+    from arbiter.cli.input_loop import run_goal_continuation
 
     cli = _FakeCLI(tmp_path)
     run_goal_continuation(cli, goal, _run_turn=fake_turn)
@@ -235,7 +235,7 @@ def test_loop_exception_pauses_not_strands(tmp_path):
     def fake_turn(m):
         raise RuntimeError("llm boom")
 
-    from agentao.cli.input_loop import run_goal_continuation
+    from arbiter.cli.input_loop import run_goal_continuation
 
     cli = _FakeCLI(tmp_path)
     with pytest.raises(RuntimeError):
@@ -271,7 +271,7 @@ class _DummyTool:
 def test_loop_restores_host_update_goal_tool(tmp_path):
     # A host that ships its own 'update_goal' tool must get it back, not have it
     # permanently deleted by the loop's replace+remove.
-    from agentao.cli.input_loop import run_goal_continuation
+    from arbiter.cli.input_loop import run_goal_continuation
 
     cli = _FakeCLI(tmp_path)
     cli.agent = _AgentWithRegistry(tmp_path)
@@ -285,7 +285,7 @@ def test_loop_restores_host_update_goal_tool(tmp_path):
 
 
 def test_staged_images_payload_does_not_clear():
-    from agentao.cli.input_loop import _staged_images_payload
+    from arbiter.cli.input_loop import _staged_images_payload
 
     cli = type("C", (), {"_staged_images": [{"data": "d", "mimeType": "image/png"}]})()
     payload = _staged_images_payload(cli)
@@ -294,7 +294,7 @@ def test_staged_images_payload_does_not_clear():
 
 
 def test_first_goal_turn_consumes_images_on_success(tmp_path, monkeypatch):
-    import agentao.cli.input_loop as il
+    import arbiter.cli.input_loop as il
 
     seen = []
     monkeypatch.setattr(il, "_run_agent_turn",
@@ -309,7 +309,7 @@ def test_first_goal_turn_consumes_images_on_success(tmp_path, monkeypatch):
 
 
 def test_first_goal_turn_keeps_images_on_failure(tmp_path, monkeypatch):
-    import agentao.cli.input_loop as il
+    import arbiter.cli.input_loop as il
 
     def boom(cli, msg, images=None):
         raise RuntimeError("transient")
@@ -329,7 +329,7 @@ def test_first_goal_turn_keeps_images_on_failure(tmp_path, monkeypatch):
 def test_first_goal_turn_keeps_images_on_interrupt(tmp_path, monkeypatch):
     # chat() returns the interrupt sentinel rather than raising; an interrupted
     # first turn must NOT clear staged images (resume must be able to resend).
-    import agentao.cli.input_loop as il
+    import arbiter.cli.input_loop as il
 
     monkeypatch.setattr(il, "_run_agent_turn",
                         lambda cli, msg, images=None: "[Interrupted by user]")
@@ -344,7 +344,7 @@ def test_first_goal_turn_keeps_images_on_interrupt(tmp_path, monkeypatch):
 
 
 def test_loop_no_prior_tool_is_removed(tmp_path):
-    from agentao.cli.input_loop import run_goal_continuation
+    from arbiter.cli.input_loop import run_goal_continuation
 
     cli = _FakeCLI(tmp_path)
     cli.agent = _AgentWithRegistry(tmp_path)  # registry starts empty
@@ -378,7 +378,7 @@ class _ResumeFakeCLI:
     ],
 )
 def test_resume_accepts_active_paused_blocked(tmp_path, monkeypatch, make_status, should_launch):
-    import agentao.cli.commands.goal as gmod
+    import arbiter.cli.commands.goal as gmod
 
     launched = []
     monkeypatch.setattr(gmod, "_run_continuation", lambda cli, goal: launched.append(goal))

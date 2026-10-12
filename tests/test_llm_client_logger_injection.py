@@ -1,11 +1,11 @@
 """Tests for ``LLMClient`` logger ownership inversion (Issue #8).
 
 Embedded hosts that bring their own logging stack must be able to
-construct an :class:`LLMClient` without having the ``agentao`` package
+construct an :class:`LLMClient` without having the ``arbiter`` package
 root logger mutated underneath them. The contract:
 
 - ``LLMClient(logger=injected)`` → ``self.logger`` is the injected one;
-  ``logging.getLogger("agentao")`` level and handler list are untouched.
+  ``logging.getLogger("arbiter")`` level and handler list are untouched.
 - ``LLMClient(log_file=None)`` → no file handler is attached, regardless
   of logger injection.
 - ``LLMClient()`` (default) → existing CLI behavior is preserved:
@@ -22,7 +22,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from agentao.llm.client import LLMClient
+from arbiter.llm.client import LLMClient
 
 
 # ---------------------------------------------------------------------------
@@ -32,12 +32,12 @@ from agentao.llm.client import LLMClient
 
 @pytest.fixture(autouse=True)
 def _reset_pkg_logger():
-    """Snapshot and restore the ``agentao`` package logger between tests.
+    """Snapshot and restore the ``arbiter`` package logger between tests.
 
     Without this, a test that mutates the package root would leak state
     into subsequent tests in the same process.
     """
-    pkg = logging.getLogger("agentao")
+    pkg = logging.getLogger("arbiter")
     saved_level = pkg.level
     saved_handlers = list(pkg.handlers)
     pkg.handlers = []
@@ -53,7 +53,7 @@ def _reset_pkg_logger():
 
 
 def _marker_handlers(pkg: logging.Logger) -> Iterable[logging.Handler]:
-    return [h for h in pkg.handlers if getattr(h, "_agentao_llm_file_handler", False)]
+    return [h for h in pkg.handlers if getattr(h, "_arbiter_llm_file_handler", False)]
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ def test_default_construction_takes_ownership_of_package_root(
         api_key="test-key",
         base_url="https://api.example.com/v1",
         model="gpt-test",
-        log_file=str(tmp_path / "agentao.log"),
+        log_file=str(tmp_path / "arbiter.log"),
     )
 
     # Existing CLI invariant: package-root level is DEBUG and exactly

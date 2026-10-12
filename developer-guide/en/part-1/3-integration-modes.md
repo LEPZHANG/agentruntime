@@ -5,7 +5,7 @@
 > - A decision tree to pick one in 30 seconds
 > - When (and how) to compose both in one process
 
-Agentao offers **two stable embedding paths**. Pick based on your host language, isolation needs, and distribution model.
+Arbiter offers **two stable embedding paths**. Pick based on your host language, isolation needs, and distribution model.
 
 ## Mode A · Python In-Process SDK
 
@@ -19,12 +19,12 @@ Agentao offers **two stable embedding paths**. Pick based on your host language,
 │          │                          │
 │          ▼                          │
 │   ┌─────────────┐                   │
-│   │  Agentao()  │   Same proc, heap │
+│   │  Arbiter()  │   Same proc, heap │
 │   └─────────────┘                   │
 └─────────────────────────────────────┘
 ```
 
-**How it works**: `from agentao import Agentao` gives you the runtime; you drive it via method calls.
+**How it works**: `from arbiter import Arbiter` gives you the runtime; you drive it via method calls.
 
 **Strengths**
 - ✅ Zero protocol overhead — it's just function calls
@@ -34,19 +34,19 @@ Agentao offers **two stable embedding paths**. Pick based on your host language,
 **Trade-offs**
 - ⚠️ Shares memory, crashes, and dependencies with your process
 - ⚠️ Python-only
-- ⚠️ Dep-lock: you must be compatible with Agentao's `openai` / `mcp` / `httpx` versions
+- ⚠️ Dep-lock: you must be compatible with Arbiter's `openai` / `mcp` / `httpx` versions
 
 ## Mode B · ACP Protocol (Cross-Language / Cross-Process)
 
 ```
 ┌─────────────────────────┐       stdio NDJSON         ┌────────────────────────┐
-│  Your host (any lang)   │   JSON-RPC 2.0, full-duplex│  Agentao subprocess    │
-│                         │◄──────────────────────────►│  agentao --acp --stdio │
+│  Your host (any lang)   │   JSON-RPC 2.0, full-duplex│  Arbiter subprocess    │
+│                         │◄──────────────────────────►│  arbiter --acp --stdio │
 │  Node / Go / Rust / …   │                           │                        │
 └─────────────────────────┘                           └────────────────────────┘
 ```
 
-**How it works**: Agentao runs as a subprocess and speaks NDJSON (one JSON per line) JSON-RPC 2.0 over stdio. The host sends `initialize` / `session/new` / `session/prompt` and receives `session/update` / `session/request_permission` notifications.
+**How it works**: Arbiter runs as a subprocess and speaks NDJSON (one JSON per line) JSON-RPC 2.0 over stdio. The host sends `initialize` / `session/new` / `session/prompt` and receives `session/update` / `session/request_permission` notifications.
 
 **Strengths**
 - ✅ Language-agnostic: Node / Go / Rust / Java / anything that can spawn a subprocess
@@ -90,7 +90,7 @@ Is your host written in Python?
 
 The two modes **compose**. A common pattern:
 
-- Your Python backend embeds Agentao via SDK for the main flow
+- Your Python backend embeds Arbiter via SDK for the main flow
 - Inside that flow, you use `ACPManager` to call **another** ACP server (e.g. a dedicated code reviewer) as a subprocess
 
 This way long-lived state stays in the SDK side while one-off heavy work is delegated to isolated ACP subprocesses.
@@ -119,7 +119,7 @@ The contract (public entry points, typed `get_status()`, single-active-turn conc
 ## How the rest of the guide is organized
 
 - **Part 2** — Python SDK deep-dive
-- **Part 3** — ACP (both Agentao-as-server and Agentao-as-client)
+- **Part 3** — ACP (both Arbiter-as-server and Arbiter-as-client)
 - **Parts 4 – 8** — Cross-cutting content for both modes
 
 ## TL;DR
@@ -129,4 +129,4 @@ The contract (public entry points, typed `get_status()`, single-active-turn conc
 - **Both can compose** — your Python backend uses SDK for the main flow and `ACPManager` to call other ACP servers.
 - **Headless runtime is not a third mode** — it's `ACPManager` driving an ACP server with no human in the loop.
 
-Next: [1.4 Hello Agentao in 5 min →](./4-hello-agentao)
+Next: [1.4 Hello Arbiter in 5 min →](./4-hello-arbiter)

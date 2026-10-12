@@ -1,6 +1,6 @@
 # ACP Embedding Guide
 
-`agentao.acp_client` exposes a small, stable surface so workflow runtimes
+`arbiter.acp_client` exposes a small, stable surface so workflow runtimes
 (e.g. kanban) can drive project-local ACP servers from a daemon without
 scraping the CLI. This doc covers the supported API, usage patterns, and
 error handling. For the internal design, see
@@ -9,10 +9,10 @@ and [`implementation/ACP_EMBEDDING_IMPLEMENTATION_PLAN.md`](../history/implement
 
 ## Supported Imports
 
-The only semver-stable import root is `agentao.acp_client`:
+The only semver-stable import root is `arbiter.acp_client`:
 
 ```python
-from agentao.acp_client import (
+from arbiter.acp_client import (
     ACPManager,
     AcpClientConfig, AcpServerConfig,
     AcpConfigError, AcpClientError, AcpRpcError, AcpErrorCode,
@@ -26,7 +26,7 @@ from agentao.acp_client import (
 Anything else — `ACPClient`, `ACPProcessHandle`, `Inbox`,
 `InteractionRegistry`, `AcpConnectionInfo`, router / render helpers — is
 an internal implementation detail. Import it from its concrete submodule
-(`agentao.acp_client.client`, `.process`, `.interaction`, `.inbox`, etc.)
+(`arbiter.acp_client.client`, `.process`, `.interaction`, `.inbox`, etc.)
 and accept that it can change between releases.
 
 ## Concurrency Contract
@@ -59,7 +59,7 @@ rejected request is latched and re-raised as
 Right for per-task daemon execution with deterministic cleanup:
 
 ```python
-from agentao.acp_client import ACPManager, AcpClientError, AcpErrorCode
+from arbiter.acp_client import ACPManager, AcpClientError, AcpErrorCode
 
 mgr = ACPManager.from_project("/path/to/project")
 try:
@@ -121,7 +121,7 @@ Every client-originated failure sets a structured `AcpErrorCode`:
 
 | Code | Meaning |
 | --- | --- |
-| `CONFIG_INVALID` | `.agentao/acp.json` failed validation |
+| `CONFIG_INVALID` | `.arbiter/acp.json` failed validation |
 | `SERVER_NOT_FOUND` | Unknown server name |
 | `PROCESS_START_FAIL` | Subprocess failed to start |
 | `HANDSHAKE_FAIL` | `initialize` or `session/new` failed. Auto-reclassified on **non-RPC** `AcpClientError` (original code preserved in `details["underlying_code"]`); `AcpRpcError` raised during handshake keeps its wire `code: int` and surfaces the handshake context via `details["phase"] == "handshake"`. See [Appendix D §D.7](/en/appendix/d-error-codes#d-7-detecting-handshake-phase-failures-canonical-pattern). |
@@ -134,7 +134,7 @@ Every client-originated failure sets a structured `AcpErrorCode`:
 Branch on `exc.code`, not on message strings:
 
 ```python
-from agentao.acp_client import AcpClientError, AcpErrorCode
+from arbiter.acp_client import AcpClientError, AcpErrorCode
 
 try:
     mgr.prompt_once("worker", prompt)
@@ -190,19 +190,19 @@ via `exc.details["method"]` for diagnostics only — do not branch on it.
 | `cancel_turn` during non-interactive turn | Latched interaction error suppressed; prompt RPC runs to completion and returns normally |
 | `prompt_once` with existing long-lived client | Reuses the client; `stop_process=True` does not stop the subprocess |
 
-## Migration From Earlier Agentao
+## Migration From Earlier Arbiter
 
 If your workflow code imported any of the following from
-`agentao.acp_client`, move the import to the concrete submodule:
+`arbiter.acp_client`, move the import to the concrete submodule:
 
 | Before | After |
 | --- | --- |
-| `from agentao.acp_client import ACPClient` | `from agentao.acp_client.client import ACPClient` |
-| `from agentao.acp_client import ACPProcessHandle` | `from agentao.acp_client.process import ACPProcessHandle` |
-| `from agentao.acp_client import AcpConnectionInfo` | `from agentao.acp_client.client import AcpConnectionInfo` |
-| `from agentao.acp_client import Inbox, InboxMessage, MessageKind` | `from agentao.acp_client.inbox import ...` |
-| `from agentao.acp_client import InteractionKind, InteractionRegistry, PendingInteraction` | `from agentao.acp_client.interaction import ...` |
-| `from agentao.acp_client import AcpExplicitRoute, detect_explicit_route` | `from agentao.acp_client.router import ...` |
+| `from arbiter.acp_client import ACPClient` | `from arbiter.acp_client.client import ACPClient` |
+| `from arbiter.acp_client import ACPProcessHandle` | `from arbiter.acp_client.process import ACPProcessHandle` |
+| `from arbiter.acp_client import AcpConnectionInfo` | `from arbiter.acp_client.client import AcpConnectionInfo` |
+| `from arbiter.acp_client import Inbox, InboxMessage, MessageKind` | `from arbiter.acp_client.inbox import ...` |
+| `from arbiter.acp_client import InteractionKind, InteractionRegistry, PendingInteraction` | `from arbiter.acp_client.interaction import ...` |
+| `from arbiter.acp_client import AcpExplicitRoute, detect_explicit_route` | `from arbiter.acp_client.router import ...` |
 
 These submodule imports are **supported for internal/CLI code** but are
 not part of the embedding contract. Treat them as best-effort.

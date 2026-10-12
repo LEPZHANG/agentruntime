@@ -13,7 +13,7 @@
 ```python
 from abc import ABC, abstractmethod
 from typing import Dict, Any
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 
 class MyTool(Tool):
     @property
@@ -82,7 +82,7 @@ def execute(self, **kwargs) -> str:
 
 ## 工具调用规范化
 
-在工具调用写回对话历史或真正执行之前，Agentao 会规范化模型产出的 function-call payload：
+在工具调用写回对话历史或真正执行之前，Arbiter 会规范化模型产出的 function-call payload：
 
 - 参数字符串在能安全修复时会被解析并重新输出为紧凑 JSON
 - 近似但不完全匹配的工具名可修复为已注册工具名
@@ -136,18 +136,18 @@ class MyFileTool(Tool):
         return p.read_text()
 ```
 
-`self.working_directory` 是 Agentao 在注册时自动绑定的——**多实例场景下**每个 Agent 的工具各自指向不同目录，不会串线。用这两个助手而不是直接 `Path(raw)` 能免费获得多租户隔离。
+`self.working_directory` 是 Arbiter 在注册时自动绑定的——**多实例场景下**每个 Agent 的工具各自指向不同目录，不会串线。用这两个助手而不是直接 `Path(raw)` 能免费获得多租户隔离。
 
 ## 注册工具
 
-契约化的注入方式是构造期 `Agentao(extra_tools=[...])` 或运行期 `agent.add_tool(...)`。两者都会替你绑定 `working_directory` / `filesystem` / `shell`，并校验保留名。
+契约化的注入方式是构造期 `Arbiter(extra_tools=[...])` 或运行期 `agent.add_tool(...)`。两者都会替你绑定 `working_directory` / `filesystem` / `shell`，并校验保留名。
 
 ```python
 from pathlib import Path
-from agentao import Agentao
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path("/tmp/session-x"),
     transport=SdkTransport(),
     extra_tools=[MyTool()],          # 第一次 chat() 起可见
@@ -179,7 +179,7 @@ agent.tools.register(my_tool)
 |---|---|
 | 增加自定义工具，或替换内置工具实现 | `extra_tools=` / `add_tool(..., replace=True)` |
 | 隐藏少数不适用的内置工具 | `disable_tools={...}` |
-| 只保留一小组 agentao 自有工具 | `enabled_tools={...}` |
+| 只保留一小组 arbiter 自有工具 | `enabled_tools={...}` |
 | 收缩到仅剩自有工具 + MCP | `enabled_tools=set()` 加 `extra_tools=[...]` |
 | 会话中途改动工具面 | 两轮之间用 `add_tool()` / `remove_tool()` |
 
@@ -195,7 +195,7 @@ agent.tools.register(my_tool)
 """你的 SaaS 后端把订单查询暴露给 Agent。"""
 import json
 from typing import Dict, Any
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 
 class GetCustomerOrdersTool(Tool):
     def __init__(self, backend_client, tenant_id: str):
@@ -260,7 +260,7 @@ class GetCustomerOrdersTool(Tool):
 
 # --- 在 Web 处理里的使用 ---
 def make_agent_for_tenant(tenant, backend):
-    return Agentao(
+    return Arbiter(
         working_directory=Path(f"/tmp/{tenant.id}"),
         transport=SdkTransport(...),
         extra_tools=[

@@ -117,7 +117,7 @@ class ClaudeHooksParser:
 
 
 class ToolAliasResolver:
-    def to_claude_name(self, agentao_tool_name: str) -> str: ...
+    def to_claude_name(self, arbiter_tool_name: str) -> str: ...
 
 
 class ClaudeHookPayloadAdapter:

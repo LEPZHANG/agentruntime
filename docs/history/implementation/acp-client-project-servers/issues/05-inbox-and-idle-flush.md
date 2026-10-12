@@ -19,12 +19,12 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Deliverables
 
-- `agentao/acp_client/inbox.py`
-- `agentao/acp_client/render.py`
+- `arbiter/acp_client/inbox.py`
+- `arbiter/acp_client/render.py`
 - CLI flush 集成：
-  - `agentao/cli/app.py`
-  - `agentao/cli/commands.py`
-  - `agentao/cli/commands_ext.py`
+  - `arbiter/cli/app.py`
+  - `arbiter/cli/commands.py`
+  - `arbiter/cli/commands_ext.py`
 - 相关测试
 
 ## Dependencies
@@ -44,9 +44,9 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 - flush 只发生在安全空闲点：
   - 显示输入提示前
   - slash command 执行完成后
-  - Agentao 当前回复完成后
+  - Arbiter 当前回复完成后
 - 不在用户输入过程中抢占式打印
-- v1 不把消息注入 Agentao 对话上下文
+- v1 不把消息注入 Arbiter 对话上下文
 - 来自 ACP server 的 permission request / input request 也通过 inbox 可见化，但不直接弹同步菜单
 - 由于 CLI 已模块化，idle flush 不应假设单一 CLI 文件存在，而应挂在当前输入循环和命令 dispatch 的实际入口上
 

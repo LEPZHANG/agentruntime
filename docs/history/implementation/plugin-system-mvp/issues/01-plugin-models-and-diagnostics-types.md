@@ -21,7 +21,7 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Deliverables
 
-- `agentao/plugins/models.py`
+- `arbiter/plugins/models.py`
 - 基础 dataclass 或等价类型定义
 - 最小类型单测
 

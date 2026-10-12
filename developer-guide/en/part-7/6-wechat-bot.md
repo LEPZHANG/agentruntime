@@ -1,13 +1,13 @@
 # 7.6 Blueprint F · WeChat Intelligent Bot (ilink-style)
 
 ::: tip ⚡ Runnable end-to-end
-**Outcome** — a long-polling daemon that runs one Agentao turn per inbound WeChat message (DM or group) and posts the reply back to the same contact. The contact id selects a permission preset (allowlist → workspace-write; everyone else → read-only).
-**Stack** — Python · `asyncio` long-poll · bring-your-own ilink / wechaty / itchat client behind a `WeChatClient` Protocol · fresh `Agentao` per message · `llm_client_factory` test seam.
+**Outcome** — a long-polling daemon that runs one Arbiter turn per inbound WeChat message (DM or group) and posts the reply back to the same contact. The contact id selects a permission preset (allowlist → workspace-write; everyone else → read-only).
+**Stack** — Python · `asyncio` long-poll · bring-your-own ilink / wechaty / itchat client behind a `WeChatClient` Protocol · fresh `Arbiter` per message · `llm_client_factory` test seam.
 **Source** — [`examples/wechat-bot/`](https://github.com/jin-bo/agentao/tree/main/examples/wechat-bot)
 **Run** — `uv sync`, then feed the daemon any client speaking the ilink-style protocol.
 :::
 
-**Scenario**: you already have a personal WeChat account (a phone, or a server running an ilink / wechaty / itchat bridge) and you want to add "natural-language conversation + tool execution" to it. **This is *not* the Official Account / Enterprise WeChat platform** — that path uses an official webhook (signature verification, 5-second ACK, 48-hour customer-service window) and is not what this blueprint covers. We're building a personal-account bot that long-polls a local/remote bot HTTP API, modeled after [`Wechat-ggGitHub/wechat-claude-code`](https://github.com/Wechat-ggGitHub/wechat-claude-code) (same shape, TypeScript with the Claude Code SDK; this is the Python + Agentao version).
+**Scenario**: you already have a personal WeChat account (a phone, or a server running an ilink / wechaty / itchat bridge) and you want to add "natural-language conversation + tool execution" to it. **This is *not* the Official Account / Enterprise WeChat platform** — that path uses an official webhook (signature verification, 5-second ACK, 48-hour customer-service window) and is not what this blueprint covers. We're building a personal-account bot that long-polls a local/remote bot HTTP API, modeled after [`Wechat-ggGitHub/wechat-claude-code`](https://github.com/Wechat-ggGitHub/wechat-claude-code) (same shape, TypeScript with the Claude Code SDK; this is the Python + Arbiter version).
 
 ## Who & why
 
@@ -48,11 +48,11 @@ Python daemon (single asyncio process)
        │          await handle_message(...)
        │
        └─ handle_message(text, contact_id, send)
-            ├─ tempdir = mkdtemp("agentao-wechat-")
+            ├─ tempdir = mkdtemp("arbiter-wechat-")
             ├─ engine = make_permission_engine_for_contact(contact_id)
             │     allowlist hit → WORKSPACE_WRITE
             │     otherwise    → READ_ONLY
-            ├─ agent = Agentao(working_directory=tempdir,
+            ├─ agent = Arbiter(working_directory=tempdir,
             │                  llm_client=llm_client_factory(),
             │                  permission_engine=engine)
             ├─ reply = await agent.arun(text)
@@ -111,8 +111,8 @@ async def handle_message(
     send: Callable[..., Awaitable[Any]],
     llm_client_factory: Callable[[], LLMClient] = make_llm_client,
 ) -> str:
-    work_dir = Path(tempfile.mkdtemp(prefix="agentao-wechat-"))
-    agent = Agentao(
+    work_dir = Path(tempfile.mkdtemp(prefix="arbiter-wechat-"))
+    agent = Arbiter(
         working_directory=work_dir,
         llm_client=llm_client_factory(),
         permission_engine=make_permission_engine_for_contact(
@@ -190,7 +190,7 @@ async def test_run_polling_loop_processes_one_batch_then_exits() -> None:
         ],
         stop=stop,
     )
-    with patch("agentao.agent.Agentao._llm_call",
+    with patch("arbiter.agent.Arbiter._llm_call",
                lambda self, msgs, tools, token: _fake_response("ok")):
         await run_polling_loop(client, stop_event=stop, llm_client_factory=_fake_llm)
     assert client.sent == [
@@ -205,9 +205,9 @@ uv sync --extra dev
 uv run pytest tests/ -v   # no WeChat, no API key, no network
 ```
 
-## Want streaming previews? Wire `Agentao.events()`
+## Want streaming previews? Wire `Arbiter.events()`
 
-The reference repo (`wechat-claude-code`) streams partial LLM output back to the chat as a "typing…" preview. To do that on Agentao, replace the `agent.arun(text)` shot with a subscription to `agent.events()` and forward `LLM_TEXT` increments to `client.send_message` on a "every N chars / every M ms" cadence (see [§4 Event Streams](/en/part-4/)). Most ilink-style clients enforce a per-message rate limit and will throttle aggressive streaming — **1.5 seconds per chunk is a safe default**.
+The reference repo (`wechat-claude-code`) streams partial LLM output back to the chat as a "typing…" preview. To do that on Arbiter, replace the `agent.arun(text)` shot with a subscription to `agent.events()` and forward `LLM_TEXT` increments to `client.send_message` on a "every N chars / every M ms" cadence (see [§4 Event Streams](/en/part-4/)). Most ilink-style clients enforce a per-message rate limit and will throttle aggressive streaming — **1.5 seconds per chunk is a safe default**.
 
 ## ⚠️ Pitfalls
 
@@ -234,7 +234,7 @@ The example **builds a fresh agent per message** — simple and easy to reclaim.
 - multi-turn memory across messages
 - a shared working directory (so the agent can edit a file in the third message that it created in the first)
 
-… cache `_agents: dict[str, Agentao]` keyed by `contact_id`, **pair it with an `asyncio.Lock` per key** to serialize, and add LRU + idle timeout (e.g. close the agent and delete its working directory after 30 min of silence). This is the most common evolution from "per-message isolation" to "per-contact session" — but the **multi-tenant security calculus** changes too; see [§6.4 Multi-Tenant & FS](/en/part-6/4-multi-tenant-fs).
+… cache `_agents: dict[str, Arbiter]` keyed by `contact_id`, **pair it with an `asyncio.Lock` per key** to serialize, and add LRU + idle timeout (e.g. close the agent and delete its working directory after 30 min of silence). This is the most common evolution from "per-message isolation" to "per-contact session" — but the **multi-tenant security calculus** changes too; see [§6.4 Multi-Tenant & FS](/en/part-6/4-multi-tenant-fs).
 
 ## Runnable code
 
@@ -266,7 +266,7 @@ You now have:
 - Security + production deployment ([Part 6](/en/part-6/))
 - Six in-repo blueprints + one external case study (this part)
 
-[§7.7 Multi-Agent Kanban Scheduling](./7-kanban-multiagent) is a bonus blueprint pointing at the derivative project [`agentao-kanban`](https://github.com/jin-bo/agentao-kanban) — read it if you're building anything queue-shaped (CI, batch eval, autonomous research).
+[§7.7 Multi-Agent Kanban Scheduling](./7-kanban-multiagent) is a bonus blueprint pointing at the derivative project [`arbiter-kanban`](https://github.com/jin-bo/agentao-kanban) — read it if you're building anything queue-shaped (CI, batch eval, autonomous research).
 
 The appendices — full API reference, config key index, ACP message fields, error codes, migration notes, FAQ, glossary — are what you'll reach for as you build.
 

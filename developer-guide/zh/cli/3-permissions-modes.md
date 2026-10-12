@@ -4,7 +4,7 @@ CLI 在安全上做的最重要一件事就是**危险的工具调用前先问�
 
 ## 四种模式
 
-Agentao 共有四种权限模式。三种用户可切；第四种 (`plan`) 由 `/plan` 设置，详见 [4. Plan 模式](./4-plan-mode)。
+Arbiter 共有四种权限模式。三种用户可切；第四种 (`plan`) 由 `/plan` 设置，详见 [4. Plan 模式](./4-plan-mode)。
 
 | 模式 | 写 & shell | 网络 | 确认 UI |
 |---|---|---|---|
@@ -28,7 +28,7 @@ Permission mode: workspace-write
 ✓ Permission mode: full-access  (all tools allowed without prompting)
 ```
 
-切换会写入 `.agentao/settings.json` 的 `mode` 字段；下一次从同一项目启动会沿用这个模式。权限规则本身只从用户级 `~/.agentao/permissions.json` 读取 — 见 [10. 配置文件参考](./10-config-reference)。
+切换会写入 `.arbiter/settings.json` 的 `mode` 字段；下一次从同一项目启动会沿用这个模式。权限规则本身只从用户级 `~/.arbiter/permissions.json` 读取 — 见 [10. 配置文件参考](./10-config-reference)。
 
 ::: warning 与 plan 模式的互斥
 plan 模式激活时不能 `/mode` — 先 `/plan implement` 或 `/plan clear` 退出 plan，再切。`/mode` 会拒绝并提示。
@@ -67,7 +67,7 @@ plan 模式激活时不能 `/mode` — 先 `/plan implement` 或 `/plan clear` �
 
 不问直接拒：
 
-- `web_fetch` 命中 blocklist 域名（SSRF 防护） — 不能通过弹框临时放行；要放就改 `~/.agentao/permissions.json`
+- `web_fetch` 命中 blocklist 域名（SSRF 防护） — 不能通过弹框临时放行；要放就改 `~/.arbiter/permissions.json`
 
 什么时候用：日常开发。默认就是它。
 
@@ -146,13 +146,13 @@ Sandbox: enabled
 
 ## 规则从哪来
 
-`/status` 会显示当前模式 + 一行 `Loaded sources:` 列出规则来源。项目级 `.agentao/permissions.json` 会被忽略；文件规则只从用户级读取。优先级：
+`/status` 会显示当前模式 + 一行 `Loaded sources:` 列出规则来源。项目级 `.arbiter/permissions.json` 会被忽略；文件规则只从用户级读取。优先级：
 
-1. `~/.agentao/permissions.json`（用户全局，自定义规则）
+1. `~/.arbiter/permissions.json`（用户全局，自定义规则）
 2. 当前模式的内建 preset（safe-shell 白名单、SSRF 黑名单等）
-3. CLI `/mode` 切换（写入 `.agentao/settings.json`，决定当前模式）
+3. CLI `/mode` 切换（写入 `.arbiter/settings.json`，决定当前模式）
 
-要持久化规则改动，直接改 `~/.agentao/permissions.json`。CLI 启动时重新读取。
+要持久化规则改动，直接改 `~/.arbiter/permissions.json`。CLI 启动时重新读取。
 
 ## 进阶：`/permission`
 
@@ -163,7 +163,7 @@ Sandbox: enabled
 - **确认 UI 看着卡住** — 弹确认时 spinner 会停。看着像冻住了，往上滚一下，菜单在那儿。
 - **`workspace-write` 也会拦 cwd 外的写** — 项目在 `/repo/foo` 但你要让 agent 改 `~/Documents/...`，会弹确认。这是有意的 — "workspace" = 启动目录。
 - **确认时按 `2` 整个会话翻车** — 没有 undo，只能 `/mode workspace-write` 或重启。把 `2` 当成"我不打算继续盯这个会话了"。
-- **沙箱 profile 切换是会话级** — 想跨重启保持，改 `.agentao/sandbox.json` 或 `~/.agentao/sandbox.json` 的 `default_profile`。
+- **沙箱 profile 切换是会话级** — 想跨重启保持，改 `.arbiter/sandbox.json` 或 `~/.arbiter/sandbox.json` 的 `default_profile`。
 
 ## 接下来读什么
 
@@ -177,9 +177,9 @@ Sandbox: enabled
 ---
 
 ::: info 这一章在体系里的位置
-CLI 的确认 UI 只是 harness `confirmation_callback` 钩子的一种实现。嵌入式宿主可以传自己的回调进 `Agentao(confirmation_callback=...)`，从而把 UI 换成 IDE 弹窗、Web 按钮、CI 审计日志等。模式模型和规则引擎在 CLI 和嵌入两条路径上完全一致。见 [Part 4.5 · 工具确认 UI](/zh/part-4/5-tool-confirmation-ui)。
+CLI 的确认 UI 只是 harness `confirmation_callback` 钩子的一种实现。嵌入式宿主可以传自己的回调进 `Arbiter(confirmation_callback=...)`，从而把 UI 换成 IDE 弹窗、Web 按钮、CI 审计日志等。模式模型和规则引擎在 CLI 和嵌入两条路径上完全一致。见 [Part 4.5 · 工具确认 UI](/zh/part-4/5-tool-confirmation-ui)。
 :::
 
 ::: tip 真相源头
-本页描述的行为锚定在 [`agentao/cli/transport.py:confirm_tool_execution`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/transport.py)（UI）、[`agentao/permissions.py`](https://github.com/jin-bo/agentao/blob/main/agentao/permissions.py)（规则）和 [`agentao/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/help_text.py)（命令）。
+本页描述的行为锚定在 [`arbiter/cli/transport.py:confirm_tool_execution`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/transport.py)（UI）、[`arbiter/permissions.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/permissions.py)（规则）和 [`arbiter/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/help_text.py)（命令）。
 :::

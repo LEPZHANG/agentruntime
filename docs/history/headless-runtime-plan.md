@@ -1,8 +1,8 @@
-# Agentao Headless Runtime Plan
+# Arbiter Headless Runtime Plan
 
 ## Goal
 
-将 `agentao` 从“可被代码调用的 ACP embedding 能力”收敛为一个**逻辑上的 headless daemon-capable runtime**。
+将 `arbiter` 从“可被代码调用的 ACP embedding 能力”收敛为一个**逻辑上的 headless daemon-capable runtime**。
 
 本阶段不做真正的 socket / TCP daemon，也不扩 ACP 协议；重点是把现有 `ACPManager` 路线产品化为一个稳定、可观测、可治理、可恢复的 headless runtime surface。
 

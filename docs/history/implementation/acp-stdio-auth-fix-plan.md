@@ -19,8 +19,8 @@ against the current code on `chore/bump-0.2.15-dev`.
 ## P1 — Shell subprocess inherits stdin (Critical)
 
 ### Symptom
-`agentao/tools/shell.py:272` (Windows background), `agentao/tools/shell.py:288`
-(POSIX background), and `agentao/tools/shell.py:323` (foreground) all call
+`arbiter/tools/shell.py:272` (Windows background), `arbiter/tools/shell.py:288`
+(POSIX background), and `arbiter/tools/shell.py:323` (foreground) all call
 `subprocess.Popen` without passing `stdin`. Under the ACP stdio transport the
 parent process's `sys.stdin` is the JSON-RPC channel; a `shell=True` child
 inherits that handle, and even incidental reads by the shell wrapper or by a
@@ -47,9 +47,9 @@ Not Windows-only — POSIX is equally affected.
 ## P2 — LLMClient log-handler dual constraint (High)
 
 ### Symptom
-`agentao/acp/server.py:252-258` installs a stderr `StreamHandler` on the
-`agentao` package logger so ACP-mode diagnostics reach the host. Then
-`agentao/llm/client.py:147` calls `pkg_logger.handlers.clear()`, which
+`arbiter/acp/server.py:252-258` installs a stderr `StreamHandler` on the
+`arbiter` package logger so ACP-mode diagnostics reach the host. Then
+`arbiter/llm/client.py:147` calls `pkg_logger.handlers.clear()`, which
 removes that stderr handler. Conversely, removing the `clear()` naively
 would let repeated `LLMClient` construction (each model switch in ACP mode
 re-constructs the client) accumulate multiple `RotatingFileHandler`s — log
@@ -65,7 +65,7 @@ Both constraints must hold:
 Replace `pkg_logger.handlers.clear()` with marker-based selective cleanup:
 
 - Tag the file handler that LLMClient creates, e.g.
-  `handler._agentao_llm_file_handler = True`.
+  `handler._arbiter_llm_file_handler = True`.
 - On (re)initialization, iterate `pkg_logger.handlers`, `removeHandler` +
   `close()` only handlers carrying that marker, then `addHandler` the new
   file handler.
@@ -75,7 +75,7 @@ Replace `pkg_logger.handlers.clear()` with marker-based selective cleanup:
 - After ACP installs its stderr handler, constructing `LLMClient` leaves
   the stderr `StreamHandler` in place.
 - Constructing `LLMClient` N times in a row leaves at most one handler with
-  `_agentao_llm_file_handler = True` on the `agentao` logger; the log file
+  `_arbiter_llm_file_handler = True` on the `arbiter` logger; the log file
   does not contain N-fold duplicate lines.
 
 ---
@@ -83,9 +83,9 @@ Replace `pkg_logger.handlers.clear()` with marker-based selective cleanup:
 ## P3 — ACP missing `set_model` / `set_mode` / `list_models` (Medium)
 
 ### Symptom
-`agentao/acp/__main__.py:67-71` only registers `initialize`, `session/new`,
+`arbiter/acp/__main__.py:67-71` only registers `initialize`, `session/new`,
 `session/prompt`, `session/cancel`, and `session/load`.
-`agentao/acp/protocol.py` defines no `session/set_model`,
+`arbiter/acp/protocol.py` defines no `session/set_model`,
 `session/set_mode`, or `session/list_models` constants. Consequence:
 
 1. UI model switching returns `Method not found`.
@@ -114,7 +114,7 @@ Rules:
 
 ### `session/set_mode`
 Updates the corresponding session's `permission_engine.active_mode` (see
-`agentao/permissions.py:208`). Per-session — must not affect other sessions.
+`arbiter/permissions.py:208`). Per-session — must not affect other sessions.
 
 ### `session/list_models` (P3+)
 Front end needs a way to refresh available models after `initialize`:
@@ -146,13 +146,13 @@ Front end needs a way to refresh available models after `initialize`:
 
 ## File reference
 
-- `agentao/tools/shell.py:272` — Windows background `Popen`
-- `agentao/tools/shell.py:288` — POSIX background `Popen`
-- `agentao/tools/shell.py:323` — foreground `Popen`
-- `agentao/llm/client.py:147` — offending `pkg_logger.handlers.clear()`
-- `agentao/acp/server.py:252-258` — stderr `StreamHandler` install
-- `agentao/acp/__main__.py:67-71` — current handler registration list
-- `agentao/acp/protocol.py:48-54` — current `METHOD_*` constants
-- `agentao/runtime/model.py:51` — `set_model` runtime helper
-- `agentao/context_manager.py:78` — `ContextManager.max_tokens` (window)
-- `agentao/permissions.py:208` — `active_mode` for `set_mode`
+- `arbiter/tools/shell.py:272` — Windows background `Popen`
+- `arbiter/tools/shell.py:288` — POSIX background `Popen`
+- `arbiter/tools/shell.py:323` — foreground `Popen`
+- `arbiter/llm/client.py:147` — offending `pkg_logger.handlers.clear()`
+- `arbiter/acp/server.py:252-258` — stderr `StreamHandler` install
+- `arbiter/acp/__main__.py:67-71` — current handler registration list
+- `arbiter/acp/protocol.py:48-54` — current `METHOD_*` constants
+- `arbiter/runtime/model.py:51` — `set_model` runtime helper
+- `arbiter/context_manager.py:78` — `ContextManager.max_tokens` (window)
+- `arbiter/permissions.py:208` — `active_mode` for `set_mode`

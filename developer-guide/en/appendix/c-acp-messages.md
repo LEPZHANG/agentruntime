@@ -1,6 +1,6 @@
 # Appendix C · ACP Message Fields Reference
 
-Field-level lookup for every message Agentao's ACP server and client emit. For the end-to-end story (handshake → prompt → streaming → cancel) see [Part 3](/en/part-3/). This appendix is the speed-lookup you open when you're in the middle of debugging a malformed message.
+Field-level lookup for every message Arbiter's ACP server and client emit. For the end-to-end story (handshake → prompt → streaming → cancel) see [Part 3](/en/part-3/). This appendix is the speed-lookup you open when you're in the middle of debugging a malformed message.
 
 **Conventions**:
 - `→` = request; `←` = response; `⇠` = server-to-client notification
@@ -15,7 +15,7 @@ Handshake. MUST be first call.
 
 | Field | Type | Req | Notes |
 |-------|------|-----|-------|
-| `protocolVersion` | `int` | yes | Agentao speaks `1`. `bool` rejected explicitly. |
+| `protocolVersion` | `int` | yes | Arbiter speaks `1`. `bool` rejected explicitly. |
 | `clientCapabilities` | `object` | yes | Client-side feature flags (e.g. `fs: {readFile, writeFile}`) |
 | `clientInfo` | `object` | no | `{name, version, title}` — purely informational |
 
@@ -25,8 +25,8 @@ Handshake. MUST be first call.
 |-------|------|-------|
 | `protocolVersion` | `int` | Negotiated — usually echoes request; never errors on mismatch |
 | `agentCapabilities` | `object` | See below |
-| `authMethods` | `[]` | Empty in v1 — Agentao does no ACP-level auth |
-| `agentInfo` | `object` | `{name: "agentao", title: "Agentao", version}` |
+| `authMethods` | `[]` | Empty in v1 — Arbiter does no ACP-level auth |
+| `agentInfo` | `object` | `{name: "arbiter", title: "Arbiter", version}` |
 | `_meta["_agentao.cn/extensions"]` | `[{method, description}]` | Vendor methods advertised under `_meta` (ACP's standard extension channel); includes `_agentao.cn/ask_user` |
 
 ### `agentCapabilities` block (v0.2.x)
@@ -77,7 +77,7 @@ Create a fresh session.
 | `-32002` | Called before `initialize` (SERVER_NOT_INITIALIZED) |
 | `-32602` | `cwd` not absolute / doesn't exist / `mcpServers` malformed |
 
-> **Startup resume.** When the server was launched with `agentao --acp --resume [SESSION_ID]`, the **first** `session/new` resumes a persisted session instead of starting blank: it replays history as `session/update` notifications and returns the persisted `sessionId`. A miss (empty store / unknown id / corrupt file / id already active) silently degrades to a normal fresh session. See [3.2 → Resume a session on startup](/en/part-3/2-agentao-as-server#resume-a-session-on-startup).
+> **Startup resume.** When the server was launched with `arbiter --acp --resume [SESSION_ID]`, the **first** `session/new` resumes a persisted session instead of starting blank: it replays history as `session/update` notifications and returns the persisted `sessionId`. A miss (empty store / unknown id / corrupt file / id already active) silently degrades to a normal fresh session. See [3.2 → Resume a session on startup](/en/part-3/2-arbiter-as-server#resume-a-session-on-startup).
 
 ## C.3 `session/prompt`
 
@@ -116,7 +116,7 @@ Server-to-client streaming updates during a prompt turn.
 
 ### Variants (`update.sessionUpdate`)
 
-| Value | Agentao event | Extra fields |
+| Value | Arbiter event | Extra fields |
 |-------|---------------|--------------|
 | `user_message_chunk` | (replay) | `content: {type:"text", text}` |
 | `agent_message_chunk` | `LLM_TEXT` | `content: {type:"text", text}` |
@@ -126,7 +126,7 @@ Server-to-client streaming updates during a prompt turn.
 
 ### `tool_call.kind` (closed enum)
 
-`read`, `edit`, `delete`, `move`, `search`, `execute`, `think`, `fetch`, `switch_mode`, `other`. Agentao maps its tool names into this enum — see `agentao/acp/transport.py`.
+`read`, `edit`, `delete`, `move`, `search`, `execute`, `think`, `fetch`, `switch_mode`, `other`. Arbiter maps its tool names into this enum — see `arbiter/acp/transport.py`.
 
 ### `tool_call_update.status`
 
@@ -189,7 +189,7 @@ Resume a session by id. Only usable when the agent advertises `loadSession: true
 
 ### Fingerprint rule
 
-`mcpServers` is hashed during `session/new`. If `session/load` passes a different set (added / removed / reordered), Agentao may either reject the call or silently re-init — depends on implementation phase. When in doubt, use the **same** list you originally passed.
+`mcpServers` is hashed during `session/new`. If `session/load` passes a different set (added / removed / reordered), Arbiter may either reject the call or silently re-init — depends on implementation phase. When in doubt, use the **same** list you originally passed.
 
 ## C.8 `session/set_config_option`
 
@@ -230,7 +230,7 @@ Switch the model (and optionally the provider) via the ACP-standard config-optio
 
 ## C.9 `_agentao.cn/set_model` (extension)
 
-Agentao-specific free-form model switch — the vendor sibling of `session/set_config_option`'s bare-value path. Secret-free; shares the same core code path.
+Arbiter-specific free-form model switch — the vendor sibling of `session/set_config_option`'s bare-value path. Secret-free; shares the same core code path.
 
 ### → Request
 
@@ -249,7 +249,7 @@ Agentao-specific free-form model switch — the vendor sibling of `session/set_c
 
 ## C.10 `session/set_mode`
 
-Set the session's ACP `modeId`. The field is the ACP-standard **`modeId`** (not `mode`) and is an **open string** — a UI/behavioural selector that need not map to an Agentao permission preset.
+Set the session's ACP `modeId`. The field is the ACP-standard **`modeId`** (not `mode`) and is an **open string** — a UI/behavioural selector that need not map to an Arbiter permission preset.
 
 ### → Request
 
@@ -271,7 +271,7 @@ Set the session's ACP `modeId`. The field is the ACP-standard **`modeId`** (not 
 
 ## C.11 `_agentao.cn/ask_user` ⇠ notification (extension)
 
-Agentao-specific. Server asks the user a free-form question.
+Arbiter-specific. Server asks the user a free-form question.
 
 ### Params
 

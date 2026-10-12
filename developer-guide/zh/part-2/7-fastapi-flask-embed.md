@@ -10,7 +10,7 @@
 模板综合了 [2.3 生命周期](./3-lifecycle)、[2.4 会话状态](./4-session-state)、[2.6 取消与超时](./6-cancellation-timeouts) 的模式。遇到不熟悉的原语请回去查。
 
 ::: tip 离线可跑的最小形态样板
-[`examples/fastapi-background/`](https://github.com/jin-bo/agentao/tree/main/examples/fastapi-background) 是配套的离线烟雾测试样板：FastAPI 路由 + asyncio 后台任务 + 每请求一个 `Agentao`，`uv sync --extra dev && PYTHONPATH=. uv run pytest tests/` 即跑。**不需要 `OPENAI_API_KEY`** —— 用 fake LLM。本章读生产模板，clone 样板看接线和通过的测试。
+[`examples/fastapi-background/`](https://github.com/jin-bo/agentao/tree/main/examples/fastapi-background) 是配套的离线烟雾测试样板：FastAPI 路由 + asyncio 后台任务 + 每请求一个 `Arbiter`，`uv sync --extra dev && PYTHONPATH=. uv run pytest tests/` 即跑。**不需要 `OPENAI_API_KEY`** —— 用 fake LLM。本章读生产模板，clone 样板看接线和通过的测试。
 
 要 SSE 流式 + 会话池 + 鉴权的完整生产蓝图，见 [`examples/saas-assistant/`](https://github.com/jin-bo/agentao/tree/main/examples/saas-assistant)（第 7.1 节）。
 :::
@@ -30,7 +30,7 @@
 ### 完整代码
 
 ```python
-"""app.py —— FastAPI + Agentao + SSE 流式。"""
+"""app.py —— FastAPI + Arbiter + SSE 流式。"""
 from __future__ import annotations
 
 import asyncio
@@ -44,10 +44,10 @@ from typing import Dict, Tuple
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from agentao import Agentao
-from agentao.cancellation import CancellationToken
-from agentao.transport import SdkTransport
-from agentao.transport.events import AgentEvent, EventType
+from arbiter import Arbiter
+from arbiter.cancellation import CancellationToken
+from arbiter.transport import SdkTransport
+from arbiter.transport.events import AgentEvent, EventType
 
 
 # --------------------------------------------------------------------------
@@ -57,16 +57,16 @@ from agentao.transport.events import AgentEvent, EventType
 class SessionPool:
     def __init__(self, root: Path):
         self.root = root
-        self._sessions: Dict[str, Tuple[Agentao, Lock]] = {}
+        self._sessions: Dict[str, Tuple[Arbiter, Lock]] = {}
         self._mu = Lock()
 
-    async def get(self, session_id: str, tenant: str) -> Tuple[Agentao, Lock]:
+    async def get(self, session_id: str, tenant: str) -> Tuple[Arbiter, Lock]:
         async with self._mu:
             entry = self._sessions.get(session_id)
             if entry is None:
                 workdir = self.root / tenant
                 workdir.mkdir(parents=True, exist_ok=True)
-                agent = Agentao(working_directory=workdir)
+                agent = Arbiter(working_directory=workdir)
                 entry = (agent, Lock())
                 self._sessions[session_id] = entry
             return entry
@@ -91,7 +91,7 @@ class SessionPool:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.pool = SessionPool(Path(os.environ.get("AGENTAO_ROOT", "/app/tenants")))
+    app.state.pool = SessionPool(Path(os.environ.get("ARBITER_ROOT", "/app/tenants")))
     app.state.active_tokens: Dict[str, CancellationToken] = {}
     yield
     await app.state.pool.close_all()
@@ -235,7 +235,7 @@ curl -N -X POST http://localhost:8000/chat/s-1 \
 ### 关键代码
 
 ```python
-"""wsgi_app.py —— Flask + Agentao。"""
+"""wsgi_app.py —— Flask + Arbiter。"""
 from __future__ import annotations
 
 import json
@@ -245,23 +245,23 @@ from queue import Queue, Empty
 
 from flask import Flask, Response, request, abort, stream_with_context
 
-from agentao import Agentao
-from agentao.cancellation import CancellationToken
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.cancellation import CancellationToken
+from arbiter.transport import SdkTransport
 
 
 # 每个 Gunicorn worker 一个独立的池
-_sessions: dict[str, tuple[Agentao, threading.Lock]] = {}
+_sessions: dict[str, tuple[Arbiter, threading.Lock]] = {}
 _active_tokens: dict[str, CancellationToken] = {}
 
 app = Flask(__name__)
 
 
-def _get_agent(session_id: str, tenant: str) -> tuple[Agentao, threading.Lock]:
+def _get_agent(session_id: str, tenant: str) -> tuple[Arbiter, threading.Lock]:
     if session_id not in _sessions:
         workdir = Path(f"/app/tenants/{tenant}")
         workdir.mkdir(parents=True, exist_ok=True)
-        agent = Agentao(working_directory=workdir)
+        agent = Arbiter(working_directory=workdir)
         _sessions[session_id] = (agent, threading.Lock())
     return _sessions[session_id]
 

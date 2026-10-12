@@ -1,4 +1,4 @@
-# Agentao Plugin System MVP
+# Arbiter Plugin System MVP
 
 ## Status
 
@@ -25,13 +25,13 @@ issue 入口：
 
 ## MVP Summary
 
-目标是在 Agentao 中建立一个 Claude Code compatible 的 plugin host，使本地 Claude-style plugins 能以受控、可诊断、可分阶段扩展的方式运行。
+目标是在 Arbiter 中建立一个 Claude Code compatible 的 plugin host，使本地 Claude-style plugins 能以受控、可诊断、可分阶段扩展的方式运行。
 
 核心边界：
 
 - 插件来源：
-  - `<home>/.agentao/plugins`
-  - `<project-root>/.agentao/plugins`
+  - `<home>/.arbiter/plugins`
+  - `<project-root>/.arbiter/plugins`
   - `--plugin-dir`
 - 插件 identity 使用 `plugin.json.name`
 - precedence 使用 global < project < inline 的原子覆盖
@@ -41,7 +41,7 @@ issue 入口：
   - `agents`
   - `mcpServers`
   - `hooks`
-- `commands` 映射为 Agentao skill/prompt 能力
+- `commands` 映射为 Arbiter skill/prompt 能力
 - `UserPromptSubmit` 支持：
   - `command`
   - `prompt`

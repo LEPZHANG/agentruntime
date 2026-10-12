@@ -6,16 +6,16 @@ from unittest.mock import Mock, patch, MagicMock
 def test_status_paused_during_confirmation():
     """Test that status.stop() is called during confirmation."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar') as mock_readchar:
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar') as mock_readchar:
                 # Mock the agent instance
                 mock_agent = Mock()
                 mock_agent_class.return_value = mock_agent
 
-                from agentao.cli import AgentaoCLI
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 # Create a mock status object
                 mock_status = MagicMock()
@@ -47,15 +47,15 @@ def test_status_paused_during_confirmation():
 def test_status_resumed_on_cancel():
     """Test that status is resumed even when user cancels."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar') as mock_readchar:
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar') as mock_readchar:
                 mock_agent = Mock()
                 mock_agent_class.return_value = mock_agent
 
-                from agentao.cli import AgentaoCLI
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
                 mock_status = MagicMock()
                 cli.current_status = mock_status
 
@@ -78,15 +78,15 @@ def test_status_resumed_on_cancel():
 def test_status_resumed_on_error():
     """Test that status is resumed even when readchar raises error."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar') as mock_readchar:
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar') as mock_readchar:
                 mock_agent = Mock()
                 mock_agent_class.return_value = mock_agent
 
-                from agentao.cli import AgentaoCLI
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
                 mock_status = MagicMock()
                 cli.current_status = mock_status
 
@@ -109,14 +109,14 @@ def test_status_resumed_on_error():
 def test_status_not_paused_with_allow_all():
     """Test that status is NOT paused when allow_all mode is enabled."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
             mock_agent = Mock()
             mock_agent_class.return_value = mock_agent
 
-            from agentao.cli import AgentaoCLI
+            from arbiter.cli import ArbiterCLI
 
-            cli = AgentaoCLI()
+            cli = ArbiterCLI()
             cli.allow_all_tools = True  # Enable allow all mode
 
             mock_status = MagicMock()
@@ -141,15 +141,15 @@ def test_status_not_paused_with_allow_all():
 def test_status_none_doesnt_crash():
     """Test that confirmation works even if current_status is None."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar') as mock_readchar:
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar') as mock_readchar:
                 mock_agent = Mock()
                 mock_agent_class.return_value = mock_agent
 
-                from agentao.cli import AgentaoCLI
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
                 cli.current_status = None  # No active status
 
                 mock_readchar.readkey.return_value = "1"

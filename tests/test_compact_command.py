@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from agentao.cli.commands import handle_compact_command
+from arbiter.cli.commands import handle_compact_command
 
 
 def _cli_with_messages(messages: list[dict], compacted: list[dict] | None = None):

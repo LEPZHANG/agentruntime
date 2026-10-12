@@ -1,6 +1,6 @@
 # Agent Client Protocol (ACP) Support
 
-Agentao implements a stdio-based [Agent Client Protocol](https://github.com/zed-industries/agent-client-protocol) server so ACP-compatible clients (e.g. Zed) can drive Agentao as their agent runtime. This document covers what ships, how to launch it, and the explicit limits of the v1 implementation.
+Arbiter implements a stdio-based [Agent Client Protocol](https://github.com/zed-industries/agent-client-protocol) server so ACP-compatible clients (e.g. Zed) can drive Arbiter as their agent runtime. This document covers what ships, how to launch it, and the explicit limits of the v1 implementation.
 
 ACP support landed across `docs/implementation/acp-issues/01` through `14`. Tests live in `tests/test_acp_*.py`. Version examples below track the current release line (`0.2.14` as of this document revision).
 
@@ -12,10 +12,10 @@ ACP support landed across `docs/implementation/acp-issues/01` through `14`. Test
 
 ```bash
 # Console script
-agentao --acp --stdio
+arbiter --acp --stdio
 
 # Module form (works without the console script on PATH)
-python -m agentao --acp --stdio
+python -m arbiter --acp --stdio
 ```
 
 Both commands block reading newline-delimited JSON-RPC 2.0 messages from `stdin`, write responses and notifications to `stdout`, and route logs + any stray `print` to `stderr`. Press Ctrl-D (or close stdin) to shut the server down cleanly.
@@ -25,11 +25,11 @@ Both commands block reading newline-delimited JSON-RPC 2.0 messages from `stdin`
 Pass `--resume` to have the server reattach to a previously saved session the first time the client opens one:
 
 ```bash
-agentao --acp --resume                 # resume the latest saved session
-agentao --acp --resume <SESSION_ID>    # resume a specific session (UUID / prefix / timestamp)
+arbiter --acp --resume                 # resume the latest saved session
+arbiter --acp --resume <SESSION_ID>    # resume a specific session (UUID / prefix / timestamp)
 ```
 
-ACP is client-driven — the server cannot create a session on its own — so the directive is **one-shot and consumed by the first `session/new`**: that request hydrates the persisted message history and replays it as `session/update` notifications (exactly like `session/load`), then returns the persisted `sessionId` instead of a freshly generated one. Every later `session/new` on the connection starts a normal blank session. The session store is keyed by the client-provided `cwd`, so the lookup happens at request time against `<cwd>/.agentao/sessions`.
+ACP is client-driven — the server cannot create a session on its own — so the directive is **one-shot and consumed by the first `session/new`**: that request hydrates the persisted message history and replays it as `session/update` notifications (exactly like `session/load`), then returns the persisted `sessionId` instead of a freshly generated one. Every later `session/new` on the connection starts a normal blank session. The session store is keyed by the client-provided `cwd`, so the lookup happens at request time against `<cwd>/.arbiter/sessions`.
 
 The fallback is permissive — any recoverable problem degrades to a normal fresh session (logged at WARNING) rather than failing the client's first `session/new`: an empty store, an unknown id, an unreadable/corrupt session file, or a resolved id that is already live in the registry (e.g. the client `session/load`-ed it earlier on the same connection).
 
@@ -38,7 +38,7 @@ The fallback is permissive — any recoverable problem degrades to a normal fres
 ### Smoke test by hand
 
 ```bash
-OPENAI_API_KEY=sk-... agentao --acp --stdio <<'EOF'
+OPENAI_API_KEY=sk-... arbiter --acp --stdio <<'EOF'
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{}}}
 {"jsonrpc":"2.0","id":2,"method":"session/new","params":{"cwd":"/tmp","mcpServers":[]}}
 EOF
@@ -47,12 +47,12 @@ EOF
 Expected — two NDJSON response envelopes on stdout:
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"promptCapabilities":{"image":true,"audio":false,"embeddedContext":false},"mcpCapabilities":{"http":true,"sse":true}},"authMethods":[],"agentInfo":{"name":"agentao","title":"Agentao","version":"0.2.14"}}}
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"promptCapabilities":{"image":true,"audio":false,"embeddedContext":false},"mcpCapabilities":{"http":true,"sse":true}},"authMethods":[],"agentInfo":{"name":"arbiter","title":"Arbiter","version":"0.2.14"}}}
 {"jsonrpc":"2.0","id":2,"result":{"sessionId":"sess_<32hex>"}}
 ```
 
 > **Note:** `agentInfo.version` in the response is sourced from
-> `agentao.__version__`, so the literal above tracks whatever release
+> `arbiter.__version__`, so the literal above tracks whatever release
 > line you have installed — it is illustrative, not a pinned value.
 
 ### From a real ACP client
@@ -62,8 +62,8 @@ A reference Zed configuration (`<home>/.config/zed/settings.json`):
 ```json
 {
   "agent_servers": {
-    "Agentao": {
-      "command": "agentao",
+    "Arbiter": {
+      "command": "arbiter",
       "args": ["--acp", "--stdio"],
       "env": {
         "OPENAI_API_KEY": "sk-..."
@@ -73,27 +73,27 @@ A reference Zed configuration (`<home>/.config/zed/settings.json`):
 }
 ```
 
-The same shape works for any client that launches an ACP agent over stdio: pass `--acp --stdio` and an environment with whatever provider key Agentao needs (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.).
+The same shape works for any client that launches an ACP agent over stdio: pass `--acp --stdio` and an environment with whatever provider key Arbiter needs (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.).
 
 ---
 
 ## Supported Methods
 
-### Client → server (requests Agentao handles)
+### Client → server (requests Arbiter handles)
 
 | Method | Status | Notes |
 |---|---|---|
 | `initialize` | ✅ | Echoes the client's `protocolVersion` if supported (currently `1`); falls back to ours otherwise. Records `clientCapabilities` per connection. |
 | `session/new` | ✅ | Creates a fresh session bound to a per-session `cwd` and (optionally) per-session MCP servers. Returns `{"sessionId": "sess_…", "configOptions": [...]}` (model/provider selection options — see `session/set_config_option`). |
-| `session/prompt` | ✅ | Runs one Agentao turn against the named session; returns `{"stopReason": …}` — `end_turn`, `cancelled`, `max_tokens`, or `max_turn_requests` (see [stop reasons](#sessionprompt-stop-reasons) below). |
+| `session/prompt` | ✅ | Runs one Arbiter turn against the named session; returns `{"stopReason": …}` — `end_turn`, `cancelled`, `max_tokens`, or `max_turn_requests` (see [stop reasons](#sessionprompt-stop-reasons) below). |
 | `session/cancel` | ✅ | Fires the session's active `CancellationToken`. Idempotent; no-op on closed sessions or sessions with no active turn. Accepted both as a notification (no `id`) and as a request. |
-| `session/load` | ✅ | Reuses `agentao/session.py`'s persistence layer, hydrates the runtime's message history, and replays each persisted message as a `session/update` notification before responding. Response includes `configOptions` (same as `session/new`). |
+| `session/load` | ✅ | Reuses `arbiter/session.py`'s persistence layer, hydrates the runtime's message history, and replays each persisted message as a `session/update` notification before responding. Response includes `configOptions` (same as `session/new`). |
 | `session/set_config_option` | ✅ | ACP-standard model/provider switch (`configId="model"`, `value="provider/model"` or bare `model`). Credentials resolve **server-side** via an injectable `provider_resolver` — `apiKey`/`baseUrl`/`_meta` are rejected. Returns refreshed `configOptions`. |
 | `_agentao.cn/set_model` | ✅ | Vendor free-form model switch (`{sessionId, model}`); secret-free, shares the `set_config_option` core path. Returns `{"model": …}`. |
 | `session/set_mode` | ✅ | Sets the session's ACP `modeId` (open string). Exact match to a preset (`read-only`/`workspace-write`/`full-access`/`plan`) changes permission posture; any other value persists + echoes without changing it. Returns `{"modeId": …}`. |
 | `session/set_model`, `session/list_models` | ✅ (compat) | Pre-standard model methods, kept as one-release compatibility aliases. Prefer `session/set_config_option`. |
 
-### Server → client (sent by Agentao)
+### Server → client (sent by Arbiter)
 
 | Method | Direction | Notes |
 |---|---|---|
@@ -102,7 +102,7 @@ The same shape works for any client that launches an ACP agent over stdio: pass 
 
 ### Capabilities Advertised in `initialize`
 
-Source: `agentao/acp/initialize.py`.
+Source: `arbiter/acp/initialize.py`.
 
 ```jsonc
 {
@@ -119,7 +119,7 @@ Source: `agentao/acp/initialize.py`.
 }
 ```
 
-`authMethods` is `[]` — Agentao does not implement ACP-level auth in v1. Provider credentials (`OPENAI_API_KEY`, etc.) are read from the launch environment and never travel through the ACP wire.
+`authMethods` is `[]` — Arbiter does not implement ACP-level auth in v1. Provider credentials (`OPENAI_API_KEY`, etc.) are read from the launch environment and never travel through the ACP wire.
 
 ---
 
@@ -136,13 +136,13 @@ ACP defines a large surface area; v1 deliberately implements a working subset. A
 
 ### `session/prompt` content blocks
 
-Source: `agentao/acp/session_prompt.py::_parse_prompt`.
+Source: `arbiter/acp/session_prompt.py::_parse_prompt`.
 
 | Block type | Status | Notes |
 |---|---|---|
 | `text` | ✅ | Multiple text blocks are joined with `\n\n`. |
-| `resource_link` | ✅ | Rendered as `[Resource: {title or name or uri}](../{uri})` so the LLM sees the reference; Agentao does **not** dereference the URI in v1. |
-| `image` | ✅ | Inline `{data, mimeType}` only — surfaced to the LLM as an OpenAI `image_url` data-URL part. `mimeType` must be `image/*`, `data` valid base64 within the per-image size cap, ≤ `MAX_IMAGES_PER_TURN` per prompt. A by-reference `uri` is **rejected** (`INVALID_PARAMS`) so the wire never carries a host path or secret. `promptCapabilities.image` is `true`. If the selected model rejects image input, the turn degrades the images to `<attachment uri=... mimetype=.../>` text tags (canonical format description: `agentao/runtime/chat_loop/_runner.py::_render_image_reference_fallback`; developer guide appendix A.1). |
+| `resource_link` | ✅ | Rendered as `[Resource: {title or name or uri}](../{uri})` so the LLM sees the reference; Arbiter does **not** dereference the URI in v1. |
+| `image` | ✅ | Inline `{data, mimeType}` only — surfaced to the LLM as an OpenAI `image_url` data-URL part. `mimeType` must be `image/*`, `data` valid base64 within the per-image size cap, ≤ `MAX_IMAGES_PER_TURN` per prompt. A by-reference `uri` is **rejected** (`INVALID_PARAMS`) so the wire never carries a host path or secret. `promptCapabilities.image` is `true`. If the selected model rejects image input, the turn degrades the images to `<attachment uri=... mimetype=.../>` text tags (canonical format description: `arbiter/runtime/chat_loop/_runner.py::_render_image_reference_fallback`; developer guide appendix A.1). |
 | `audio` | ❌ | `INVALID_PARAMS`. `promptCapabilities.audio` is `false`. |
 | `resource` (embedded) | ❌ | `INVALID_PARAMS`. `promptCapabilities.embeddedContext` is `false`. |
 
@@ -152,27 +152,27 @@ Per the [ACP epic](../history/implementation/acp-github-epic.md) non-goals:
 
 | Feature | Status | Notes |
 |---|---|---|
-| `fs/read_text_file` / `fs/write_text_file` proxy | ❌ | Agentao always reads and writes files **locally** in the session's `cwd`. The client's `fs` capability flags are recorded on the session for future use but not consulted. |
-| `terminal/*` proxy | ❌ | Shell commands run locally via Agentao's existing `run_shell_command` tool, not via an ACP terminal session. |
+| `fs/read_text_file` / `fs/write_text_file` proxy | ❌ | Arbiter always reads and writes files **locally** in the session's `cwd`. The client's `fs` capability flags are recorded on the session for future use but not consulted. |
+| `terminal/*` proxy | ❌ | Shell commands run locally via Arbiter's existing `run_shell_command` tool, not via an ACP terminal session. |
 | MCP-over-ACP extension | ❌ | Use `mcpServers` in `session/new` instead — that's the supported injection point. |
 
 ### MCP server injection (`session/new` → `mcpServers`)
 
-Source: `agentao/acp/mcp_translate.py`.
+Source: `arbiter/acp/mcp_translate.py`.
 
 | Transport in entry | Status | Notes |
 |---|---|---|
-| stdio (`{name, command, args, env}`) | ✅ | Translated to Agentao's internal `{command, args, env: {…}}` config. Always created with `trust: false`. |
+| stdio (`{name, command, args, env}`) | ✅ | Translated to Arbiter's internal `{command, args, env: {…}}` config. Always created with `trust: false`. |
 | sse (`{type:"sse", name, url, headers}`) | ✅ | `mcpCapabilities.sse` is `true`. Legacy transport. Headers translated from `[{name,value}]` to `{name: value}`. The explicit `type:"sse"` is stamped into the produced config so it survives the native bare-`url`-defaults-to-HTTP resolution. |
-| http (`{type:"http", name, url, headers}`) | ✅ | `mcpCapabilities.http` is `true`. Streamable HTTP transport (`agentao/mcp/client.py` ships `streamable_http_client`). Headers translated the same way; `type:"http"` stamped into the config. |
+| http (`{type:"http", name, url, headers}`) | ✅ | `mcpCapabilities.http` is `true`. Streamable HTTP transport (`arbiter/mcp/client.py` ships `streamable_http_client`). Headers translated the same way; `type:"http"` stamped into the config. |
 
-ACP-provided MCP servers **override** any same-named entries in the project's `.agentao/mcp.json`. They are **session-scoped** — they are torn down when the session closes and never leak to sibling sessions.
+ACP-provided MCP servers **override** any same-named entries in the project's `.arbiter/mcp.json`. They are **session-scoped** — they are torn down when the session closes and never leak to sibling sessions.
 
 ### Session management
 
 | Behavior | Status | Notes |
 |---|---|---|
-| Per-session `cwd` | ✅ | Each session sees its own working directory; the `Agentao` runtime is constructed with `working_directory=cwd` so memory db, AGENTAO.md lookup, MCP config lookup, and file/shell tools all resolve against it. |
+| Per-session `cwd` | ✅ | Each session sees its own working directory; the `Arbiter` runtime is constructed with `working_directory=cwd` so memory db, ARBITER.md lookup, MCP config lookup, and file/shell tools all resolve against it. |
 | Per-session `agent.messages` history | ✅ | Two sessions on the same server have independent conversations. |
 | Per-session permission overrides | ✅ | `allow_always`/`reject_always` decisions are stored on `AcpSessionState.permission_overrides` and never leak to sibling sessions. Cleared on session close. |
 | Concurrent prompts on different sessions | ✅ | Issue 08's `ThreadPoolExecutor(max_workers=8)` lets handlers run in parallel; verified end-to-end in `tests/test_acp_multi_session.py::TestTurnLockIsolation`. |
@@ -182,15 +182,15 @@ ACP-provided MCP servers **override** any same-named entries in the project's `.
 
 ### `session/prompt` stop reasons
 
-Source: `agentao/acp/session_prompt.py`.
+Source: `arbiter/acp/session_prompt.py`.
 
 | `stopReason` | Meaning |
 |---|---|
-| `end_turn` | The Agentao chat loop returned normally. Also covers a turn where the model produced no prose (`no_output` / `reasoning_only`) — the turn genuinely ended, it just said nothing — and a turn whose LLM call failed, because the ACP enum has no error member (the `[LLM API error: …]` notice is the turn's streamed content). |
+| `end_turn` | The Arbiter chat loop returned normally. Also covers a turn where the model produced no prose (`no_output` / `reasoning_only`) — the turn genuinely ended, it just said nothing — and a turn whose LLM call failed, because the ACP enum has no error member (the `[LLM API error: …]` notice is the turn's streamed content). |
 | `cancelled` | The session's `CancellationToken` was fired (via `session/cancel`, connection close, or session teardown) before the loop returned. Takes precedence over every other reason. |
 | `max_tokens` | The turn was halted after the model's response was cut off at the token limit (`TurnOutcome.incomplete_reason == "length_truncated"`). |
 | `max_turn_requests` | The harness capped requests within the turn — either the tool-iteration budget was exhausted, or a doom loop (repeated identical calls) was halted. |
-| `refusal` | Listed in the ACP enum and accepted by the schema, but **never emitted**: Agentao has no content-refusal detection, and reporting an infrastructure failure as a refusal would be a different kind of lie. |
+| `refusal` | Listed in the ACP enum and accepted by the schema, but **never emitted**: Arbiter has no content-refusal detection, and reporting an infrastructure failure as a refusal would be a different kind of lie. |
 
 Precedence is `cancelled` → iteration budget → `incomplete_reason`. An
 unrecognized future reason degrades to `end_turn` rather than failing the turn.
@@ -231,12 +231,12 @@ ACP defines additional stop reasons (`max_tokens`, `max_turn_requests`, `refusal
                    │                                                 │
                    │   sessions: AcpSessionManager (session_manager) │
                    │     │                                           │
-                   │     ├─ AcpSessionState ─ Agentao runtime        │
-                   │     ├─ AcpSessionState ─ Agentao runtime        │
+                   │     ├─ AcpSessionState ─ Arbiter runtime        │
+                   │     ├─ AcpSessionState ─ Arbiter runtime        │
                    │     └─ ...                                      │
                    │                                                 │
        stderr ◄────┤   sys.stdout reassigned to sys.stderr; logger   │
-                   │   handler installed on the agentao package      │
+                   │   handler installed on the arbiter package      │
                    └────────────────────────────────────────────────┘
 ```
 
@@ -246,7 +246,7 @@ When `AcpServer` is constructed with no explicit `stdout`/`stdin` (the productio
 
 1. **Captures** the real `sys.stdout` into a private handle that all JSON-RPC writes use.
 2. **Reassigns** `sys.stdout = sys.stderr` so any stray `print()` anywhere in the process — application code, third-party libraries, the LLM client's debug output — lands on stderr.
-3. **Installs** a `StreamHandler(sys.stderr)` on the `agentao` package logger if no handler is attached yet, so logs are visible from the moment the server starts (before `LLMClient` would normally configure logging).
+3. **Installs** a `StreamHandler(sys.stderr)` on the `arbiter` package logger if no handler is attached yet, so logs are visible from the moment the server starts (before `LLMClient` would normally configure logging).
 
 The acceptance criterion *"stdout contains only ACP messages"* is enforced by `tests/test_acp_cli_entrypoint.py::TestAcpSubprocessSmoke::test_logs_go_to_stderr_not_stdout`.
 
@@ -265,15 +265,15 @@ Reversing steps 1 and 2 deadlocks. There's a comment in `server.py:327` and a re
 ### File layout
 
 ```
-agentao/acp/
+arbiter/acp/
 ├── __init__.py
-├── __main__.py            # `python -m agentao.acp` entry; main() registers all handlers
+├── __main__.py            # `python -m arbiter.acp` entry; main() registers all handlers
 ├── protocol.py            # METHOD_*, ACP_PROTOCOL_VERSION, error code constants
 ├── server.py              # AcpServer + JsonRpcHandlerError + concurrent dispatch
 ├── session_manager.py     # AcpSessionManager: thread-safe registry, close_all
 ├── models.py              # JsonRpcRequest/Response/Error, AcpSessionState, AcpConnectionState
 ├── transport.py           # ACPTransport: emit() event mapping + confirm_tool() permission flow
-├── mcp_translate.py       # ACP {name, command, args, env} → Agentao internal MCP config
+├── mcp_translate.py       # ACP {name, command, args, env} → Arbiter internal MCP config
 ├── initialize.py          # initialize handler + AGENT_CAPABILITIES
 ├── session_new.py         # session/new handler + agent_factory DI seam
 ├── session_prompt.py      # session/prompt handler + ContentBlock parser
@@ -281,7 +281,7 @@ agentao/acp/
 └── session_load.py        # session/load handler + history hydration + replay
 ```
 
-The CLI wiring (`agentao --acp --stdio`) lives in `agentao/cli/entrypoints.py::run_acp_mode` and `agentao/__main__.py`; both delegate to `agentao.acp.__main__.main`. The `--resume` selector is threaded through `run_acp_mode(resume=...)` → `main(resume=...)`, which builds a `ResumeDirective` (`agentao/acp/models.py`) and injects it into `AcpServer`; the first `session/new` consumes it via `session_load.resume_session_on_new`.
+The CLI wiring (`arbiter --acp --stdio`) lives in `arbiter/cli/entrypoints.py::run_acp_mode` and `arbiter/__main__.py`; both delegate to `arbiter.acp.__main__.main`. The `--resume` selector is threaded through `run_acp_mode(resume=...)` → `main(resume=...)`, which builds a `ResumeDirective` (`arbiter/acp/models.py`) and injects it into `AcpServer`; the first `session/new` consumes it via `session_load.resume_session_on_new`.
 
 ---
 
@@ -305,8 +305,8 @@ Below is a complete client→server→client conversation. Each line on the wire
       "mcpCapabilities":{"http":true,"sse":true}
     },
     "authMethods":[],
-    // agentInfo.version is sourced from agentao.__version__ — tracks the installed release line.
-    "agentInfo":{"name":"agentao","title":"Agentao","version":"0.2.14"}
+    // agentInfo.version is sourced from arbiter.__version__ — tracks the installed release line.
+    "agentInfo":{"name":"arbiter","title":"Arbiter","version":"0.2.14"}
   }}
 
 // 2. Open a session bound to a working directory.
@@ -317,7 +317,7 @@ Below is a complete client→server→client conversation. Each line on the wire
 
 ← {"jsonrpc":"2.0","id":2,"result":{"sessionId":"sess_3a8f1b2c...","configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"openai/gpt-4o","options":[...]}]}}
 
-// 3. Send a prompt. Agentao runs one chat() turn, streaming events as
+// 3. Send a prompt. Arbiter runs one chat() turn, streaming events as
 //    session/update notifications, then returns a final stopReason.
 → {"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{
     "sessionId":"sess_3a8f1b2c...",
@@ -359,7 +359,7 @@ Below is a complete client→server→client conversation. Each line on the wire
     "sessionId":"sess_3a8f1b2c...",
     "update":{
       "sessionUpdate":"agent_message_chunk",
-      "content":{"type":"text","text":"Found main.py, setup.py, and 12 files in agentao/.\n"}
+      "content":{"type":"text","text":"Found main.py, setup.py, and 12 files in arbiter/.\n"}
     }
   }}
 
@@ -379,9 +379,9 @@ Below is a complete client→server→client conversation. Each line on the wire
 
 ## Event Mapping
 
-`ACPTransport.emit` (in `agentao/acp/transport.py`) is the single source of truth for how Agentao runtime events become ACP `session/update` notifications. The full table:
+`ACPTransport.emit` (in `arbiter/acp/transport.py`) is the single source of truth for how Arbiter runtime events become ACP `session/update` notifications. The full table:
 
-| Agentao `EventType` | ACP `sessionUpdate` | Notes |
+| Arbiter `EventType` | ACP `sessionUpdate` | Notes |
 |---|---|---|
 | `TURN_START` | (silent) | Returns `None`; no notification written. |
 | `LLM_TEXT` | `agent_message_chunk` | `content` is a single text block carrying the chunk. |
@@ -414,7 +414,7 @@ ACP clients that wait for the load response before sending the next prompt will 
 
 ## Permissions
 
-When a tool with `requires_confirmation=True` is about to run, `ACPTransport.confirm_tool` sends a server→client `session/request_permission` request and **blocks** until the client responds. The four option ids Agentao always offers:
+When a tool with `requires_confirmation=True` is about to run, `ACPTransport.confirm_tool` sends a server→client `session/request_permission` request and **blocks** until the client responds. The four option ids Arbiter always offers:
 
 | `optionId` | Outcome |
 |---|---|
@@ -468,8 +468,8 @@ After cancellation, the still-running `session/prompt` returns `{"stopReason": "
 | `session/prompt` with an `image` block returns `INVALID_PARAMS` | The block carries a by-reference `uri`, a non-`image/*` `mimeType`, invalid/oversized base64 `data`, or exceeds the per-prompt image count | Send inline `{data, mimeType}` only (no `uri`), with `image/*` and base64 within the size/count caps. |
 | `session/prompt` with `audio`/embedded `resource` block returns `INVALID_PARAMS` | Those block types are intentionally not supported in v1 | Use only `text`, `resource_link`, and inline `image` blocks. The capability flags in `initialize` advertise this. |
 | Server hangs forever waiting for `session/request_permission` | Client is not handling server→client requests | Check that the client routes incoming requests with `srv_*` ids back as JSON-RPC responses. |
-| Process exits with garbage on stdout | Some library is calling `print()` and you constructed `AcpServer` with explicit streams | The stdout guard only installs when `AcpServer()` is constructed with no `stdin`/`stdout` arguments. Use `agentao --acp --stdio` for production launches; the test path passes streams explicitly to avoid mutating global state. |
-| `python -m agentao --acp --stdio`: `No module named agentao.__main__` | Pre-v0.2.6 install | Upgrade — `agentao/__main__.py` ships from v0.2.6. |
+| Process exits with garbage on stdout | Some library is calling `print()` and you constructed `AcpServer` with explicit streams | The stdout guard only installs when `AcpServer()` is constructed with no `stdin`/`stdout` arguments. Use `arbiter --acp --stdio` for production launches; the test path passes streams explicitly to avoid mutating global state. |
+| `python -m arbiter --acp --stdio`: `No module named arbiter.__main__` | Pre-v0.2.6 install | Upgrade — `arbiter/__main__.py` ships from v0.2.6. |
 
 ---
 
@@ -513,5 +513,5 @@ The pattern (mirrored across `initialize.py`, `session_new.py`, `session_prompt.
 1. Define the handler: `def handle_<method>(server, params, *, <deps>) -> dict:`
 2. Validate params: raise `TypeError` for shape errors → `-32602`; raise `JsonRpcHandlerError(code, message)` for everything else.
 3. Add a `register(server, *, <deps>)` helper that wires the handler into `server._handlers` via `server.register(METHOD_X, lambda params: handle_<method>(server, params, ...))`.
-4. Wire `register(server)` into `agentao/acp/__main__.py::main()` so `python -m agentao --acp --stdio` picks it up.
+4. Wire `register(server)` into `arbiter/acp/__main__.py::main()` so `python -m arbiter --acp --stdio` picks it up.
 5. Write tests that exercise both the unit-level handler and the end-to-end wire path. Use a `FakeAgent` factory injected via the same `agent_factory` kwarg `session_new` exposes — it lets the test avoid pulling in the LLM stack.

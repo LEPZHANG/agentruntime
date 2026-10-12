@@ -13,7 +13,7 @@
 ```python
 from abc import ABC, abstractmethod
 from typing import Dict, Any
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 
 class MyTool(Tool):
     @property
@@ -81,7 +81,7 @@ Large responses (> a few dozen KB) should be **truncated or paginated** first, o
 
 ## Tool-call normalization
 
-Before a tool call is written back into conversation history or executed, Agentao normalizes the model's function-call payload:
+Before a tool call is written back into conversation history or executed, Arbiter normalizes the model's function-call payload:
 
 - argument strings are parsed and re-emitted as compact JSON when a safe repair is possible
 - near-miss tool names can be repaired to a registered tool name
@@ -136,18 +136,18 @@ class MyFileTool(Tool):
         return p.read_text()
 ```
 
-`self.working_directory` is auto-bound by Agentao at registration time, so in **multi-instance deployments** each agent's tools resolve paths against that agent's root. Using these helpers (not `Path(raw)`) gives you tenant isolation for free.
+`self.working_directory` is auto-bound by Arbiter at registration time, so in **multi-instance deployments** each agent's tools resolve paths against that agent's root. Using these helpers (not `Path(raw)`) gives you tenant isolation for free.
 
 ## Registering tools
 
-The contract way to inject tools is `Agentao(extra_tools=[...])` at construction or `agent.add_tool(...)` at runtime. Both paths bind `working_directory` / `filesystem` / `shell` and validate reserved names for you.
+The contract way to inject tools is `Arbiter(extra_tools=[...])` at construction or `agent.add_tool(...)` at runtime. Both paths bind `working_directory` / `filesystem` / `shell` and validate reserved names for you.
 
 ```python
 from pathlib import Path
-from agentao import Agentao
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path("/tmp/session-x"),
     transport=SdkTransport(),
     extra_tools=[MyTool()],          # visible from the first chat()
@@ -180,7 +180,7 @@ Hosts can also shrink the tools the model sees:
 |---|---|
 | Add a custom tool, or replace a built-in's implementation | `extra_tools=` / `add_tool(..., replace=True)` |
 | Hide a few inapplicable built-ins | `disable_tools={...}` |
-| Keep only a small set of agentao-owned tools | `enabled_tools={...}` |
+| Keep only a small set of arbiter-owned tools | `enabled_tools={...}` |
 | Strip to only your own tools + MCP | `enabled_tools=set()` plus `extra_tools=[...]` |
 | Mutate the surface mid-session | `add_tool()` / `remove_tool()` between turns |
 
@@ -196,7 +196,7 @@ These APIs reduce the **schema the model sees**; they are not authorization. If 
 """Your SaaS backend exposes order queries to the agent."""
 import json
 from typing import Dict, Any
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 
 class GetCustomerOrdersTool(Tool):
     def __init__(self, backend_client, tenant_id: str):
@@ -261,7 +261,7 @@ class GetCustomerOrdersTool(Tool):
 
 # --- In your web handler ---
 def make_agent_for_tenant(tenant, backend):
-    return Agentao(
+    return Arbiter(
         working_directory=Path(f"/tmp/{tenant.id}"),
         transport=SdkTransport(...),
         extra_tools=[

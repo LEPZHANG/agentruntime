@@ -18,9 +18,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from agentao.embedding import build_from_environment
-from agentao.transport import SdkTransport
-from agentao.transport.events import EventType
+from arbiter.embedding import build_from_environment
+from arbiter.transport import SdkTransport
+from arbiter.transport.events import EventType
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -50,8 +50,8 @@ def seed_fake_data() -> None:
 def prepare_workspace() -> Path:
     """Copy (symlink) the skills into the per-session workdir."""
     WORKDIR.mkdir(parents=True, exist_ok=True)
-    src_skills_root = ROOT / ".agentao" / "skills"
-    dst_skills_root = WORKDIR / ".agentao" / "skills"
+    src_skills_root = ROOT / ".arbiter" / "skills"
+    dst_skills_root = WORKDIR / ".arbiter" / "skills"
     dst_skills_root.mkdir(parents=True, exist_ok=True)
 
     for skill in ("duckdb-analyst", "matplotlib-charts"):

@@ -6,7 +6,7 @@ Agent 运行时与你的用户界面之间的唯一接口就是 **Transport**。
 - **Transport** — 推送接口（`emit` / `ask_confirmation` / `ask_user` / `bailout`）；运行时和 UI 之间的唯一缝隙 · [§4.1](/zh/part-4/1-transport-protocol)、[G.2](/zh/appendix/g-glossary#g-2-扩展点)
 - **AgentEvent** — 内部事件类型（文本片段、工具启动/完成、LLM 调用）—— 仅供调试，**版本间不保证稳定** · [§4.2](/zh/part-4/2-agent-events)、[G.6](/zh/appendix/g-glossary#g-6-事件类型速查)
 - **HostEvent** — Pydantic 类型的生命周期事件（tool / permission / subagent）；**稳定**，附 schema 快照 · [§4.7](/zh/part-4/7-host-contract)、[G.1](/zh/appendix/g-glossary#g-1-核心概念)
-- **`agent.events()`** — 落在**稳定** `agentao.host` 表面上的异步 pull 迭代器；审计 / SIEM / 计费用 · [§4.7](/zh/part-4/7-host-contract)
+- **`agent.events()`** — 落在**稳定** `arbiter.host` 表面上的异步 pull 迭代器；审计 / SIEM / 计费用 · [§4.7](/zh/part-4/7-host-contract)
 - **`active_permissions()`** — 当前生效策略的 JSON 化快照，给"谁能做什么"UI 用 · [§4.7](/zh/part-4/7-host-contract#active-permissions-策略快照)、[G.5](/zh/appendix/g-glossary#g-5-安全术语)
 :::
 

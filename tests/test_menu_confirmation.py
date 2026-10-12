@@ -8,12 +8,12 @@ from io import StringIO
 def test_menu_confirmation_yes():
     """Test selecting 'Yes' (option 1) in confirmation menu."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar.readkey', return_value='1'):
-                from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar.readkey', return_value='1'):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 # Test confirmation with option 1 (Yes)
                 result = cli.confirm_tool_execution(
@@ -30,12 +30,12 @@ def test_menu_confirmation_yes():
 def test_menu_confirmation_yes_to_all():
     """Test selecting 'Yes to all' (option 2) in confirmation menu."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar.readkey', return_value='2'):
-                from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar.readkey', return_value='2'):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 # Test confirmation with option 2 (Yes to all)
                 result = cli.confirm_tool_execution(
@@ -52,12 +52,12 @@ def test_menu_confirmation_yes_to_all():
 def test_menu_confirmation_no():
     """Test selecting 'No' (option 3) in confirmation menu."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar.readkey', return_value='3'):
-                from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar.readkey', return_value='3'):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 # Test confirmation with option 3 (No)
                 result = cli.confirm_tool_execution(
@@ -74,15 +74,15 @@ def test_menu_confirmation_no():
 def test_allow_all_mode_bypass():
     """Test that allow_all mode bypasses confirmation prompt."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            from arbiter.cli import ArbiterCLI
 
-            cli = AgentaoCLI()
+            cli = ArbiterCLI()
             cli.allow_all_tools = True
 
             # Should not prompt when allow_all is enabled
-            with patch('agentao.cli.transport.readchar.readkey') as mock_readkey:
+            with patch('arbiter.cli.transport.readchar.readkey') as mock_readkey:
                 result = cli.confirm_tool_execution(
                     "test_tool",
                     "Test tool description",
@@ -97,12 +97,12 @@ def test_allow_all_mode_bypass():
 def test_keyboard_interrupt_handling():
     """Test that Ctrl+C cancels confirmation."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar.readkey', side_effect=KeyboardInterrupt):
-                from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar.readkey', side_effect=KeyboardInterrupt):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 # Test Ctrl+C handling
                 result = cli.confirm_tool_execution(
@@ -118,11 +118,11 @@ def test_keyboard_interrupt_handling():
 def test_session_state_initialization():
     """Test that CLI initializes with allow_all_tools = False."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            from arbiter.cli import ArbiterCLI
 
-            cli = AgentaoCLI()
+            cli = ArbiterCLI()
 
             assert hasattr(cli, 'allow_all_tools'), "Should have allow_all_tools attribute"
             assert cli.allow_all_tools is False, "Should initialize to False"
@@ -132,12 +132,12 @@ def test_session_state_initialization():
 def test_allow_all_persists_across_calls():
     """Test that allow_all mode persists across multiple tool calls."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar.readkey', return_value='2'):
-                from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar.readkey', return_value='2'):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 # First call - enable allow_all
                 result1 = cli.confirm_tool_execution("tool1", "desc1", {})
@@ -145,7 +145,7 @@ def test_allow_all_persists_across_calls():
                 assert cli.allow_all_tools is True
 
                 # Second call - should auto-approve without prompting
-                with patch('agentao.cli.transport.readchar.readkey') as mock_readkey:
+                with patch('arbiter.cli.transport.readchar.readkey') as mock_readkey:
                     result2 = cli.confirm_tool_execution("tool2", "desc2", {})
                     assert result2 is True
                     mock_readkey.assert_not_called()

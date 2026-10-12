@@ -15,4 +15,4 @@ better left inline.
 from inside `tests/`. Helpers here are **plain functions / classes**, not
 pytest fixtures — construction is explicit at the call site.
 
-See `plans/agentao-fixture-helper-abstract-rossum.md` for the migration plan.
+See `plans/arbiter-fixture-helper-abstract-rossum.md` for the migration plan.

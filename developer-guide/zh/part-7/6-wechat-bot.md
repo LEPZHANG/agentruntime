@@ -1,13 +1,13 @@
 # 7.6 蓝图 F · 微信智能机器人（ilink-style）
 
 ::: tip ⚡ 端到端可跑
-**产出** —— 一个长轮询守护进程，把每条进来的微信消息（私聊或群消息）跑一次 Agentao，把回复发回同一个联系人；联系人 ID 决定权限预设（白名单 → workspace-write；其余 → read-only）。
-**技术栈** —— Python · `asyncio` 长轮询 · 自带的 ilink / wechaty / itchat 客户端通过 `WeChatClient` Protocol 接入 · 每条消息一个新 `Agentao` 实例 · `llm_client_factory` 测试钩子。
+**产出** —— 一个长轮询守护进程，把每条进来的微信消息（私聊或群消息）跑一次 Arbiter，把回复发回同一个联系人；联系人 ID 决定权限预设（白名单 → workspace-write；其余 → read-only）。
+**技术栈** —— Python · `asyncio` 长轮询 · 自带的 ilink / wechaty / itchat 客户端通过 `WeChatClient` Protocol 接入 · 每条消息一个新 `Arbiter` 实例 · `llm_client_factory` 测试钩子。
 **源代码** —— [`examples/wechat-bot/`](https://github.com/jin-bo/agentao/tree/main/examples/wechat-bot)
 **运行** —— `uv sync` 然后用任何一个能讲 ilink-style 协议的客户端去喂这个 daemon
 :::
 
-**场景**：你已经有个微信号（一台手机 / 一台服务器跑着 ilink、wechaty、itchat 之类的桥接客户端），想给这个号加上"自然语言对话 + 工具执行"的能力。**这不是公众号 / 企业微信开放平台**——那条路要走 §7.6 之外的官方 webhook 通道；本蓝图走的是个人号 bot API（长轮询一个本地/远程 HTTP 接口），形态参考 [`Wechat-ggGitHub/wechat-claude-code`](https://github.com/Wechat-ggGitHub/wechat-claude-code)（同一个形状的 TypeScript 版本，挂的是 Claude Code SDK；这里是 Python + Agentao）。
+**场景**：你已经有个微信号（一台手机 / 一台服务器跑着 ilink、wechaty、itchat 之类的桥接客户端），想给这个号加上"自然语言对话 + 工具执行"的能力。**这不是公众号 / 企业微信开放平台**——那条路要走 §7.6 之外的官方 webhook 通道；本蓝图走的是个人号 bot API（长轮询一个本地/远程 HTTP 接口），形态参考 [`Wechat-ggGitHub/wechat-claude-code`](https://github.com/Wechat-ggGitHub/wechat-claude-code)（同一个形状的 TypeScript 版本，挂的是 Claude Code SDK；这里是 Python + Arbiter）。
 
 ## 谁 & 为什么
 
@@ -48,11 +48,11 @@ Python daemon（一个 asyncio 进程）
        │          await handle_message(...)
        │
        └─ handle_message(text, contact_id, send)
-            ├─ tempdir = mkdtemp("agentao-wechat-")
+            ├─ tempdir = mkdtemp("arbiter-wechat-")
             ├─ engine = make_permission_engine_for_contact(contact_id)
             │     allowlist 命中 → WORKSPACE_WRITE
             │     其余        → READ_ONLY
-            ├─ agent = Agentao(working_directory=tempdir,
+            ├─ agent = Arbiter(working_directory=tempdir,
             │                  llm_client=llm_client_factory(),
             │                  permission_engine=engine)
             ├─ reply = await agent.arun(text)
@@ -111,8 +111,8 @@ async def handle_message(
     send: Callable[..., Awaitable[Any]],
     llm_client_factory: Callable[[], LLMClient] = make_llm_client,
 ) -> str:
-    work_dir = Path(tempfile.mkdtemp(prefix="agentao-wechat-"))
-    agent = Agentao(
+    work_dir = Path(tempfile.mkdtemp(prefix="arbiter-wechat-"))
+    agent = Arbiter(
         working_directory=work_dir,
         llm_client=llm_client_factory(),
         permission_engine=make_permission_engine_for_contact(
@@ -190,7 +190,7 @@ async def test_run_polling_loop_processes_one_batch_then_exits() -> None:
         ],
         stop=stop,
     )
-    with patch("agentao.agent.Agentao._llm_call",
+    with patch("arbiter.agent.Arbiter._llm_call",
                lambda self, msgs, tools, token: _fake_response("ok")):
         await run_polling_loop(client, stop_event=stop, llm_client_factory=_fake_llm)
     assert client.sent == [
@@ -205,9 +205,9 @@ uv sync --extra dev
 uv run pytest tests/ -v   # 没微信、没 API key、没网络
 ```
 
-## 想要流式预览？接 `Agentao.events()`
+## 想要流式预览？接 `Arbiter.events()`
 
-参考 repo（`wechat-claude-code`）会把 LLM 输出的中间片段当成"打字中"实时回到聊天里。在 Agentao 这边，把 `agent.arun(text)` 换成订阅 `agent.events()` 流，把 `LLM_TEXT` 增量按"每 N 字符 / 每 M 毫秒"刷给 `client.send_message` 即可（事件契约见 [§4 事件流](/zh/part-4/)）。多数 ilink 客户端有单条消息频率限制，刷得太快会被截断——保守值是 **1.5 秒一段**。
+参考 repo（`wechat-claude-code`）会把 LLM 输出的中间片段当成"打字中"实时回到聊天里。在 Arbiter 这边，把 `agent.arun(text)` 换成订阅 `agent.events()` 流，把 `LLM_TEXT` 增量按"每 N 字符 / 每 M 毫秒"刷给 `client.send_message` 即可（事件契约见 [§4 事件流](/zh/part-4/)）。多数 ilink 客户端有单条消息频率限制，刷得太快会被截断——保守值是 **1.5 秒一段**。
 
 ## ⚠️ 陷阱
 
@@ -234,7 +234,7 @@ uv run pytest tests/ -v   # 没微信、没 API key、没网络
 - 跨消息的对话上下文（多轮记忆）
 - 共享的工作目录（agent 在第一条消息里写的文件，第三条消息能继续编辑）
 
-把 `_agents: dict[str, Agentao]` 缓存按 `contact_id` 留下来即可——同时**配一把 `asyncio.Lock` 防并发**，并加 LRU + 空闲超时（比如 30 分钟没消息就关 agent + 删工作目录）。这是从"每消息隔离"切到"每联系人会话"的最常见演进，但**多租户安全**就要重新算账了——参考 [§6.4 多租户隔离](/zh/part-6/4-multi-tenant-fs)。
+把 `_agents: dict[str, Arbiter]` 缓存按 `contact_id` 留下来即可——同时**配一把 `asyncio.Lock` 防并发**，并加 LRU + 空闲超时（比如 30 分钟没消息就关 agent + 删工作目录）。这是从"每消息隔离"切到"每联系人会话"的最常见演进，但**多租户安全**就要重新算账了——参考 [§6.4 多租户隔离](/zh/part-6/4-multi-tenant-fs)。
 
 ## 可运行代码
 
@@ -266,7 +266,7 @@ asyncio.run(run_polling_loop(IlinkClient()))
 - 安全 + 生产部署（[Part 6](/zh/part-6/)）
 - 六个本仓蓝图 + 一个外部案例（本部分）
 
-[§7.7 多 Agent 看板调度](./7-kanban-multiagent) 是 bonus 蓝图，指向衍生项目 [`agentao-kanban`](https://github.com/jin-bo/agentao-kanban)——如果你在做任何"工作队列"形态的产品（CI、批量评估、自主研究），值得读。
+[§7.7 多 Agent 看板调度](./7-kanban-multiagent) 是 bonus 蓝图，指向衍生项目 [`arbiter-kanban`](https://github.com/jin-bo/agentao-kanban)——如果你在做任何"工作队列"形态的产品（CI、批量评估、自主研究），值得读。
 
 接下来的附录——完整 API 参考、配置键索引、ACP 消息字段、错误码、框架迁移、FAQ、术语表——是落地过程中常翻的查询手册。
 

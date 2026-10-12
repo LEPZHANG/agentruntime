@@ -16,7 +16,7 @@ spec:
           restartPolicy: Never
           containers:
           - name: runner
-            image: your-registry/agentao-digest:v0.2.11
+            image: your-registry/arbiter-digest:v0.2.11
             command: ["python", "-m", "src.daily_digest"]
             env:
             - name: OPENAI_API_KEY

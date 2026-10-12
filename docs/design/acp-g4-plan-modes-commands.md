@@ -11,7 +11,7 @@ now-work). The `modes` half landed as designed (and is also advertised on the
 *pre-permission-decision* (a denied call showed a phantom applied plan) and
 orphaned the empty/malformed fallback `tool_call`; validation is **all-or-nothing**.
 §4.2 and §7 describe the final, implemented design.
-**Audience:** Agentao maintainers; the DeepChat/TensorChat integration owner.
+**Audience:** Arbiter maintainers; the DeepChat/TensorChat integration owner.
 **Companion:** `acp-g4-plan-modes-commands.zh.md`.
 **Related:**
 - `acp-server-conformance-review.md` — defines G4 and the chat/automation decision this design serves.
@@ -19,7 +19,7 @@ orphaned the empty/malformed fallback `tool_call`; validation is **all-or-nothin
 - `embedding-vs-acp.md` — ACP is a frontend over the embedded core; keep mappings in the ACP layer, not the runtime.
 
 **Method:** ACP shapes are quoted verbatim from the official v1 schema
-(`schema/v1/schema.json`, fetched 2026-06-18). agentao primitives are anchored to
+(`schema/v1/schema.json`, fetched 2026-06-18). arbiter primitives are anchored to
 `main`@`bcdb8e4`. Every mapping below was checked against actual source — no
 intuition mappings.
 
@@ -27,12 +27,12 @@ intuition mappings.
 
 ## TL;DR
 
-G4 surfaces three internal Agentao concepts as standard ACP `session/update`
+G4 surfaces three internal Arbiter concepts as standard ACP `session/update`
 notifications a chat client renders natively: the **task checklist** (→ `plan`),
 the **permission mode** (→ `modes` + `current_mode_update`), and **slash
 commands** (→ `available_commands_update`). Each maps to an existing primitive:
 
-| ACP surface (schema-verified) | Agentao primitive | Fit | Recommendation |
+| ACP surface (schema-verified) | Arbiter primitive | Fit | Recommendation |
 |---|---|---|---|
 | `plan` update — `Plan{entries:[PlanEntry{content, priority, status}]}` | `todo_write` tool (`tools/todo.py`); `todos:[{content,status}]`, status enum identical | High — only `priority` missing | **Do 2nd** — transport maps it, **deferred to `TOOL_COMPLETE`-on-`ok`**, synthesize `priority:"medium"` |
 | `modes` (session/new) + `current_mode_update` | `PermissionMode{read-only, workspace-write, full-access, plan}` (`permissions.py:75`); typed-up the existing loose `modes` schema field; emit `current_mode_update` **from the set_mode handler** | High — 4 presets → availableModes | **Do 1st** — smallest, highest conformance value |
@@ -45,7 +45,7 @@ Two conformance asides surfaced while verifying (fold back into the review doc):
 **(1)** ACP `ToolKind` has **10** values (`read, edit, delete, move, search,
 execute, think, fetch, switch_mode, other`) — the review said 9. **(2)** the ACP
 standard `SetSessionModeResponse` is an **empty object**; the mode change is
-communicated via `current_mode_update`, whereas agentao currently returns
+communicated via `current_mode_update`, whereas arbiter currently returns
 `{modeId}` (`session_set_mode.py:86`).
 
 ---
@@ -93,7 +93,7 @@ AvailableCommandInput   = { hint: string }                 // "all text after th
 
 ---
 
-## 3. Agentao source primitives
+## 3. Arbiter source primitives
 
 - **`todo_write`** (`tools/todo.py` — `TodoWriteTool`): holds `self.todos:
   List[{content, status}]`; status enum `pending|in_progress|completed` is a **1:1
@@ -118,7 +118,7 @@ AvailableCommandInput   = { hint: string }                 // "all text after th
 
 ### 4.1 Modes (do first)
 
-**Schema** (`agentao/acp/schema.py`): add `AcpSessionMode{id, name, description?}`,
+**Schema** (`arbiter/acp/schema.py`): add `AcpSessionMode{id, name, description?}`,
 `AcpSessionModeState{currentModeId, availableModes}`, and an
 `AcpSessionUpdateCurrentMode{sessionUpdate:"current_mode_update", currentModeId}`;
 add the latter to the `AcpSessionUpdate` union (`schema.py:567`). Note `modes`
@@ -209,7 +209,7 @@ carries the full raw args) rather than emit a truncated or empty plan.
 > popped on completion. (`todo_write` is a plain sync tool with no `output_callback`,
 > so it never emits `TOOL_OUTPUT` between the two — no intermediate orphan risk.)
 
-**Priority**: agentao todos have no priority; ACP requires it → emit `"medium"`
+**Priority**: arbiter todos have no priority; ACP requires it → emit `"medium"`
 for all. **Out of scope for this PR:** adding a `priority` field to the
 `todo_write` tool schema — that turns an ACP-adapter change into a runtime/tool
 contract change and isn't worth it. Zero runtime change: the mapping lives entirely
@@ -217,7 +217,7 @@ in the ACP transport, consistent with `embedding-vs-acp.md`.
 
 ### 4.3 Commands — deferred, no implementation planned this round
 
-agentao's slash commands are host/CLI subsystem control with **no agent-runtime
+arbiter's slash commands are host/CLI subsystem control with **no agent-runtime
 meaning** over ACP, and ACP command *invocation* routes the command back as
 `session/prompt` text (`UnstructuredCommandInput` = "all text after the name"),
 which the agent would have to parse and dispatch — a separate mechanism from
@@ -238,7 +238,7 @@ speculative advertise-only tier.
    `kind` enum, currently 6) should target 10. `switch_mode` is also a candidate
    kind for surfacing a mode switch as a tool call (optional).
 2. **`session/set_mode` response**: ACP standard is empty; change via
-   `current_mode_update`. agentao's `{modeId}` is a non-standard extra (kept for
+   `current_mode_update`. arbiter's `{modeId}` is a non-standard extra (kept for
    DeepChat). G4.1 resolves this by adding the notification.
 
 ---
@@ -247,23 +247,23 @@ speculative advertise-only tier.
 
 **PR-1 — and only this PR. Two things:** typed modes + `current_mode_update`, and
 the defensive `todo_write`→`plan` transport mapping.
-- `agentao/acp/schema.py`: add `AcpSessionMode` / `AcpSessionModeState` /
+- `arbiter/acp/schema.py`: add `AcpSessionMode` / `AcpSessionModeState` /
   `AcpSessionUpdateCurrentMode` / `AcpPlanEntry` / `AcpSessionUpdatePlan`; **replace
   the loose `modes: Optional[Dict[str,Any]]`** (`schema.py:198`) with
   `AcpSessionModeState`; add the two new updates to the `AcpSessionUpdate` union.
   Regenerate `docs/schema/host.acp.v1.json`; update schema snapshot tests.
-- `agentao/acp/transport.py`: map `todo_write`→`plan`, **deferred to
+- `arbiter/acp/transport.py`: map `todo_write`→`plan`, **deferred to
   `TOOL_COMPLETE`-on-`ok`** (stash at `TOOL_START` keyed by `call_id`;
   all-or-nothing validation; denied/failed → no plan; empty/malformed → fallback
   `tool_call` that completes normally). Optionally also map
   `PERMISSION_MODE_CHANGED`→`current_mode_update` for completeness — but it is not
   load-bearing for the ACP path (see §4.1).
-- `agentao/acp/_transport_helpers.py`: `_todo_write_plan` (all-or-nothing validate,
+- `arbiter/acp/_transport_helpers.py`: `_todo_write_plan` (all-or-nothing validate,
   synthesize `priority:"medium"`).
-- `agentao/acp/session_new.py`: emit the typed `modes` in the response.
-- `agentao/acp/session_load.py`: `resume_session_on_new` advertises the same typed
+- `arbiter/acp/session_new.py`: emit the typed `modes` in the response.
+- `arbiter/acp/session_load.py`: `resume_session_on_new` advertises the same typed
   `modes`, so a `--resume` client gets the same mode selector as a fresh session.
-- `agentao/acp/session_set_mode.py`: **emit `current_mode_update` from the handler**
+- `arbiter/acp/session_set_mode.py`: **emit `current_mode_update` from the handler**
   after `session.mode_id = mode_id`; keep returning `{modeId}` for DeepChat.
 - Tests: `tests/test_acp_transport.py` (plan deferred at `TOOL_START` then emitted on
   `TOOL_COMPLETE`-`ok`; denied/failed → no plan; empty/malformed → fallback

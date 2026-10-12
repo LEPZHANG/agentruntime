@@ -2,10 +2,10 @@
 
 > **本节你会学到**
 > - 什么场景适合用 MCP，什么场景应当写自定义 Tool
-> - Agentao 支持的三种 transport（stdio、Streamable HTTP、SSE）
+> - Arbiter 支持的三种 transport（stdio、Streamable HTTP、SSE）
 > - 多租户模式：会话级 `extra_mcp_servers`、环境变量展开、`trust:` 的边界
 
-**MCP（Model Context Protocol）** 是"工具互操作的事实标准"。Agentao 作为 MCP Client，可以接入任何 MCP 兼容服务器——GitHub、Filesystem、Postgres、Slack、Jira、你自己写的……所有这些工具都会**自动**以 `mcp_{server}_{tool}` 的形式出现在 Agent 可用工具列表里。
+**MCP（Model Context Protocol）** 是"工具互操作的事实标准"。Arbiter 作为 MCP Client，可以接入任何 MCP 兼容服务器——GitHub、Filesystem、Postgres、Slack、Jira、你自己写的……所有这些工具都会**自动**以 `mcp_{server}_{tool}` 的形式出现在 Agent 可用工具列表里。
 
 ## MCP 能做什么
 
@@ -26,8 +26,8 @@
 **文件位置**（同名冲突时**用户级胜**；项目级**仅可新增名字**）：
 
 ```
-~/.agentao/mcp.json         ← 用户级（所有项目共享；任何在该文件声明的 server name 都以此为准）
-<working_dir>/.agentao/mcp.json ← 项目级（仅可声明新 name，不能覆盖用户级同名条目）
+~/.arbiter/mcp.json         ← 用户级（所有项目共享；任何在该文件声明的 server name 都以此为准）
+<working_dir>/.arbiter/mcp.json ← 项目级（仅可声明新 name，不能覆盖用户级同名条目）
 ```
 
 ::: tip 为何仅可新增？
@@ -70,9 +70,9 @@
 构造 Agent 时通过 `extra_mcp_servers` 参数注入——**完全跳过 JSON 文件**，按会话/租户动态生成：
 
 ```python
-from agentao import Agentao
+from arbiter import Arbiter
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path(f"/tmp/tenant-{tenant.id}"),
     extra_mcp_servers={
         "github-per-tenant": {
@@ -84,7 +84,7 @@ agent = Agentao(
 )
 ```
 
-合并规则：**同名覆盖** `.agentao/mcp.json` 的同名条目。
+合并规则：**同名覆盖** `.arbiter/mcp.json` 的同名条目。
 
 ## 配置字段详解
 
@@ -120,7 +120,7 @@ agent = Agentao(
 | `trust` | ❌ | 同上 |
 
 ::: info Streamable HTTP 已支持
-Agentao 的 MCP 客户端导入了 `stdio_client`、`sse_client`，**以及** `streamable_http_client`（外加 `create_mcp_http_client`），三种 transport 都能接入。`type` 选择 transport（`"stdio"` / `"http"` / `"sse"`）；省略时自动推断——`command` → stdio，裸 `url` → **Streamable HTTP**。旧版 SSE 需要显式写 `"type": "sse"`。未知的 `type` 或缺少必填键会 fail closed（`McpTransportConfigError`）。ACP 握手会通告 `mcpCapabilities.http: true`。
+Arbiter 的 MCP 客户端导入了 `stdio_client`、`sse_client`，**以及** `streamable_http_client`（外加 `create_mcp_http_client`），三种 transport 都能接入。`type` 选择 transport（`"stdio"` / `"http"` / `"sse"`）；省略时自动推断——`command` → stdio，裸 `url` → **Streamable HTTP**。旧版 SSE 需要显式写 `"type": "sse"`。未知的 `type` 或缺少必填键会 fail closed（`McpTransportConfigError`）。ACP 握手会通告 `mcpCapabilities.http: true`。
 :::
 
 ## 环境变量展开
@@ -138,12 +138,12 @@ Agentao 的 MCP 客户端导入了 `stdio_client`、`sse_client`，**以及** `s
 
 ## MCP 工具的命名
 
-一个 MCP Server 发现的每个工具都被包装为 Agentao Tool，**名字加前缀**：
+一个 MCP Server 发现的每个工具都被包装为 Arbiter Tool，**名字加前缀**：
 
 ```
 Server: "github"
 MCP 工具: "create_issue"
-Agentao 里的名字: "mcp_github_create_issue"
+Arbiter 里的名字: "mcp_github_create_issue"
 ```
 
 名字里的非 `[a-zA-Z0-9_]` 字符会被替换成 `_`。
@@ -166,7 +166,7 @@ if agent.mcp_manager:
     print(f"{len(agent.mcp_manager.clients)} server(s) connected")
 ```
 
-日志文件 `agentao.log` 会记录：
+日志文件 `arbiter.log` 会记录：
 - MCP Server 启动成功/失败
 - 每个工具发现
 - 工具调用参数和结果
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     mcp.run()   # 默认 stdio
 ```
 
-然后在 `.agentao/mcp.json` 里：
+然后在 `.arbiter/mcp.json` 里：
 
 ```json
 {
@@ -257,7 +257,7 @@ MCP 工具默认**也需要确认**（等同 `requires_confirmation=True`），�
 
 ### MCP 工具注解：`readOnlyHint` / `destructiveHint`
 
-如果 server 声明了标准 MCP `ToolAnnotations`，Agentao 会读取 —— **但仅当 `trust: true` 时**（按 MCP 规范：客户端不应基于来自不受信任 server 的注解作出工具决策）。
+如果 server 声明了标准 MCP `ToolAnnotations`，Arbiter 会读取 —— **但仅当 `trust: true` 时**（按 MCP 规范：客户端不应基于来自不受信任 server 的注解作出工具决策）。
 
 | `trust` | 注解 | 效果 |
 |---|---|---|
@@ -280,7 +280,7 @@ MCP 工具默认**也需要确认**（等同 `requires_confirmation=True`），�
 
 ### ❌ Server 启动失败但 Agent 静默继续
 
-Agentao 的 MCP 初始化是**容错**的——单个 Server 失败只会 log warning，不会阻塞 Agent 构造。检查 `agentao.log`：
+Arbiter 的 MCP 初始化是**容错**的——单个 Server 失败只会 log warning，不会阻塞 Agent 构造。检查 `arbiter.log`：
 
 ```
 MCP: failed to start 'github': ...
@@ -301,7 +301,7 @@ MCP: 12 tools from 2 server(s)       ← 有些 Server 没起来
 
 - **MCP** 用来消费第三方工具生态（GitHub / 文件系统 / Postgres / Slack …）；**自定义 Tool** 用来封装你自己的业务逻辑。
 - 三种 transport：**stdio** 子进程、**Streamable HTTP** URL（裸 `url` 的默认）、或旧版 **SSE** URL（`"type":"sse"`）。
-- 多租户 token：构造时传 `extra_mcp_servers`（`{name: {command, args, env}}`），同名会覆盖 `.agentao/mcp.json`。项目级 `.agentao/mcp.json` 是**仅可新增**的 —— 不能覆盖用户级同名条目。
+- 多租户 token：构造时传 `extra_mcp_servers`（`{name: {command, args, env}}`），同名会覆盖 `.arbiter/mcp.json`。项目级 `.arbiter/mcp.json` 是**仅可新增**的 —— 不能覆盖用户级同名条目。
 - 工具命名：`mcp_{server}_{tool}` ——自动加前缀避免不同服务器的同名冲突。
 - 写操作能力的 Server **绝对不要**设 `trust: true`，会绕过所有确认。
 

@@ -1,4 +1,4 @@
-"""Tests for ``agentao doctor`` and ``agentao config validate``.
+"""Tests for ``arbiter doctor`` and ``arbiter config validate``.
 
 These commands aggregate or validate existing health signals; they must not
 require an instantiated agent and must not print API keys.
@@ -14,7 +14,7 @@ from typing import Dict
 
 import pytest
 
-from agentao.cli.diagnostics_cli import (
+from arbiter.cli.diagnostics_cli import (
     DiagnosticReport,
     Finding,
     _collect_mcp,
@@ -25,7 +25,7 @@ from agentao.cli.diagnostics_cli import (
     handle_config_validate_subcommand,
     handle_doctor_subcommand,
 )
-from agentao.cli.entrypoints import _build_parser
+from arbiter.cli.entrypoints import _build_parser
 
 
 # ----------------------------------------------------------------------
@@ -50,7 +50,7 @@ def isolated_wd(tmp_path, monkeypatch):
         "ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL",
     ):
         monkeypatch.delenv(var, raising=False)
-    # Re-route ~/.agentao away from the real user home so tests do not
+    # Re-route ~/.arbiter away from the real user home so tests do not
     # observe (or mutate) the developer's memory store.
     fake_home = tmp_path / "fake_home"
     fake_home.mkdir()
@@ -100,8 +100,8 @@ class TestCollectSettings:
         assert report.sections["settings"]["status"] == "absent"
 
     def test_malformed_json_is_an_error(self, isolated_wd):
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "settings.json").write_text("{not json", encoding="utf-8")
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "settings.json").write_text("{not json", encoding="utf-8")
 
         report = DiagnosticReport()
         _collect_settings(isolated_wd, report)
@@ -113,8 +113,8 @@ class TestCollectSettings:
         assert "settings.json" in (err.source or "")
 
     def test_non_object_top_level_is_an_error(self, isolated_wd):
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "settings.json").write_text("[1, 2, 3]", encoding="utf-8")
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "settings.json").write_text("[1, 2, 3]", encoding="utf-8")
 
         report = DiagnosticReport()
         _collect_settings(isolated_wd, report)
@@ -122,8 +122,8 @@ class TestCollectSettings:
         assert report.sections["settings"]["status"] == "malformed"
 
     def test_well_formed_settings_is_ok(self, isolated_wd):
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "settings.json").write_text(
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "settings.json").write_text(
             json.dumps({"replay": {"enabled": True}}), encoding="utf-8",
         )
 
@@ -178,7 +178,7 @@ class TestCollectPermissions:
         assert section["project_status"] == "absent"
 
     def test_malformed_user_permissions_is_error(self, isolated_wd):
-        ur = Path.home() / ".agentao"
+        ur = Path.home() / ".arbiter"
         ur.mkdir(parents=True, exist_ok=True)
         (ur / "permissions.json").write_text("{broken", encoding="utf-8")
 
@@ -188,8 +188,8 @@ class TestCollectPermissions:
         assert report.sections["permissions"]["user_status"] == "malformed"
 
     def test_project_scope_permissions_warns(self, isolated_wd):
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "permissions.json").write_text(
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "permissions.json").write_text(
             json.dumps({"rules": []}), encoding="utf-8",
         )
 
@@ -206,8 +206,8 @@ class TestCollectPermissions:
 
 class TestCollectMcp:
     def test_malformed_mcp_is_error(self, isolated_wd):
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "mcp.json").write_text("{not json", encoding="utf-8")
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "mcp.json").write_text("{not json", encoding="utf-8")
 
         report = DiagnosticReport()
         _collect_mcp(isolated_wd, report)
@@ -215,8 +215,8 @@ class TestCollectMcp:
         assert report.sections["mcp"]["project_status"] == "malformed"
 
     def test_servers_must_be_object(self, isolated_wd):
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "mcp.json").write_text(
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "mcp.json").write_text(
             json.dumps({"mcpServers": [1, 2, 3]}), encoding="utf-8",
         )
 
@@ -228,8 +228,8 @@ class TestCollectMcp:
     def test_individual_server_entry_must_be_object(self, isolated_wd):
         # Regression: previously this passed as "ok" but would crash the
         # runtime loader's _expand_config_env(dict(config)) on the string.
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "mcp.json").write_text(
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "mcp.json").write_text(
             json.dumps({"mcpServers": {"bad": "oops", "good": {"command": "x"}}}),
             encoding="utf-8",
         )
@@ -244,8 +244,8 @@ class TestCollectMcp:
     def test_nested_env_must_be_strings(self, isolated_wd):
         # `expand_env_vars` will TypeError on a non-string; the validator
         # must catch this before the runtime loader does.
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "mcp.json").write_text(
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "mcp.json").write_text(
             json.dumps({
                 "mcpServers": {
                     "srv": {"command": "x", "env": {"PORT": 3000}},
@@ -262,8 +262,8 @@ class TestCollectMcp:
         )
 
     def test_nested_args_must_be_list_of_strings(self, isolated_wd):
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "mcp.json").write_text(
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "mcp.json").write_text(
             json.dumps({"mcpServers": {"srv": {"command": "x", "args": ["ok", 5]}}}),
             encoding="utf-8",
         )
@@ -275,14 +275,14 @@ class TestCollectMcp:
     def test_warns_on_user_project_collision(self, isolated_wd):
         # Runtime drops the project entry silently — validator must warn so
         # the user knows their project entry is dead.
-        ur = Path.home() / ".agentao"
+        ur = Path.home() / ".arbiter"
         ur.mkdir(parents=True, exist_ok=True)
         (ur / "mcp.json").write_text(
             json.dumps({"mcpServers": {"shared": {"command": "user-bin"}}}),
             encoding="utf-8",
         )
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "mcp.json").write_text(
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "mcp.json").write_text(
             json.dumps({
                 "mcpServers": {
                     "shared": {"command": "project-bin"},
@@ -397,23 +397,23 @@ class TestCollectMemoryStores:
     def test_probe_does_not_create_files(self, isolated_wd):
         """Doctor must be read-only — sqlite3.connect on an absent path
         silently creates an empty file. A previous version did exactly that,
-        bootstrapping a memory DB just by running ``agentao doctor``."""
-        from agentao.cli.diagnostics_cli import _collect_memory_stores
+        bootstrapping a memory DB just by running ``arbiter doctor``."""
+        from arbiter.cli.diagnostics_cli import _collect_memory_stores
 
         report = DiagnosticReport()
         _collect_memory_stores(isolated_wd, report)
 
         section = report.sections["memory"]
         assert section["project_status"] == "absent"
-        assert not (isolated_wd / ".agentao" / "memory.db").exists()
-        assert not (isolated_wd / ".agentao").exists()  # parent dir untouched too
+        assert not (isolated_wd / ".arbiter" / "memory.db").exists()
+        assert not (isolated_wd / ".arbiter").exists()  # parent dir untouched too
 
     def test_probe_reports_ok_when_db_exists(self, isolated_wd):
         import sqlite3
-        from agentao.cli.diagnostics_cli import _collect_memory_stores
+        from arbiter.cli.diagnostics_cli import _collect_memory_stores
 
-        (isolated_wd / ".agentao").mkdir()
-        db = isolated_wd / ".agentao" / "memory.db"
+        (isolated_wd / ".arbiter").mkdir()
+        db = isolated_wd / ".arbiter" / "memory.db"
         sqlite3.connect(str(db)).close()
 
         report = DiagnosticReport()
@@ -450,15 +450,15 @@ class TestHandleDoctor:
             pass
         out = capsys.readouterr().out
         # Rich strips style tags so plain text remains.
-        assert "agentao doctor" in out
+        assert "arbiter doctor" in out
         assert "LLM provider" in out
         assert "Permissions" in out
         assert "Replay" in out
 
     def test_error_exit_when_finding_is_error(self, isolated_wd):
         # Malformed settings.json → error → non-zero exit.
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "settings.json").write_text("{broken", encoding="utf-8")
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "settings.json").write_text("{broken", encoding="utf-8")
 
         with pytest.raises(SystemExit) as exc:
             handle_doctor_subcommand(_ns(json_output=True))
@@ -471,7 +471,7 @@ class TestHandleDoctor:
 
 class TestDotenvLoading:
     def test_doctor_reads_api_key_from_dotenv(self, isolated_wd, capsys, monkeypatch):
-        """When the user runs `agentao init`, the API key lands in `.env`;
+        """When the user runs `arbiter init`, the API key lands in `.env`;
         the diagnostics handlers must honor that the same way the factory
         does, or they will falsely warn about a missing key right after
         setup."""
@@ -504,15 +504,15 @@ class TestHandleConfigValidate:
         assert not any(f["level"] == "error" for f in doc["findings"])
 
     def test_malformed_settings_exits_nonzero(self, isolated_wd):
-        (isolated_wd / ".agentao").mkdir()
-        (isolated_wd / ".agentao" / "settings.json").write_text("{broken", encoding="utf-8")
+        (isolated_wd / ".arbiter").mkdir()
+        (isolated_wd / ".arbiter" / "settings.json").write_text("{broken", encoding="utf-8")
         with pytest.raises(SystemExit) as exc:
             handle_config_validate_subcommand(_ns(json_output=True))
         assert exc.value.code == 1
 
     def test_validate_does_not_include_plugin_section(self, isolated_wd, capsys):
         # config validate is configuration-only; plugin diagnostics live in
-        # `agentao doctor` and `agentao plugin list`.
+        # `arbiter doctor` and `arbiter plugin list`.
         handle_config_validate_subcommand(_ns(json_output=True))
         out = capsys.readouterr().out
         doc = json.loads(out)
@@ -520,13 +520,13 @@ class TestHandleConfigValidate:
 
 
 class TestRejectUnknownArgs:
-    """``agentao doctor`` / ``agentao config`` are automation-oriented; a typo
-    like ``--jsno`` must fail loudly the way ``agentao run`` does, rather than
+    """``arbiter doctor`` / ``arbiter config`` are automation-oriented; a typo
+    like ``--jsno`` must fail loudly the way ``arbiter run`` does, rather than
     parse_known_args silently dropping it and exit-0'ing on the wrong flag."""
 
     def _run(self, monkeypatch, argv):
         import sys as _sys
-        from agentao import cli
+        from arbiter import cli
         monkeypatch.setattr(_sys, "argv", argv)
         # Stub the actual handlers so this test only asserts dispatch.
         monkeypatch.setattr(
@@ -544,30 +544,30 @@ class TestRejectUnknownArgs:
         return exc.value.code
 
     def test_doctor_typo_exits_two(self, monkeypatch, capsys):
-        code = self._run(monkeypatch, ["agentao", "doctor", "--jsno"])
+        code = self._run(monkeypatch, ["arbiter", "doctor", "--jsno"])
         assert code == 2
         err = capsys.readouterr().err
-        assert "agentao doctor: unrecognized arguments" in err
+        assert "arbiter doctor: unrecognized arguments" in err
         assert "--jsno" in err
 
     def test_config_unknown_flag_exits_two(self, monkeypatch, capsys):
-        code = self._run(monkeypatch, ["agentao", "config", "validate", "--bogus"])
+        code = self._run(monkeypatch, ["arbiter", "config", "validate", "--bogus"])
         assert code == 2
         err = capsys.readouterr().err
-        assert "agentao config: unrecognized arguments" in err
+        assert "arbiter config: unrecognized arguments" in err
         assert "--bogus" in err
 
     def test_doctor_with_only_known_flag_dispatches(self, monkeypatch):
         """Sanity: a clean invocation still reaches the handler (i.e. the
         extras gate isn't accidentally rejecting valid input)."""
         import sys as _sys
-        from agentao import cli
+        from arbiter import cli
         called: Dict[str, bool] = {}
         monkeypatch.setattr(
             cli, "handle_doctor_subcommand",
             lambda args: called.setdefault("ran", True),
             raising=False,
         )
-        monkeypatch.setattr(_sys, "argv", ["agentao", "doctor", "--json"])
+        monkeypatch.setattr(_sys, "argv", ["arbiter", "doctor", "--json"])
         cli.entrypoint()
         assert called.get("ran") is True

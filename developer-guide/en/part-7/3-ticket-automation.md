@@ -7,7 +7,7 @@
 **Run** — `uv run python -m src.triage "ticket text"`
 :::
 
-**Scenario**: incoming support tickets pile up faster than your agents can triage. You want Agentao to read each new ticket, classify it, pull context from the CRM, propose a reply, and **only auto-send when confidence is high** — otherwise leave a draft for a human.
+**Scenario**: incoming support tickets pile up faster than your agents can triage. You want Arbiter to read each new ticket, classify it, pull context from the CRM, propose a reply, and **only auto-send when confidence is high** — otherwise leave a draft for a human.
 
 ## Who & why
 
@@ -23,7 +23,7 @@ Zendesk / Intercom / HubSpot
           ▼
     FastAPI worker
           │
-          ├─ Agentao instance (single, reused — stateless triage)
+          ├─ Arbiter instance (single, reused — stateless triage)
           │    ├─ Custom tools:
           │    │    - get_customer_profile(email)
           │    │    - search_kb(query)
@@ -42,7 +42,7 @@ Zendesk / Intercom / HubSpot
 
 ```python
 # tools/support.py
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 import httpx
 
 class GetCustomerProfile(Tool):
@@ -88,7 +88,7 @@ class SendReply(Tool):
 
 ```python
 # permissions.py
-from agentao.permissions import PermissionEngine, PermissionDecision, PermissionMode
+from arbiter.permissions import PermissionEngine, PermissionDecision, PermissionMode
 
 class ConfidenceGatedEngine(PermissionEngine):
     def decide(self, tool_name: str, tool_args: dict):
@@ -141,7 +141,7 @@ description: Use for every inbound support ticket. Defines triage policy, tone, 
 ```python
 # worker.py
 from fastapi import FastAPI
-from agentao import Agentao
+from arbiter import Arbiter
 from pathlib import Path
 from .tools.support import GetCustomerProfile, SearchKb, GetOrderStatus, DraftReply, SendReply
 from .permissions import ConfidenceGatedEngine
@@ -153,7 +153,7 @@ def build_agent(ticket):
     workdir.mkdir(exist_ok=True)
     engine = ConfidenceGatedEngine(project_root=workdir)
     engine.set_mode(PermissionMode.READ_ONLY)
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=workdir,
         permission_engine=engine,
     )
@@ -185,7 +185,7 @@ async def on_ticket(ticket: dict):
 Store every turn to your audit log — managers need to see why the agent drafted what it drafted:
 
 ```python
-from agentao.transport import SdkTransport
+from arbiter.transport import SdkTransport
 
 def archive(ev):
     db.insert("ticket_agent_events", {
@@ -193,7 +193,7 @@ def archive(ev):
         "data": ev.data, "ts": time.time(),
     })
 
-agent = Agentao(transport=SdkTransport(on_event=archive), ...)
+agent = Arbiter(transport=SdkTransport(on_event=archive), ...)
 ```
 
 Reviewers query: "show me all cases where confidence was 0.85–0.92 last week" — that's your continuous-training signal.

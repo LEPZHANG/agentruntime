@@ -1,6 +1,6 @@
 # 3.3 Host as ACP Client — Architecture
 
-[3.2](./2-agentao-as-server) showed the wire protocol. This section is about **the machinery you build around it**: subprocess lifecycle, stdio I/O loops, concurrency, permission-UI bridging, and the cross-language shape of it all. Any language that can spawn subprocesses and read/write stdio can implement this — examples below include Node/TypeScript and Go.
+[3.2](./2-arbiter-as-server) showed the wire protocol. This section is about **the machinery you build around it**: subprocess lifecycle, stdio I/O loops, concurrency, permission-UI bridging, and the cross-language shape of it all. Any language that can spawn subprocesses and read/write stdio can implement this — examples below include Node/TypeScript and Go.
 
 ## 3.3.1 The six concerns of an ACP host
 
@@ -13,7 +13,7 @@ A production ACP client has to handle:
 | **Dispatch** | Route incoming JSON by shape: response vs. notification vs. server→client request |
 | **Matching** | Correlate responses back to the `id` of the request that sent them |
 | **UI bridge** | Show `session/request_permission` prompts, route replies back |
-| **Observability** | Log every RPC; tail the agent's `agentao.log` for deep debug |
+| **Observability** | Log every RPC; tail the agent's `arbiter.log` for deep debug |
 
 You can skip none of these in production.
 
@@ -39,7 +39,7 @@ Whichever language you pick, the minimal structure is three loops running concur
 └──────────────────────────────────────────────────────────┘
                      ▲ stdio
                      │
-           agentao --acp --stdio (subprocess)
+           arbiter --acp --stdio (subprocess)
 ```
 
 Why three? Because you **cannot** block the reader while handling a message — the agent's next notification is already arriving. Decouple:
@@ -99,7 +99,7 @@ export class ACPClient {
     async () => ({ result: { outcome: { outcome: "cancelled" } } });
 
   async start() {
-    this.proc = spawn("agentao", ["--acp", "--stdio"], {
+    this.proc = spawn("arbiter", ["--acp", "--stdio"], {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
@@ -107,8 +107,8 @@ export class ACPClient {
     rl.on("line", (line) => this.dispatch(line));
 
     this.proc.stderr.on("data", (chunk) => {
-      // agentao writes logs here; forward to your logger
-      process.stderr.write(`[agentao] ${chunk}`);
+      // arbiter writes logs here; forward to your logger
+      process.stderr.write(`[arbiter] ${chunk}`);
     });
 
     await this.call("initialize", {
@@ -211,7 +211,7 @@ type Client struct {
 }
 
 func Start() (*Client, error) {
-    cmd := exec.Command("agentao", "--acp", "--stdio")
+    cmd := exec.Command("arbiter", "--acp", "--stdio")
     stdin, _ := cmd.StdinPipe()
     stdout, _ := cmd.StdoutPipe()
     if err := cmd.Start(); err != nil { return nil, err }
@@ -303,7 +303,7 @@ ACP servers can die. Your host must cope:
 | Process exits with non-zero code | `exit` event on child process | Surface error, don't auto-restart unless you capture why |
 | stdout EOF / stream closed | Reader loop sees EOF | Mark all pending requests as failed; don't leak their futures |
 | Unresponsive (no reply in N seconds) | Per-request timer fires | Fail the specific request; decide whether to also `session/cancel` |
-| `initialize` returns a lower version than you sent | Response payload | Agentao echoes `protocolVersion=1`; if you sent `2`, accept the downgrade |
+| `initialize` returns a lower version than you sent | Response payload | Arbiter echoes `protocolVersion=1`; if you sent `2`, accept the downgrade |
 | JSON parse error | Reader catches exception | Log loud; drop the line (don't crash) |
 
 Restart strategy: avoid auto-restart during development (makes bugs invisible). In production, exponential backoff + circuit-breaker. Each restart spawns a fresh ACP process; existing `sessionId`s are lost unless you use `session/load` during reconnection.
@@ -313,7 +313,7 @@ Restart strategy: avoid auto-restart during development (makes bugs invisible). 
 - Log every outgoing request with its `id`, `method`, and `params` (truncate large payloads)
 - Log every incoming response with its `id` and a `duration_ms`
 - Surface `session/update` streams in a debug panel
-- Tail `<session_cwd>/agentao.log` for the agent side — that's where stack traces live
+- Tail `<session_cwd>/arbiter.log` for the agent side — that's where stack traces live
 - Alert on: RPC timeout rate, process restart count, permission-prompt timeout
 
 ---

@@ -2,13 +2,13 @@
 
 ## Goal
 
-Add non-interactive skill package management commands to Agentao:
+Add non-interactive skill package management commands to Arbiter:
 
 ```bash
-agentao skill install jin-bo/agentao-git-skill
-agentao skill remove web-scraper
-agentao skill list
-agentao skill update --all
+arbiter skill install jin-bo/agentao-git-skill
+arbiter skill remove web-scraper
+arbiter skill list
+arbiter skill update --all
 ```
 
 The design must fit the current codebase:
@@ -21,11 +21,11 @@ The design must fit the current codebase:
 
 From the current code:
 
-- [`agentao/cli/entrypoints.py`](../../agentao/cli/entrypoints.py) now owns top-level argument parsing, while subcommand dispatch lives under `agentao/cli/subcommands.py`. Any `agentao skill install ...` design should target the modular CLI package rather than the removed monolithic file.
-- [`agentao/skills/manager.py`](../../agentao/skills/manager.py#L24) only scans local folders and a disabled-skills config. It does not track install source, version, or update state.
+- [`arbiter/cli/entrypoints.py`](../../arbiter/cli/entrypoints.py) now owns top-level argument parsing, while subcommand dispatch lives under `arbiter/cli/subcommands.py`. Any `arbiter skill install ...` design should target the modular CLI package rather than the removed monolithic file.
+- [`arbiter/skills/manager.py`](../../arbiter/skills/manager.py#L24) only scans local folders and a disabled-skills config. It does not track install source, version, or update state.
 - Skills are already layered by priority:
-  1. `<home>/.agentao/skills`
-  2. `<project-root>/.agentao/skills`
+  1. `<home>/.arbiter/skills`
+  2. `<project-root>/.arbiter/skills`
   3. `<project-root>/skills`
 
 That layering is a good base. Installed remote skills should live in one managed layer, not in repo-root `skills/`.
@@ -35,11 +35,11 @@ That layering is a good base. Installed remote skills should live in one managed
 ### Commands
 
 ```bash
-agentao skill install <ref> [--scope global|project] [--force]
-agentao skill remove <name> [--scope global|project]
-agentao skill list [--installed] [--json]
-agentao skill update <name> [--scope global|project]
-agentao skill update --all [--scope global|project]
+arbiter skill install <ref> [--scope global|project] [--force]
+arbiter skill remove <name> [--scope global|project]
+arbiter skill list [--installed] [--json]
+arbiter skill update <name> [--scope global|project]
+arbiter skill update --all [--scope global|project]
 ```
 
 ### Default Scope
@@ -58,7 +58,7 @@ Recommended project-root detection:
   - `.git/`
   - `pyproject.toml`
   - `package.json`
-  - `.agentao/`
+  - `.arbiter/`
 
 This keeps installs local to the current repo in the common case, while still making the command usable from arbitrary directories.
 
@@ -67,7 +67,7 @@ This keeps installs local to the current repo in the common case, while still ma
 Support GitHub shorthand only:
 
 ```bash
-agentao skill install jin-bo/agentao-git-skill
+arbiter skill install jin-bo/agentao-git-skill
 ```
 
 Interpret as GitHub repo default branch, skill package at repo root.
@@ -75,7 +75,7 @@ Interpret as GitHub repo default branch, skill package at repo root.
 ### Remove Semantics
 
 ```bash
-agentao skill remove web-scraper
+arbiter skill remove web-scraper
 ```
 
 Behavior:
@@ -88,7 +88,7 @@ Behavior:
 
 ### List Semantics
 
-`agentao skill list` should show managed installed skills, not every discovered skill.
+`arbiter skill list` should show managed installed skills, not every discovered skill.
 
 Output fields:
 
@@ -103,7 +103,7 @@ Existing interactive `/skills` remains the command for "what skills are currentl
 
 Default behavior:
 
-- `agentao skill list` shows both project and global managed installs
+- `arbiter skill list` shows both project and global managed installs
 - output must clearly label each row with its scope
 - future optional flags can narrow the view, for example `--scope project` or `--scope global`
 
@@ -115,13 +115,13 @@ Do not introduce a separate `skills-installed/` directory.
 
 Managed installs should use the existing writable skill roots:
 
-- global: `<home>/.agentao/skills/<skill-name>/`
-- project: `<project-root>/.agentao/skills/<skill-name>/`
+- global: `<home>/.arbiter/skills/<skill-name>/`
+- project: `<project-root>/.arbiter/skills/<skill-name>/`
 
 `SkillManager` scan order stays simple:
 
-1. `<home>/.agentao/skills/`
-2. `<project-root>/.agentao/skills/`
+1. `<home>/.arbiter/skills/`
+2. `<project-root>/.arbiter/skills/`
 3. `<project-root>/skills/`
 
 Rationale:
@@ -135,8 +135,8 @@ Rationale:
 
 Add a registry JSON file per scope:
 
-- global: `<home>/.agentao/skills_registry.json`
-- project: `<project-root>/.agentao/skills_registry.json`
+- global: `<home>/.arbiter/skills_registry.json`
+- project: `<project-root>/.arbiter/skills_registry.json`
 
 Example:
 
@@ -149,17 +149,17 @@ Example:
       "source_ref": "jin-bo/agentao-git-skill",
       "installed_at": "2026-04-10T12:00:00Z",
       "install_scope": "global",
-      "install_dir": "<home>/.agentao/skills/web-scraper",
+      "install_dir": "<home>/.arbiter/skills/web-scraper",
       "version": "1.2.0",
       "revision": "sha256:abcd",
       "etag": "W/\"1234\"",
-      "manifest_path": "<home>/.agentao/skills/web-scraper/skill.json"
+      "manifest_path": "<home>/.arbiter/skills/web-scraper/skill.json"
     }
   }
 }
 ```
 
-This is separate from [`skills_config.json`](../../agentao/skills/manager.py#L20), which should continue to store disabled-skill state only.
+This is separate from [`skills_config.json`](../../arbiter/skills/manager.py#L20), which should continue to store disabled-skill state only.
 
 ## Package Format
 
@@ -203,7 +203,7 @@ Rules:
 
 ### 1. `SkillManager` remains runtime loader
 
-Keep [`SkillManager`](../../agentao/skills/manager.py) focused on:
+Keep [`SkillManager`](../../arbiter/skills/manager.py) focused on:
 
 - scanning directories
 - parsing `SKILL.md`
@@ -220,7 +220,7 @@ Do not put network/download/update logic into `SkillManager`.
 
 New module:
 
-- `agentao/skills/registry.py`
+- `arbiter/skills/registry.py`
 
 Responsibilities:
 
@@ -233,7 +233,7 @@ Responsibilities:
 
 New module:
 
-- `agentao/skills/installer.py`
+- `arbiter/skills/installer.py`
 
 Responsibilities:
 
@@ -248,7 +248,7 @@ Responsibilities:
 
 New module:
 
-- `agentao/skills/sources.py`
+- `arbiter/skills/sources.py`
 
 Interface:
 
@@ -269,7 +269,7 @@ This keeps `install` and `update` extensible without coupling CLI to source-spec
 Input:
 
 ```bash
-agentao skill install jin-bo/agentao-git-skill
+arbiter skill install jin-bo/agentao-git-skill
 ```
 
 Recommended fetch strategy:
@@ -291,8 +291,8 @@ Stored metadata:
 Future extension:
 
 ```bash
-agentao skill install jin-bo/agentao-git-skill@v1.4.0
-agentao skill install github.com/jin-bo/agentao-git-skill
+arbiter skill install jin-bo/agentao-git-skill@v1.4.0
+arbiter skill install github.com/jin-bo/agentao-git-skill
 ```
 
 ## Update Semantics
@@ -300,7 +300,7 @@ agentao skill install github.com/jin-bo/agentao-git-skill
 ### Single Skill
 
 ```bash
-agentao skill update web-scraper
+arbiter skill update web-scraper
 ```
 
 Flow:
@@ -318,7 +318,7 @@ Flow:
 ### Batch
 
 ```bash
-agentao skill update --all
+arbiter skill update --all
 ```
 
 Flow:
@@ -353,10 +353,10 @@ This avoids half-installed skills.
 
 ### Problem
 
-[`entrypoint()`](../../agentao/cli/entrypoints.py) currently parses the top-level CLI, with subcommand handling split into `agentao/cli/subcommands.py`:
+[`entrypoint()`](../../arbiter/cli/entrypoints.py) currently parses the top-level CLI, with subcommand handling split into `arbiter/cli/subcommands.py`:
 
-- `agentao init`
-- `agentao -p`
+- `arbiter init`
+- `arbiter -p`
 - interactive mode
 
 It should be refactored to explicit subparsers.
@@ -365,11 +365,11 @@ It should be refactored to explicit subparsers.
 
 Top-level subcommands:
 
-- `agentao init`
-- `agentao skill ...`
-- `agentao` interactive
-- `agentao -p ...`
-- `agentao --acp --stdio`
+- `arbiter init`
+- `arbiter skill ...`
+- `arbiter` interactive
+- `arbiter -p ...`
+- `arbiter --acp --stdio`
 
 Skill subcommands:
 
@@ -384,7 +384,7 @@ Suggested implementation split:
 - add `build_parser()`
 - add `handle_skill_subcommand(args)`
 
-New CLI helpers should land in the relevant `agentao/cli/` module directly; avoid reintroducing a monolithic single-file CLI.
+New CLI helpers should land in the relevant `arbiter/cli/` module directly; avoid reintroducing a monolithic single-file CLI.
 
 ## Validation Rules
 
@@ -422,10 +422,10 @@ It must never delete:
 
 and it must never delete manually created skills in:
 
-- `<home>/.agentao/skills/<name>`
-- `<project-root>/.agentao/skills/<name>`
+- `<home>/.arbiter/skills/<name>`
+- `<project-root>/.arbiter/skills/<name>`
 
-unless the registry says that exact directory was installed and is managed by Agentao.
+unless the registry says that exact directory was installed and is managed by Arbiter.
 
 That means registry ownership is the safety boundary, not the parent directory name.
 
@@ -434,14 +434,14 @@ That means registry ownership is the safety boundary, not the parent directory n
 ### Phase 1: Local foundations
 
 - add registry module
-- add CLI parser for `agentao skill list/remove`
+- add CLI parser for `arbiter skill list/remove`
 - support remove/list for registry-managed skills in existing install roots
 
 ### Phase 2: GitHub install
 
 - add GitHub source adapter
-- add `agentao skill install <owner/repo>`
-- add `agentao skill update <name>` for GitHub-installed skills
+- add `arbiter skill install <owner/repo>`
+- add `arbiter skill update <name>` for GitHub-installed skills
 
 ### Phase 3: Polish
 

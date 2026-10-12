@@ -1,13 +1,13 @@
 ---
 layout: home
 hero:
-  name: Agentao
+  name: Arbiter
   text: Embed an AI agent into your own product
   tagline: A 3-line Python import, or stdio JSON-RPC for any language. Tools, permissions, memory, multi-tenant — included.
   actions:
     - theme: brand
       text: Run Hello in 5 min →
-      link: /en/part-1/4-hello-agentao
+      link: /en/part-1/4-hello-arbiter
     - theme: alt
       text: Recipes (1-click)
       link: /en/recipes/
@@ -20,7 +20,7 @@ features:
   - icon: ⚡
     title: I just want to try it
     details: 3 lines of Python, get a streaming reply. No web server, no extra services.
-    link: /en/part-1/4-hello-agentao
+    link: /en/part-1/4-hello-arbiter
     linkText: 5-min Hello →
   - icon: 🧰
     title: I want the agent to call my API
@@ -29,7 +29,7 @@ features:
     linkText: Custom tools →
   - icon: 🔌
     title: My host is not Python
-    details: Run Agentao as a subprocess, drive it from Node / Go / Rust / IDE via ACP (stdio + JSON-RPC).
+    details: Run Arbiter as a subprocess, drive it from Node / Go / Rust / IDE via ACP (stdio + JSON-RPC).
     link: /en/part-3/1-acp-tour
     linkText: ACP tour →
   - icon: 🛡️
@@ -44,7 +44,7 @@ features:
     linkText: Web backend embedding →
   - icon: 📐
     title: I want my host code to keep working across releases
-    details: "The `agentao.host` package is the stable, schema-snapshotted host API. Use it for audit / observability / billing pipelines."
+    details: "The `arbiter.host` package is the stable, schema-snapshotted host API. Use it for audit / observability / billing pipelines."
     link: /en/part-4/7-host-contract
     linkText: Harness contract →
   - icon: 🧭
@@ -64,9 +64,9 @@ features:
     linkText: Troubleshooting →
 ---
 
-## What is Agentao, in one paragraph
+## What is Arbiter, in one paragraph
 
-Agentao is an **embeddable Python agent runtime** — `from agentao import Agentao` and you have a stateful, tool-using assistant inside your app. Same runtime also speaks the **ACP** stdio protocol so non-Python hosts (IDE plugins, Node, Go, Rust) can drive it without re-implementing anything.
+Arbiter is an **embeddable Python agent runtime** — `from arbiter import Arbiter` and you have a stateful, tool-using assistant inside your app. Same runtime also speaks the **ACP** stdio protocol so non-Python hosts (IDE plugins, Node, Go, Rust) can drive it without re-implementing anything.
 
 What's in the box: built-in tools (files / shell / web / search), MCP client, permission engine, multi-tenant working directories, conversation compression, SQLite-backed memory, runtime LLM swap.
 
@@ -74,8 +74,8 @@ What's in the box: built-in tools (files / shell / web / search), MCP client, pe
 
 | If you're… | Read in order |
 |-----------|---------------|
-| Just exploring | [1.4 Hello](/en/part-1/4-hello-agentao) → [1.2 Core Concepts](/en/part-1/2-core-concepts) |
-| A Python backend engineer shipping a feature | [1.4](/en/part-1/4-hello-agentao) → [Part 2](/en/part-2/) → [5.1 Custom Tools](/en/part-5/1-custom-tools) → [Part 6](/en/part-6/) |
+| Just exploring | [1.4 Hello](/en/part-1/4-hello-arbiter) → [1.2 Core Concepts](/en/part-1/2-core-concepts) |
+| A Python backend engineer shipping a feature | [1.4](/en/part-1/4-hello-arbiter) → [Part 2](/en/part-2/) → [5.1 Custom Tools](/en/part-5/1-custom-tools) → [Part 6](/en/part-6/) |
 | Building an IDE / editor plugin | [1.3 Modes](/en/part-1/3-integration-modes) → [Part 3 · ACP](/en/part-3/) → [Part 4 · Events](/en/part-4/) |
 | Building platform extensions / audit automation | [Part 5 · Extend Agent Behavior](/en/part-5/) → [5.7 Plugin Hooks](/en/part-5/7-plugin-hooks) → [4.7 Harness Contract](/en/part-4/7-host-contract) |
 | You already know the product shape | [Part 7 · Blueprints](/en/part-7/) → matching blueprint → linked reference chapters |

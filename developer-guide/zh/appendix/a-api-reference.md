@@ -1,30 +1,30 @@
 # 附录 A · API 参考
 
-这是一份**面向表层**的参考——Agentao 嵌入契约里的公开符号。未在此列出的都算实现细节，可能变动。行为与示例请回跳到正文相应章节。
+这是一份**面向表层**的参考——Arbiter 嵌入契约里的公开符号。未在此列出的都算实现细节，可能变动。行为与示例请回跳到正文相应章节。
 
 权威 `__all__`：
 
-- `from agentao import ...` → `Agentao`、`SkillManager`
-- `from agentao.embedding import ...` → `build_from_environment`
-- `from agentao.transport import ...` → `AgentEvent`、`EventType`、`Transport`、`NullTransport`、`SdkTransport`、`build_compat_transport`
-- `from agentao.capabilities import ...` → `FileSystem`、`LocalFileSystem`、`FileEntry`、`FileStat`、`ShellExecutor`、`LocalShellExecutor`、`ShellRequest`、`ShellResult`、`BackgroundHandle`、`MemoryStore`、`SQLiteMemoryStore`、`MCPRegistry`、`FileBackedMCPRegistry`、`InMemoryMCPRegistry`
-- `from agentao.tools.base import ...` → `Tool`、`ToolRegistry`
-- `from agentao.permissions import ...` → `PermissionEngine`、`PermissionMode`、`PermissionDecision`
-- `from agentao.memory.manager import MemoryManager`
-- `from agentao.cancellation import ...` → `CancellationToken`、`AgentCancelledError`
-- `from agentao.acp_client import ...` → `ACPManager`、`ACPClient`、`AcpClientError`、`AcpErrorCode`、`AcpRpcError`、`AcpInteractionRequiredError`、`AcpClientConfig`、`AcpServerConfig`、`AcpConfigError`、`PromptResult`、`ServerState`、`load_acp_client_config`（以及更底层的 re-export——哪些属于"稳定嵌入面"、哪些属于"实现细节"请参考 `agentao.acp_client.__init__.py` 的 docstring）
-- `from agentao.host import ...` → `ActivePermissions`、`EventStream`、`StreamSubscribeError`、`HostEvent`、`ToolLifecycleEvent`、`SubagentLifecycleEvent`、`PermissionDecisionEvent`、`RFC3339UTCString`、`export_host_event_json_schema`、`export_host_acp_json_schema` —— 宿主面 harness 合约，详见 [A.10](#a-10-嵌入-harness-合约)
+- `from arbiter import ...` → `Arbiter`、`SkillManager`
+- `from arbiter.embedding import ...` → `build_from_environment`
+- `from arbiter.transport import ...` → `AgentEvent`、`EventType`、`Transport`、`NullTransport`、`SdkTransport`、`build_compat_transport`
+- `from arbiter.capabilities import ...` → `FileSystem`、`LocalFileSystem`、`FileEntry`、`FileStat`、`ShellExecutor`、`LocalShellExecutor`、`ShellRequest`、`ShellResult`、`BackgroundHandle`、`MemoryStore`、`SQLiteMemoryStore`、`MCPRegistry`、`FileBackedMCPRegistry`、`InMemoryMCPRegistry`
+- `from arbiter.tools.base import ...` → `Tool`、`ToolRegistry`
+- `from arbiter.permissions import ...` → `PermissionEngine`、`PermissionMode`、`PermissionDecision`
+- `from arbiter.memory.manager import MemoryManager`
+- `from arbiter.cancellation import ...` → `CancellationToken`、`AgentCancelledError`
+- `from arbiter.acp_client import ...` → `ACPManager`、`ACPClient`、`AcpClientError`、`AcpErrorCode`、`AcpRpcError`、`AcpInteractionRequiredError`、`AcpClientConfig`、`AcpServerConfig`、`AcpConfigError`、`PromptResult`、`ServerState`、`load_acp_client_config`（以及更底层的 re-export——哪些属于"稳定嵌入面"、哪些属于"实现细节"请参考 `arbiter.acp_client.__init__.py` 的 docstring）
+- `from arbiter.host import ...` → `ActivePermissions`、`EventStream`、`StreamSubscribeError`、`HostEvent`、`ToolLifecycleEvent`、`SubagentLifecycleEvent`、`PermissionDecisionEvent`、`RFC3339UTCString`、`export_host_event_json_schema`、`export_host_acp_json_schema` —— 宿主面 harness 合约，详见 [A.10](#a-10-嵌入-harness-合约)
 
-## A.1 `Agentao`
+## A.1 `Arbiter`
 
 核心类——完整构造参数表见 [Part 2.2](/zh/part-2/2-constructor-reference)。
 
 ### 构造器
 
-完整参数表见 [Part 2.2](/zh/part-2/2-constructor-reference)。**0.3.0 起**，不传 `working_directory=` 调用 `Agentao()` 会从 Python 签名分派直接抛 `TypeError`——软废弃周期已结束。完整嵌入式接入实践见 [`docs/guides/embedding.md`](../../../docs/guides/embedding.md)。
+完整参数表见 [Part 2.2](/zh/part-2/2-constructor-reference)。**0.3.0 起**，不传 `working_directory=` 调用 `Arbiter()` 会从 Python 签名分派直接抛 `TypeError`——软废弃周期已结束。完整嵌入式接入实践见 [`docs/guides/embedding.md`](../../../docs/guides/embedding.md)。
 
 ```python
-Agentao(
+Arbiter(
     api_key: str | None = None,
     base_url: str | None = None,
     model: str | None = None,
@@ -72,23 +72,23 @@ Agentao(
 
 可选子系统语义（默认 `None`）：
 
-- `replay_config=None` —— 构造时不读 `<wd>/.agentao/replay.json`，内部用 no-op 的 `ReplayConfig()`。
+- `replay_config=None` —— 构造时不读 `<wd>/.arbiter/replay.json`，内部用 no-op 的 `ReplayConfig()`。
 - `sandbox_policy=None` —— `ToolRunner` 跑 shell 时不再走 macOS `sandbox-exec` 包装。
 - `bg_store=None` —— `check_background_agent` / `cancel_background_agent` 不注册，chat loop 后台通知 drain 短路，子 agent 工具定义里 `run_in_background` 字段在 **schema 层被移除**（LLM 看不到、就不会调用一个被禁用的能力）。`/agent bg|dashboard|cancel|delete|logs|result` 这几个 CLI 子命令也会短路，并打印明确的提示。
 
-`agentao.embedding.build_from_environment()` 会按 CLI 默认行为构造这三个对象（都锚定到当前 session 的工作目录），然后显式传入，所以 CLI / ACP 行为保持不变。嵌入式 host 不主动启用就不会有任何开销。
+`arbiter.embedding.build_from_environment()` 会按 CLI 默认行为构造这三个对象（都锚定到当前 session 的工作目录），然后显式传入，所以 CLI / ACP 行为保持不变。嵌入式 host 不主动启用就不会有任何开销。
 
-### `agentao.embedding.build_from_environment`
+### `arbiter.embedding.build_from_environment`
 
 ```python
 def build_from_environment(
     working_directory: Path | None = None,
     **overrides,
-) -> Agentao:
+) -> Arbiter:
     ...
 ```
 
-CLI 风格的自动发现工厂：读 `.env`、`LLM_PROVIDER` 前缀的 env 变量、`~/.agentao/permissions.json`（项目级文件故意不加载 —— 见 [5.4](/zh/part-5/4-permissions)）、`<wd>/.agentao/mcp.json` + `~/.agentao/mcp.json`（同名冲突时用户胜；项目级仅可新增）、内存目录，然后用发现到的值构造 `Agentao`。**调用方传入的 `**overrides` 优先**。同样会触发上面构造器的互斥校验（如果 `overrides` 含 `llm_client`，工厂会先把发现到的 `api_key` / `base_url` / `model` 丢掉再转发）。
+CLI 风格的自动发现工厂：读 `.env`、`LLM_PROVIDER` 前缀的 env 变量、`~/.arbiter/permissions.json`（项目级文件故意不加载 —— 见 [5.4](/zh/part-5/4-permissions)）、`<wd>/.arbiter/mcp.json` + `~/.arbiter/mcp.json`（同名冲突时用户胜；项目级仅可新增）、内存目录，然后用发现到的值构造 `Arbiter`。**调用方传入的 `**overrides` 优先**。同样会触发上面构造器的互斥校验（如果 `overrides` 含 `llm_client`，工厂会先把发现到的 `api_key` / `base_url` / `model` 丢掉再转发）。
 
 ### 方法
 
@@ -118,14 +118,14 @@ CLI 风格的自动发现工厂：读 `.env`、`LLM_PROVIDER` 前缀的 env 变�
 
 `uri` 取已知的来源路径或 URL（例如经 CLI `/image` 命令暂存的文件）；wire 上不带
 来源的图片退化为 `inline-image-N`。本节是该格式的规范出处——实现见
-`agentao/runtime/chat_loop/_runner.py::_render_image_reference_fallback`。
+`arbiter/runtime/chat_loop/_runner.py::_render_image_reference_fallback`。
 
 ### 属性
 
 | 属性 | 类型 | 说明 |
 |------|------|------|
 | `messages` | `list[dict]` | OpenAI chat 格式的历史；可读，修改风险自担 |
-| `tools` | `ToolRegistry` | 活的注册表。优先用契约 API——`Agentao(extra_tools=[...])` 或 `agent.add_tool(...)`（会绑定能力并校验）；`agent.tools.register(...)` 是绕过两者的底层路径。见 [5.1](/zh/part-5/1-custom-tools) |
+| `tools` | `ToolRegistry` | 活的注册表。优先用契约 API——`Arbiter(extra_tools=[...])` 或 `agent.add_tool(...)`（会绑定能力并校验）；`agent.tools.register(...)` 是绕过两者的底层路径。见 [5.1](/zh/part-5/1-custom-tools) |
 | `skill_manager` | `SkillManager` | `agent.skill_manager.activate_skill(name, task_description)` 激活技能 |
 | `transport` | `Transport` | 当前传输层；可重新赋值 |
 | `_current_token` | `CancellationToken | None` | 按约定公开；其他线程可读到它并 `.cancel()` |
@@ -162,7 +162,7 @@ SdkTransport(
 
 ### `build_compat_transport`
 
-从老式分立回调参数构造 `Transport` 的 helper。位于 `agentao.embedding.compat`，是仍在用 0.2.10 之前回调形态的宿主**有文档保证的迁移面**——显式调用它即可避开构造期的 `DeprecationWarning`。一般也不会直接用——`Agentao(...)` 在你传 `confirmation_callback=` 等参数时会自动调（并在每次构造时发一次 `DeprecationWarning`）。8 个 legacy 回调 kwarg 本身将在 **0.5.0** 从 `Agentao(...)` 签名中移除；`build_compat_transport()` 自身保留。
+从老式分立回调参数构造 `Transport` 的 helper。位于 `arbiter.embedding.compat`，是仍在用 0.2.10 之前回调形态的宿主**有文档保证的迁移面**——显式调用它即可避开构造期的 `DeprecationWarning`。一般也不会直接用——`Arbiter(...)` 在你传 `confirmation_callback=` 等参数时会自动调（并在每次构造时发一次 `DeprecationWarning`）。8 个 legacy 回调 kwarg 本身将在 **0.5.0** 从 `Arbiter(...)` 签名中移除；`build_compat_transport()` 自身保留。
 
 ### `AgentEvent` / `EventType`
 
@@ -196,7 +196,7 @@ class Tool(ABC):
     @abstractmethod
     def execute(self, **kwargs) -> str: ...
 
-    # 注册时由 Agentao 注入
+    # 注册时由 Arbiter 注入
     working_directory: Path | None
     output_callback: Callable[[str], None] | None
     filesystem: FileSystem | None
@@ -212,15 +212,15 @@ class Tool(ABC):
 
 | 方法 | 作用 |
 |------|------|
-| `register(tool: Tool, *, replace: bool = False)` | 注册。`replace=False` 冲突会 warn 后覆盖；`replace=True` 静默覆盖（打 INFO 审计）。底层 API——不绑定能力；优先用 `Agentao(extra_tools=)` / `add_tool`（见 [5.1](/zh/part-5/1-custom-tools)） |
+| `register(tool: Tool, *, replace: bool = False)` | 注册。`replace=False` 冲突会 warn 后覆盖；`replace=True` 静默覆盖（打 INFO 审计）。底层 API——不绑定能力；优先用 `Arbiter(extra_tools=)` / `add_tool`（见 [5.1](/zh/part-5/1-custom-tools)） |
 | `unregister(name: str) -> bool` | 移除 `name`；返回是否存在过。纯 dict 操作 |
 | `get(name: str) -> Tool` | 不存在时抛 `KeyError`，带可用工具列表 |
 | `list_tools() -> list[Tool]` | |
 | `to_openai_format() -> list[dict]` | OpenAI function-calling schemas |
 
-### Capabilities（`agentao.capabilities`）
+### Capabilities（`arbiter.capabilities`）
 
-文件 / 搜索 / Shell 工具的 IO 都路由经过这两个 runtime-checkable `Protocol`。宿主通过 `Agentao(filesystem=..., shell=...)` 注入自定义实现，可以重定向到 Docker exec、虚拟文件系统、审计代理或远程 runner。包还导出与 0.2.16 之前字节级一致的默认实现 `LocalFileSystem` / `LocalShellExecutor`。
+文件 / 搜索 / Shell 工具的 IO 都路由经过这两个 runtime-checkable `Protocol`。宿主通过 `Arbiter(filesystem=..., shell=...)` 注入自定义实现，可以重定向到 Docker exec、虚拟文件系统、审计代理或远程 runner。包还导出与 0.2.16 之前字节级一致的默认实现 `LocalFileSystem` / `LocalShellExecutor`。
 
 ```python
 class FileSystem(Protocol):
@@ -278,7 +278,7 @@ PermissionEngine(
 )
 ```
 
-0.2.16 起两个参数都显式传——`project_root=None`（或不传）会抛 `TypeError`。用户规则从 `<user_root>/permissions.json` 加载（一般 `user_root=Path.home() / ".agentao"`，对应 `~/.agentao/permissions.json`）；传 `user_root=None` 可完全禁用用户态规则。`project_root` 仅用于检测（并 warn）一份残留的 `<project_root>/.agentao/permissions.json` —— 该文件**不会**作为规则源加载（原因见 [5.4](/zh/part-5/4-permissions)）。构造后用 `set_mode()` 切换预设模式。
+0.2.16 起两个参数都显式传——`project_root=None`（或不传）会抛 `TypeError`。用户规则从 `<user_root>/permissions.json` 加载（一般 `user_root=Path.home() / ".arbiter"`，对应 `~/.arbiter/permissions.json`）；传 `user_root=None` 可完全禁用用户态规则。`project_root` 仅用于检测（并 warn）一份残留的 `<project_root>/.arbiter/permissions.json` —— 该文件**不会**作为规则源加载（原因见 [5.4](/zh/part-5/4-permissions)）。构造后用 `set_mode()` 切换预设模式。
 
 | 方法 | 签名 | 作用 |
 |------|------|------|
@@ -303,11 +303,11 @@ MemoryManager(
 构造器接收预先构造好的 `MemoryStore` 实例（嵌入式工厂负责构造并传入）。基于路径的构造下沉到 store 层：
 
 ```python
-from agentao.memory import MemoryManager, SQLiteMemoryStore
+from arbiter.memory import MemoryManager, SQLiteMemoryStore
 
 mgr = MemoryManager(
-    project_store=SQLiteMemoryStore.open_or_memory(workdir / ".agentao" / "memory.db"),
-    user_store=SQLiteMemoryStore.open(home / ".agentao" / "memory.db"),
+    project_store=SQLiteMemoryStore.open_or_memory(workdir / ".arbiter" / "memory.db"),
+    user_store=SQLiteMemoryStore.open(home / ".arbiter" / "memory.db"),
 )
 ```
 
@@ -372,11 +372,11 @@ class MCPRegistry(Protocol):
     def list_servers(self) -> Dict[str, McpServerConfig]: ...
 ```
 
-MCP 服务器配置的来源。`Agentao(mcp_registry=...)` 是注入点；`mcp_manager=` 与 `mcp_registry=` 互斥（manager 是构造结果，registry 是配置源）。
+MCP 服务器配置的来源。`Arbiter(mcp_registry=...)` 是注入点；`mcp_manager=` 与 `mcp_registry=` 互斥（manager 是构造结果，registry 是配置源）。
 
 | 具体实现 | 作用 |
 |---|---|
-| `FileBackedMCPRegistry(project_root, user_root=None)` | CLI/ACP 默认。每次 `list_servers()` 都重读 `<wd>/.agentao/mcp.json` + `<user_root>/mcp.json`。**同名冲突时用户胜**；项目级条目仅可声明新 server name（冲突打 warning 并跳过项目项）。 |
+| `FileBackedMCPRegistry(project_root, user_root=None)` | CLI/ACP 默认。每次 `list_servers()` 都重读 `<wd>/.arbiter/mcp.json` + `<user_root>/mcp.json`。**同名冲突时用户胜**；项目级条目仅可声明新 server name（冲突打 warning 并跳过项目项）。 |
 | `InMemoryMCPRegistry(servers=None)` | 测试 / 嵌入式 host 用的程序化版本。构造入参做浅拷贝。 |
 
 ## A.7 取消
@@ -401,12 +401,12 @@ token 被取消时在 agent 循环里抛出。`chat()` 会捕获并返回 `[Canc
 
 ### `ACPManager`
 
-宿主侧驱动 `.agentao/acp.json` 里声明的外部 ACP 服务器的典型入口。
+宿主侧驱动 `.arbiter/acp.json` 里声明的外部 ACP 服务器的典型入口。
 如果你在无人值守环境里使用它（CI / worker / cron / queue consumer），那它就是正文里说的 **Headless Runtime**：不是新协议，也不是新类，只是 `ACPManager` 的一种运行方式。
 
 | 方法 | 签名 | 作用 |
 |------|------|------|
-| `from_project` | `@classmethod from_project(project_root=None) -> ACPManager` | 读 `.agentao/acp.json` |
+| `from_project` | `@classmethod from_project(project_root=None) -> ACPManager` | 读 `.arbiter/acp.json` |
 | `server_names` | `-> list[str]` | 已声明的服务器 |
 | `start_all` | `start_all(only_auto=True)` | 启动所有 auto-start 服务器 |
 | `start_server(name)` / `stop_server(name)` / `restart_server(name)` | | |
@@ -503,13 +503,13 @@ load_acp_client_config(project_root: Path | None = None) -> AcpClientConfig
 
 `project_root` 为 `None` 时退回 `Path.cwd()`。
 
-不构造 manager 直接校验 + 加载 `.agentao/acp.json`。写 config lint 工具时好用。
+不构造 manager 直接校验 + 加载 `.arbiter/acp.json`。写 config lint 工具时好用。
 
 ## A.9 技能
 
 ### `SkillManager`
 
-通过 `from agentao import SkillManager` 懒加载。一般通过 `agent.skill_manager` 使用。
+通过 `from arbiter import SkillManager` 懒加载。一般通过 `agent.skill_manager` 使用。
 
 | 方法 | 作用 |
 |------|------|
@@ -521,18 +521,18 @@ load_acp_client_config(project_root: Path | None = None) -> AcpClientConfig
 
 ## A.10 嵌入 Host 合约
 
-*自 0.3.1 起 Stable。包名于 0.4.2 由 `agentao.harness` 重命名为 `agentao.host`。*
+*自 0.3.1 起 Stable。包名于 0.4.2 由 `arbiter.harness` 重命名为 `arbiter.host`。*
 
-`agentao.host` 是嵌入 Agentao 的 **稳定宿主面 API**。内部运行时类型（`AgentEvent`、`ToolExecutionResult`、`PermissionEngine`）刻意 **不在** 该面内 —— 任何版本都可能改动。只针对 `agentao.host`（加上 `Agentao(...)` 构造器以及上文标注的方法）开发的宿主可在版本升级中保持前向兼容。
+`arbiter.host` 是嵌入 Arbiter 的 **稳定宿主面 API**。内部运行时类型（`AgentEvent`、`ToolExecutionResult`、`PermissionEngine`）刻意 **不在** 该面内 —— 任何版本都可能改动。只针对 `arbiter.host`（加上 `Arbiter(...)` 构造器以及上文标注的方法）开发的宿主可在版本升级中保持前向兼容。
 
-> **命名说明。** "Harness" 仍然指 *Agentao 自身嵌入在宿主应用中运行* 这一概念（见 `docs/design/embedded-host-contract.md` 设计语境）；合约包重命名为 `agentao.host` 是为了让 `from agentao.host import HostEvent` 读起来自洽。旧的 `agentao.harness` 导入路径以及旧符号名（`HarnessEvent`、`HarnessReplaySink`、`export_harness_*`）作为弃用别名保留至 0.5.0，首次导入时发一次 `DeprecationWarning`。
+> **命名说明。** "Harness" 仍然指 *Arbiter 自身嵌入在宿主应用中运行* 这一概念（见 `docs/design/embedded-host-contract.md` 设计语境）；合约包重命名为 `arbiter.host` 是为了让 `from arbiter.host import HostEvent` 读起来自洽。旧的 `arbiter.harness` 导入路径以及旧符号名（`HarnessEvent`、`HarnessReplaySink`、`export_harness_*`）作为弃用别名保留至 0.5.0，首次导入时发一次 `DeprecationWarning`。
 
 完整参考：[`docs/reference/host-api.md`](../../../docs/reference/host-api.md) · [`docs/reference/host-api.zh.md`](../../../docs/reference/host-api.zh.md)。设计动机：[`docs/design/embedded-host-contract.md`](../../../docs/design/embedded-host-contract.md)。
 
 ### 公共导出
 
 ```python
-from agentao.host import (
+from arbiter.host import (
     ActivePermissions,
     EventStream,
     StreamSubscribeError,
@@ -554,14 +554,14 @@ from agentao.host import (
 | `PermissionDecisionEvent` | 单次权限决定的投影。在 `allow` / `deny` / `prompt` 都触发；不渲染 allow 的消费者也必须排空迭代器以避免背压 |
 | `HostEvent` | 三种事件模型的判别联合（Pydantic discriminator: `event_type`） |
 | `RFC3339UTCString` | 受约束的时间戳类型。仅允许标准 `Z` 后缀 —— `+00:00` 偏移会被拒绝 |
-| `EventStream` | `Agentao.events()` 的运行时侧。生产者调 `publish()`；消费者迭代 `subscribe()` |
-| `StreamSubscribeError` | 同一 `session_id` 过滤器上发起第二个并发订阅时抛出（MVP 每个 `Agentao` 只支持一个公共流消费者） |
+| `EventStream` | `Arbiter.events()` 的运行时侧。生产者调 `publish()`；消费者迭代 `subscribe()` |
+| `StreamSubscribeError` | 同一 `session_id` 过滤器上发起第二个并发订阅时抛出（MVP 每个 `Arbiter` 只支持一个公共流消费者） |
 | `export_host_event_json_schema()` | 导出事件 + 权限面的标准 JSON schema。`tests/test_host_schema.py` 用它与 `docs/schema/host.events.v1.json` 做字节相等校验 |
 | `export_host_acp_json_schema()` | 导出宿主面 ACP 载荷的标准 JSON schema。快照在 `docs/schema/host.acp.v1.json` |
 
 ### `agent.events(session_id=None)`
 
-返回 `HostEvent` 的异步迭代器。传 `session_id=` 过滤；传 `None` 订阅该 `Agentao` 实例下所有会话。
+返回 `HostEvent` 的异步迭代器。传 `session_id=` 过滤；传 `None` 订阅该 `Arbiter` 实例下所有会话。
 
 ```python
 async for ev in agent.events():
@@ -580,7 +580,7 @@ async for ev in agent.events():
 - **不 replay。** 第一次订阅前发出的事件被丢弃。
 - 背压走宿主拉取：消费者慢时，生产者会 await 匹配事件的容量，不会丢事件，也不会无限堆队列。
 - 取消迭代器会释放队列/订阅资源。
-- MVP 每个 `Agentao` 只支持一个公共流消费者。
+- MVP 每个 `Arbiter` 只支持一个公共流消费者。
 
 ### `agent.active_permissions()`
 
@@ -591,7 +591,7 @@ snap = agent.active_permissions()
 # snap.mode            -> "workspace-write"（Literal 类型）
 # snap.rules           -> list[dict]
 # snap.loaded_sources  -> ["preset:workspace-write",
-#                          "user:/Users/me/.agentao/permissions.json",
+#                          "user:/Users/me/.arbiter/permissions.json",
 #                          "injected:host"]
 ```
 

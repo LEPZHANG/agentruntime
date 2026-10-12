@@ -16,7 +16,7 @@ import pytest
 prompt_toolkit = pytest.importorskip("prompt_toolkit")
 from prompt_toolkit.document import Document  # noqa: E402
 
-from agentao.cli._utils import _SlashCompleter  # noqa: E402
+from arbiter.cli._utils import _SlashCompleter  # noqa: E402
 
 
 def _complete(buffer: str, cursor: int | None = None) -> list:

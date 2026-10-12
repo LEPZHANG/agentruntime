@@ -1,30 +1,30 @@
 # 2.4 Session State & Persistence
 
 > **What you'll learn**
-> - The four state buckets every `Agentao` instance carries
+> - The four state buckets every `Arbiter` instance carries
 > - Which parts must be persisted to survive a process restart
 > - Three deployment patterns (long-pool / rebuild-per-request / hybrid) and how to pick
 
-A running `Agentao` instance carries a lot more than the last assistant message. Knowing **exactly what lives on the instance and where** is the difference between "users keep their context when the pod restarts" and "every restart throws away the conversation."
+A running `Arbiter` instance carries a lot more than the last assistant message. Knowing **exactly what lives on the instance and where** is the difference between "users keep their context when the pod restarts" and "every restart throws away the conversation."
 
 This section is the reference for three questions:
 
-1. What state does an `Agentao` instance hold?
+1. What state does an `Arbiter` instance hold?
 2. Which parts must the host persist to survive a restart?
 3. How do you restore that state cleanly?
 
 ## 2.4.1 The four state buckets
 
-Every `Agentao` instance has four independent storage areas — they are **not** the same thing and must be treated separately when you persist.
+Every `Arbiter` instance has four independent storage areas — they are **not** the same thing and must be treated separately when you persist.
 
 | Bucket | Lives on | Survives `close()`? | Who owns durability |
 |--------|----------|---------------------|----------------------|
 | **Conversation messages** | `agent.messages` (in-memory list) | ❌ no | Host |
-| **Memory (persistent)** | `.agentao/memory.db` + `~/.agentao/memory.db` (SQLite) | ✅ yes | Agentao |
-| **Session summaries** | `session_summaries` table in project SQLite | ✅ yes | Agentao |
+| **Memory (persistent)** | `.arbiter/memory.db` + `~/.arbiter/memory.db` (SQLite) | ✅ yes | Arbiter |
+| **Session summaries** | `session_summaries` table in project SQLite | ✅ yes | Arbiter |
 | **Skill activation** | `agent.skill_manager.active_skills` (in-memory dict) | ❌ no | Host (re-activate on restore) |
 
-Rule of thumb: **if it lives on SQLite, Agentao handles it; if it lives in a Python list or dict, your host must persist it.**
+Rule of thumb: **if it lives on SQLite, Arbiter handles it; if it lives in a Python list or dict, your host must persist it.**
 
 ## 2.4.2 `agent.messages` — the turn-by-turn log
 
@@ -56,7 +56,7 @@ agent.messages = [
 
 ### What is NOT in `agent.messages`
 
-- The system prompt — rebuilt on every `chat()` call from `AGENTAO.md` + date + active skills + memory blocks. Do not persist it.
+- The system prompt — rebuilt on every `chat()` call from `ARBITER.md` + date + active skills + memory blocks. Do not persist it.
 - Tool schemas — rebuilt from the tool registry on every call.
 - The user's working directory — set at construction, immutable after.
 
@@ -73,9 +73,9 @@ Minimal pattern — one column per session, store the whole message list as JSON
 ```python
 import json
 from pathlib import Path
-from agentao import Agentao
+from arbiter import Arbiter
 
-def save_session(agent: Agentao, session_id: str, db) -> None:
+def save_session(agent: Arbiter, session_id: str, db) -> None:
     """Call after every chat() turn."""
     db.upsert(
         session_id,
@@ -87,13 +87,13 @@ def save_session(agent: Agentao, session_id: str, db) -> None:
         },
     )
 
-def load_session(session_id: str, db) -> Agentao:
+def load_session(session_id: str, db) -> Arbiter:
     """Call on host startup or request arrival."""
     row = db.get(session_id)
     if row is None:
         raise KeyError(session_id)
 
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=Path(row["working_directory"]),
         model=row["model"],
     )
@@ -115,11 +115,11 @@ def load_session(session_id: str, db) -> Agentao:
 
 ## 2.4.4 Memory restores itself
 
-You do **not** need to persist memory — Agentao already does.
+You do **not** need to persist memory — Arbiter already does.
 
 ```python
-agent = Agentao(working_directory=Path("/app/users/alice"))
-# MemoryManager auto-opens /app/users/alice/.agentao/memory.db
+agent = Arbiter(working_directory=Path("/app/users/alice"))
+# MemoryManager auto-opens /app/users/alice/.arbiter/memory.db
 # Persistent memories from previous sessions are loaded automatically.
 ```
 
@@ -127,7 +127,7 @@ As long as `working_directory` is stable across restarts for the same tenant, me
 
 ## 2.4.5 Session summaries — don't manage them
 
-When the context window fills, Agentao's compaction pipeline writes a `[Conversation Summary]` block into `agent.messages` and stores the same summary in `session_summaries` (SQLite). This is transparent:
+When the context window fills, Arbiter's compaction pipeline writes a `[Conversation Summary]` block into `agent.messages` and stores the same summary in `session_summaries` (SQLite). This is transparent:
 
 - Compacted messages stay in `agent.messages`, so your persisted JSON still round-trips cleanly
 - On restart, you don't need to rehydrate `session_summaries` separately — the summary block is already inside `messages`

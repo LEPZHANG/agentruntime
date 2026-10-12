@@ -2,7 +2,7 @@
 
 A plain ``open(path, "w")`` truncates *before* the write, so an
 interruption in between — Ctrl+C, host OOM, ``kill`` — leaves the user's
-source file empty or half-written. Agentao runs inside a host process it
+source file empty or half-written. Arbiter runs inside a host process it
 does not control, so replacing an existing file goes through a sibling
 temp file and ``os.replace``.
 
@@ -17,8 +17,8 @@ import os
 
 import pytest
 
-from agentao.capabilities import filesystem as fsmod
-from agentao.capabilities.filesystem import LocalFileSystem
+from arbiter.capabilities import filesystem as fsmod
+from arbiter.capabilities.filesystem import LocalFileSystem
 
 
 ORIGINAL = "ORIGINAL CONTENT\n" * 100

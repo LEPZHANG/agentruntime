@@ -31,7 +31,7 @@ cron / k8s CronJob
        ▼
 Python 入口
        │
-       ├─ Agentao 实例（每次跑都新建，结束干净关闭）
+       ├─ Arbiter 实例（每次跑都新建，结束干净关闭）
        │    ├─ 技能: "daily-digest"
        │    ├─ 工具: web_fetch（只读，白名单源）、write_file
        │    └─ PermissionEngine: READ_ONLY + 显式写入白名单
@@ -50,9 +50,9 @@ Python 入口
 import os, sys, json, traceback
 from pathlib import Path
 from datetime import date
-from agentao import Agentao
-from agentao.transport import SdkTransport
-from agentao.transport.events import EventType
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
+from arbiter.transport.events import EventType
 
 def run():
     today = date.today().isoformat()
@@ -66,7 +66,7 @@ def run():
             tokens_used += len(ev.data.get("chunk", "")) // 4
 
     transport = SdkTransport(on_event=on_event)
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=workdir,
         transport=transport,
         max_context_tokens=64_000,
@@ -131,7 +131,7 @@ description: 从筛选过的源生成每日 digest。严格遵守输出契约。
 ```
 # 每日 Digest — YYYY-MM-DD
 
-## Agentao 提交
+## Arbiter 提交
 - SHA  简短消息
 
 ## 技术要点
@@ -196,7 +196,7 @@ send_email(to="team@x.com", path=result["path"])
 如果调度任务在 Node 或 Go 里，可以通过 ACP 用一次性 helper 驱动——自己构造 `ACPClient`（见 7.2），发一条 `session/prompt`，收集最终消息，关闭。Python 到 Python 且你要**从任务里调另一个 ACP agent** 的场景，用 `ACPManager.prompt_once()`：
 
 ```python
-from agentao.acp_client import ACPManager
+from arbiter.acp_client import ACPManager
 
 result = ACPManager().prompt_once(
     name="external-reviewer",

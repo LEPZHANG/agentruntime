@@ -1,4 +1,4 @@
-"""P0.7 regression: a freshly-installed wheel must construct ``Agentao``.
+"""P0.7 regression: a freshly-installed wheel must construct ``Arbiter``.
 
 Local mirror of the CI ``smoke`` job. The CI side runs after ``build``
 in a separate venv on every PR; this in-tree test exists so a
@@ -6,7 +6,7 @@ maintainer can rehearse the same check locally without pushing to CI.
 
 It is gated:
 
-- skipped if no built wheel exists at ``dist/agentao-*.whl`` (CI builds
+- skipped if no built wheel exists at ``dist/arbiter-*.whl`` (CI builds
   the wheel as a separate job, so the artifact is only present when
   invoked alongside ``uv build``)
 - skipped on platforms where ``venv`` cannot be spawned in a sandbox
@@ -36,7 +36,7 @@ DIST_DIR = REPO_ROOT / "dist"
 def _find_wheel() -> Path | None:
     if not DIST_DIR.is_dir():
         return None
-    wheels = sorted(DIST_DIR.glob("agentao-*.whl"))
+    wheels = sorted(DIST_DIR.glob("arbiter-*.whl"))
     return wheels[-1] if wheels else None
 
 
@@ -45,7 +45,7 @@ pytestmark = [pytest.mark.slow]
 
 @pytest.mark.skipif(
     _find_wheel() is None,
-    reason="no built wheel at dist/agentao-*.whl — run `uv build` first",
+    reason="no built wheel at dist/arbiter-*.whl — run `uv build` first",
 )
 def test_wheel_install_and_embed_construct(tmp_path: Path) -> None:
     """``pip install dist/*.whl`` followed by an embed-only construction works.
@@ -73,7 +73,7 @@ def test_wheel_install_and_embed_construct(tmp_path: Path) -> None:
 
     # Install the wheel into the new venv. ``--upgrade-pip`` is omitted
     # deliberately — the canonical embedded-host install is the same
-    # ``pip install agentao`` command they would type, no warmups.
+    # ``pip install arbiter`` command they would type, no warmups.
     subprocess.run(
         [str(py), "-m", "pip", "install", "--quiet", str(wheel)],
         check=True,
@@ -86,10 +86,10 @@ def test_wheel_install_and_embed_construct(tmp_path: Path) -> None:
     snippet = (
         "import tempfile\n"
         "from pathlib import Path\n"
-        "from agentao import Agentao\n"
-        "from agentao.llm import LLMClient\n"
-        "from agentao.transport import NullTransport\n"
-        "agent = Agentao(\n"
+        "from arbiter import Arbiter\n"
+        "from arbiter.llm import LLMClient\n"
+        "from arbiter.transport import NullTransport\n"
+        "agent = Arbiter(\n"
         "    working_directory=Path(tempfile.mkdtemp()),\n"
         "    llm_client=LLMClient(api_key='dummy', base_url='http://localhost:1', model='dummy'),\n"
         "    transport=NullTransport(),\n"
@@ -113,7 +113,7 @@ def test_wheel_install_and_embed_construct(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(
     _find_wheel() is None,
-    reason="no built wheel at dist/agentao-*.whl — run `uv build` first",
+    reason="no built wheel at dist/arbiter-*.whl — run `uv build` first",
 )
 def test_wheel_ships_py_typed_marker(tmp_path: Path) -> None:
     """The installed wheel must carry ``py.typed`` (PEP 561, P0.1)."""
@@ -140,7 +140,7 @@ def test_wheel_ships_py_typed_marker(tmp_path: Path) -> None:
             "-c",
             (
                 "from importlib.resources import files; "
-                "assert files('agentao').joinpath('py.typed').is_file(); "
+                "assert files('arbiter').joinpath('py.typed').is_file(); "
                 "print('py.typed OK')"
             ),
         ],

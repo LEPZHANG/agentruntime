@@ -22,7 +22,7 @@
 - command hook execution
 - tool alias matching
 - repeatable `--plugin-dir`
-- `agentao plugin list`
+- `arbiter plugin list`
 - startup diagnostics surface
 
 本阶段不包含：
@@ -118,8 +118,8 @@ class PluginHookDispatcher:
 CLI：
 
 ```text
-agentao --plugin-dir /path/to/plugin
-agentao plugin list
+arbiter --plugin-dir /path/to/plugin
+arbiter plugin list
 ```
 
 ## Lifecycle Sequence
@@ -156,7 +156,7 @@ session shutdown
 2. 在 tool runner 接入 `dispatch_pre_tool_use()`
 3. 在 tool success/failure path 接入 post hooks
 4. 实现 repeatable `--plugin-dir`
-5. 实现 `agentao plugin list`
+5. 实现 `arbiter plugin list`
 6. 编写 lifecycle hooks 和 CLI 测试
 
 ## Tests

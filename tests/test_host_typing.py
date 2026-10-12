@@ -1,11 +1,11 @@
-"""Typing gate for the public ``agentao.host`` surface (P0.4).
+"""Typing gate for the public ``arbiter.host`` surface (P0.4).
 
 Two checks:
 
-1. ``mypy --strict --package agentao.host`` is clean — the package
+1. ``mypy --strict --package arbiter.host`` is clean — the package
    itself has no internal typing debt.
 2. A throwaway downstream-shaped script that imports every name in
-   ``agentao.host.__all__`` and ``agentao.host.protocols.__all__``
+   ``arbiter.host.__all__`` and ``arbiter.host.protocols.__all__``
    passes ``mypy --strict``. This is the property hosts running
    ``mypy --strict`` against their own code path observe.
 
@@ -36,13 +36,13 @@ mypy_required = pytest.mark.skipif(
 def test_mypy_strict_on_harness_package() -> None:
     """The package itself must be clean under ``--strict``."""
     result = subprocess.run(
-        [MYPY_BIN, "--strict", "--package", "agentao.host"],
+        [MYPY_BIN, "--strict", "--package", "arbiter.host"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
     )
     assert result.returncode == 0, (
-        "mypy --strict failed on agentao.host:\n"
+        "mypy --strict failed on arbiter.host:\n"
         f"stdout:\n{result.stdout}\n"
         f"stderr:\n{result.stderr}\n"
     )
@@ -52,7 +52,7 @@ def test_mypy_strict_on_harness_package() -> None:
 def test_mypy_strict_on_downstream_consumer(tmp_path: Path) -> None:
     """A host file that imports every public name passes ``--strict``.
 
-    This catches regressions where ``agentao.host`` is internally clean
+    This catches regressions where ``arbiter.host`` is internally clean
     but exposes an ``Any`` (or untyped) into a downstream's strict context.
     """
     consumer = tmp_path / "host_app.py"
@@ -61,7 +61,7 @@ def test_mypy_strict_on_downstream_consumer(tmp_path: Path) -> None:
             """\
             from __future__ import annotations
 
-            from agentao.host import (
+            from arbiter.host import (
                 ActivePermissions,
                 EventStream,
                 HostEvent,
@@ -73,7 +73,7 @@ def test_mypy_strict_on_downstream_consumer(tmp_path: Path) -> None:
                 export_host_acp_json_schema,
                 export_host_event_json_schema,
             )
-            from agentao.host.protocols import (
+            from arbiter.host.protocols import (
                 BackgroundHandle,
                 FileEntry,
                 FileStat,
@@ -156,12 +156,12 @@ def test_mypy_strict_on_downstream_consumer(tmp_path: Path) -> None:
 
 
 def test_protocols_module_all_matches_imports() -> None:
-    """``agentao.host.protocols.__all__`` must list exactly what is imported.
+    """``arbiter.host.protocols.__all__`` must list exactly what is imported.
 
     Drift here means a maintainer added a re-export but forgot ``__all__``
-    (so ``from agentao.host.protocols import *`` silently misses it).
+    (so ``from arbiter.host.protocols import *`` silently misses it).
     """
-    from agentao.host import protocols
+    from arbiter.host import protocols
 
     expected = {
         "BackgroundHandle",
@@ -177,18 +177,18 @@ def test_protocols_module_all_matches_imports() -> None:
     assert set(protocols.__all__) == expected
     for name in expected:
         assert getattr(protocols, name, None) is not None, (
-            f"agentao.host.protocols.{name} is in __all__ but not bound"
+            f"arbiter.host.protocols.{name} is in __all__ but not bound"
         )
 
 
 def test_host_all_matches_documented_set() -> None:
-    """``agentao.host.__all__`` must match the surface listed in docs/api/host.md.
+    """``arbiter.host.__all__`` must match the surface listed in docs/api/host.md.
 
     Drift detection: a new public name added to ``__all__`` without a
     docs entry — or removed from docs without a deprecation cycle — fails
     here loudly.
     """
-    from agentao import host
+    from arbiter import host
 
     documented = {
         "ActivePermissions",
@@ -206,22 +206,22 @@ def test_host_all_matches_documented_set() -> None:
         "export_host_event_json_schema",
     }
     assert set(host.__all__) == documented, (
-        "agentao.host.__all__ drifted from the documented public surface "
+        "arbiter.host.__all__ drifted from the documented public surface "
         "in docs/api/host.md. Update both, in the same PR."
     )
 
 
 def test_harness_alias_emits_deprecation_warning_and_re_exports():
-    """``agentao.harness`` is a deprecated re-export alias for ``agentao.host``.
+    """``arbiter.harness`` is a deprecated re-export alias for ``arbiter.host``.
 
     Locks two things in:
-      1. Importing ``agentao.harness`` raises a ``DeprecationWarning`` that
+      1. Importing ``arbiter.harness`` raises a ``DeprecationWarning`` that
          names the new path so downstream embedders know what to migrate to.
-      2. Every public name from ``agentao.host`` is reachable via the alias —
+      2. Every public name from ``arbiter.host`` is reachable via the alias —
          the literal find/replace migration documented in CHANGELOG works.
 
     Removing the alias in 0.5.0 means deleting this test (and the
-    ``agentao/harness/`` shim package) together.
+    ``arbiter/harness/`` shim package) together.
     """
     import importlib
     import sys
@@ -229,21 +229,21 @@ def test_harness_alias_emits_deprecation_warning_and_re_exports():
 
     # Force a fresh import so the warning fires deterministically.
     for mod in list(sys.modules):
-        if mod == "agentao.harness" or mod.startswith("agentao.harness."):
+        if mod == "arbiter.harness" or mod.startswith("arbiter.harness."):
             del sys.modules[mod]
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        harness = importlib.import_module("agentao.harness")
+        harness = importlib.import_module("arbiter.harness")
 
     deprecation = [w for w in caught if issubclass(w.category, DeprecationWarning)]
-    assert deprecation, "agentao.harness import must emit a DeprecationWarning"
-    assert "agentao.host" in str(deprecation[0].message), (
+    assert deprecation, "arbiter.harness import must emit a DeprecationWarning"
+    assert "arbiter.host" in str(deprecation[0].message), (
         "DeprecationWarning must name the new module path"
     )
 
-    from agentao import host
+    from arbiter import host
     for name in host.__all__:
         assert getattr(harness, name) is getattr(host, name), (
-            f"agentao.harness.{name} must re-export agentao.host.{name}"
+            f"arbiter.harness.{name} must re-export arbiter.host.{name}"
         )

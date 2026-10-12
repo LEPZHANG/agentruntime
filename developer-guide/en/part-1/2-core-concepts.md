@@ -5,7 +5,7 @@
 > - How they fit together in one diagram
 > - Where each one is anchored in code, so you can dig further
 
-Before writing integration code, learn Agentao's six core nouns. Every chapter that follows uses them.
+Before writing integration code, learn Arbiter's six core nouns. Every chapter that follows uses them.
 
 ## Concept map
 
@@ -19,7 +19,7 @@ Before writing integration code, learn Agentao's six core nouns. Every chapter t
 │        │ drive                 │                            │
 │        ▼                       │                            │
 │   ┌──────────────────────────────────────────────────┐      │
-│   │                   Agent (Agentao)                │      │
+│   │                   Agent (Arbiter)                │      │
 │   │                                                  │      │
 │   │   Session ──► Working Directory                  │      │
 │   │      │                                           │      │
@@ -32,9 +32,9 @@ Before writing integration code, learn Agentao's six core nouns. Every chapter t
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 1. Agent (Agentao instance)
+## 1. Agent (Arbiter instance)
 
-A `agentao.Agentao` instance is a **stateful, single-session** object. It owns:
+A `arbiter.Arbiter` instance is a **stateful, single-session** object. It owns:
 
 - Conversation history `self.messages`
 - Tool registry `self.tools`
@@ -54,7 +54,7 @@ An action the agent can invoke. Each tool declares:
 - `execute(**kwargs) -> str` — the real implementation
 - `requires_confirmation` — whether to prompt the user
 
-Agentao ships dozens of built-ins (`read_file`, `write_file`, `run_shell_command`, `web_fetch`, `grep`, `glob`…). **Your business APIs become agent capabilities by being wrapped as tools** (Part 5.1).
+Arbiter ships dozens of built-ins (`read_file`, `write_file`, `run_shell_command`, `web_fetch`, `grep`, `glob`…). **Your business APIs become agent capabilities by being wrapped as tools** (Part 5.1).
 
 ## 3. Skill
 
@@ -90,9 +90,9 @@ Three built-ins:
 
 ## 5. Session / Working Directory
 
-A **session** is the lifetime from `Agentao()` to `close()`, matching one conversation history.
+A **session** is the lifetime from `Arbiter()` to `close()`, matching one conversation history.
 
-**Working directory** is the "project root" this session sees. File tools, shell, skills, and `AGENTAO.md` loading are all relative to it.
+**Working directory** is the "project root" this session sees. File tools, shell, skills, and `ARBITER.md` loading are all relative to it.
 
 ⚠️ When embedding multiple instances in one process, **always pass `working_directory=Path(...)` explicitly**. Otherwise `Path.cwd()` is shared globally and sessions bleed into each other.
 
@@ -100,25 +100,25 @@ A **session** is the lifetime from `Agentao()` to `close()`, matching one conver
 
 Not a static string — **rebuilt on every `chat()` call** from:
 
-1. `AGENTAO.md` (project instructions, read from working_directory)
+1. `ARBITER.md` (project instructions, read from working_directory)
 2. Base agent capability description
 3. Current date + available skill catalog
 4. Active skills' full text
 5. Memory recall block `<memory-context>`
 6. Task list (todos)
 
-Hosts inject business knowledge here by writing `AGENTAO.md` or custom skills (Part 5.6).
+Hosts inject business knowledge here by writing `ARBITER.md` or custom skills (Part 5.6).
 
 ## Quick cross-reference
 
 | Concept | Source location | Main touchpoint |
 |---------|----------------|------------------|
-| Agent | `agentao/agent.py` | `Agentao(...)` constructor |
-| Tool | `agentao/tools/base.py` | Subclass `Tool` |
-| Skill | `agentao/skills/manager.py` | Author `SKILL.md` |
-| Transport | `agentao/transport/` | Instantiate `SdkTransport` |
+| Agent | `arbiter/agent.py` | `Arbiter(...)` constructor |
+| Tool | `arbiter/tools/base.py` | Subclass `Tool` |
+| Skill | `arbiter/skills/manager.py` | Author `SKILL.md` |
+| Transport | `arbiter/transport/` | Instantiate `SdkTransport` |
 | Session | `agent.messages` | Lifecycle + concurrency |
-| System Prompt | `agent._build_system_prompt()` | Author `AGENTAO.md` |
+| System Prompt | `agent._build_system_prompt()` | Author `ARBITER.md` |
 
 ## TL;DR
 
@@ -127,6 +127,6 @@ Hosts inject business knowledge here by writing `AGENTAO.md` or custom skills (P
 - **Skill = on-demand prompt knowledge.** Markdown bundle activated explicitly; not code.
 - **Transport = the UI bridge.** 4 callbacks: emit / confirm / ask_user / on_max_iterations.
 - **Working directory = process-isolated session root.** Always pass an explicit `Path`.
-- **System prompt = composed each turn** from AGENTAO.md + date + skills + memory.
+- **System prompt = composed each turn** from ARBITER.md + date + skills + memory.
 
 Next: [1.3 Integration Modes →](./3-integration-modes)

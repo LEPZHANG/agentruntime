@@ -1,13 +1,13 @@
 # Blueprint B · IDE Plugin (VS Code + ACP)
 
-A minimal VS Code extension that drives `agentao --acp --stdio` as a workspace-scoped subprocess. Reference implementation of the "three-loop" ACP client architecture from the developer guide.
+A minimal VS Code extension that drives `arbiter --acp --stdio` as a workspace-scoped subprocess. Reference implementation of the "three-loop" ACP client architecture from the developer guide.
 
 Corresponds to [Part 7.2 of the developer guide](../../developer-guide/en/part-7/2-ide-plugin) and the TypeScript client in [Part 3.3.4](../../developer-guide/en/part-3/3-host-client-architecture).
 
 ## What it demonstrates
 
-- **`ACPClient` class** — spawn `agentao`, line-oriented stdio reader, request/response correlation with timeouts, notification dispatch, server→client request handling
-- **VS Code integration** — two commands (`Agentao: Ask`, `Agentao: Cancel`), streaming output channel, modal permission prompts
+- **`ACPClient` class** — spawn `arbiter`, line-oriented stdio reader, request/response correlation with timeouts, notification dispatch, server→client request handling
+- **VS Code integration** — two commands (`Arbiter: Ask`, `Arbiter: Cancel`), streaming output channel, modal permission prompts
 - **Session persistence** — `sessionId` saved to `ctx.globalState` and restored via `session/load` on next activation
 
 ## How to compile
@@ -22,11 +22,11 @@ Expected: zero TypeScript errors, `out/` directory created.
 ## How to run inside VS Code
 
 1. Open this directory in VS Code
-2. Ensure `agentao` is on your `PATH` (`uv tool install agentao` or run from this repo with `uv run agentao`)
+2. Ensure `arbiter` is on your `PATH` (`uv tool install arbiter` or run from this repo with `uv run arbiter`)
 3. Press **F5** — a new Extension Development Host window opens
 4. Open any folder as a workspace in the new window
-5. Command Palette → `Agentao: Ask` → type a question
-6. The "Agentao" output channel streams the reply; permission prompts appear as modal dialogs
+5. Command Palette → `Arbiter: Ask` → type a question
+6. The "Arbiter" output channel streams the reply; permission prompts appear as modal dialogs
 
 ## File map
 

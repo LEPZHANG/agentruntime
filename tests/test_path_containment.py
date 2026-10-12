@@ -20,8 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from agentao.tools.file_ops import EditTool, WriteFileTool
-from agentao.tools.shell import ShellTool
+from arbiter.tools.file_ops import EditTool, WriteFileTool
+from arbiter.tools.shell import ShellTool
 
 
 # ---------------------------------------------------------------------------

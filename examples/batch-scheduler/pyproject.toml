@@ -1,14 +1,14 @@
 [project]
-name = "agentao-example-batch-scheduler"
+name = "arbiter-example-batch-scheduler"
 version = "0.1.0"
 description = "Blueprint E — nightly scheduled agent producing a structured daily digest."
 requires-python = ">=3.10"
 dependencies = [
-    "agentao",
+    "arbiter",
 ]
 
 [tool.uv.sources]
-agentao = { path = "../..", editable = true }
+arbiter = { path = "../..", editable = true }
 
 [build-system]
 requires = ["hatchling"]

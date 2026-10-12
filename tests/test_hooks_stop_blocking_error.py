@@ -1,4 +1,4 @@
-"""Stop hook ``blockingError`` Agentao-internal field.
+"""Stop hook ``blockingError`` Arbiter-internal field.
 
 A Stop hook returning ``{"blockingError": "lint failed"}`` produces a
 ``StopHookResult`` with ``blocking_error`` set and a
@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import json
 
-from agentao.plugins.hooks import PluginHookDispatcher
-from agentao.plugins.models import ParsedHookRule, StopHookResult
+from arbiter.plugins.hooks import PluginHookDispatcher
+from arbiter.plugins.models import ParsedHookRule, StopHookResult
 
 
 def test_blocking_error_recorded_and_short_circuits():

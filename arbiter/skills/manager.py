@@ -1,0 +1,488 @@
+"""Skills manager for Arbiter."""
+
+import json
+import re
+import shutil
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, List, Optional, Set
+
+from arbiter.frontmatter import parse_frontmatter
+
+from ..paths import user_root
+
+if TYPE_CHECKING:
+    # Declared here, not at module scope: the plugin subsystem is an
+    # optional dependency, so ``register_plugin_skills`` keeps its real
+    # import inside the function body. Without these the string
+    # annotations on that method name types that nothing ever binds, so
+    # no static checker can resolve them (ruff F821).
+    from arbiter.plugins.models import PluginLoadError, PluginSkillEntry
+
+# Global skills directory (shared across all projects). Cwd-independent.
+_GLOBAL_SKILLS_DIR = user_root() / "skills"
+
+# Bundled skills shipped with the package (skill-creator lives here after install)
+_BUNDLED_SKILLS_DIR = Path(__file__).parent.parent.parent / "skills"
+
+# Default project-scoped paths, evaluated once at import time. These are the
+# fallbacks used by ``SkillManager()`` when no ``working_directory`` is
+# supplied (CLI behavior). They remain module-level so existing tests can
+# patch them via ``unittest.mock.patch.multiple(...)``. ACP sessions pass an
+# explicit ``working_directory`` and bypass these constants entirely.
+_PROJECT_SKILLS_DIR = Path.cwd() / ".arbiter" / "skills"
+_CONFIG_DIR = Path.cwd() / ".arbiter"
+_CONFIG_FILE = _CONFIG_DIR / "skills_config.json"
+
+# Single source of truth for the relative-path resolution rule injected next
+# to every "Skill directory:" line (activation message + per-turn context).
+_SKILL_DIR_NOTE = (
+    "Relative paths in the skill's instructions (e.g. scripts/foo.py) "
+    "resolve against this skill directory, NOT your current working "
+    "directory. Build absolute paths from the skill directory before "
+    "reading or running them.\n"
+)
+
+# Resource subdirectories enumerated per skill. references/ and assets/ are
+# documentation (*.md only); scripts/ is executable surface, so every file
+# counts. Hidden files and __pycache__ are skipped everywhere, and listings
+# are capped so a large tree cannot flood the system prompt (the listing is
+# re-rendered every turn for active skills).
+_RESOURCE_SPECS = (("references", "*.md"), ("assets", "*.md"), ("scripts", "*"))
+_RESOURCE_FILE_CAP = 50
+
+
+class SkillManager:
+    """Manager for Arbiter skills.
+
+    Scans three layers of skill directories (highest priority last):
+      1. ~/.arbiter/skills/                  — global skills
+      2. <working_directory>/.arbiter/skills — project config skills
+      3. <working_directory>/skills          — repo-root skills
+
+    Project paths are resolved against an explicit ``working_directory`` so
+    that ACP sessions targeting different repositories see independent skill
+    sets and disabled-skill state. The CLI passes ``None`` and falls back to
+    ``Path.cwd()`` at construction time, preserving the legacy single-project
+    behavior.
+
+    On first run, bundled skills (e.g. skill-creator) are copied to the global
+    skills directory so they are available immediately after install.
+    """
+
+    def __init__(
+        self,
+        skills_dir: Optional[str] = None,
+        *,
+        working_directory: Optional[Path] = None,
+    ):
+        """Initialize skill manager.
+
+        Args:
+            skills_dir: If provided, scan only this directory (legacy / sub-agent use).
+                       Pass a non-existent path to suppress all skills.
+                       If None (default), use the two-layer global + project scan.
+            working_directory: Project root used to resolve project-scoped
+                       skill directories and the disabled-skills config file.
+                       When ``None`` (CLI default), falls back to ``Path.cwd()``
+                       *at construction time* — same semantic as the previous
+                       module-level constants. ACP sessions pass their frozen
+                       per-session ``cwd`` so two sessions in different repos
+                       cannot leak skills or disabled-skill state into each
+                       other.
+        """
+        self.active_skills: Dict[str, dict] = {}
+        self.available_skills: Dict[str, dict] = {}
+        self.disabled_skills: Set[str] = set()
+        self._explicit_dir = Path(skills_dir) if skills_dir is not None else None
+
+        # Resolve project-scoped paths once at construction time:
+        #   - When ``working_directory`` is provided (ACP session path),
+        #     scope every project path to it. Two ACP sessions in different
+        #     repos see independent skills + disabled-skill state.
+        #   - When ``working_directory`` is None (CLI default), fall back to
+        #     the module-level constants. Tests patch those constants via
+        #     ``unittest.mock.patch.multiple(_mod, _PROJECT_SKILLS_DIR=...)``,
+        #     so this fallback path preserves their existing setup pattern.
+        if working_directory is not None:
+            self._project_skills_dir = working_directory / ".arbiter" / "skills"
+            self._repo_skills_dir = working_directory / "skills"
+            self._config_dir = working_directory / ".arbiter"
+            self._config_file = self._config_dir / "skills_config.json"
+        else:
+            self._project_skills_dir = _PROJECT_SKILLS_DIR
+            self._repo_skills_dir = Path.cwd() / "skills"
+            self._config_dir = _CONFIG_DIR
+            self._config_file = _CONFIG_FILE
+
+        if self._explicit_dir is None:
+            self._bootstrap_bundled_skills()
+        self._load_config()
+        self._load_skills()
+
+    # ------------------------------------------------------------------
+    # Bootstrap
+    # ------------------------------------------------------------------
+
+    def _bootstrap_bundled_skills(self) -> None:
+        """Copy bundled skills to ~/.arbiter/skills/ on first run.
+
+        Each bundled skill is copied only if it does not already exist in the
+        global skills directory, so user modifications are never overwritten.
+        """
+        if not _BUNDLED_SKILLS_DIR.exists():
+            return
+        for skill_dir in _BUNDLED_SKILLS_DIR.iterdir():
+            if not skill_dir.is_dir():
+                continue
+            dest = _GLOBAL_SKILLS_DIR / skill_dir.name
+            if not dest.exists():
+                try:
+                    _GLOBAL_SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+                    shutil.copytree(skill_dir, dest)
+                except Exception:
+                    pass  # best-effort; don't crash on bootstrap failure
+
+    # ------------------------------------------------------------------
+    # Config
+    # ------------------------------------------------------------------
+
+    def _load_config(self):
+        """Load disabled skills list from config file."""
+        if self._config_file.exists():
+            try:
+                with open(self._config_file, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                self.disabled_skills = set(config.get("disabled_skills", []))
+            except (IOError, json.JSONDecodeError):
+                self.disabled_skills = set()
+
+    def _save_config(self):
+        """Save disabled skills list to config file."""
+        self._config_dir.mkdir(parents=True, exist_ok=True)
+        config = {"disabled_skills": sorted(self.disabled_skills)}
+        with open(self._config_file, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2)
+
+    def disable_skill(self, skill_name: str) -> str:
+        """Disable a skill, hiding it from the available list."""
+        if skill_name not in self.available_skills:
+            available = ", ".join(sorted(self.available_skills.keys()))
+            return f"Error: Unknown skill '{skill_name}'. Known skills: {available}"
+        if skill_name in self.disabled_skills:
+            return f"Skill '{skill_name}' is already disabled."
+        self.disabled_skills.add(skill_name)
+        if skill_name in self.active_skills:
+            self.deactivate_skill(skill_name)
+        self._save_config()
+        return f"Skill '{skill_name}' has been disabled."
+
+    def enable_skill(self, skill_name: str) -> str:
+        """Re-enable a previously disabled skill."""
+        if skill_name not in self.disabled_skills:
+            if skill_name in self.available_skills:
+                return f"Skill '{skill_name}' is not disabled."
+            available = ", ".join(sorted(self.available_skills.keys()))
+            return f"Error: Unknown skill '{skill_name}'. Known skills: {available}"
+        self.disabled_skills.discard(skill_name)
+        self._save_config()
+        return f"Skill '{skill_name}' has been re-enabled."
+
+    # ------------------------------------------------------------------
+    # Loading
+    # ------------------------------------------------------------------
+
+    def _load_skills(self):
+        """Load skills from all configured directories.
+
+        Priority order (highest last — later entries overwrite earlier ones):
+          1. ~/.arbiter/skills/                   global skills
+          2. <project_root>/.arbiter/skills/      project config skills
+          3. <project_root>/skills/               repo-root skills (highest priority)
+
+        ``<project_root>`` is the per-instance ``working_directory`` argument
+        captured at construction time, defaulting to ``Path.cwd()`` for the CLI.
+        """
+        if self._explicit_dir is not None:
+            # Legacy / sub-agent mode: single directory only
+            self._load_skills_from_dir(self._explicit_dir)
+        else:
+            self._load_skills_from_dir(_GLOBAL_SKILLS_DIR)
+            self._load_skills_from_dir(self._project_skills_dir)
+            if self._repo_skills_dir.exists():
+                self._load_skills_from_dir(self._repo_skills_dir)
+
+    def _load_skills_from_dir(self, skills_dir: Path) -> None:
+        """Scan one directory for skills and merge into available_skills."""
+        if not skills_dir.exists():
+            return
+
+        for skill_dir in skills_dir.iterdir():
+            if not skill_dir.is_dir():
+                continue
+
+            skill_md_path = skill_dir / "SKILL.md"
+            if not skill_md_path.exists():
+                continue
+
+            try:
+                with open(skill_md_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                frontmatter, body_content = parse_frontmatter(
+                    content, coerce_str=True, source=str(skill_md_path)
+                )
+
+                skill_name = frontmatter.get("name", skill_dir.name)
+                description = frontmatter.get("description", "")
+                when_to_use = frontmatter.get("when-to-use", "")
+
+                title_match = re.search(r'^#\s+(.+)$', body_content, re.MULTILINE)
+                title = title_match.group(1) if title_match else skill_name
+
+                self.available_skills[skill_name] = {
+                    "name": skill_name,
+                    "title": title,
+                    "description": description,
+                    "when_to_use": when_to_use,
+                    # Resolved so the paths surfaced to the model (Skill
+                    # directory, resource listings) work from any cwd even
+                    # when a host passes a relative skills_dir.
+                    "path": str(skill_md_path.resolve()),
+                    "content": body_content[:500],
+                    "frontmatter": frontmatter,
+                }
+
+            except (IOError, UnicodeDecodeError) as e:
+                print(f"Warning: Could not load skill from {skill_md_path}: {e}")
+                continue
+
+    # ------------------------------------------------------------------
+    # Queries
+    # ------------------------------------------------------------------
+
+    def list_available_skills(self) -> List[str]:
+        """List available (non-disabled) skills."""
+        return [name for name in self.available_skills if name not in self.disabled_skills]
+
+    def list_all_skills(self) -> List[str]:
+        """List all discovered skills including disabled ones."""
+        return list(self.available_skills.keys())
+
+    def get_skill_description(self, skill_name: str) -> Optional[str]:
+        skill_data = self.available_skills.get(skill_name)
+        return skill_data.get("description") if skill_data else None
+
+    def get_skill_info(self, skill_name: str) -> Optional[dict]:
+        return self.available_skills.get(skill_name)
+
+    @staticmethod
+    def _skill_dir(skill_info: Optional[dict]) -> Optional[Path]:
+        """Directory owning the skill's files, or None when there isn't one.
+
+        None for path-less entries (inline plugin content) and for plugin
+        commands — command ``.md`` files sit in a shared ``commands/``
+        folder that is not a skill directory, so reporting it (or scanning
+        it for resources) would misattribute sibling files to every
+        command.
+        """
+        if not skill_info or not skill_info.get('path'):
+            return None
+        if skill_info.get('source_kind') == "plugin-command":
+            return None
+        return Path(skill_info['path']).parent
+
+    def _list_skill_resources(self, skill_name: str) -> Dict[str, List[str]]:
+        resources: Dict[str, List[str]] = {key: [] for key, _ in _RESOURCE_SPECS}
+        skill_dir = self._skill_dir(self.get_skill_info(skill_name))
+        if skill_dir is None:
+            return resources
+
+        for key, pattern in _RESOURCE_SPECS:
+            base = skill_dir / key
+            if not base.is_dir():
+                continue
+            files = [
+                f for f in sorted(base.rglob(pattern))
+                if f.is_file() and not any(
+                    part.startswith(".") or part == "__pycache__"
+                    for part in f.relative_to(base).parts
+                )
+            ]
+            resources[key] = [str(f) for f in files[:_RESOURCE_FILE_CAP]]
+            if len(files) > _RESOURCE_FILE_CAP:
+                resources[key].append(
+                    f"... ({len(files) - _RESOURCE_FILE_CAP} more files "
+                    f"under {base} not shown)"
+                )
+
+        return resources
+
+    # ------------------------------------------------------------------
+    # Activation
+    # ------------------------------------------------------------------
+
+    def activate_skill(self, skill_name: str, task_description: str) -> str:
+        skill_info = self.get_skill_info(skill_name)
+        if not skill_info:
+            available = ", ".join(self.list_available_skills())
+            return f"Error: Unknown skill '{skill_name}'. Available skills: {available}"
+
+        self.active_skills[skill_name] = {
+            "task": task_description,
+            "skill_info": skill_info,
+        }
+
+        message = f"\nSkill Activated: {skill_name}\n"
+        message += f"Title: {skill_info.get('title', skill_name)}\n"
+        if skill_info.get('description'):
+            message += f"Description: {skill_info['description'][:200]}...\n"
+        message += f"Task: {task_description}\n"
+        skill_path = skill_info.get('path')
+        message += f"Documentation: {skill_path or 'N/A'}\n"
+        skill_dir = self._skill_dir(skill_info)
+        if skill_dir is not None:
+            message += f"Skill directory: {skill_dir}\n"
+            message += _SKILL_DIR_NOTE
+
+        resources = self._list_skill_resources(skill_name)
+        if any(resources.values()):
+            message += "\n=== Available Resource Files ===\n"
+            message += "You can use the read_file tool to load these files as needed:\n\n"
+            if resources["references"]:
+                message += "References:\n"
+                for ref_path in resources["references"]:
+                    message += f"  - {ref_path}\n"
+            if resources["assets"]:
+                message += "\nAssets:\n"
+                for asset_path in resources["assets"]:
+                    message += f"  - {asset_path}\n"
+            if resources["scripts"]:
+                message += "\nScripts (prefer running or patching these instead of retyping their code):\n"
+                for script_path in resources["scripts"]:
+                    message += f"  - {script_path}\n"
+
+        message += "\nThe skill is now active. You can reference its documentation for detailed usage."
+        return message
+
+    def deactivate_skill(self, skill_name: str) -> bool:
+        if skill_name in self.active_skills:
+            del self.active_skills[skill_name]
+            return True
+        return False
+
+    def get_active_skills(self) -> Dict[str, dict]:
+        return self.active_skills.copy()
+
+    def clear_active_skills(self):
+        self.active_skills.clear()
+
+    def get_skills_context(self) -> str:
+        """Get context about active skills for the LLM."""
+        if not self.active_skills:
+            return ""
+
+        context = "\n=== Active Skills ===\n"
+        for name, info in self.active_skills.items():
+            skill_info = info['skill_info']
+            context += f"\n## {name} - {skill_info.get('title', name)}\n"
+            context += f"Task: {info['task']}\n"
+            skill_dir = self._skill_dir(skill_info)
+            if skill_dir is not None:
+                context += f"Skill directory: {skill_dir}\n"
+                context += _SKILL_DIR_NOTE
+
+            skill_content = self.get_skill_content(name)
+            if skill_content:
+                context += f"\n{skill_content}\n"
+
+            resources = self._list_skill_resources(name)
+            if any(resources.values()):
+                context += "\nAvailable resource files (use read_file to load; prefer running scripts directly):\n"
+                for key, _ in _RESOURCE_SPECS:
+                    for path in resources.get(key, []):
+                        context += f"  - {path}\n"
+
+        return context
+
+    # ------------------------------------------------------------------
+    # Plugin skill registration
+    # ------------------------------------------------------------------
+
+    def register_plugin_skills(
+        self,
+        entries: "list[PluginSkillEntry]",
+    ) -> "list[PluginLoadError]":
+        """Register plugin-provided skill entries.
+
+        Returns a list of collision errors.  If the list is non-empty the
+        caller should treat the plugin as failed.
+
+        Imports are deferred to avoid a hard dependency when the plugin
+        subsystem is not installed.
+        """
+        from arbiter.plugins.models import PluginLoadError, PluginSkillEntry
+        from arbiter.plugins.skills import validate_no_external_collisions
+
+        errors = validate_no_external_collisions(
+            entries[0].plugin_name if entries else "",
+            entries,
+            set(self.available_skills.keys()),
+        )
+        if errors:
+            return errors
+
+        for entry in entries:
+            self.available_skills[entry.runtime_name] = {
+                "name": entry.runtime_name,
+                "title": entry.runtime_name,
+                "description": entry.description or "",
+                "when_to_use": "",
+                "path": str(entry.source_path) if entry.source_path else None,
+                "content": (entry.content or "")[:500],
+                "frontmatter": {},
+                # Plugin metadata — distinguishes plugin entries from native ones.
+                "plugin_name": entry.plugin_name,
+                "source_kind": entry.source_kind,
+                "argument_hint": entry.argument_hint,
+                "model": entry.model,
+                "allowed_tools": entry.allowed_tools,
+                "full_content": entry.content,
+            }
+
+        return []
+
+    def reload_skills(self):
+        """Reload skill definitions from disk.
+
+        Plugin-provided skills are preserved across reloads since they
+        are not backed by on-disk skill directories.
+        """
+        # Snapshot plugin entries so they survive the clear+reload cycle.
+        plugin_entries = {
+            name: info
+            for name, info in self.available_skills.items()
+            if info.get("source_kind")
+        }
+        self.available_skills.clear()
+        self._load_skills()
+        # Re-inject plugin entries that don't collide with native skills.
+        for name, info in plugin_entries.items():
+            if name not in self.available_skills:
+                self.available_skills[name] = info
+        self.disabled_skills &= set(self.available_skills.keys())
+        self._save_config()
+
+    def get_skill_content(self, skill_name: str) -> Optional[str]:
+        skill_info = self.get_skill_info(skill_name)
+        if not skill_info:
+            return None
+        # Plugin entries with inline content but no file path.
+        if skill_info.get("full_content") and not skill_info.get("path"):
+            return skill_info["full_content"]
+        if "path" not in skill_info or not skill_info["path"]:
+            return None
+        try:
+            with open(skill_info['path'], 'r', encoding='utf-8') as f:
+                return f.read()
+        except IOError:
+            return None

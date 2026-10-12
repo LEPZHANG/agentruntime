@@ -119,7 +119,7 @@ You: /reset-confirm
 
 ### 代码修改
 
-**agentao/cli/commands.py**:
+**arbiter/cli/commands.py**:
 
 ```python
 elif command == "clear":

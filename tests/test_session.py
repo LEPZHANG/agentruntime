@@ -1,7 +1,7 @@
 """Regression tests for session save/restore.
 
-The implementation moved to :mod:`agentao.embedding.sessions` (the
-top-level :mod:`agentao.session` survives only as a deprecation shim
+The implementation moved to :mod:`arbiter.embedding.sessions` (the
+top-level :mod:`arbiter.session` survives only as a deprecation shim
 until 0.5.0). The tests still import the public functions through the
 shim to confirm the shim works, but ``_session_dir`` monkeypatching
 targets the new module — wrapper-shim mechanics cannot intercept
@@ -20,7 +20,7 @@ import pytest
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", DeprecationWarning)
-    from agentao.session import (
+    from arbiter.session import (
         delete_all_sessions,
         delete_session,
         format_session_time_local,
@@ -29,7 +29,7 @@ with warnings.catch_warnings():
         save_session,
     )
 
-import agentao.embedding.sessions as session_module
+import arbiter.embedding.sessions as session_module
 
 _MESSAGES = [
     {"role": "user", "content": "hello"},
@@ -45,8 +45,8 @@ def isolated_session_dir(tmp_path, monkeypatch):
 
     Issue 05 added an optional ``project_root`` parameter to ``_session_dir``;
     the mock accepts but ignores it so the tests keep working unchanged.
-    Patches ``agentao.embedding.sessions._session_dir`` (where the helper
-    actually lives after the 0.4.5 migration); the ``agentao.session``
+    Patches ``arbiter.embedding.sessions._session_dir`` (where the helper
+    actually lives after the 0.4.5 migration); the ``arbiter.session``
     shim delegates through ``embedding.sessions``, so a single patch
     redirects both paths.
     """
@@ -181,7 +181,7 @@ def test_persisted_title_from_multimodal_first_message():
 def test_rotation_keeps_max_10(tmp_path):
     # save_session uses second-precision timestamps that collide in rapid loops;
     # create session files directly and invoke _rotate_sessions explicitly.
-    from agentao.embedding.sessions import _rotate_sessions
+    from arbiter.embedding.sessions import _rotate_sessions
     session_dir = tmp_path / "sessions"
     session_dir.mkdir(parents=True, exist_ok=True)
     for i in range(12):

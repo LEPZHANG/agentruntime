@@ -1,9 +1,9 @@
 # protocol-injection · replace every host IO surface
 
-Runnable companion to the `agentao.host.protocols` extension points.
+Runnable companion to the `arbiter.host.protocols` extension points.
 Each of the four protocols — `FileSystem`, `ShellExecutor`,
 `MCPRegistry`, `MemoryStore` — is replaced with a small adapter that
-records what Agentao does, so the smoke suite can prove the slots are
+records what Arbiter does, so the smoke suite can prove the slots are
 actually wired through.
 
 ## Try it
@@ -17,7 +17,7 @@ PYTHONPATH=. uv run pytest tests/ -v
 ## What's in the box
 
 `src/protocol_demo.py` defines four reference adapters and a `make_agent`
-factory that hands them to `Agentao(...)`:
+factory that hands them to `Arbiter(...)`:
 
 | Protocol | Adapter | What it shows |
 |----------|---------|---------------|
@@ -27,16 +27,16 @@ factory that hands them to `Agentao(...)`:
 | `MemoryStore` | `DictMemoryStore` | full CRUD + soft-delete + review queue |
 
 Each smoke test exercises one slot end-to-end (`read_file`,
-`run_shell_command`, `Agentao()` construction, `save_memory`) and asserts
+`run_shell_command`, `Arbiter()` construction, `save_memory`) and asserts
 the adapter saw the call.
 
 ## Use in your project
 
 ```python
-from agentao import Agentao
-from agentao.memory import MemoryManager
+from arbiter import Arbiter
+from arbiter.memory import MemoryManager
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=cwd,
     llm_client=my_llm,
     filesystem=MyDockerFileSystem(),       # FileSystem
@@ -49,4 +49,4 @@ agent = Agentao(
 ```
 
 The Protocol surface is enforced structurally — implement every method
-and Agentao will route through your adapter without subclassing.
+and Arbiter will route through your adapter without subclassing.

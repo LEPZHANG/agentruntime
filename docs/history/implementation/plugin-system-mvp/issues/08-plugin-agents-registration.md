@@ -6,7 +6,7 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Goal
 
-把 plugin agents 接入 Agentao agent discovery。
+把 plugin agents 接入 Arbiter agent discovery。
 
 ## Scope
 
@@ -17,7 +17,7 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Deliverables
 
-- `agentao/agents/manager.py` 接线
+- `arbiter/agents/manager.py` 接线
 - agents integration 单测
 
 ## Dependencies

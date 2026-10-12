@@ -1,4 +1,4 @@
-# 非交互式 `agentao run` —— 设计方案
+# 非交互式 `arbiter run` —— 设计方案
 
 **日期：** 2026-05-08
 **状态：** 草案（M0 范围）
@@ -7,36 +7,36 @@
 
 ## TL;DR
 
-新增 `agentao run` 子命令：
+新增 `arbiter run` 子命令：
 
 1. 从 stdin 或 `--spec <file>` 读取结构化 run spec；
 2. 与显式 CLI flags 合并；
-3. 执行一次 Agentao turn；
+3. 执行一次 Arbiter turn；
 4. 输出机器可读的结果。
 
 ```bash
-agentao run --format json < task.yaml
-agentao run --spec task.yaml --format text
-agentao run --prompt "Summarize this directory" --format json
+arbiter run --format json < task.yaml
+arbiter run --spec task.yaml --format text
+arbiter run --prompt "Summarize this directory" --format json
 ```
 
-`agentao run` 是自动化入口。交互式 REPL 与 `agentao -p` 保留。本次工作完成后，`-p` 重写为同一个 pipeline 的轻量 shim，两者共用一张 exit-code 表。
+`arbiter run` 是自动化入口。交互式 REPL 与 `arbiter -p` 保留。本次工作完成后，`-p` 重写为同一个 pipeline 的轻量 shim，两者共用一张 exit-code 表。
 
 ---
 
 ## 为什么要做
 
-`agentao -p` 故意做得简单。在自动化场景下不够用：
+`arbiter -p` 故意做得简单。在自动化场景下不够用：
 
 - 运行时设置散落在 flags、env vars、cwd、CLI 默认值之间；
 - stdin 被当作提示词文本，不是结构化任务对象；
 - 调用方需要解析自然语言输出才能取到 status / replay 路径 / token 用量 / 失败原因；
 - CI 无法在一个任务模板上做小范围 per-run override。
 
-`agentao run` 为这个用例提供稳定契约：
+`arbiter run` 为这个用例提供稳定契约：
 
 ```text
-run spec + CLI overrides → 一次 Agentao turn → 结构化结果
+run spec + CLI overrides → 一次 Arbiter turn → 结构化结果
 ```
 
 ---
@@ -61,15 +61,15 @@ run spec + CLI overrides → 一次 Agentao turn → 结构化结果
 
 ## Non-Goals
 
-- 不让所有 Agentao 子命令都接 YAML/JSON stdin。
+- 不让所有 Arbiter 子命令都接 YAML/JSON stdin。
 - 不引入 GJSON/JQ 风格的 transform 语言。
 - 不引入 OpenAPI 风格的 flag metadata。
 - 不把内部 replay/debug payload 暴露成 run-result schema。
-- `agentao run` 不做交互式审批。失败显式上报。
+- `arbiter run` 不做交互式审批。失败显式上报。
 - 不提供 `approve_all` 快捷选项。完全放行用 `permission_mode: full-access`——诚实且可审计。
 - 不引入并行的权限匹配器。spec 级规则复用 `PermissionEngine`。
 - 不新增 `Transport` 异常类型，不改 `confirm_tool` 签名。非交互中止路径基于现有原语实现：`CancellationToken` 加同步 `EventStream.add_observer(...)`（通过新增的两个 thin pass-through `Agent.add_event_observer` / `remove_event_observer` 访问），详见 Design Decisions。
-- 不替代 ACP。ACP 是长期协议面；`agentao run` 是一次性本地进程面。
+- 不替代 ACP。ACP 是长期协议面；`arbiter run` 是一次性本地进程面。
 
 ---
 
@@ -78,7 +78,7 @@ run spec + CLI overrides → 一次 Agentao turn → 结构化结果
 ### 通过 stdin 传入 spec
 
 ```bash
-agentao run --format json < task.yaml
+arbiter run --format json < task.yaml
 ```
 
 ```yaml
@@ -94,7 +94,7 @@ replay: true
 ### 用 flags 覆盖 spec
 
 ```bash
-agentao run \
+arbiter run \
   --model gpt-5.5 \
   --permission-mode workspace-write \
   --format json \
@@ -112,7 +112,7 @@ effective spec = 默认值 + stdin/file spec + 显式 CLI flags
 ### 从文件读 spec
 
 ```bash
-agentao run --spec .agentao/tasks/review.yaml --format json
+arbiter run --spec .arbiter/tasks/review.yaml --format json
 ```
 
 `--spec` 与 piped stdin 同时出现 → 清晰报错（exit `2`）。一次运行只接受一个结构化 spec 来源。
@@ -120,10 +120,10 @@ agentao run --spec .agentao/tasks/review.yaml --format json
 ### 内联 prompt 便利写法
 
 ```bash
-agentao run --prompt "Summarize the current directory" --format json
+arbiter run --prompt "Summarize the current directory" --format json
 ```
 
-适合需要结构化输出但不想写 YAML 文件的调用方。它不替代 `agentao -p`，只是共享同一个结果契约。
+适合需要结构化输出但不想写 YAML 文件的调用方。它不替代 `arbiter -p`，只是共享同一个结果契约。
 
 ---
 
@@ -161,9 +161,9 @@ output:
 - `prompt`：未提供 `--prompt` 时必填。
 - `cwd`：本次运行的工作目录，相对路径相对进程 cwd 解析，映射到 `Agent.working_directory`。`RunResult.cwd` 返回解析后的绝对路径。
 - `model`、`base_url`：仅本次运行覆盖 env-derived LLM 设置，通过 `**overrides` 走 `build_from_environment(...)`。**spec 不接受 `api_key`** ——secrets 留在环境变量或 host 注入的客户端里。
-- `permission_mode`：现有 Agentao 模式（`agentao/permissions.py:71-76`）。默认与交互式 CLI 一致（`workspace-write`）。CI 示例应显式设 `read-only`。
+- `permission_mode`：现有 Arbiter 模式（`arbiter/permissions.py:71-76`）。默认与交互式 CLI 一致（`workspace-write`）。CI 示例应显式设 `read-only`。
 - `interaction_policy`：M0 仅接受 `reject`。ASK 且无 `permissions.allow` 命中 → `permission_required`（exit `3`）。`ask_user(...)` → `interaction_required`（exit `3`）。字段省略时按 `reject` 处理。其他取值预留。
-- `permissions.allow` / `permissions.deny`：注入到现有 `PermissionEngine`，仅本次运行有效。匹配器与规则形状与 `~/.agentao/permissions.json` 完全一致（见 `agentao/permissions.py::_matches`）。优先级与 provenance 见 Design Decisions 的 **Permissions** 节。
+- `permissions.allow` / `permissions.deny`：注入到现有 `PermissionEngine`，仅本次运行有效。匹配器与规则形状与 `~/.arbiter/permissions.json` 完全一致（见 `arbiter/permissions.py::_matches`）。优先级与 provenance 见 Design Decisions 的 **Permissions** 节。
 - `max_iterations`：现有 chat-loop 上限。spec / flag 都不设时默认 `100`（`Agent.chat(max_iterations=100)`）。
 - `skills`：turn 开始前要激活的技能名。append 到已发现的 active skills，不替换。任一缺失 → 在 turn 开始前失败。
 - `replay`：本次运行启用 `ReplayManager`。
@@ -196,7 +196,7 @@ output:
 
 ### `--format text`
 
-stdout 只输出最终助手文本。诊断信息走 stderr。这是与 `agentao -p` 最接近的形态，但走的是新 pipeline。
+stdout 只输出最终助手文本。诊断信息走 stderr。这是与 `arbiter -p` 最接近的形态，但走的是新 pipeline。
 
 ### `--format json`
 
@@ -212,7 +212,7 @@ stdout 只输出最终助手文本。诊断信息走 stderr。这是与 `agentao
   "cwd": "/abs/path/to/project",
   "model": "gpt-5.5",
   "final_text": "The tests fail because ...",
-  "replay_path": ".agentao/replays/session-id.jsonl",
+  "replay_path": ".arbiter/replays/session-id.jsonl",
   "usage": {
     "prompt_tokens": 12000,
     "completion_tokens": 900,
@@ -238,7 +238,7 @@ stdout 只输出最终助手文本。诊断信息走 stderr。这是与 `agentao
     "tool_name": "run_shell_command",
     "tool_call_id": "call_01HX..."
   },
-  "replay_path": ".agentao/replays/session-id.jsonl",
+  "replay_path": ".arbiter/replays/session-id.jsonl",
   "warnings": []
 }
 ```
@@ -277,7 +277,7 @@ M0 故意不带 `schema_version`，让 result envelope 与 host events 保持同
 
 可控的运行时失败一律输出结构化 JSON。CLI 用法/spec 无效类失败可只走 stderr。
 
-`agentao -p` 迁移到同一张表。当前 `-p` 在 max-iterations 时返回 `2`（`cli/entrypoints.py:60`）；本次改动后返回 `4`，与 `agentao run` 对齐。**这是 breaking change**，需要在 release notes 显式说明。
+`arbiter -p` 迁移到同一张表。当前 `-p` 在 max-iterations 时返回 `2`（`cli/entrypoints.py:60`）；本次改动后返回 `4`，与 `arbiter run` 对齐。**这是 breaking change**，需要在 release notes 显式说明。
 
 ---
 
@@ -297,7 +297,7 @@ run pipeline 必须在以下情况中止：
 
 **M0 机制（不新增异常类型，不改 `Transport` 签名）：**
 
-1. 新增 `NonInteractiveTransport(SdkTransport)`，位于 `agentao/transport/non_interactive.py`。它把 rejection 与 max-iterations 标志都记在实例属性上，并**取消由 run pipeline 显式构造、再通过 `agent.chat(cancellation_token=...)` 传入的 `CancellationToken`**（pipeline 必须显式构造该 token——`runtime/turn.py:60` 在缺省时会自己内部 new 一个，那个 token transport 拿不到）。
+1. 新增 `NonInteractiveTransport(SdkTransport)`，位于 `arbiter/transport/non_interactive.py`。它把 rejection 与 max-iterations 标志都记在实例属性上，并**取消由 run pipeline 显式构造、再通过 `agent.chat(cancellation_token=...)` 传入的 `CancellationToken`**（pipeline 必须显式构造该 token——`runtime/turn.py:60` 在缺省时会自己内部 new 一个，那个 token transport 拿不到）。
 
    ```python
    class NonInteractiveTransport(SdkTransport):
@@ -351,7 +351,7 @@ run pipeline 必须在以下情况中止：
            return "[interaction_required]"
 
        def on_max_iterations(self, max_iterations, pending_tools):
-           # 复用 agentao -p 现在已经在用的 Transport hook
+           # 复用 arbiter -p 现在已经在用的 Transport hook
            # （cli/entrypoints.py:25-37）。把 flag 记下来，pipeline 即可
            # 映射到 exit 4，不需要新造一个 MaxIterationsError。
            self.max_iterations_hit = True
@@ -363,7 +363,7 @@ run pipeline 必须在以下情况中止：
    本次工作给 `Agent` 加两个 thin pass-through，避免 pipeline 直接访问私有属性：
 
    ```python
-   # agentao/agent.py
+   # arbiter/agent.py
    def add_event_observer(self, callback):
        return self._host_events.add_observer(callback)
 
@@ -421,7 +421,7 @@ run pipeline 必须在以下情况中止：
 - 新增 sentinel 异常类型（`PermissionRequired` / `PermissionDenied` / `InteractionRequired`）。
 - `Transport.confirm_tool` 签名变更 → 不需要修改 6 处调用点（`base.py`、`sdk.py`、`null.py`、`replay/adapter.py`、`acp/transport.py`、`cli/app.py`）。
 - 在 `Transport` 抽象基类上新增 `on_permission_decision` hook。
-- 新造 `MaxIterationsError` —— 直接复用 `agentao -p` 已经在用的 `on_max_iterations` Transport hook。
+- 新造 `MaxIterationsError` —— 直接复用 `arbiter -p` 已经在用的 `on_max_iterations` Transport hook。
 - 复用 chat loop 已有的 `CancellationToken` —— 与 SIGINT 走同一套机制。
 
 **取舍：** DENY 发生时，现有运行时仍会先产生一条 "cancelled by user" 的 tool result，下一轮 chat loop 才发现 cancellation。这与现在 SIGINT 行为完全一致；最终的 `RunResult` 不受影响。
@@ -477,13 +477,13 @@ hardline → spec deny（新 pre-check）→ 现有 PermissionEngine 排序
 
 ### D3. Transport 必须构造期注入
 
-`Agentao.__init__` 把 `self.transport` 传给 `ToolRunner`，再由 `ToolRunner` 存到 `ToolExecutor` 与 `ToolResultFormatter`（`agent.py:404`）。构造完成后再 `agent.transport = NonInteractiveTransport(...)` 不会到达上述持有引用的地方。
+`Arbiter.__init__` 把 `self.transport` 传给 `ToolRunner`，再由 `ToolRunner` 存到 `ToolExecutor` 与 `ToolResultFormatter`（`agent.py:404`）。构造完成后再 `agent.transport = NonInteractiveTransport(...)` 不会到达上述持有引用的地方。
 
 run pipeline 因此先构造 `NonInteractiveTransport`，通过 `build_from_environment(transport=...)` 注入（factory 已经通过 `**overrides` 接受 `transport=`，见 `embedding/factory.py:215-222`）。构造完成后再绑定 cancel：`transport.bind_cancel(token.cancel)`。
 
-### D4. `agentao -p` 是轻量 shim
+### D4. `arbiter -p` 是轻量 shim
 
-`agentao -p <text>` ≡ `agentao run --format text --prompt <text>`。当前 `run_print_mode` 函数体改成调用同一个 `cli.run.execute(...)` 入口的 stub。Exit-code 统一自动随之达成 —— 不再需要为 max-iterations 单开一个分支。
+`arbiter -p <text>` ≡ `arbiter run --format text --prompt <text>`。当前 `run_print_mode` 函数体改成调用同一个 `cli.run.execute(...)` 入口的 stub。Exit-code 统一自动随之达成 —— 不再需要为 max-iterations 单开一个分支。
 
 ### D5. Plugins / skills / replay / sessions
 
@@ -500,11 +500,11 @@ run pipeline 因此先构造 `NonInteractiveTransport`，通过 `build_from_envi
 
 ### Phase 1 —— 模型、parser、transport、引擎扩展
 
-- 新增模块 `agentao/cli/run_models.py`：
+- 新增模块 `arbiter/cli/run_models.py`：
   - `RunSpec`、`RunOutputOptions`、`RunPermissionRule`、`RunPermissionDomainRule`、`RunResult`。
   - `RunSpec` 与 rule 模型：`extra="forbid"`。`RunResult`：`extra="ignore"`（forward-compat）。
   - `RunPermissionRule.to_engine_dict(action)` 转引擎 dict 形态；`action` 在此处注入，永不由用户填写。
-- 新增模块 `agentao/transport/non_interactive.py`：
+- 新增模块 `arbiter/transport/non_interactive.py`：
   - `NonInteractiveTransport(SdkTransport)`，按 D1（约 30 LOC）。
   - 不改 `Transport` 基类，不改任何现有 transport，不引入新异常类型。
 - `PermissionEngine.add_run_rules(...)`，按 D2（约 10 LOC + 把 first-match-wins 主循环扩展为在每种模式下先走 `_run_scope_rules`）。
@@ -514,7 +514,7 @@ run pipeline 因此先构造 `NonInteractiveTransport`，通过 `build_from_envi
 
 ### Phase 2 —— CLI 子命令与 pipeline
 
-- 新增模块 `agentao/cli/run.py`：
+- 新增模块 `arbiter/cli/run.py`：
   - argparse 子 parser：`--spec`、`--prompt`、`--format`、`--model`、`--base-url`、`--permission-mode`、`--interaction-policy`、`--max-iterations`、`--skill`、`--replay`。
   - YAML/JSON 加载器，严格未知字段校验。
   - 显式 flag 跟踪以满足合并规则。
@@ -541,7 +541,7 @@ run pipeline 因此先构造 `NonInteractiveTransport`，通过 `build_from_envi
     13. 取 LLM token 总量快照（`llm/client.py:498`）以便算 per-run delta。
     14. `agent.chat(spec.prompt, max_iterations=spec.max_iterations, cancellation_token=token)`。**不要**用 `try/except` 去接 `AgentCancelledError` 或 `KeyboardInterrupt` —— `runtime/turn.py:97-109` 已经把这两个吞掉、改返回 sentinel 文本。
     15. 按 D1 step 3 读 `transport.rejection`、`transport.max_iterations_hit`、`token.is_cancelled` 进行分类；构造 `RunResult`，算 `usage` delta，按 `--format` 序列化，映射 exit code（`0` / `3` / `4` / `130`）。`chat()` 抛出的通用异常在入口处被 catch 为 exit `1`。
-- 把 `agentao -p` 重写为 D4 的 shim。在 release notes 说明 max-iterations exit code `2 → 4` 的变化。
+- 把 `arbiter -p` 重写为 D4 的 shim。在 release notes 说明 max-iterations exit code `2 → 4` 的变化。
 
 ---
 
@@ -562,7 +562,7 @@ run pipeline 因此先构造 `NonInteractiveTransport`，通过 `build_from_envi
 - DENY（spec `permissions.deny` 命中 agent 试图调用的 tool）exit `3`，`error.type="permission_denied"`，`error.matched_rule` 已设，且该 `tool_call_id` **没有** `tool_lifecycle phase="started"` 事件。
 - `ask_user(...)` 调用 exit `3`，`error.type="interaction_required"`，`error.message` 已设（匹配 `"ask_user requires interaction in non-interactive mode"`）。
 - 未知 `interaction_policy` 值（如 `approve_all`）exit `2`。
-- `workspace-write` 模式下，`~/.agentao/permissions.json` 已有 `allow:*` 时，spec `permissions.deny` 仍能拦下 tool（`_run_scope_rules` 排序的回归保护——没有它 user `allow:*` 会盖住 spec deny）。
+- `workspace-write` 模式下，`~/.arbiter/permissions.json` 已有 `allow:*` 时，spec `permissions.deny` 仍能拦下 tool（`_run_scope_rules` 排序的回归保护——没有它 user `allow:*` 会盖住 spec deny）。
 - `full-access` 模式下，spec `permissions.deny` 仍能拦下 tool（防 preset `allow:*` 盖住 spec deny 的回归保护）。
 - `read-only` 与 `workspace-write` 下，spec `permissions.allow` **不能**覆盖 user-rule list 中靠前的同 tool user `deny`（叠加语义的回归保护 —— spec allow 走标准 first-match-wins 加入 user 列表）。
 - `read-only` 与 `workspace-write` 下，当 standing user policy 没有覆盖某个 tool 时，spec `permissions.allow` 能为它授权（叠加语义的正向覆盖；通过 `user-rule:<tool>` reason 前缀断言）。
@@ -572,7 +572,7 @@ run pipeline 因此先构造 `NonInteractiveTransport`，通过 `build_from_envi
 - spec-deny 前缀透传：spec `permissions.deny` 拦下的 tool 产生的 `error.message` 以 `injected:run-spec:` 开头（同一通路在非 hardline 来源下的回归保护）。
 - `permission_mode: read-only` 在没有任何 user / preset rule 命中的情况下也能拦下非 read-only tool（Phase 2 step 5 中 `set_readonly_mode(True)` 同步调用的回归保护 —— 漏掉第二行 read-only 在 `runtime/tool_planning.py:298` 处不会生效，运行可能静默改动 workspace）。同时断言 `error.message == "mode-preset:read-only"`，以及序列化 envelope 中 `error.matched_rule` key **不存在**（合成 detail 的 reason 修正 + 序列化层 `matched_rule is None → 省略 key` 规则的回归保护）。
 - Observer-only emit-gate：run pipeline **只**注册 sync observer（不挂任何 async `Agent.events()` 订阅者）时，会触发 DENY 的 tool 调用仍然能让 observer 收到 `permission_decision` 事件（`_has_listeners()` 修正的回归保护 —— 没有它 `_has_subscribers()` 返回 false，事件不发，pipeline 会静默错过 DENY）。
-- spec 中 `replay: false` 时，即便项目存在 `.agentao/replay.toml` 启用了 replay，运行也不应产生任何 replay 输出（Phase 2 中显式注入 `replay_config=` 的回归保护 —— 没有它 factory 的盘上自动加载仍会挂上 manager）。
+- spec 中 `replay: false` 时，即便项目存在 `.arbiter/replay.toml` 启用了 replay，运行也不应产生任何 replay 输出（Phase 2 中显式注入 `replay_config=` 的回归保护 —— 没有它 factory 的盘上自动加载仍会挂上 manager）。
 - ASK `tool_call_id` 关联：同一批含两个相同 tool name 的 ASK plan 时，第一次 `confirm_tool` 取到第一个 plan 的 `tool_call_id`，不是第二个（验证 D1 中 FIFO 在重复条目场景下也能正常工作）。
 - 构造期注入的 `NonInteractiveTransport` 真的到达 tool 执行路径：触发一次 ASK 后断言被调用的是 `NonInteractiveTransport.confirm_tool`（不是 `SdkTransport.confirm_tool`）。
 - `permissions.allow` 的 `args` pattern 与实际调用参数不匹配时，**不**自动 approve。
@@ -580,7 +580,7 @@ run pipeline 因此先构造 `NonInteractiveTransport`，通过 `build_from_envi
 - chat 期间收到 SIGINT exit `130`（断言 `agent.chat()` 返回后 `token.is_cancelled` 为真且 `transport.rejection is None`；**不要**断言 `KeyboardInterrupt` 向外传播 —— `runtime/turn.py:97-103` 会吞掉）。
 - 缺失的 skill 在 chat 开始前失败。
 - replay 启用时 result 含 `replay_path`。
-- `agentao -p` 在 max iterations 命中时返回 `4`（不是 `2`）—— exit-code 统一的回归保护。
+- `arbiter -p` 在 max iterations 命中时返回 `4`（不是 `2`）—— exit-code 统一的回归保护。
 
 ---
 
@@ -595,7 +595,7 @@ run pipeline 因此先构造 `NonInteractiveTransport`，通过 `build_from_envi
 - **权限默认值：** `workspace-write`（与交互式 CLI 一致）。CI 示例仍应显式设 `read-only`。
 - **interaction policy 默认值：** `reject`。无 `approve_all`。
 - **权限规则（M0 信任模型）：** spec 级 `allow`/`deny` 复用现有引擎匹配器。spec `deny` 进入专用的 `_run_scope_rules` pre-check tier，hardline 之后、其他来源之前，在每种模式下都最先求值 —— 安全闸门无条件生效。spec `allow` 是**叠加性**的：附加到标准 user-rule list，沿用引擎现有的各模式排序（`permissions.py:442-451`）。M0 **不**为 spec allow 引入新 tier，**不**改变现有各模式 source 排序 —— `permission_mode: full-access` 仍然意味着完全放行（D2）。
-- **`cwd` 策略：** 允许指向任意目录（包括原始进程 cwd 之外）。用户显式选定的 `cwd` **就是**他们为本次运行声明的 workspace 边界；`permission_mode` 规则在该 cwd 内适用。这与交互式 CLI 一致 —— 用户启动 `agentao` 之前本来就可以 `cd` 到任意位置。解析后的绝对路径写入 `RunResult.cwd` 以便审计。
+- **`cwd` 策略：** 允许指向任意目录（包括原始进程 cwd 之外）。用户显式选定的 `cwd` **就是**他们为本次运行声明的 workspace 边界；`permission_mode` 规则在该 cwd 内适用。这与交互式 CLI 一致 —— 用户启动 `arbiter` 之前本来就可以 `cd` 到任意位置。解析后的绝对路径写入 `RunResult.cwd` 以便审计。
 - **Transport：** `NonInteractiveTransport` 构造期注入（D3）。**不**新增 sentinel 异常，**不**改 `Transport.confirm_tool` 签名，**不**在基类加 `on_permission_decision` hook。中止路径复用现有 `CancellationToken` 与同步 `EventStream.add_observer(...)`（通过新增 thin pass-through `Agent.add_event_observer` 访问；D1）。
 - **输出：** M0 仅 `text` 与 `json`。JSONL 流式 Post-MVP。
 - **Exit codes：** 与 `-p` 共用，`-p` 退化成 shim（D4）。

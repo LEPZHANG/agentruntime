@@ -1,12 +1,12 @@
-# Agentao Logging System
+# Arbiter Logging System
 
 ## Overview
 
-Agentao 自动记录所有与 LLM 的交互到日志文件，包括请求和响应的完整内容（不截断；写入前会对形似凭据的字符串做脱敏，见[凭据脱敏](#-凭据脱敏两层)）。
+Arbiter 自动记录所有与 LLM 的交互到日志文件，包括请求和响应的完整内容（不截断；写入前会对形似凭据的字符串做脱敏，见[凭据脱敏](#-凭据脱敏两层)）。
 
 ## 日志文件
 
-**默认位置**: `agentao.log`（在运行目录）
+**默认位置**: `arbiter.log`（在运行目录）
 
 ## 记录内容
 
@@ -26,7 +26,7 @@ Messages (N total):
 
   Message 1 [system]:
     Content (XXX chars):
-      You are Agentao, a helpful AI assistant...
+      You are Arbiter, a helpful AI assistant...
       (完整的系统提示)
 
   Message 2 [user]:
@@ -147,9 +147,9 @@ Tool Calls (N):
 
 #### 第 2 层：日志文件全局按模式脱敏（默认开启）
 
-第 1 层只看得见 `extra_body` 这一个字段，但凭据同样会**从别处流进日志**——`run_shell_command("env")` 的输出、`cat .env` 的文件内容、模型回复里粘贴的一段 token。为此，文件 handler 上装了一个 `_RedactingFormatter`（`agentao/llm/client.py`），对**每一条**写入 `agentao.log` 的记录做正则扫描，命中的片段替换为 `[REDACTED:<kind>]`。
+第 1 层只看得见 `extra_body` 这一个字段，但凭据同样会**从别处流进日志**——`run_shell_command("env")` 的输出、`cat .env` 的文件内容、模型回复里粘贴的一段 token。为此，文件 handler 上装了一个 `_RedactingFormatter`（`arbiter/llm/client.py`），对**每一条**写入 `arbiter.log` 的记录做正则扫描，命中的片段替换为 `[REDACTED:<kind>]`。
 
-模式集合是共享模块 `agentao/security/secret_scan.py`，按“先具体后宽泛”排序，覆盖 11 条：私钥块（`-----BEGIN … KEY-----`）、Anthropic `sk-ant-`、OpenAI `sk-` / `sk-proj-`、Google `AIza`、AWS `AKIA`/`ASIA`、GitHub `ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`、Slack `xox[baprs]-`、JWT（`eyJ….eyJ….…`）、`Bearer <token>`、`Authorization:` 头、以及 `api_key=` / `token=` / `secret=` / `password=` 这类内联键值对。
+模式集合是共享模块 `arbiter/security/secret_scan.py`，按“先具体后宽泛”排序，覆盖 11 条：私钥块（`-----BEGIN … KEY-----`）、Anthropic `sk-ant-`、OpenAI `sk-` / `sk-proj-`、Google `AIza`、AWS `AKIA`/`ASIA`、GitHub `ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`、Slack `xox[baprs]-`、JWT（`eyJ….eyJ….…`）、`Bearer <token>`、`Authorization:` 头、以及 `api_key=` / `token=` / `secret=` / `password=` 这类内联键值对。
 
 几个实现上的要点：
 
@@ -164,34 +164,34 @@ Tool Calls (N):
 日志功能默认开启，无需配置：
 
 ```bash
-# 启动 Agentao
+# 启动 Arbiter
 uv run python main.py
 
-# 所有交互会自动记录到 agentao.log
+# 所有交互会自动记录到 arbiter.log
 ```
 
 ### 查看日志
 
 **实时查看**：
 ```bash
-tail -f agentao.log
+tail -f arbiter.log
 ```
 
 **查看完整日志**：
 ```bash
-cat agentao.log
+cat arbiter.log
 ```
 
 **搜索特定内容**：
 ```bash
-grep "read_file" agentao.log
-grep "ERROR" agentao.log
-grep "req_5" agentao.log  # 查看特定请求
+grep "read_file" arbiter.log
+grep "ERROR" arbiter.log
+grep "req_5" arbiter.log  # 查看特定请求
 ```
 
 **查看最近 N 行**：
 ```bash
-tail -n 100 agentao.log
+tail -n 100 arbiter.log
 ```
 
 ### 自定义日志位置
@@ -199,7 +199,7 @@ tail -n 100 agentao.log
 在代码中可以指定日志文件位置：
 
 ```python
-from agentao.llm import LLMClient
+from arbiter.llm import LLMClient
 
 client = LLMClient(
     api_key="your-key",
@@ -211,31 +211,31 @@ client = LLMClient(
 
 ### 关闭日志文件 / 让 host 完全接管日志栈（嵌入场景）
 
-嵌入式 host 想完全关掉 `agentao.log`、或不让 LLMClient 改写
-`logging.getLogger("agentao")`（package-root level、handler）时，有两个独立的钮：
+嵌入式 host 想完全关掉 `arbiter.log`、或不让 LLMClient 改写
+`logging.getLogger("arbiter")`（package-root level、handler）时，有两个独立的钮：
 
 | 想关掉的东西 | 怎么传 |
 |---|---|
-| `agentao.log` 文件 | `log_file=None` 给 `LLMClient` |
-| 对 `"agentao"` 包级 logger 的 level / handler 改写 | `logger=<your_logger>` 给 `Agentao` 或 `LLMClient` |
+| `arbiter.log` 文件 | `log_file=None` 给 `LLMClient` |
+| 对 `"arbiter"` 包级 logger 的 level / handler 改写 | `logger=<your_logger>` 给 `Arbiter` 或 `LLMClient` |
 
-最简洁的写法是直接在 `Agentao(...)` 里注入 logger —
+最简洁的写法是直接在 `Arbiter(...)` 里注入 logger —
 `LLMClient.__init__` 在收到非空 `logger=` 时会走早返回分支，根本不会建 file handler，
-所以即使 `Agentao` 仍按默认把 `<wd>/agentao.log` 作为 `log_file=` 传下去，也不会产生文件。
+所以即使 `Arbiter` 仍按默认把 `<wd>/arbiter.log` 作为 `log_file=` 传下去，也不会产生文件。
 完整说明、踩坑提醒和 `NullHandler + propagate=False` 静默写法见
-**[docs/guides/embedding.md §2 → "Optional: silencing or redirecting agentao.log"](embedding.md#optional-silencing-or-redirecting-agentaolog)**。
+**[docs/guides/embedding.md §2 → "Optional: silencing or redirecting arbiter.log"](embedding.md#optional-silencing-or-redirecting-arbiterlog)**。
 
 ## 日志格式
 
 ### 时间戳格式
 
 ```
-2026-02-09 14:30:45 - agentao.llm - INFO - [req_1] LLM REQUEST
+2026-02-09 14:30:45 - arbiter.llm - INFO - [req_1] LLM REQUEST
 ```
 
 格式说明：
 - `2026-02-09 14:30:45` - 时间戳
-- `agentao.llm` - 日志来源
+- `arbiter.llm` - 日志来源
 - `INFO` - 日志级别
 - `[req_1]` - 请求 ID
 - `LLM REQUEST` - 日志内容
@@ -260,10 +260,10 @@ client = LLMClient(
 ### ⚠️ 注意事项
 
 1. **敏感信息** - 日志包含完整的对话内容，可能包含敏感信息
-2. **API 密钥** - 默认脱敏，但**不是密封**。写入 `agentao.log` 的每条记录都会经过[第 2 层模式脱敏](#第-2-层日志文件全局按模式脱敏默认开启)，形似凭据的字符串变成 `[REDACTED:<kind>]`。请按它的实际边界理解这条保证：
+2. **API 密钥** - 默认脱敏，但**不是密封**。写入 `arbiter.log` 的每条记录都会经过[第 2 层模式脱敏](#第-2-层日志文件全局按模式脱敏默认开启)，形似凭据的字符串变成 `[REDACTED:<kind>]`。请按它的实际边界理解这条保证：
    - **基于正则、尽力而为**。不长得像凭据的密钥就不会被拦——自定义格式的内部 token、纯十六进制串、短口令，都照原样落盘。它降低泄漏面，不构成合规意义上的保证。
    - **只覆盖日志文件**。发给 LLM provider 的那份对话是**刻意逐字原样**的：正则区分不了线上凭据和测试夹具，改写在途内容会悄悄破坏 agent 的工作数据。凭据一旦进了上下文就会离开本机——这属于 host 的管控范围，不是日志层能解决的。
-   - **会话状态同样不扫描**。`.agentao/sessions/*.json`、`.agentao/background_tasks.json` 原样序列化消息文本，因为它们在 resume 时会回灌进 `agent.messages`，脱敏会污染恢复出来的对话。脱敏施加于**终点产物**，回读的路径上则不施加。
+   - **会话状态同样不扫描**。`.arbiter/sessions/*.json`、`.arbiter/background_tasks.json` 原样序列化消息文本，因为它们在 resume 时会回灌进 `agent.messages`，脱敏会污染恢复出来的对话。脱敏施加于**终点产物**，回读的路径上则不施加。
 3. **文件权限** - 确保日志文件权限设置正确
 4. **定期清理** - 日志文件会持续增长，需要定期清理
 
@@ -280,20 +280,20 @@ client = LLMClient(
 
 ```bash
 # 清空但保留文件
-> agentao.log
+> arbiter.log
 
 # 或删除文件
-rm agentao.log
+rm arbiter.log
 ```
 
 ### 归档日志
 
 ```bash
 # 按日期归档
-mv agentao.log agentao_$(date +%Y%m%d).log
+mv arbiter.log arbiter_$(date +%Y%m%d).log
 
 # 压缩归档
-gzip agentao_$(date +%Y%m%d).log
+gzip arbiter_$(date +%Y%m%d).log
 ```
 
 ### 日志轮转
@@ -301,8 +301,8 @@ gzip agentao_$(date +%Y%m%d).log
 创建 logrotate 配置（Linux/macOS）：
 
 ```bash
-# /etc/logrotate.d/agentao 或 ~/.logrotate.d/agentao
-/path/to/agentao.log {
+# /etc/logrotate.d/arbiter 或 ~/.logrotate.d/arbiter
+/path/to/arbiter.log {
     daily
     rotate 7
     compress
@@ -316,51 +316,51 @@ gzip agentao_$(date +%Y%m%d).log
 ### 完整对话示例
 
 ```
-2026-02-09 14:30:45 - agentao.llm - INFO - LLMClient initialized with model: claude-sonnet-4-5
-2026-02-09 14:30:50 - agentao.llm - INFO - ================================================================================
-2026-02-09 14:30:50 - agentao.llm - INFO - [req_1] LLM REQUEST
-2026-02-09 14:30:50 - agentao.llm - INFO - ================================================================================
-2026-02-09 14:30:50 - agentao.llm - INFO - Model: claude-sonnet-4-5
-2026-02-09 14:30:50 - agentao.llm - INFO - Temperature: 0.7
-2026-02-09 14:30:50 - agentao.llm - INFO -
+2026-02-09 14:30:45 - arbiter.llm - INFO - LLMClient initialized with model: claude-sonnet-4-5
+2026-02-09 14:30:50 - arbiter.llm - INFO - ================================================================================
+2026-02-09 14:30:50 - arbiter.llm - INFO - [req_1] LLM REQUEST
+2026-02-09 14:30:50 - arbiter.llm - INFO - ================================================================================
+2026-02-09 14:30:50 - arbiter.llm - INFO - Model: claude-sonnet-4-5
+2026-02-09 14:30:50 - arbiter.llm - INFO - Temperature: 0.7
+2026-02-09 14:30:50 - arbiter.llm - INFO -
 Messages (2 total):
-2026-02-09 14:30:50 - agentao.llm - INFO -
+2026-02-09 14:30:50 - arbiter.llm - INFO -
   Message 1 [system]:
-2026-02-09 14:30:50 - agentao.llm - INFO -     Content (245 chars):
-2026-02-09 14:30:50 - agentao.llm - INFO -       You are Agentao, a helpful AI assistant with access to various tools and skills.
-2026-02-09 14:30:50 - agentao.llm - INFO -
-2026-02-09 14:30:50 - agentao.llm - INFO -       You can help users with:
-2026-02-09 14:30:50 - agentao.llm - INFO -       - Reading, writing, and editing files
-2026-02-09 14:30:50 - agentao.llm - INFO -       - Searching for files and text content
-2026-02-09 14:30:50 - agentao.llm - INFO -       ...
-2026-02-09 14:30:50 - agentao.llm - INFO -
+2026-02-09 14:30:50 - arbiter.llm - INFO -     Content (245 chars):
+2026-02-09 14:30:50 - arbiter.llm - INFO -       You are Arbiter, a helpful AI assistant with access to various tools and skills.
+2026-02-09 14:30:50 - arbiter.llm - INFO -
+2026-02-09 14:30:50 - arbiter.llm - INFO -       You can help users with:
+2026-02-09 14:30:50 - arbiter.llm - INFO -       - Reading, writing, and editing files
+2026-02-09 14:30:50 - arbiter.llm - INFO -       - Searching for files and text content
+2026-02-09 14:30:50 - arbiter.llm - INFO -       ...
+2026-02-09 14:30:50 - arbiter.llm - INFO -
   Message 2 [user]:
-2026-02-09 14:30:50 - agentao.llm - INFO -     Content (25 chars):
-2026-02-09 14:30:50 - agentao.llm - INFO -       Read the file main.py
-2026-02-09 14:30:50 - agentao.llm - INFO -
+2026-02-09 14:30:50 - arbiter.llm - INFO -     Content (25 chars):
+2026-02-09 14:30:50 - arbiter.llm - INFO -       Read the file main.py
+2026-02-09 14:30:50 - arbiter.llm - INFO -
 Tools (13 available):
-2026-02-09 14:30:50 - agentao.llm - INFO -   - read_file
-2026-02-09 14:30:50 - agentao.llm - INFO -   - write_file
-2026-02-09 14:30:50 - agentao.llm - INFO -   ...
-2026-02-09 14:30:52 - agentao.llm - INFO - ================================================================================
-2026-02-09 14:30:52 - agentao.llm - INFO - [req_1] LLM RESPONSE
-2026-02-09 14:30:52 - agentao.llm - INFO - ================================================================================
-2026-02-09 14:30:52 - agentao.llm - INFO - Model: claude-sonnet-4-5
-2026-02-09 14:30:52 - agentao.llm - INFO - Finish Reason: tool_calls
-2026-02-09 14:30:52 - agentao.llm - INFO -
+2026-02-09 14:30:50 - arbiter.llm - INFO -   - read_file
+2026-02-09 14:30:50 - arbiter.llm - INFO -   - write_file
+2026-02-09 14:30:50 - arbiter.llm - INFO -   ...
+2026-02-09 14:30:52 - arbiter.llm - INFO - ================================================================================
+2026-02-09 14:30:52 - arbiter.llm - INFO - [req_1] LLM RESPONSE
+2026-02-09 14:30:52 - arbiter.llm - INFO - ================================================================================
+2026-02-09 14:30:52 - arbiter.llm - INFO - Model: claude-sonnet-4-5
+2026-02-09 14:30:52 - arbiter.llm - INFO - Finish Reason: tool_calls
+2026-02-09 14:30:52 - arbiter.llm - INFO -
 Token Usage:
-2026-02-09 14:30:52 - agentao.llm - INFO -   Prompt Tokens: 1234
-2026-02-09 14:30:52 - agentao.llm - INFO -   Completion Tokens: 45
-2026-02-09 14:30:52 - agentao.llm - INFO -   Total Tokens: 1279
-2026-02-09 14:30:52 - agentao.llm - INFO -
+2026-02-09 14:30:52 - arbiter.llm - INFO -   Prompt Tokens: 1234
+2026-02-09 14:30:52 - arbiter.llm - INFO -   Completion Tokens: 45
+2026-02-09 14:30:52 - arbiter.llm - INFO -   Total Tokens: 1279
+2026-02-09 14:30:52 - arbiter.llm - INFO -
 Tool Calls (1):
-2026-02-09 14:30:52 - agentao.llm - INFO -   Tool: read_file
-2026-02-09 14:30:52 - agentao.llm - INFO -   ID: call_abc123
-2026-02-09 14:30:52 - agentao.llm - INFO -   Arguments:
-2026-02-09 14:30:52 - agentao.llm - INFO -     {
-2026-02-09 14:30:52 - agentao.llm - INFO -       "file_path": "main.py"
-2026-02-09 14:30:52 - agentao.llm - INFO -     }
-2026-02-09 14:30:52 - agentao.llm - INFO - ================================================================================
+2026-02-09 14:30:52 - arbiter.llm - INFO -   Tool: read_file
+2026-02-09 14:30:52 - arbiter.llm - INFO -   ID: call_abc123
+2026-02-09 14:30:52 - arbiter.llm - INFO -   Arguments:
+2026-02-09 14:30:52 - arbiter.llm - INFO -     {
+2026-02-09 14:30:52 - arbiter.llm - INFO -       "file_path": "main.py"
+2026-02-09 14:30:52 - arbiter.llm - INFO -     }
+2026-02-09 14:30:52 - arbiter.llm - INFO - ================================================================================
 ```
 
 ## 调试技巧
@@ -368,36 +368,36 @@ Tool Calls (1):
 ### 查找错误
 
 ```bash
-grep -n "ERROR" agentao.log
+grep -n "ERROR" arbiter.log
 ```
 
 ### 查看特定请求
 
 ```bash
-grep -A 50 "req_5" agentao.log
+grep -A 50 "req_5" arbiter.log
 ```
 
 ### 统计 Token 使用
 
 ```bash
-grep "Total Tokens" agentao.log | awk '{sum += $NF} END {print "Total:", sum}'
+grep "Total Tokens" arbiter.log | awk '{sum += $NF} END {print "Total:", sum}'
 ```
 
 ### 查看工具调用
 
 ```bash
-grep -B 2 -A 5 "Tool Calls" agentao.log
+grep -B 2 -A 5 "Tool Calls" arbiter.log
 ```
 
 ## 配置选项
 
-在初始化 `Agentao` 时，可以传递日志配置：
+在初始化 `Arbiter` 时，可以传递日志配置：
 
 ```python
 from pathlib import Path
-from agentao.agent import Agentao
+from arbiter.agent import Arbiter
 
-agent = Agentao(
+agent = Arbiter(
     api_key="your-key",
     base_url="https://api.anthropic.com/v1",  # 0.2.16 起必传
     model="claude-sonnet-4-5",
@@ -406,7 +406,7 @@ agent = Agentao(
 )
 
 # 或者走工厂从 .env 自动发现（.env 里设 LLM_PROVIDER + 对应 _API_KEY/_BASE_URL/_MODEL）
-from agentao.embedding import build_from_environment
+from arbiter.embedding import build_from_environment
 agent = build_from_environment(working_directory=Path.cwd())
 ```
 
@@ -438,8 +438,8 @@ agent = build_from_environment(working_directory=Path.cwd())
 
 ```bash
 # 只保留最近 1000 行
-tail -n 1000 agentao.log > agentao_temp.log
-mv agentao_temp.log agentao.log
+tail -n 1000 arbiter.log > arbiter_temp.log
+mv arbiter_temp.log arbiter.log
 ```
 
 ## 最佳实践

@@ -1,7 +1,7 @@
 # RunSpec Parameters & Instructions: Closing the Recipe Gap
 
 **Status:** Shipped 2026-05-25. Implementation notes follow at the bottom of this doc.
-**Audience:** agentao maintainers considering `agentao run` ergonomics and the
+**Audience:** arbiter maintainers considering `arbiter run` ergonomics and the
 goose-recipes comparison.
 **Companion:** `run-spec-parameters.zh.md`.
 
@@ -15,7 +15,7 @@ artifact.
 
 A direct port would land a parallel "Recipes" concept next to `RunSpec` — a
 second source of truth for "how to launch a non-interactive run." That is the
-wrong shape for agentao because **`RunSpec` (`agentao/cli/run_models.py:111`)
+wrong shape for arbiter because **`RunSpec` (`arbiter/cli/run_models.py:111`)
 already covers ~75% of recipe semantics**. The gap is narrow and additive.
 
 This design fills the gap without introducing a second concept.
@@ -23,7 +23,7 @@ This design fills the gap without introducing a second concept.
 ## Current coverage
 
 Goose recipe field → `RunSpec` field, verified against
-`agentao/cli/run_models.py:111-131`:
+`arbiter/cli/run_models.py:111-131`:
 
 | Recipe field              | RunSpec field                          | Status |
 |---------------------------|----------------------------------------|--------|
@@ -31,7 +31,7 @@ Goose recipe field → `RunSpec` field, verified against
 | `settings.provider/model` | `model`, `base_url`                    | ✅ |
 | `settings.max_turns`      | `max_iterations`                       | ✅ |
 | `extensions.builtin`      | `skills`                               | ✅ |
-| `extensions.mcp`          | `.agentao/mcp.json` (separate config)  | ✅ via reference |
+| `extensions.mcp`          | `.arbiter/mcp.json` (separate config)  | ✅ via reference |
 | `permissions`             | `permissions` + `permission_mode`      | ✅ cleaner |
 | (replay)                  | `replay`                               | ✅ ahead of goose |
 | `instructions`            | —                                      | ❌ gap |
@@ -49,7 +49,7 @@ wants them — adding speculative public schema now violates the project's
 Add two fields to `RunSpec` and one Jinja-rendering pass. No new file format,
 no new CLI subcommand, no separate Recipes module.
 
-### Pydantic model delta (`agentao/cli/run_models.py`)
+### Pydantic model delta (`arbiter/cli/run_models.py`)
 
 ```python
 import re
@@ -147,7 +147,7 @@ Existing specs validate unchanged — purely additive.
 if it didn't, mixing "parameter declarations" with "parameter values" in the
 same Pydantic model conflates two distinct concepts.
 
-Two new helpers in `agentao/cli/run.py`:
+Two new helpers in `arbiter/cli/run.py`:
 
 ```python
 def _parse_cli_params(items: Optional[list[str]]) -> dict[str, str]:
@@ -157,7 +157,7 @@ def _parse_cli_params(items: Optional[list[str]]) -> dict[str, str]:
     """
 ```
 
-`_execute_with_args` (`agentao/cli/run.py:315`) calls in this order:
+`_execute_with_args` (`arbiter/cli/run.py:315`) calls in this order:
 
 1. `_load_spec(args)` — line 323 (unchanged).
 2. `_apply_cli_overrides(spec, args)` — line 337 (unchanged).
@@ -198,7 +198,7 @@ for specs that don't use templating at all.
 
 ### Renderer details
 
-`agentao/cli/run_template.py::render_spec(spec, params) -> RunSpec`:
+`arbiter/cli/run_template.py::render_spec(spec, params) -> RunSpec`:
 
 1. Validates supplied params against declared `spec.parameters` (required
    check, choices enforcement, unknown-key check).
@@ -208,12 +208,12 @@ for specs that don't use templating at all.
 
 Failure modes (all exit 2, `invalid_spec`):
 
-- Missing required param → `agentao run: parameter '{name}' is required`.
-- Unknown param → `agentao run: unknown parameter '{name}'`.
-- Choices violation → `agentao run: parameter '{name}' must be one of {choices}`.
-- Jinja undefined variable → `agentao run: template uses undefined variable
+- Missing required param → `arbiter run: parameter '{name}' is required`.
+- Unknown param → `arbiter run: unknown parameter '{name}'`.
+- Choices violation → `arbiter run: parameter '{name}' must be one of {choices}`.
+- Jinja undefined variable → `arbiter run: template uses undefined variable
   '{name}' (declare it in spec.parameters)`.
-- Jinja syntax error → `agentao run: template syntax error in spec.{field}: {msg}`.
+- Jinja syntax error → `arbiter run: template syntax error in spec.{field}: {msg}`.
 
 `StrictUndefined` is non-negotiable — silent empty substitution would let
 typos in the prompt template ship without error.
@@ -226,7 +226,7 @@ tiny package (~1MB, no transitive native deps). Not worth the complexity.
 Add to `pyproject.toml`'s base deps, import at the top of `run_template.py`,
 done.
 
-### CLI flag (`agentao/cli/run.py`)
+### CLI flag (`arbiter/cli/run.py`)
 
 One new flag on `add_run_subparser`:
 
@@ -241,22 +241,22 @@ parser.add_argument(
 `_parse_cli_params` rules (all errors are `_UsageError` → exit 2,
 `invalid_spec`):
 
-- **Missing `=`**: `--param foo` → `agentao run: malformed --param 'foo'
+- **Missing `=`**: `--param foo` → `arbiter run: malformed --param 'foo'
   (expected KEY=VALUE)`.
 - **Empty key**: `--param =1` → same malformed message.
 - **Multiple `=` in value**: `--param expr=a=b` → key=`expr`, value=`a=b`
   (split on the first `=` only; value is preserved verbatim).
-- **Duplicate key**: `--param x=1 --param x=2` → `agentao run: --param 'x'
+- **Duplicate key**: `--param x=1 --param x=2` → `arbiter run: --param 'x'
   supplied multiple times`. Erroring is less surprising than last-wins.
 - **Non-identifier key**: `--param foo-bar=v` or `--param 1foo=v` →
-  `agentao run: --param '{key}' is not a valid identifier (must match
+  `arbiter run: --param '{key}' is not a valid identifier (must match
   [A-Za-z_][A-Za-z0-9_]*)`. Same regex as the spec validator; failing
   here gives a clearer message than letting it fall through to "unknown
   parameter" downstream.
 
 ### Agent wiring (concrete)
 
-`agentao/cli/run.py:404` currently builds `factory_kwargs` like this:
+`arbiter/cli/run.py:404` currently builds `factory_kwargs` like this:
 
 ```python
 factory_kwargs: Dict[str, Any] = dict(
@@ -277,16 +277,16 @@ if spec.instructions is not None:
     factory_kwargs["project_instructions"] = spec.instructions
 ```
 
-This routes through the kwarg already at `agentao/agent.py:68`, which
-short-circuits the AGENTAO.md disk read (`agent.py:349-352`). **Precedence is
-implicit**: when `spec.instructions` is set, AGENTAO.md is skipped; when it
-is not set, AGENTAO.md is read normally. No warning, no extra detection
+This routes through the kwarg already at `arbiter/agent.py:68`, which
+short-circuits the ARBITER.md disk read (`agent.py:349-352`). **Precedence is
+implicit**: when `spec.instructions` is set, ARBITER.md is skipped; when it
+is not set, ARBITER.md is read normally. No warning, no extra detection
 logic, no coupling to disk-presence checks.
 
 ## Worked example
 
 ```yaml
-# .agentao/runs/review-pr.yaml
+# .arbiter/runs/review-pr.yaml
 parameters:
   - name: pr_number
     required: true
@@ -307,7 +307,7 @@ max_iterations: 30
 Invocation:
 
 ```bash
-agentao run --spec .agentao/runs/review-pr.yaml \
+arbiter run --spec .arbiter/runs/review-pr.yaml \
             --param pr_number=142 --param depth=deep
 ```
 
@@ -316,7 +316,7 @@ agentao run --spec .agentao/runs/review-pr.yaml \
 New tests under `tests/cli/test_run_parameters.py`:
 
 1. **Valid render**: spec with one required param, prompt template uses it →
-   `Agentao` receives the rendered prompt.
+   `Arbiter` receives the rendered prompt.
 2. **Required missing**: spec marks param required, no `--param` supplied →
    exit 2, `invalid_spec`, message names the param.
 3. **Default applied**: optional param with `default`, no `--param` →
@@ -359,11 +359,11 @@ Fifteen tests. No mocking of Jinja2 imports, no sys.modules snapshots.
   have a real consumer driving the spec.
 - **`response.json_schema` / FinalOutputTool gating**: separate design
   once consumers exist. Decoupled cleanly from recipes.
-- **Recipe `activities` UI pills**: agentao has no desktop UI.
+- **Recipe `activities` UI pills**: arbiter has no desktop UI.
 - **Recipe `sub_recipes`**: defer until subagents land
   ([[project_async_tool_landed]] gives us the dispatch primitives but no
   agent-spawning surface yet).
-- **AGENTAO.md "both present" warning**: not worth the extra disk probe.
+- **ARBITER.md "both present" warning**: not worth the extra disk probe.
 - **Templating fields other than `prompt` and `instructions`**: templating
   `permissions` or `skills` invites footguns.
 - **`{% include %}` / file-include in templates**: filesystem-resolution
@@ -376,7 +376,7 @@ Purely additive. Existing specs validate unchanged because the two new
 fields are optional. `extra="forbid"` remains intact.
 
 No deprecations. No callback signature changes. No host-API impact —
-`Agentao(project_instructions=...)` already exists and stays untouched.
+`Arbiter(project_instructions=...)` already exists and stays untouched.
 
 ## Risks & mitigations
 
@@ -459,7 +459,7 @@ when a spec declares a parameter named `self`. The blocklist above already
 rejects that name, but passing positionally is defense-in-depth against
 any future name we forget to add.
 
-### Whitespace-only rendered instructions fall through to AGENTAO.md
+### Whitespace-only rendered instructions fall through to ARBITER.md
 
 `run.py` guards the `project_instructions` plumbing with
 `if spec.instructions and spec.instructions.strip():`, not just truthiness.
@@ -467,9 +467,9 @@ A YAML block scalar `instructions: |\n  {{ extra }}\n` renders to `"\n"`
 when `extra` is empty (Jinja's `keep_trailing_newline=True` preserves the
 trailing newline) — that bare newline is truthy, so the earlier
 empty-string guard would have let it through and silently suppressed the
-AGENTAO.md fallback. Tests: the original
-`test_empty_rendered_instructions_does_not_override_agentao_md` plus
-`test_whitespace_only_rendered_instructions_does_not_override_agentao_md`.
+ARBITER.md fallback. Tests: the original
+`test_empty_rendered_instructions_does_not_override_arbiter_md` plus
+`test_whitespace_only_rendered_instructions_does_not_override_arbiter_md`.
 
 ### Diagnostic improvements
 
@@ -490,12 +490,12 @@ Two adjacent UX issues surfaced in review and were folded in:
 
 ### Files touched
 
-- `agentao/cli/run_models.py` — `RunParameter`, `_JINJA_RESERVED_NAMES`,
+- `arbiter/cli/run_models.py` — `RunParameter`, `_JINJA_RESERVED_NAMES`,
   validators (identifier + reserved + required-XOR-default + default-in-choices
   + no-duplicate-names).
-- `agentao/cli/run_template.py` — `SandboxedEnvironment`, `RunTemplateError`,
+- `arbiter/cli/run_template.py` — `SandboxedEnvironment`, `RunTemplateError`,
   `render_spec`, `_validate_params`, `_render_field`.
-- `agentao/cli/run.py` — `--param` flag, `_parse_cli_params`,
+- `arbiter/cli/run.py` — `--param` flag, `_parse_cli_params`,
   `render_spec` call site, `project_instructions` plumbing (with strip-guard).
 - `tests/cli/test_run_parameters.py` — 30 test cases (the 15 from the
   original test plan plus 15 added during review iterations).

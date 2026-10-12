@@ -19,8 +19,8 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Deliverables
 
-- `agentao/acp_client/client.py`
-- `agentao/acp_client/manager.py`
+- `arbiter/acp_client/client.py`
+- `arbiter/acp_client/manager.py`
 - prompt / cancel 相关测试
 
 ## Dependencies

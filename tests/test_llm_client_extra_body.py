@@ -25,8 +25,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from agentao.embedding.factory import discover_llm_kwargs
-from agentao.llm.client import LLMClient
+from arbiter.embedding.factory import discover_llm_kwargs
+from arbiter.llm.client import LLMClient
 
 
 # ---------------------------------------------------------------------------
@@ -190,26 +190,26 @@ def test_construction_deep_freezes_nested_extra_body():
 # ---------------------------------------------------------------------------
 
 
-def test_agentao_rejects_extra_body_alongside_llm_client(tmp_path):
-    from agentao import Agentao
+def test_arbiter_rejects_extra_body_alongside_llm_client(tmp_path):
+    from arbiter import Arbiter
 
     injected = _make_client()
     with pytest.raises(ValueError, match="extra_body"):
-        Agentao(
+        Arbiter(
             working_directory=tmp_path,
             llm_client=injected,
             extra_body={"reasoning_effort": "high"},
         )
 
 
-def test_agentao_extra_body_is_keyword_only():
+def test_arbiter_extra_body_is_keyword_only():
     """Codex P1: extra_body must be keyword-only so it does NOT shift the
     legacy positional callback args (api_key..plan_session are
-    positional-or-keyword on Agentao.__init__). The 6th positional must still
+    positional-or-keyword on Arbiter.__init__). The 6th positional must still
     be confirmation_callback, not extra_body."""
-    from agentao import Agentao
+    from arbiter import Arbiter
 
-    init = Agentao.__init__
+    init = Arbiter.__init__
     # The autouse conftest fixture wraps __init__ in a (*args, **kwargs) shim;
     # reach the real function via its closure to inspect the true signature.
     if getattr(init, "__closure__", None):
@@ -242,7 +242,7 @@ def test_env_parses_valid_extra_body(monkeypatch):
 
 def test_env_skips_malformed_extra_body(monkeypatch, caplog):
     monkeypatch.setenv("LLM_EXTRA_BODY", "not json {")
-    with caplog.at_level(logging.WARNING, logger="agentao.embedding.factory"):
+    with caplog.at_level(logging.WARNING, logger="arbiter.embedding.factory"):
         out = discover_llm_kwargs()
     assert "extra_body" not in out
     # The "warn" half of "warn + skip" must actually fire.
@@ -252,7 +252,7 @@ def test_env_skips_malformed_extra_body(monkeypatch, caplog):
 @pytest.mark.parametrize("value", ["[]", '"x"', "3", "true", "null"])
 def test_env_skips_non_object_extra_body(monkeypatch, caplog, value):
     monkeypatch.setenv("LLM_EXTRA_BODY", value)
-    with caplog.at_level(logging.WARNING, logger="agentao.embedding.factory"):
+    with caplog.at_level(logging.WARNING, logger="arbiter.embedding.factory"):
         out = discover_llm_kwargs()
     assert "extra_body" not in out
     assert any("must be a JSON object" in r.message for r in caplog.records)
@@ -263,7 +263,7 @@ def test_env_empty_extra_body_is_unset_and_silent(monkeypatch, caplog, value):
     """Empty / whitespace-only is treated as unset — skipped with NO warning
     (a common 'disable this var' idiom must not log on every startup)."""
     monkeypatch.setenv("LLM_EXTRA_BODY", value)
-    with caplog.at_level(logging.WARNING, logger="agentao.embedding.factory"):
+    with caplog.at_level(logging.WARNING, logger="arbiter.embedding.factory"):
         out = discover_llm_kwargs()
     assert "extra_body" not in out
     assert not any("LLM_EXTRA_BODY" in r.message for r in caplog.records)
@@ -379,9 +379,9 @@ def test_llm_config_snapshot_includes_extra_body(tmp_path):
     """Sub-agents are rebuilt from the parent's _llm_config() snapshot via the
     raw-config path; extra_body must be in it or sub-agent LLM calls silently
     drop reasoning_effort / provider-mandatory fields."""
-    from agentao import Agentao
+    from arbiter import Arbiter
 
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=tmp_path,
         api_key="x",
         base_url="http://localhost:0",
@@ -395,9 +395,9 @@ def test_llm_config_snapshot_includes_extra_body(tmp_path):
 
 
 def test_llm_config_snapshot_extra_body_none_when_unset(tmp_path):
-    from agentao import Agentao
+    from arbiter import Arbiter
 
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=tmp_path,
         api_key="x",
         base_url="http://localhost:0",

@@ -1,6 +1,6 @@
 """Tests for ACPTransport — Issue 07.
 
-Verifies that Agentao runtime :class:`AgentEvent` values are translated
+Verifies that Arbiter runtime :class:`AgentEvent` values are translated
 to well-shaped ACP ``session/update`` notifications, that the transport
 never raises, that the session id is stamped on every notification, and
 that thread-safe writes reach the server's write path.
@@ -16,10 +16,10 @@ from typing import Any, Dict, List, Tuple
 
 import pytest
 
-from agentao.acp.protocol import METHOD_SESSION_UPDATE
-from agentao.acp.server import AcpServer
-from agentao.acp.transport import ACPTransport, _json_safe, _todo_write_plan, _tool_kind
-from agentao.transport.events import AgentEvent, EventType
+from arbiter.acp.protocol import METHOD_SESSION_UPDATE
+from arbiter.acp.server import AcpServer
+from arbiter.acp.transport import ACPTransport, _json_safe, _todo_write_plan, _tool_kind
+from arbiter.transport.events import AgentEvent, EventType
 
 
 # ---------------------------------------------------------------------------

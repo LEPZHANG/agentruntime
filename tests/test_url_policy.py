@@ -19,8 +19,8 @@ import ipaddress
 
 import pytest
 
-from agentao.security import UrlPolicyError, guarded_get, validate_outbound_url
-from agentao.security import url_policy
+from arbiter.security import UrlPolicyError, guarded_get, validate_outbound_url
+from arbiter.security import url_policy
 
 
 @pytest.fixture
@@ -262,20 +262,20 @@ def test_guarded_get_redirect_budget(fake_resolver):
 
 
 # --------------------------------------------------------------------------
-# Opt-in CIDR allowlist (AGENTAO_WEB_FETCH_ALLOW_CIDRS)
+# Opt-in CIDR allowlist (ARBITER_WEB_FETCH_ALLOW_CIDRS)
 # --------------------------------------------------------------------------
 
 _FAKE_IP_RANGE = (ipaddress.ip_network("198.18.0.0/15"),)
 
 
 def test_read_allow_cidrs_empty_when_unset(monkeypatch):
-    monkeypatch.delenv("AGENTAO_WEB_FETCH_ALLOW_CIDRS", raising=False)
+    monkeypatch.delenv("ARBITER_WEB_FETCH_ALLOW_CIDRS", raising=False)
     assert url_policy.read_allow_cidrs_setting() == ()
 
 
 def test_read_allow_cidrs_parses_list_and_bare_ip(monkeypatch):
     monkeypatch.setenv(
-        "AGENTAO_WEB_FETCH_ALLOW_CIDRS", "198.18.0.0/15, 10.1.2.3  192.168.0.0/16"
+        "ARBITER_WEB_FETCH_ALLOW_CIDRS", "198.18.0.0/15, 10.1.2.3  192.168.0.0/16"
     )
     nets = url_policy.read_allow_cidrs_setting()
     assert ipaddress.ip_network("198.18.0.0/15") in nets
@@ -284,7 +284,7 @@ def test_read_allow_cidrs_parses_list_and_bare_ip(monkeypatch):
 
 
 def test_read_allow_cidrs_skips_invalid_tokens(monkeypatch):
-    monkeypatch.setenv("AGENTAO_WEB_FETCH_ALLOW_CIDRS", "198.18.0.0/15, not-an-ip, ::1/999")
+    monkeypatch.setenv("ARBITER_WEB_FETCH_ALLOW_CIDRS", "198.18.0.0/15, not-an-ip, ::1/999")
     nets = url_policy.read_allow_cidrs_setting()
     assert nets == (ipaddress.ip_network("198.18.0.0/15"),)
 
@@ -362,10 +362,10 @@ def test_guarded_get_allowlist_threads_to_redirect_hop(fake_resolver):
 
 
 def test_webfetch_tool_wires_allowlist_into_description(monkeypatch):
-    from agentao.tools.web import WebFetchTool
+    from arbiter.tools.web import WebFetchTool
 
-    monkeypatch.delenv("AGENTAO_WEB_FETCH_FALLBACK", raising=False)
-    monkeypatch.setenv("AGENTAO_WEB_FETCH_ALLOW_CIDRS", "198.18.0.0/15")
+    monkeypatch.delenv("ARBITER_WEB_FETCH_FALLBACK", raising=False)
+    monkeypatch.setenv("ARBITER_WEB_FETCH_ALLOW_CIDRS", "198.18.0.0/15")
     tool = WebFetchTool()
     assert tool._allow_cidrs == (ipaddress.ip_network("198.18.0.0/15"),)
     assert "SSRF allowlist active" in tool.description

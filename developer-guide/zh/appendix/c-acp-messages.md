@@ -1,6 +1,6 @@
 # 附录 C · ACP 消息字段参考
 
-Agentao 的 ACP 服务器/客户端发出的每种消息的字段级速查。端到端叙事（握手 → 提示 → 流式 → 取消）见 [Part 3](/zh/part-3/)。本附录是你在调试畸形消息时打开的那一页。
+Arbiter 的 ACP 服务器/客户端发出的每种消息的字段级速查。端到端叙事（握手 → 提示 → 流式 → 取消）见 [Part 3](/zh/part-3/)。本附录是你在调试畸形消息时打开的那一页。
 
 **约定**：
 - `→` 请求；`←` 响应；`⇠` 服务器到客户端通知
@@ -15,7 +15,7 @@ Agentao 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `protocolVersion` | `int` | 是 | Agentao 讲 `1`；`bool` 被显式拒绝 |
+| `protocolVersion` | `int` | 是 | Arbiter 讲 `1`；`bool` 被显式拒绝 |
 | `clientCapabilities` | `object` | 是 | 客户端能力标志（如 `fs: {readFile, writeFile}`） |
 | `clientInfo` | `object` | 否 | `{name, version, title}` —— 纯信息性 |
 
@@ -25,8 +25,8 @@ Agentao 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 |------|------|------|
 | `protocolVersion` | `int` | 协商后——通常回显请求值；版本不匹配也不报错 |
 | `agentCapabilities` | `object` | 见下 |
-| `authMethods` | `[]` | v1 为空——Agentao 不做 ACP 级认证 |
-| `agentInfo` | `object` | `{name: "agentao", title: "Agentao", version}` |
+| `authMethods` | `[]` | v1 为空——Arbiter 不做 ACP 级认证 |
+| `agentInfo` | `object` | `{name: "arbiter", title: "Arbiter", version}` |
 | `_meta["_agentao.cn/extensions"]` | `[{method, description}]` | 扩展方法，放在 `_meta` 下（ACP 标准的扩展通道）；含 `_agentao.cn/ask_user` |
 
 ### `agentCapabilities` 字段（v0.2.x）
@@ -77,7 +77,7 @@ Agentao 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 | `-32002` | 在 `initialize` 之前调（SERVER_NOT_INITIALIZED） |
 | `-32602` | `cwd` 不是绝对/不存在，或 `mcpServers` 格式错 |
 
-> **启动时恢复。** 当 server 以 `agentao --acp --resume [SESSION_ID]` 启动时，**第一个** `session/new` 会恢复持久化会话而非新建空会话：把历史作为 `session/update` 通知重放，并返回持久化的 `sessionId`。未命中（空存储 / 未知 id / 文件损坏 / id 已存活）会静默降级为普通的全新会话。见 [3.2 → 启动时恢复会话](/zh/part-3/2-agentao-as-server#启动时恢复会话)。
+> **启动时恢复。** 当 server 以 `arbiter --acp --resume [SESSION_ID]` 启动时，**第一个** `session/new` 会恢复持久化会话而非新建空会话：把历史作为 `session/update` 通知重放，并返回持久化的 `sessionId`。未命中（空存储 / 未知 id / 文件损坏 / id 已存活）会静默降级为普通的全新会话。见 [3.2 → 启动时恢复会话](/zh/part-3/2-arbiter-as-server#启动时恢复会话)。
 
 ## C.3 `session/prompt`
 
@@ -116,7 +116,7 @@ Agentao 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 
 ### 变体（`update.sessionUpdate`）
 
-| 值 | Agentao 事件 | 额外字段 |
+| 值 | Arbiter 事件 | 额外字段 |
 |----|--------------|----------|
 | `user_message_chunk` | （回放） | `content: {type:"text", text}` |
 | `agent_message_chunk` | `LLM_TEXT` | `content: {type:"text", text}` |
@@ -126,7 +126,7 @@ Agentao 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 
 ### `tool_call.kind`（封闭枚举）
 
-`read`、`edit`、`delete`、`move`、`search`、`execute`、`think`、`fetch`、`switch_mode`、`other`。Agentao 会把内部工具名映射到这枚举——见 `agentao/acp/transport.py`。
+`read`、`edit`、`delete`、`move`、`search`、`execute`、`think`、`fetch`、`switch_mode`、`other`。Arbiter 会把内部工具名映射到这枚举——见 `arbiter/acp/transport.py`。
 
 ### `tool_call_update.status`
 
@@ -189,11 +189,11 @@ Agentao 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 
 ### 指纹规则
 
-`session/new` 时 `mcpServers` 会被哈希。如果 `session/load` 传了不同的集合（增/删/重排），Agentao 可能拒绝或静默重建——取决于实现阶段。拿不准就**传原样列表**。
+`session/new` 时 `mcpServers` 会被哈希。如果 `session/load` 传了不同的集合（增/删/重排），Arbiter 可能拒绝或静默重建——取决于实现阶段。拿不准就**传原样列表**。
 
 ## C.8 `session/set_config_option`
 
-用 ACP 标准的 config-option 机制切换模型（以及可选地切换提供方）。**凭证绝不上线**——Agentao 在服务端用宿主注入的 `provider_resolver` 解析凭证（默认走环境变量）。
+用 ACP 标准的 config-option 机制切换模型（以及可选地切换提供方）。**凭证绝不上线**——Arbiter 在服务端用宿主注入的 `provider_resolver` 解析凭证（默认走环境变量）。
 
 ### → 请求
 
@@ -213,7 +213,7 @@ Agentao 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 
 ### 解析与错误
 
-- **`provider/model`**：Agentao 调 `provider_resolver(provider_id)` → `{api_key, base_url?}`，然后整套切换 provider + model。**默认** resolver 只接受配置的 `LLM_PROVIDER`（大小写不敏感），读 `{PREFIX}_API_KEY` / `{PREFIX}_BASE_URL`；其它 provider → `-32600` `cannot resolve provider '<id>'`。要支持更多提供方，注入更丰富的 resolver。
+- **`provider/model`**：Arbiter 调 `provider_resolver(provider_id)` → `{api_key, base_url?}`，然后整套切换 provider + model。**默认** resolver 只接受配置的 `LLM_PROVIDER`（大小写不敏感），读 `{PREFIX}_API_KEY` / `{PREFIX}_BASE_URL`；其它 provider → `-32600` `cannot resolve provider '<id>'`。要支持更多提供方，注入更丰富的 resolver。
 - **裸 `model`**：只换模型（provider 不变），与 `_agentao.cn/set_model` 走同一条核心路径。
 - resolver 失败时，服务端只记录 provider id + 异常**类型**，绝不记录消息（可能夹带密钥）。
 
@@ -230,7 +230,7 @@ Agentao 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 
 ## C.9 `_agentao.cn/set_model`（扩展）
 
-Agentao 独有的自由文本换模型——`session/set_config_option` 裸值路径的厂商版兄弟。无密钥；与其共享同一条核心路径。
+Arbiter 独有的自由文本换模型——`session/set_config_option` 裸值路径的厂商版兄弟。无密钥；与其共享同一条核心路径。
 
 ### → 请求
 
@@ -249,14 +249,14 @@ Agentao 独有的自由文本换模型——`session/set_config_option` 裸值�
 
 ## C.10 `session/set_mode`
 
-设置会话的 ACP `modeId`。字段是 ACP 标准的 **`modeId`**（不是 `mode`），且是**开放字符串**——一个 UI/行为选择器，不一定映射到 Agentao 权限预设。
+设置会话的 ACP `modeId`。字段是 ACP 标准的 **`modeId`**（不是 `mode`），且是**开放字符串**——一个 UI/行为选择器，不一定映射到 Arbiter 权限预设。
 
 ### → 请求
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `sessionId` | `string` | 是 | 活跃会话 |
-| `modeId` | `string` | 是 | 非空。精确命中权限预设（`read-only` / `workspace-write` / `full-access` / `plan`）时 Agentao 应用之；其它值（如 `code`、`ask`）会被持久化并回显，但**不改变**权限姿态 |
+| `modeId` | `string` | 是 | 非空。精确命中权限预设（`read-only` / `workspace-write` / `full-access` / `plan`）时 Arbiter 应用之；其它值（如 `code`、`ask`）会被持久化并回显，但**不改变**权限姿态 |
 
 ### ← 响应
 
@@ -271,7 +271,7 @@ Agentao 独有的自由文本换模型——`session/set_config_option` 裸值�
 
 ## C.11 `_agentao.cn/ask_user` ⇠ 通知（扩展）
 
-Agentao 独有，服务器向用户问一个自由文本问题。
+Arbiter 独有，服务器向用户问一个自由文本问题。
 
 ### Params
 

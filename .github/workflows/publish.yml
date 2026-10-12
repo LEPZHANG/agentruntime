@@ -26,10 +26,10 @@ jobs:
           import pathlib
           import re
 
-          init_py = pathlib.Path("agentao/__init__.py").read_text(encoding="utf-8")
+          init_py = pathlib.Path("arbiter/__init__.py").read_text(encoding="utf-8")
           match = re.search(r'^__version__\s*=\s*"([^"]+)"', init_py, re.MULTILINE)
           if not match:
-              raise SystemExit("Could not find __version__ in agentao/__init__.py")
+              raise SystemExit("Could not find __version__ in arbiter/__init__.py")
 
           package_version = match.group(1)
           release_tag = "${{ github.event.release.tag_name }}"
@@ -55,7 +55,7 @@ jobs:
         # Test job. After P0.9 the bundled CLI deps live in `[cli]`;
         # tests/test_menu_confirmation.py, test_readchar_confirmation.py,
         # test_cli_dashboard.py, test_skill_crystallize_enhancement.py, etc.
-        # all import from agentao.cli or read prompt_toolkit/readchar at
+        # all import from arbiter.cli or read prompt_toolkit/readchar at
         # collect time. Without these extras the test step fails before
         # build/publish run.
         run: uv sync --python 3.12 --extra cli --extra web --extra i18n
@@ -63,8 +63,8 @@ jobs:
       - name: Run tests in CI offline mode
         env:
           GITHUB_ACTIONS: "true"
-          AGENTAO_TEST_LIVE_MODELS: "0"
-          AGENTAO_TEST_LIVE_LLM: "0"
+          ARBITER_TEST_LIVE_MODELS: "0"
+          ARBITER_TEST_LIVE_LLM: "0"
         run: uv run --python 3.12 python -m pytest tests/ -v --tb=short
 
       - name: Build wheel and sdist
@@ -79,15 +79,15 @@ jobs:
           source .publish-venv/bin/activate
           pip install dist/*.whl
           python -c "
-          import agentao
-          print('version:', agentao.__version__)
-          from agentao import Agentao, SkillManager
+          import arbiter
+          print('version:', arbiter.__version__)
+          from arbiter import Arbiter, SkillManager
           print('Public API OK')
           "
-          python -c "from agentao.cli import entrypoint; print('CLI entrypoint OK')"
-          python -c "import shutil; assert shutil.which('agentao'), 'agentao not found on PATH'; print('agentao on PATH OK')"
+          python -c "from arbiter.cli import entrypoint; print('CLI entrypoint OK')"
+          python -c "import shutil; assert shutil.which('arbiter'), 'arbiter not found on PATH'; print('arbiter on PATH OK')"
           python -c "
-          import agentao.skills.manager as m
+          import arbiter.skills.manager as m
           bundled = m._BUNDLED_SKILLS_DIR
           assert bundled.exists(), f'Bundled skills dir missing: {bundled}'
           skills = [d.name for d in bundled.iterdir() if d.is_dir()]

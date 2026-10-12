@@ -9,11 +9,11 @@ the result for force_continue / blocking_error branching.
 
 from __future__ import annotations
 
-from agentao.plugins.hooks import (
+from arbiter.plugins.hooks import (
     ClaudeHookPayloadAdapter,
     PluginHookDispatcher,
 )
-from agentao.plugins.models import ParsedHookRule, StopHookResult
+from arbiter.plugins.models import ParsedHookRule, StopHookResult
 
 
 def test_dispatch_stop_returns_hook_success_attachment(tmp_path):

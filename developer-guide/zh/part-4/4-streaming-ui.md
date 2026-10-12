@@ -12,7 +12,7 @@ Agent 事件是**后端内部**的 Python 对象。要让前端实时看到 Agen
 ```
 ┌─────────────┐        ┌──────────────┐       ┌──────────────┐
 │  前端浏览器   │◄──────►│  Web 服务器   │◄─────►│  Agent 实例   │
-│ EventSource │  SSE   │  (FastAPI)   │  emit │  Agentao()   │
+│ EventSource │  SSE   │  (FastAPI)   │  emit │  Arbiter()   │
 │    or WS    │        │  Transport  │        │              │
 └─────────────┘        └──────────────┘       └──────────────┘
 ```
@@ -35,8 +35,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from agentao import Agentao
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
 
 app = FastAPI()
 
@@ -57,7 +57,7 @@ def make_session(session_id: str):
         on_event=on_event,
         confirm_tool=lambda *a: True,  # 生产应走确认 API（见 4.5）
     )
-    agent = Agentao(
+    agent = Arbiter(
         transport=transport,
         working_directory=Path(f"/tmp/{session_id}"),
     )
@@ -161,8 +161,8 @@ async function send(text) {
 ```python
 import json, asyncio
 from fastapi import FastAPI, WebSocket
-from agentao import Agentao
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
 from pathlib import Path
 
 app = FastAPI()
@@ -204,7 +204,7 @@ async def ws(websocket: WebSocket, session_id: str):
         return await fut
 
     transport = SdkTransport(on_event=on_event, confirm_tool=confirm_tool)
-    agent = Agentao(transport=transport, working_directory=Path(f"/tmp/{session_id}"))
+    agent = Arbiter(transport=transport, working_directory=Path(f"/tmp/{session_id}"))
 
     try:
         while True:

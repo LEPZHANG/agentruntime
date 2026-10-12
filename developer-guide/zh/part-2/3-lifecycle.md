@@ -1,16 +1,16 @@
 # 2.3 生命周期管理
 
 > **本节你会学到**
-> - 标准 4 步生命周期（`Agentao()` → `chat()` → … → `close()`）
+> - 标准 4 步生命周期（`Arbiter()` → `chat()` → … → `close()`）
 > - 单实例为什么不是线程安全的，以及如何正确串行化
 > - 一个能正确处理并发会话的 FastAPI 模板
 
-一个 `Agentao` 实例 = 一次完整的对话会话。掌握它的生老病死对生产嵌入至关重要。
+一个 `Arbiter` 实例 = 一次完整的对话会话。掌握它的生老病死对生产嵌入至关重要。
 
 ## 标准生命周期
 
 ```python
-agent = Agentao(...)          # 1. 构造（开 MCP、加载技能）
+agent = Arbiter(...)          # 1. 构造（开 MCP、加载技能）
 reply1 = agent.chat("hello")   # 2. 第一轮对话
 reply2 = agent.chat("continue")# 3. 同一会话再聊
 # ...
@@ -96,7 +96,7 @@ from contextlib import contextmanager
 
 @contextmanager
 def agent_session(**kwargs):
-    agent = Agentao(**kwargs)
+    agent = Arbiter(**kwargs)
     try:
         yield agent
     finally:
@@ -150,7 +150,7 @@ agent.skill_manager.active_skills  # dict
 
 ## 并发模型
 
-**单个 `Agentao` 实例不是线程安全的**。同一实例不能被两个线程同时 `chat()`。
+**单个 `Arbiter` 实例不是线程安全的**。同一实例不能被两个线程同时 `chat()`。
 
 正确做法：每会话一个 Agent 实例。
 
@@ -167,17 +167,17 @@ agent.skill_manager.active_skills  # dict
 from asyncio import to_thread, Lock
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
-from agentao import Agentao
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
 
 app = FastAPI()
 
 # session_id -> (agent, lock)
 _sessions: dict = {}
 
-async def get_or_create(session_id: str, workdir: Path) -> tuple[Agentao, Lock]:
+async def get_or_create(session_id: str, workdir: Path) -> tuple[Arbiter, Lock]:
     if session_id not in _sessions:
-        agent = Agentao(
+        agent = Arbiter(
             working_directory=workdir,
             transport=SdkTransport(),  # 简单起见不订阅事件
         )

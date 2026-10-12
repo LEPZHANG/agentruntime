@@ -7,8 +7,8 @@ machine-checkable answer instead of living in a dataclass docstring.
 ## Source of truth
 
 ```
-agentao/replay/events.py    # EventKind vocabulary + ReplayEvent envelope
-agentao/replay/schema.py    # emitter that turns those into JSON Schema
+arbiter/replay/events.py    # EventKind vocabulary + ReplayEvent envelope
+arbiter/replay/schema.py    # emitter that turns those into JSON Schema
 schemas/replay-event-*.json # generated artefact, committed to the repo
 ```
 
@@ -18,7 +18,7 @@ CI and fails on drift.
 
 ## What `SCHEMA_VERSION` covers
 
-The `SCHEMA_VERSION` constant in `agentao/replay/events.py` describes
+The `SCHEMA_VERSION` constant in `arbiter/replay/events.py` describes
 the **on-disk JSONL format**: envelope shape + kind vocabulary +
 per-kind payload contract (the third tier is being introduced
 incrementally). Every change to that on-disk format must bump the
@@ -84,7 +84,7 @@ Per-kind payload policy:
 - **v1.2 harness-projected kinds** (`tool_lifecycle`,
   `subagent_lifecycle`, `permission_decision`) — payload is a typed
   schema derived from the public Pydantic model in
-  `agentao.host.models` (`extra="forbid"`, so
+  `arbiter.host.models` (`extra="forbid"`, so
   `additionalProperties: false`), extended with the sanitizer's
   optional projection metadata (`redaction_hits`, `redacted`,
   `redacted_fields`). A model field rename / removal therefore
@@ -112,7 +112,7 @@ add a fresh fixture before merge.
 ## Regeneration
 
 ```bash
-# Rewrite schemas/ from agentao/replay/events.py
+# Rewrite schemas/ from arbiter/replay/events.py
 uv run python scripts/write_replay_schema.py
 
 # CI invocation (fails on drift)
@@ -120,7 +120,7 @@ uv run python scripts/write_replay_schema.py --check
 ```
 
 The script is intentionally tiny: anything more than "render and write"
-belongs in `agentao/replay/schema.py` so it is unit-testable.
+belongs in `arbiter/replay/schema.py` so it is unit-testable.
 
 ## Changelog
 
@@ -134,18 +134,18 @@ belongs in `agentao/replay/schema.py` so it is unit-testable.
   with 1.0 — every 1.0 kind survives.
 - **1.2** — adds three harness-projected lifecycle kinds so embedded
   hosts have a single audit artifact instead of two parallel streams
-  (`Agentao.events()` + replay JSONL): `tool_lifecycle`,
+  (`Arbiter.events()` + replay JSONL): `tool_lifecycle`,
   `subagent_lifecycle`, `permission_decision`. Each new variant carries
   a **typed payload** generated from the matching public Pydantic model
   (`ToolLifecycleEvent` / `SubagentLifecycleEvent` /
-  `PermissionDecisionEvent`) in `agentao.host.models`, extended with
+  `PermissionDecisionEvent`) in `arbiter.host.models`, extended with
   the sanitizer's optional projection metadata
   (`redaction_hits`, `redacted`, `redacted_fields` — see
-  `agentao.replay.sanitize.SANITIZER_INJECTED_FIELDS`, which is the
+  `arbiter.replay.sanitize.SANITIZER_INJECTED_FIELDS`, which is the
   single source of truth shared with the schema generator). Forward
   projection (`HostReplaySink`) and reverse projection
   (`replay_payload_to_host_event`) live in
-  `agentao.host.replay_projection`; `start_replay()` auto-attaches
+  `arbiter.host.replay_projection`; `start_replay()` auto-attaches
   the sink so every published harness event also lands in the JSONL.
   Backward-compatible with 1.1 — every 1.1 kind survives, and a 1.0 /
   1.1 reader treats the three new kinds as unknown and skips them.

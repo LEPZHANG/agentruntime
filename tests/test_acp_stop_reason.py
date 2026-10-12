@@ -17,8 +17,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from agentao.acp.schema import AcpSessionPromptResponse
-from agentao.acp.session_prompt import _stop_reason_for
+from arbiter.acp.schema import AcpSessionPromptResponse
+from arbiter.acp.session_prompt import _stop_reason_for
 
 
 def _outcome(reason=None):
@@ -134,7 +134,7 @@ class TestTransportFlag:
     def test_acp_transport_records_iteration_exhaustion(self):
         """The signal cannot be recovered from TurnOutcome after the fact,
         so it has to be recorded as it happens."""
-        from agentao.acp._transport_interaction import _InteractionMixin
+        from arbiter.acp._transport_interaction import _InteractionMixin
 
         class T(_InteractionMixin):
             _session_id = "s1"

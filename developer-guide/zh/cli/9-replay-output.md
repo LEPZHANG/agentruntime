@@ -4,7 +4,7 @@
 
 ## `/replay` — 录制 / 列表 / 检视 / 清理会话
 
-录制开启后，agent 发出的每个事件（LLM 回复、工具调用、工具结果、权限决策、记忆写入...）都被追加到 `.agentao/replay/` 下的 JSONL 文件。之后你可以列表、渲染、看尾部、清理这些文件。
+录制开启后，agent 发出的每个事件（LLM 回复、工具调用、工具结果、权限决策、记忆写入...）都被追加到 `.arbiter/replay/` 下的 JSONL 文件。之后你可以列表、渲染、看尾部、清理这些文件。
 
 ### `/replay on` 和 `/replay off`
 
@@ -13,7 +13,7 @@
 Replay recording ON. (max_instances=20)
 ```
 
-持久化到 `.agentao/settings.json`，下次启动也是这个状态。默认关 — 想要审计轨迹时再开。
+持久化到 `.arbiter/settings.json`，下次启动也是这个状态。默认关 — 想要审计轨迹时再开。
 
 ### `/replay` 和 `/replay list` — 列出录制
 
@@ -80,7 +80,7 @@ Usage: /replay show <id>  or  /replay tail <id> [n]  or  /replay prune
 Pruned 5 replay(s) beyond max_instances=20.
 ```
 
-删掉超过 `replay.max_instances`（在 `.agentao/settings.json` 配）的最旧 replay。不弹确认 — 有上限保护，安全。
+删掉超过 `replay.max_instances`（在 `.arbiter/settings.json` 配）的最旧 replay。不弹确认 — 有上限保护，安全。
 
 ### `/replay delete <id>` 和 `/replay delete all`
 
@@ -169,9 +169,9 @@ Markdown rendering: OFF
 ---
 
 ::: info 这一章在体系里的位置
-Replay 实现在 `agentao.replay`。嵌入式宿主可以直接读相同的 JSONL 文件，用 `agentao.replay.read_replay()` 反序列化。事件 schema 在 CLI 和嵌入两条路径上一致。CI 里可以用 replay 验证行为改动不破坏过去的会话。
+Replay 实现在 `arbiter.replay`。嵌入式宿主可以直接读相同的 JSONL 文件，用 `arbiter.replay.read_replay()` 反序列化。事件 schema 在 CLI 和嵌入两条路径上一致。CI 里可以用 replay 验证行为改动不破坏过去的会话。
 :::
 
 ::: tip 真相源头
-命令语法：`/help`。行为：[`agentao/cli/replay_commands.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/replay_commands.py)。渲染逻辑：[`agentao/cli/replay_render.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/replay_render.py)。存储：[`agentao/replay/`](https://github.com/jin-bo/agentao/blob/main/agentao/replay/)。
+命令语法：`/help`。行为：[`arbiter/cli/replay_commands.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/replay_commands.py)。渲染逻辑：[`arbiter/cli/replay_render.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/replay_render.py)。存储：[`arbiter/replay/`](https://github.com/jin-bo/agentao/blob/main/arbiter/replay/)。
 :::

@@ -1,19 +1,19 @@
 # Host tool injection: `extra_tools` / `disable_tools` (v1)
 
 **Status:** **v1 landed** (`extra_tools` + `disable_tools` + `WebSearchTool(backend/api_key)`, see §11; tests in `tests/test_host_tool_injection.py`). `tool_options` / settings.json still deferred, see §10.
-**Audience:** agentao maintainers building a declarative host tool-injection surface; reviewers of the follow-up PR.
+**Audience:** arbiter maintainers building a declarative host tool-injection surface; reviewers of the follow-up PR.
 **Companions:**
 - `docs/design/host-tool-injection.zh.md` — Chinese version
 - `docs/design/pi-mono-tools-review.md` / `.zh.md` — where the idea was surfaced (pi-mono tool-design comparison)
 - `docs/design/embedded-host-contract.md` — the host-contract stability boundary (where this design belongs)
-- `agentao/tooling/registry.py` — `register_builtin_tools`, the main change site
-- `agentao/tools/base.py` — `Tool` / `AsyncToolBase` / `ToolRegistry.register`
+- `arbiter/tooling/registry.py` — `register_builtin_tools`, the main change site
+- `arbiter/tools/base.py` — `Tool` / `AsyncToolBase` / `ToolRegistry.register`
 
 ---
 
-## 1. Problem: agentao has no host tool-injection surface
+## 1. Problem: arbiter has no host tool-injection surface
 
-agentao ships ~19 built-in tools, but **whether a given tool exists** is controlled by **five unrelated mechanisms**:
+arbiter ships ~19 built-in tools, but **whether a given tool exists** is controlled by **five unrelated mechanisms**:
 
 - `[web]` extra detection (`registry.py:57`; no `bs4` → web tools not registered)
 - `bg_store` opt-in (`registry.py:74`; no store → bg-agent tools not registered)
@@ -27,15 +27,15 @@ agentao ships ~19 built-in tools, but **whether a given tool exists** is control
 2. **Replace** a built-in's implementation (e.g. swap `web_search` for an in-house retriever)
 3. **Remove** a built-in (e.g. drop `run_shell_command` in a read-only deployment)
 
-Today the only option is to poke the runtime registry after construction via `agent.tools.register(...)` — it works, but it mutates runtime internals directly and is **not part of the stability-guaranteed `agentao.host` contract**.
+Today the only option is to poke the runtime registry after construction via `agent.tools.register(...)` — it works, but it mutates runtime internals directly and is **not part of the stability-guaranteed `arbiter.host` contract**.
 
-There is a fourth, related gap: **configuring a built-in tool's behavior**. `WebSearchTool.__init__` (`web.py:279`) reads `os.getenv("BOCHA_API_KEY")` at construction — process-global — so two same-process `Agentao` instances cannot use different search backends. This contradicts the invariant stated in `agent.py`'s docstring / CLAUDE.md that "two same-process instances with different `working_directory` can coexist." The v1 fix is in §7: give built-in tools constructor args and pass pre-configured instances via `extra_tools`, **without introducing an extra config layer**.
+There is a fourth, related gap: **configuring a built-in tool's behavior**. `WebSearchTool.__init__` (`web.py:279`) reads `os.getenv("BOCHA_API_KEY")` at construction — process-global — so two same-process `Arbiter` instances cannot use different search backends. This contradicts the invariant stated in `agent.py`'s docstring / CLAUDE.md that "two same-process instances with different `working_directory` can coexist." The v1 fix is in §7: give built-in tools constructor args and pass pre-configured instances via `extra_tools`, **without introducing an extra config layer**.
 
 ## 2. Scope decision: v1 does exactly two things
 
-**The need comes from agentao's own embedded-host posture**: a host needs a stable API to **add/replace tools** and **hide inapplicable built-ins**, while injected tools automatically get capability binding (`working_directory` / `filesystem` / `shell`) — rather than reaching into `agent.tools.register(...)` after construction (runtime internals, off-contract). This is the agentao gap described in §1, independent of any external framework.
+**The need comes from arbiter's own embedded-host posture**: a host needs a stable API to **add/replace tools** and **hide inapplicable built-ins**, while injected tools automatically get capability binding (`working_directory` / `filesystem` / `shell`) — rather than reaching into `agent.tools.register(...)` after construction (runtime internals, off-contract). This is the arbiter gap described in §1, independent of any external framework.
 
-> Background: pi-mono's `createTool` / preset / bare-`AgentTool`-override trio (see `pi-mono-tools-review`) is where the idea was surfaced, but it is background only. v1 scope is decided by the agentao gap in §1, **not by parity with pi-mono**.
+> Background: pi-mono's `createTool` / preset / bare-`AgentTool`-override trio (see `pi-mono-tools-review`) is where the idea was surfaced, but it is background only. v1 scope is decided by the arbiter gap in §1, **not by parity with pi-mono**.
 
 **v1 ships only `extra_tools` + `disable_tools`:**
 
@@ -50,7 +50,7 @@ There is a fourth, related gap: **configuring a built-in tool's behavior**. `Web
 - `tool_options` + settings.json + env placeholders + unset rules introduce a semi-public kwargs contract, settings fields, and loader behavior differences — too broad for v1 host injection. Build it when a real "CLI user wants to configure a built-in" need appears, and start from one concrete tool (gap≠need).
 
 **v1 also explicitly does not:**
-- Copy pi-mono's per-tool `operations?` capability DI — agentao already has a single `FileSystem` / `ShellExecutor` Protocol (`capabilities/`); one object to redirect all IO uniformly is the better answer.
+- Copy pi-mono's per-tool `operations?` capability DI — arbiter already has a single `FileSystem` / `ShellExecutor` Protocol (`capabilities/`); one object to redirect all IO uniformly is the better answer.
 - Load `extra_tools` from JSON — tools are implementations and cannot be serialized.
 
 ## 3. Constructor signature
@@ -101,7 +101,7 @@ The combinations follow with **no warn-then-continue conflict arbitration needed
 `disable_tools` filters the built-in list. **`extra_tools` is not registered here** (see §5b). No `tool_options` injection, no options-eligible / dependency-wired classification:
 
 ```python
-def register_builtin_tools(agent: "Agentao") -> None:
+def register_builtin_tools(agent: "Arbiter") -> None:
     disabled = agent._disable_tools
 
     tools = [ReadFileTool(), WriteFileTool(), EditTool(), ReadFolderTool(),
@@ -151,7 +151,7 @@ def _bind_and_register(agent, tool, *, replace=False):
     tool.shell = agent.shell              # (was registry.py:78-83)
     agent.tools.register(tool, replace=replace)
 
-def register_extra_tools(agent: "Agentao") -> None:
+def register_extra_tools(agent: "Arbiter") -> None:
     for tool in agent._extra_tools:
         # Decide override against the live registry. It now holds built-in +
         # MCP + agent tools, but extra names are forbidden the `mcp_` prefix
@@ -199,30 +199,30 @@ class WebSearchTool(Tool):
 |---|---|---|---|
 | `web_search` | `backend`, `api_key` | `BOCHA_API_KEY` | The §1 multi-instance env leak — a **demonstrated** defect, not "might be useful" |
 
-**`web_fetch`'s `fallback`: same-class multi-instance crack** (`WebFetchTool.__init__` likewise reads the process-global `AGENTAO_WEB_FETCH_FALLBACK`, `web.py:139/30`), **but its env is a non-secret, deployment-level mode switch (none/jina/crawl4ai) with low per-instance-variance priority, so it is deferred in v1.** Detailed rationale left to a follow-up issue/ADR.
+**`web_fetch`'s `fallback`: same-class multi-instance crack** (`WebFetchTool.__init__` likewise reads the process-global `ARBITER_WEB_FETCH_FALLBACK`, `web.py:139/30`), **but its env is a non-secret, deployment-level mode switch (none/jina/crawl4ai) with low per-instance-variance priority, so it is deferred in v1.** Detailed rationale left to a follow-up issue/ADR.
 
-**The genuinely "might be useful" tier**: `read/write`'s `max_bytes/max_lines`, shell's `timeout/prefix` — no evidence agentao needs them now; add them one tool at a time when a concrete need appears.
+**The genuinely "might be useful" tier**: `read/write`'s `max_bytes/max_lines`, shell's `timeout/prefix` — no evidence arbiter needs them now; add them one tool at a time when a concrete need appears.
 
 **Contract-burden note (and why it is *not* an argument against `tool_options`)**: configuring a built-in **necessarily** makes the depended-upon kwarg names a **semi-public contract** subject to deprecation on rename — **whether via `extra_tools` reusing the built-in class or, later, via `tool_options`**. This burden is not a new cost introduced by `tool_options`; it is the cost of "letting a host configure built-ins" at all:
 - v1 bears it via `extra_tools`, at the cost of being **wide-open** — the whole constructor signature is exposed and the class must be importable;
-- later, `tool_options` is the mechanism that **narrows the same contract into an explicit option schema** (agentao keeps construction control, exposes only the option keys it commits to), see §10.
+- later, `tool_options` is the mechanism that **narrows the same contract into an explicit option schema** (arbiter keeps construction control, exposes only the option keys it commits to), see §10.
 
 v1 commits only to `WebSearchTool`'s `api_key`/`backend` precisely to keep this wide-open contract minimal — avoiding a PR that silently expands the public contract surface.
 
 ## 8. End-to-end usage
 
 ```python
-from agentao import Agentao
+from arbiter import Arbiter
 
 # Configure a built-in (the secret is held by host code, never in any config file)
-agent = Agentao(
+agent = Arbiter(
     working_directory=wd,
     extra_tools=[WebSearchTool(backend="bocha", api_key=key)],  # same name → replaces built-in
 )
 
 # Remove the built-in search/fetch and add a separate in-house retriever
 # (different name — this is an addition, NOT a replacement of web_search semantics)
-agent = Agentao(
+agent = Arbiter(
     working_directory=wd,
     disable_tools={"web_search", "web_fetch"},
     extra_tools=[MyRetrievalTool()],
@@ -231,8 +231,8 @@ agent = Agentao(
 
 ## 9. Implementation prerequisites and out-of-scope notes
 
-- **`RegistrableTool` entering the contract = re-export only, no abstraction layer**: export the existing `Tool` / `AsyncToolBase` / `RegistrableTool` from `agentao.host`. Do **not** create a new host-tool protocol / adapter / wrapper — that is a separate design task, unrelated to this one. Implementation: a direct export from `agentao.host.__init__`; do not touch `host/protocols.py` or add a protocol.
-- **Concentrated change surface**: `Agentao.__init__` (accept `extra_tools` / `disable_tools` + construction-time validation), `register_builtin_tools` (add `disable_tools` filtering), new `register_extra_tools` called after `agent.py`'s `_register_agent_tools()`, `ToolRegistry.register(replace=...)`, plus `WebSearchTool` constructor args. Simple route.
+- **`RegistrableTool` entering the contract = re-export only, no abstraction layer**: export the existing `Tool` / `AsyncToolBase` / `RegistrableTool` from `arbiter.host`. Do **not** create a new host-tool protocol / adapter / wrapper — that is a separate design task, unrelated to this one. Implementation: a direct export from `arbiter.host.__init__`; do not touch `host/protocols.py` or add a protocol.
+- **Concentrated change surface**: `Arbiter.__init__` (accept `extra_tools` / `disable_tools` + construction-time validation), `register_builtin_tools` (add `disable_tools` filtering), new `register_extra_tools` called after `agent.py`'s `_register_agent_tools()`, `ToolRegistry.register(replace=...)`, plus `WebSearchTool` constructor args. Simple route.
 - **Static built-in name set = a constant/small function in registry.py**: the "all possible built-in names" needed for `disable_tools` validation should be a simple constant in `registry.py` (or a small function derived from the factory list) — **do not introduce a tool-metadata registry**.
 - **Registration paths left untouched**: plan-only (`plan_*`) and agent-tool (`codebase_investigator` / `cli_help`) registration paths are orthogonal to this design and unchanged in v1.
 
@@ -253,7 +253,7 @@ agent = Agentao(
 | Dimension | `extra_tools` | `disable_tools` |
 |---|---|---|
 | Form | Code (instance) | Pure data (name set) |
-| v1 source | in-process `Agentao(...)` API | in-process `Agentao(...)` API |
+| v1 source | in-process `Arbiter(...)` API | in-process `Arbiter(...)` API |
 | settings.json | No (implementations can't serialize) | **No in v1** — pure data is serialization-friendly, but v1 has no settings loader and doesn't read settings.json; CLI/JSON needs come later |
 | Can do | add / replace impl / configure built-in (pass a configured instance) | skip built-in registration only (not a security boundary — security is the permission engine's) |
 | Registers | after built-in + agent tools (separate pass, §5b) | filters the built-in list |

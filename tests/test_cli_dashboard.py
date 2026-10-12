@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from agentao.cli import AgentaoCLI
-from agentao.cli.commands_ext import _show_agents_dashboard
+from arbiter.cli import ArbiterCLI
+from arbiter.cli.commands_ext import _show_agents_dashboard
 
 
 def test_dashboard_keeps_live_view_for_pending_tasks(monkeypatch):
@@ -36,10 +36,10 @@ def test_dashboard_keeps_live_view_for_pending_tasks(monkeypatch):
     prints = []
 
     monkeypatch.setattr("rich.live.Live", FakeLive)
-    monkeypatch.setattr("agentao.cli._globals.console.print", lambda *args, **kwargs: prints.append((args, kwargs)))
+    monkeypatch.setattr("arbiter.cli._globals.console.print", lambda *args, **kwargs: prints.append((args, kwargs)))
     monkeypatch.setattr("time.sleep", lambda *args, **kwargs: None)
 
-    cli = AgentaoCLI.__new__(AgentaoCLI)
+    cli = ArbiterCLI.__new__(ArbiterCLI)
     cli.agent = SimpleNamespace(bg_store=SimpleNamespace(list=fake_list))
     _show_agents_dashboard(cli)
 

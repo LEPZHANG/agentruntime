@@ -29,10 +29,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict
 
-from agentao.agents.tools import AgentToolWrapper
-from agentao.tooling.agent_tools import register_agent_tools
-from agentao.transport import AgentEvent, EventType
-from agentao.transport.sdk import build_compat_transport
+from arbiter.agents.tools import AgentToolWrapper
+from arbiter.tooling.agent_tools import register_agent_tools
+from arbiter.transport import AgentEvent, EventType
+from arbiter.transport.sdk import build_compat_transport
 
 from tests.support.host_events import CapturingTransport
 
@@ -82,7 +82,7 @@ def test_same_name_parallel_completions_keep_distinct_call_ids():
     parent = cap["_parent_transport"]
 
     # Wire the captured callbacks into the real legacy bridge, exactly as the
-    # sub-agent's Agentao.__init__ does — including the real prefixed step
+    # sub-agent's Arbiter.__init__ does — including the real prefixed step
     # callback (TOOL_START labels get the prefix; tool_complete keeps the raw
     # name, the exact asymmetry that broke name-keyed correlation).
     sub_transport = build_compat_transport(

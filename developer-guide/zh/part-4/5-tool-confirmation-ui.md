@@ -148,7 +148,7 @@ async def _ask_mobile(user_id, name, desc, args):
 完全不需要用户交互时，用规则代替人工：
 
 ```python
-from agentao.permissions import PermissionEngine, PermissionMode
+from arbiter.permissions import PermissionEngine, PermissionMode
 
 READ_ONLY = {"read_file", "glob", "grep", "read_folder"}
 ALWAYS_OK = READ_ONLY | {"save_memory", "activate_skill"}
@@ -168,7 +168,7 @@ def confirm_tool(name, desc, args):
 
 ## 和权限引擎的协同
 
-Agentao 有两层防御：
+Arbiter 有两层防御：
 
 ```
               ┌──────────────────────┐

@@ -2,7 +2,7 @@
 
 ## Goal
 
-建立插件系统的基础读取层，让 Agentao 能稳定发现插件目录、解析 `plugin.json`、决议 precedence，并生成可诊断的 `LoadedPlugin` 列表。
+建立插件系统的基础读取层，让 Arbiter 能稳定发现插件目录、解析 `plugin.json`、决议 precedence，并生成可诊断的 `LoadedPlugin` 列表。
 
 这一阶段不接入 skills、agents、MCP、hooks 的运行时，只负责“找得到、读得对、决议稳定、错误可诊断”。
 
@@ -37,8 +37,8 @@
 ## MVP Contract For This Phase
 
 - 插件目录来源：
-  - `<home>/.agentao/plugins`
-  - `<project-root>/.agentao/plugins`
+  - `<home>/.arbiter/plugins`
+  - `<project-root>/.arbiter/plugins`
   - `--plugin-dir`
 - 插件 identity 使用 `plugin.json.name`
 - precedence 规则：
@@ -51,12 +51,12 @@
 
 新文件：
 
-- `agentao/plugins/__init__.py`
-- `agentao/plugins/models.py`
-- `agentao/plugins/manifest.py`
-- `agentao/plugins/loader.py`
-- `agentao/plugins/manager.py`
-- `agentao/plugins/diagnostics.py`
+- `arbiter/plugins/__init__.py`
+- `arbiter/plugins/models.py`
+- `arbiter/plugins/manifest.py`
+- `arbiter/plugins/loader.py`
+- `arbiter/plugins/manager.py`
+- `arbiter/plugins/diagnostics.py`
 
 测试文件：
 
@@ -65,7 +65,7 @@
 
 可能改动：
 
-- `agentao/cli/subcommands.py`
+- `arbiter/cli/subcommands.py`
   - 仅为后续 `--plugin-dir` 参数预留接线点时才需要
 
 ## Data Model
@@ -194,8 +194,8 @@ class PluginManager:
 
 目录层级：
 
-1. global: `<home>/.agentao/plugins`
-2. project: `<project-root>/.agentao/plugins`
+1. global: `<home>/.arbiter/plugins`
+2. project: `<project-root>/.arbiter/plugins`
 3. inline: `--plugin-dir`
 
 precedence：
@@ -206,8 +206,8 @@ precedence：
 
 disable 规则：
 
-- global config: `<home>/.agentao/plugins_config.json`
-- project config: `<project-root>/.agentao/plugins_config.json`
+- global config: `<home>/.arbiter/plugins_config.json`
+- project config: `<project-root>/.arbiter/plugins_config.json`
 - project config 对当前项目最终态有更高优先级
 
 ## Example Inputs
@@ -218,7 +218,7 @@ disable 规则：
 {
   "name": "demo-plugin",
   "version": "0.1.0",
-  "description": "Minimal Agentao / Claude-compatible demo plugin"
+  "description": "Minimal Arbiter / Claude-compatible demo plugin"
 }
 ```
 
@@ -246,7 +246,7 @@ disable 规则：
 ## Lifecycle Sequence
 
 ```text
-Agentao startup
+Arbiter startup
   -> PluginManager.discover_candidates()
   -> apply plugins_config.json
   -> resolve precedence
@@ -292,7 +292,7 @@ Agentao startup
 
 满足以下条件即可完成本阶段：
 
-1. Agentao 能稳定发现三层 plugin 目录
+1. Arbiter 能稳定发现三层 plugin 目录
 2. 能基于 `plugin.json.name` 做 precedence 决议
 3. 能输出稳定的 `LoadedPlugin` 列表
 4. 已知 unsupported field 记录 warning

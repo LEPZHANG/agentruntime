@@ -17,15 +17,15 @@ from __future__ import annotations
 
 import pytest
 
-from agentao import Agentao
-from agentao.host import AsyncToolBase, RegistrableTool, Tool
-from agentao.tooling import BUILTIN_TOOL_NAMES
-from agentao.tools.web import WebSearchTool
+from arbiter import Arbiter
+from arbiter.host import AsyncToolBase, RegistrableTool, Tool
+from arbiter.tooling import BUILTIN_TOOL_NAMES
+from arbiter.tools.web import WebSearchTool
 
 
-def _make_agent(tmp_path, **kwargs) -> Agentao:
-    """Construct an Agentao with a dummy LLM config (no network at init)."""
-    return Agentao(
+def _make_agent(tmp_path, **kwargs) -> Arbiter:
+    """Construct an Arbiter with a dummy LLM config (no network at init)."""
+    return Arbiter(
         working_directory=tmp_path,
         api_key="x",
         base_url="http://localhost:0",
@@ -265,7 +265,7 @@ def test_builtin_tool_names_constant_in_sync(tmp_path):
     """
     import importlib.util
     from unittest.mock import Mock
-    from agentao.tooling.registry import register_builtin_tools
+    from arbiter.tooling.registry import register_builtin_tools
 
     # Minimal stand-in agent exposing only what register_builtin_tools reads.
     fake = Mock()
@@ -279,7 +279,7 @@ def test_builtin_tool_names_constant_in_sync(tmp_path):
     fake.memory_tool = _NamedTool("save_memory")
     fake.transport = Mock()
 
-    from agentao.tools.base import ToolRegistry
+    from arbiter.tools.base import ToolRegistry
 
     fake.tools = ToolRegistry()
     register_builtin_tools(fake)
@@ -293,7 +293,7 @@ def test_builtin_tool_names_constant_in_sync(tmp_path):
 
 def test_registrable_tool_reexport_identity():
     """host re-export must BE the canonical types, not copies."""
-    from agentao.tools import base
+    from arbiter.tools import base
 
     assert Tool is base.Tool
     assert AsyncToolBase is base.AsyncToolBase

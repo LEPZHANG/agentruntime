@@ -7,11 +7,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agentao.acp.protocol import (
+from arbiter.acp.protocol import (
     ASK_USER_UNAVAILABLE_SENTINEL,
     METHOD_ASK_USER,
 )
-from agentao.acp.transport import ACPTransport
+from arbiter.acp.transport import ACPTransport
 
 
 # ---------------------------------------------------------------------------
@@ -101,12 +101,12 @@ class TestAskUserFailures:
 
     def test_pending_cancelled_returns_sentinel(self) -> None:
         # Simulate PendingRequestCancelled
-        from agentao.acp.server import PendingRequestCancelled
+        from arbiter.acp.server import PendingRequestCancelled
         t = _make_transport(wait_exception=PendingRequestCancelled())
         assert t.ask_user("q?") == ASK_USER_UNAVAILABLE_SENTINEL
 
     def test_jsonrpc_error_returns_sentinel(self) -> None:
-        from agentao.acp.server import JsonRpcHandlerError
+        from arbiter.acp.server import JsonRpcHandlerError
         t = _make_transport(
             wait_exception=JsonRpcHandlerError(-32600, "bad request")
         )
@@ -140,7 +140,7 @@ class TestOnMaxIterations:
 
 class TestCapabilityAdvertisement:
     def test_initialize_includes_extensions(self) -> None:
-        from agentao.acp.initialize import handle_initialize
+        from arbiter.acp.initialize import handle_initialize
 
         mock_server = MagicMock()
         mock_server.state = MagicMock()

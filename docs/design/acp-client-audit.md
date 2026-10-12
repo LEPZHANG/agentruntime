@@ -1,13 +1,13 @@
-# Agentao — `acp_client/` Subpackage Audit
+# Arbiter — `acp_client/` Subpackage Audit
 
 **Status:** Review record. Drafted 2026-07-23 from a June-grade four-dimension
-audit of the `agentao/acp_client/` subpackage — the ACP *client* (Agentao talking
+audit of the `arbiter/acp_client/` subpackage — the ACP *client* (Arbiter talking
 **out** to project-local ACP servers it spawns as child processes over stdio).
 **This is an evidence-backed findings list + prioritized proposal, not an approved
 plan.** The subpackage was **not in scope** of the 2026-06-19
 `optimization-opportunities-review.md` (that pass covered the runtime, packaging,
 CLI, and the ACP *server*); this closes that gap.
-**Audience:** Agentao maintainers.
+**Audience:** Arbiter maintainers.
 **Companion:** `acp-client-audit.zh.md`.
 **Related:**
 - `optimization-opportunities-review.md` — the June audit whose method and
@@ -121,7 +121,7 @@ kept alive only by tests, so a reader treats inert machinery as real:
   directly (`turns.py:575`). Every other mention is a comment. Only a test
   monkeypatches it as a spy — which can't even intercept the real `_locked` path.
 - **`recovery.py:166` `_note_handshake_failure`** (bare, non-`_and_maybe_fatal`)
-  — zero production callers (grep across `agentao/`); only tests use it to
+  — zero production callers (grep across `arbiter/`); only tests use it to
   simulate a streak.
 - **Fix:** delete the two dead helpers and either wire `deadline_at` or remove the
   expiry machinery. Removal touches the tests that reference them — do it as one
@@ -285,8 +285,8 @@ so fold in only when the file is open:
   grep for `url|https?|headers|authorization|bearer|sse|streamable|websocket`
   across `acp_client/` → **no transport match.** stdio-only; `url_policy.py` is
   inapplicable (watch-item only if a URL transport is ever added).
-- **N3 — secrets are redacted in `agentao.log`.** The `agentao.acp_client` logger
-  is a child of `agentao`, whose file handler carries `_RedactingFormatter`; debug
+- **N3 — secrets are redacted in `arbiter.log`.** The `arbiter.acp_client` logger
+  is a child of `arbiter`, whose file handler carries `_RedactingFormatter`; debug
   param dumps and child stderr are redacted. Config never logs env *values*
   (errors use `type(...).__name__`). No hand-rolled redaction (correctly — grep
   `secret_scan|redact` → no match; it isn't needed here).
@@ -353,7 +353,7 @@ harness-vs-product judgment calls that belong to the maintainer.
 | AC5 | read `render.py` end-to-end: plain `sys.stdout.write` `:117`, `escape` handles markup not ANSI `:185/195/197`; `helpers.py` agent chunks untruncated |
 | AC6 | grep `_reclassify_as_handshake_fail`/`_note_handshake_success` → 5 call-site clusters (`connection.py:170/263/400`, `turns.py:662/840`); matching `create_session`/`initialize` sites |
 | AC7 | `awk` method-span → `prompt_once` `452–712` (261 lines), next def `_rollback_ephemeral_on_busy` at `:714` |
-| N1–N9 | `build_child_env` read; grep for url/SSRF transport (none); logger parentage + `_RedactingFormatter`; traced ephemeral race interleavings; NDJSON atomic-write reasoning; `_we_started` gate; `import.*acp_client` across `agentao/` |
+| N1–N9 | `build_child_env` read; grep for url/SSRF transport (none); logger parentage + `_RedactingFormatter`; traced ephemeral race interleavings; NDJSON atomic-write reasoning; `_we_started` gate; `import.*acp_client` across `arbiter/` |
 
 ---
 
@@ -411,8 +411,8 @@ dead). AC5 and AC8 remain recorded (opportunistic).
   the group is already empty), with a second teeth test for the die-on-SIGTERM path.
   Two **accepted trade-offs** the review surfaced, both requiring changes outside
   this subpackage so left as recorded follow-ups: (1) `start_new_session` detaches
-  the server from agentao's controlling terminal, so a terminal-close `SIGHUP` no
-  longer reaps it — robust cleanup on agentao's *own* abnormal termination needs a
+  the server from arbiter's controlling terminal, so a terminal-close `SIGHUP` no
+  longer reaps it — robust cleanup on arbiter's *own* abnormal termination needs a
   CLI-layer `SIGHUP`/`SIGTERM` handler calling `stop_all()` (the interactive CLI only
   cleans up via a `finally`); (2) on Windows the force-kill now shells out to
   `taskkill /F /T` (≤5 s) instead of an instant `proc.kill()`, so the handle lock is

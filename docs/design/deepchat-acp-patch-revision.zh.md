@@ -2,33 +2,33 @@
 
 **状态:** 设计记录。起草于 2026-05-29。实现进行中 —— PR-1/PR-2/PR-3
 已落地(见 PR 排序);PR-4 起尚未开始。
-**读者:** Agentao 维护者;DeepChat/TensorChat 集成 fork 的负责人。
+**读者:** Arbiter 维护者;DeepChat/TensorChat 集成 fork 的负责人。
 **相关文档:** `docs/design/embedded-host-contract.md`,
 `docs/design/embedding-vs-acp.md`(若存在),
-`agentao/embedding/factory.py`,`agentao/acp/`。
+`arbiter/embedding/factory.py`,`arbiter/acp/`。
 
 ## 范围(先读这段)
 
-一份约 405 KB 的本地改动 patch(`agentaolocal-changes.patch`,56 文件,
-+4448 / −6153),目的是让 Agentao 作为 **ACP 子进程后端接入
+一份约 405 KB 的本地改动 patch(`arbiterlocal-changes.patch`,56 文件,
++4448 / −6153),目的是让 Arbiter 作为 **ACP 子进程后端接入
 DeepChat / TensorChat(Electron)桌面聊天 UI**。本文是对该 patch 的
-分类 + 修订方案:哪些回流 Agentao core、哪些重做、哪些留在 fork、哪些拒绝。
+分类 + 修订方案:哪些回流 Arbiter core、哪些重做、哪些留在 fork、哪些拒绝。
 
 这份 patch **不是单个特性**,它捆绑了四件互不相关的事:
 (1)真实的 harness 能力;(2)一个暴露方式错误的能力;
 (3)只属于 DeepChat 的 glue 与打包;(4)会**回退当前 `main`** 的删除。
 本方案把它们拆开。
 
-**本方案在 agentao `main` 上的可执行范围是 A 系列、B 系列与 D1。**
+**本方案在 arbiter `main` 上的可执行范围是 A 系列、B 系列与 D1。**
 下文的处置总表是 *patch 分类裁决*,不是 main 工作清单:只有 A 组(上游)、
 B 组(重做 + 上游)、以及 **D1(还原被删的 `acp_client` 测试)** 是 `main`
 动作。C 组与 D3 是**留 fork / 丢弃**裁决 —— 它们描述的是什么*不*进 `main`,
 其中 fork 侧的那些集中收录为**建议**,放在「给 DeepChat fork 的建议」一节。
 核心重设计与 PR 落地顺序才是真正的 `main` 工作;本方案**不**实现 fork 侧事项。
-agentao `main` 只提供 fork 要消费的接缝。
+arbiter `main` 只提供 fork 要消费的接缝。
 
 唯一**承重的设计决策**是**运行时切换 provider/model 时的凭据处理**:
-patch 把 `apiKey` / `baseUrl` 经 ACP 线缆传输(并写入 `agentao.log`)。
+patch 把 `apiKey` / `baseUrl` 经 ACP 线缆传输(并写入 `arbiter.log`)。
 本文用 ACP 标准的 `session/set_config_option` 机制 + 一个 server 端、
 host 可注入的 `provider_resolver` 取而代之。
 
@@ -36,12 +36,12 @@ host 可注入的 `provider_resolver` 取而代之。
 
 | 主题 | 代表文件 |
 |---|---|
-| ACP handler 长出 DeepChat 线缆形状(`modelId`、`_meta`、`apiKey`、`baseUrl`) | `agentao/acp/session_set_model.py`、`session_set_mode.py`、`models.py`、`server.py`、`transport.py` |
-| 多模态(图片)输入贯穿一个 turn | `agentao/agent.py`、`agentao/runtime/turn.py`、`agentao/runtime/chat_loop/_runner.py`、`agentao/llm/client.py` |
-| 结构化 `ask_user`(options/header/multiple/custom) | `agentao/tools/ask_user.py`、`agentao/tools/base.py` |
-| 第二套平行 ACP 传输实现 | `agentao/transport/acp.py`(新)、`transport/acp_server.py`(新) |
+| ACP handler 长出 DeepChat 线缆形状(`modelId`、`_meta`、`apiKey`、`baseUrl`) | `arbiter/acp/session_set_model.py`、`session_set_mode.py`、`models.py`、`server.py`、`transport.py` |
+| 多模态(图片)输入贯穿一个 turn | `arbiter/agent.py`、`arbiter/runtime/turn.py`、`arbiter/runtime/chat_loop/_runner.py`、`arbiter/llm/client.py` |
+| 结构化 `ask_user`(options/header/multiple/custom) | `arbiter/tools/ask_user.py`、`arbiter/tools/base.py` |
+| 第二套平行 ACP 传输实现 | `arbiter/transport/acp.py`(新)、`transport/acp_server.py`(新) |
 | PyInstaller 二进制打包,6 平台 CI | `run.py`、`pyinstaller.spec`、`scripts/build_binaries.sh`、`.github/workflows/build-matrix.yml` |
-| 基于 `$HOME` 的路径解析 | `agentao/paths.py` 及调用方 |
+| 基于 `$HOME` 的路径解析 | `arbiter/paths.py` 及调用方 |
 | 删除 | `tests/test_acp_client_*.py`、`docs/dev-notes/*` |
 
 ## 已核实的结论(边界分析)
@@ -49,12 +49,12 @@ host 可注入的 `provider_resolver` 取而代之。
 以下结论均经 grep 对工作树、以及对 ACP 规范(`agentclientprotocol.com`)
 核对,**非凭记忆**。证据见附录。
 
-1. **`reconfigure()` 已在 core**(`agentao/llm/client.py:233`,
+1. **`reconfigure()` 已在 core**(`arbiter/llm/client.py:233`,
    `reconfigure(api_key, base_url, model)`)。运行时切 provider 本就是
    harness 原语;patch 只是从一个新线缆形状去*调用*它。无需新增能力,
    只需一个安全的触发方式。
 
-2. **server 端凭据解析已存在**(`agentao/embedding/factory.py:71-77`):
+2. **server 端凭据解析已存在**(`arbiter/embedding/factory.py:71-77`):
    `LLM_PROVIDER` 选中 provider,再从环境读 `{PROVIDER}_API_KEY` /
    `_BASE_URL` / `_MODEL`。凭据在构造期就已在 server 端解析,线缆从来
    不需要携带 key。
@@ -62,23 +62,23 @@ host 可注入的 `provider_resolver` 取而代之。
 3. **ACP 没有任何选模型方法。** 经规范核实:不存在 `session/set_model`、
    `session/select_model`、`session/list_models`。选模型由通用的
    **`session/set_config_option`**(`category: "model"`)或 agent 内部
-   机制承担。因此 Agentao 现有的 `session/set_model` / `session/list_models`
+   机制承担。因此 Arbiter 现有的 `session/set_model` / `session/list_models`
    **本就是非标准扩展**,却裸占了标准 `session/` 命名空间 —— 与正确使用
    厂商前缀的 `_agentao.cn/ask_user` 不一致。
 
 4. **`session/set_mode` 用 `modeId` *才是* ACP 标准。** 规范字段是
    `modeId`(不是 `mode`),配 `availableModes` / `currentModeId`。
-   patch 改成 `modeId` 反而*靠近*标准;Agentao 改之前的 `mode` 才是
+   patch 改成 `modeId` 反而*靠近*标准;Arbiter 改之前的 `mode` 才是
    非标准那个。
 
-5. **`agentao/acp_client/` 及其测试在 `main` 里是活的。** patch 删除
+5. **`arbiter/acp_client/` 及其测试在 `main` 里是活的。** patch 删除
    `tests/test_acp_client_*` 是对现有覆盖的**回退**,不是清理。
 
-6. **`agentao/transport/` 当前没有任何 ACP 实现。** 新增的
+6. **`arbiter/transport/` 当前没有任何 ACP 实现。** 新增的
    `transport/acp.py` + `acp_server.py` 是*第二套*平行 ACP 实现,
-   与完整的 `agentao/acp/` server 包重复 —— fork 债。
+   与完整的 `arbiter/acp/` server 包重复 —— fork 债。
 
-7. **`main` 上的私有 schema 完整清单。** 对 `agentao/acp/` 逐项对标规范,
+7. **`main` 上的私有 schema 完整清单。** 对 `arbiter/acp/` 逐项对标规范,
    发现以下非标准面*已在 `main`*(与 patch 无关):
 
    | 私有面 | schema | 评价 |
@@ -87,7 +87,7 @@ host 可注入的 `provider_resolver` 取而代之。
    | `session/list_models` | `AcpSessionListModelsRequest/Response`、`AcpModelInfo`(`extra="allow"`) | 非标准方法,同样的命名空间问题。 |
    | `_agentao.cn/ask_user` | `AcpAskUserParams`、`AcpAskUserAnswered/Cancelled` | 非标准但**正确用厂商前缀**且在 `initialize` 声明 —— 模范。 |
    | `initialize` 响应的 `extensions: [...]` | `AcpInitializeExtension` | **非标准顶层字段。** ACP 用 **`_meta`** 声明扩展,没有顶层 `extensions` 数组。 |
-   | `session/set_mode` 的 `mode` 字段 | `AcpSessionSetModeRequest`(`mode: Literal["read-only","workspace-write","full-access","plan"]`) | **两处偏离:** ACP 字段是 `modeId`(非 `mode`);取值锁死为 Agentao **权限预设**,把 ACP 的「mode」(UI/行为选择器)与权限姿态混为一谈。 |
+   | `session/set_mode` 的 `mode` 字段 | `AcpSessionSetModeRequest`(`mode: Literal["read-only","workspace-write","full-access","plan"]`) | **两处偏离:** ACP 字段是 `modeId`(非 `mode`);取值锁死为 Arbiter **权限预设**,把 ACP 的「mode」(UI/行为选择器)与权限姿态混为一谈。 |
 
    作为对照,以下经核实为**标准**、无需改动:`protocolVersion`、
    `agentCapabilities`(`loadSession` / `promptCapabilities` /
@@ -109,14 +109,14 @@ host 可注入的 `provider_resolver` 取而代之。
 | **A3 —— `$HOME` 路径健壮性**(`paths.py` + `memory/storage.py`、`skills/manager.py`、`llm/client.py` fallback、`tests/test_memory_store.py`) | ✅ | 小 PR。确认 `$HOME` 未设时的回退。 |
 | **B1 —— secret-wire 修复(PR-4,核心)**(`acp/session_set_model.py`、`models.py`、`server.py`、`transport.py`、`initialize.py`、`schema.py`、`session_new.py`、`test_acp_set_model.py`) | 🔧 | **丢弃** `apiKey`/`baseUrl`/`modelId`/`_meta`。新增 `session/set_config_option`(仅 `configId="model"`;单 `category:"model"` 选项、`provider/model` value)+ 注入式 `provider_resolver`(server 端 secret;**handler 白名单 + `extra="forbid"` 拒 `apiKey`/`baseUrl`/`_meta`**)。**新增 `_agentao.cn/set_model`**(`{sessionId, model}`、free-form、本就无 secret;共用 core 代码路径 —— 决议 #4),并**保留既有 `session/set_model` 原样**作为一个版本的兼容别名 —— 其现有形状 `{sessionId, model?, contextLength?, maxTokens?}` 本就 `extra="forbid"`、无 secret;PR-4 只是**不采纳 patch 给它加的 `modelId`/`apiKey`/`baseUrl`/`_meta`**(CHANGELOG 标弃用;与 `list_models` 一起在 PR-7 退休)。默认 catalog = **当前 env** 那一条 `provider/model`(model 取自实时 `agent.llm.model`);更丰富 catalog 由 host 注入。本 PR **`session/list_models` 保留为兼容端点**。见「核心重设计」。 |
 | **B2 —— `session/set_mode` 字段(PR-5,独立)**(`acp/session_set_mode.py`、`schema.py`、`test_acp_set_mode.py`) | 🔧 | 最小:`mode` → **`modeId`** 且**接受未知值**(始终持久化;命中 preset 才映射)——让 DeepChat 的 `code`/`ask` 不被拒。**推迟**(决议 #6 —— 解耦是大重构):权限轴拆分 *以及* `availableModes`/`currentModeId` + `current_mode_update`。不进 model/provider PR。 |
-| **B3 —— `initialize` 的 `extensions` 数组 → `_meta`(PR-6,低优先)**(`acp/initialize.py`、`acp/schema.py`) | 🔧 | **决议 #5:挪到 `_meta`**(合规)。agentao 自己的 client 不读 `extensions`;只影响 schema 快照 + `test_acp_schema.py`。独立小 PR;**不**捆进 secret-wire 修复;排最后。bump 快照(`docs/schema/host.acp.v1.json`)。 |
+| **B3 —— `initialize` 的 `extensions` 数组 → `_meta`(PR-6,低优先)**(`acp/initialize.py`、`acp/schema.py`) | 🔧 | **决议 #5:挪到 `_meta`**(合规)。arbiter 自己的 client 不读 `extensions`;只影响 schema 快照 + `test_acp_schema.py`。独立小 PR;**不**捆进 secret-wire 修复;排最后。bump 快照(`docs/schema/host.acp.v1.json`)。 |
 | **B4 —— 退休遗留选模型方法(PR-7,后续)** | 🔧 | 待有 host 消费标准 `configOptions` 路径后:**两个**兼容端点一起删 —— `session/list_models` **与** `session/set_model` 名称别名(规范名 `_agentao.cn/set_model` 保留)。方向是标准对齐;跨版本分批。 |
-| **C1 —— 重复 ACP 传输**(`transport/acp.py`、`transport/acp_server.py`、`transport/__init__.py`、`transport/sdk.py`) | ❌ | 整组丢弃。`agentao/acp/` 已是完整 server 包。 |
-| **C2 —— PyInstaller 打包**(`run.py`、`pyinstaller.spec`、`scripts/build_binaries.sh`、`.github/workflows/build-matrix.yml`、`pyproject.toml`) | 🟠 | 留 DeepChat fork。与 Agentao「嵌入式库」定位(`pip install agentao`)冲突。仅当项目决定发二进制(独立产品决策)时才上游。 |
+| **C1 —— 重复 ACP 传输**(`transport/acp.py`、`transport/acp_server.py`、`transport/__init__.py`、`transport/sdk.py`) | ❌ | 整组丢弃。`arbiter/acp/` 已是完整 server 包。 |
+| **C2 —— PyInstaller 打包**(`run.py`、`pyinstaller.spec`、`scripts/build_binaries.sh`、`.github/workflows/build-matrix.yml`、`pyproject.toml`) | 🟠 | 留 DeepChat fork。与 Arbiter「嵌入式库」定位(`pip install arbiter`)冲突。仅当项目决定发二进制(独立产品决策)时才上游。 |
 | **C3 —— skill-creator 前端漂移**(`skills/skill-creator/assets/eval_review.html`、`eval-viewer/viewer.html`) | ❌ | 无关前端漂移(无 ACP/provider 引用)。从 patch 移除。 |
 | **D1 —— 删除 `tests/test_acp_client_*`** | 🚫 | 拒绝。`acp_client` 在 `main` 里是活的;还原测试。 |
 | **D2 —— 删除 `docs/dev-notes/*`** | ⚪ | 中性。若确要做,走独立 housekeeping PR,别与特性捆绑。 |
-| **D3 —— 新增中文 fork 笔记**(`docs/agentao/*.md`) | ⚪ | 留 fork;不上游。 |
+| **D3 —— 新增中文 fork 笔记**(`docs/arbiter/*.md`) | ⚪ | 留 fork;不上游。 |
 
 ## 核心重设计 —— ACP 上的 provider/model 切换
 
@@ -141,7 +141,7 @@ model」去多走一轮 `config_option_update`。还有一处**弱**的概念偏
 **没有 `provider`**,所以 spec 的心智模型是「选一个模型」,而非「先选
 provider 再选 model」。
 
-`provider/model` 是 **Agentao 的 value 约定,不是 ACP 标准**——在选项上要
+`provider/model` 是 **Arbiter 的 value 约定,不是 ACP 标准**——在选项上要
 这么标注清楚。
 
 ### 线缆形状
@@ -215,11 +215,11 @@ def handle_set_config_option(server, params):
   **默认 catalog 只有一条**:provider 取自 `LLM_PROVIDER`,model 取自
   **实时 `agent.llm.model`**(构造期解析出的值)——**不**再去读
   `{PROVIDER}_MODEL`,所以即便 env 缺 `{PROVIDER}_MODEL` 也不影响广播当前模型。
-  agentao 现在是**单 provider**(`LLM_PROVIDER` 构造期选一个;没有
+  arbiter 现在是**单 provider**(`LLM_PROVIDER` 构造期选一个;没有
   `providers.json`、没有注册表),所以默认 agent 老实只广播一个选项,
   在 host 充实它之前 `set_config_option` 是个空切换。**多条 catalog 必须由
   host 注入**——实现**绝不可扫 env 或猜 provider 列表**。
-- **不建 `.agentao/providers.json`。** 新增一种 secret-at-rest 配置格式
+- **不建 `.arbiter/providers.json`。** 新增一种 secret-at-rest 配置格式
   与「secret 不过线」正交,只会扩大攻击面。host 想要更丰富的凭据库(如 OS
   钥匙串)或多 provider catalog,就**注入自己的 resolver / catalog**——接缝
   正是为此而设。
@@ -295,7 +295,7 @@ core)落在 **PR-4**,不延后;别名只是原方法原样保留。
 
 ## PR 落地顺序
 
-以下全部落在 agentao `main`。fork 侧事项(PyInstaller、重复传输、fork
+以下全部落在 arbiter `main`。fork 侧事项(PyInstaller、重复传输、fork
 笔记、DeepChat client 适配)**不**是这里的编号 PR —— 它们收录在下方
 「给 DeepChat fork 的建议」一节。
 
@@ -314,7 +314,7 @@ core)落在 **PR-4**,不延后;别名只是原方法原样保留。
    直接构造的 `AskUserTool`、以及 1 参 replay 内层 transport —— 都照常工作。已测试
    (`tests/test_ask_user_structured.py`)。
 3. **PR-3 —— `$HOME` 路径健壮性**(A3)。✅ **已完成** —— 在 `#55` 合并
-   (squash `0b8b4f4`)。新增 `agentao.paths.user_home()` 并把散落的 `Path.home()`
+   (squash `0b8b4f4`)。新增 `arbiter.paths.user_home()` 并把散落的 `Path.home()`
    调用点都路由过去;无 home 时的兜底是私有、按用户隔离、校验属主/权限的临时目录
    (按进程缓存)。已测试(`tests/test_paths.py`)。
 4. **PR-4 —— 最小核心 ACP 选模型修复**(B1)。只做核心 provider/model 面、不越界:
@@ -348,39 +348,39 @@ core)落在 **PR-4**,不延后;别名只是原方法原样保留。
 ## 给 DeepChat fork 的建议(advisory —— 不在 `main` 范围内)
 
 以下是**给 DeepChat / TensorChat fork 负责人的建议**,不是本方案要实现的
-工作。它们位于 embedded-harness 边界的 fork 一侧;agentao `main` 只提供
+工作。它们位于 embedded-harness 边界的 fork 一侧;arbiter `main` 只提供
 fork 要消费的接缝(`provider_resolver` / catalog 注入点、无 secret 的线缆,
 以及 PR-4 交付的厂商方法 `_agentao.cn/set_model`)。
 
-> **本节对 agentao `main` 不具规范性(non-normative)。** 除非某条日后被明确
+> **本节对 arbiter `main` 不具规范性(non-normative)。** 除非某条日后被明确
 > 提升进 A/B/D1 范围,否则不要据此创建上游 PR。
 
-- **PyInstaller 打包 & 6 平台 CI 留在 fork**(C2)。与 agentao 库优先定位
-  (`pip install agentao`)冲突;仅当项目后续单独决定发二进制时才上游。
-- **中文 fork 笔记留在 fork**(`docs/agentao/*.md`,D3)。不上游。
-- **丢弃重复 ACP 传输**(C1)。直接对接 `agentao/acp/`,别再带第二套
+- **PyInstaller 打包 & 6 平台 CI 留在 fork**(C2)。与 arbiter 库优先定位
+  (`pip install arbiter`)冲突;仅当项目后续单独决定发二进制时才上游。
+- **中文 fork 笔记留在 fork**(`docs/arbiter/*.md`,D3)。不上游。
+- **丢弃重复 ACP 传输**(C1)。直接对接 `arbiter/acp/`,别再带第二套
   `transport/acp*.py` server;该重复是无上游路径的 fork 债。
 - **丢弃 skill-creator 前端漂移**(C3)。无关前端改动;别带进集成分支。
 - **把选模型 UI 适配到无 secret 的线缆。** 把 fork UI 的 `modelId` 映射成
-  线缆 **`model`** 字段;线缆上绝不放 `apiKey` / `baseUrl` / `_meta`(agentao
+  线缆 **`model`** 字段;线缆上绝不放 `apiKey` / `baseUrl` / `_meta`(arbiter
   会拒)。凭据经 `provider_resolver` 在 server 端解析。
   - 自由「随便填模型」→ 调厂商方法 `_agentao.cn/set_model`
     (`{sessionId, model}`)。
   - catalog 驱动的选择 → 调标准 `session/set_config_option`
     (`configId="model"`、value `provider/model`)。
-- **迁移掉遗留方法。** 待 fork 消费标准 `configOptions` 路径后,agentao 退休
+- **迁移掉遗留方法。** 待 fork 消费标准 `configOptions` 路径后,arbiter 退休
   `session/list_models` 与 `session/set_model` 别名(PR-7)。该退休**以此迁移为
   闸** —— fork 的迁移就是触发条件。
-- **需要真正的 provider 切换就注入多 provider resolver + catalog。** agentao
+- **需要真正的 provider 切换就注入多 provider resolver + catalog。** arbiter
   默认单 provider(当前 `LLM_PROVIDER`)。想要多 provider 的 fork 经**构造
   kwargs / 注入接缝**(无需新设宿主协议)注入自己的 `provider_resolver` +
-  catalog —— agentao 侧不建 `providers.json`、不扫 env。
+  catalog —— arbiter 侧不建 `providers.json`、不扫 env。
 
 ## 决议(已定)
 
 六项均经带引用证据研究(见附录)。结论:
 
-1. **上游目标 → A1/A2/A3 与 B 系列核心修复上游 `agentao/main`;fork 打包(C2)
+1. **上游目标 → A1/A2/A3 与 B 系列核心修复上游 `arbiter/main`;fork 打包(C2)
    与 fork 笔记(D3)不进。** 这*不是*「整个 patch 上游」—— 只有 harness 能力
    组与 ACP 合规组落 `main`。A1(图片输入)、A3(`$HOME`)
    LOW 风险:`add_message` 拓宽到 `Union[str, List]` 向后兼容(`agent.py:724`、
@@ -389,10 +389,10 @@ fork 要消费的接缝(`provider_resolver` / catalog 注入点、无 secret 的
    回调** —— `ask_user_callback` 是 deprecated 1 参回调(`agent.py:52`),裸加新参
    会破坏 embedded host。该约束在 PR-2,不阻塞决定。
 2. **PyInstaller → 留 fork。** 与库优先定位冲突(单 console script
-   `pyproject.toml:63`;`CLAUDE.md:51`「embedded harness」;`pip install agentao`
+   `pyproject.toml:63`;`CLAUDE.md:51`「embedded harness」;`pip install arbiter`
    = 库)。发二进制是独立产品决策,不在此捆绑。
 3. **退休 → `session/list_models` 与 `session/set_model` 别名一起退(PR-7)。**
-   内部零阻塞:agentao 自己的 `acp_client` **不**调这两个 wire 方法,CLI
+   内部零阻塞:arbiter 自己的 `acp_client` **不**调这两个 wire 方法,CLI
    `/model` / `/sessions resume` 用的是 **core** `agent.set_model()` /
    `list_available_models()`(`cli/commands/provider.py:87,120`),非 wire 方法。
    PR-4 新增厂商 free-form 方法 `_agentao.cn/set_model`(决议 #4);既有
@@ -407,7 +407,7 @@ fork 要消费的接缝(`provider_resolver` / catalog 注入点、无 secret 的
    无 secret)**原样**保留一个版本作为兼容别名。DeepChat 的 adapter 把 UI 的
    `modelId` 映射成 `model` 字段 —— 统一一个字段名,线缆上不出现 `modelId`。
    落在 PR-4(DeepChat 要它才能工作)。见上「Free-form 填模型名」。
-5. **`initialize.extensions` → 挪到 `_meta`(PR-6,低优先)。** agentao 自己的
+5. **`initialize.extensions` → 挪到 `_meta`(PR-6,低优先)。** arbiter 自己的
    `acp_client` 不读 `extensions`(0 引用);只影响 schema 快照
    (`docs/schema/host.acp.v1.json`)+ `test_acp_schema.py`。改动小(加 `_meta`、
    重生快照)。不阻塞;排最后。
@@ -419,17 +419,17 @@ fork 要消费的接缝(`provider_resolver` / catalog 注入点、无 secret 的
 
 ## 附录 —— 核实证据
 
-- `agentao/llm/client.py:233` —— `def reconfigure(self, api_key, base_url=None, model=None)`。
-- `agentao/embedding/factory.py:71-77` —— `LLM_PROVIDER` + `{PROVIDER}_API_KEY/_BASE_URL/_MODEL`。
-- `agentao/acp/protocol.py:47-61` —— 方法常量;仅 `_agentao.cn/ask_user` 带厂商前缀;`set_model`/`list_models` 裸占 `session/` 命名空间。
+- `arbiter/llm/client.py:233` —— `def reconfigure(self, api_key, base_url=None, model=None)`。
+- `arbiter/embedding/factory.py:71-77` —— `LLM_PROVIDER` + `{PROVIDER}_API_KEY/_BASE_URL/_MODEL`。
+- `arbiter/acp/protocol.py:47-61` —— 方法常量;仅 `_agentao.cn/ask_user` 带厂商前缀;`set_model`/`list_models` 裸占 `session/` 命名空间。
 - ACP 规范(`agentclientprotocol.com`):无 `session/set_model`;选模型走 `session/set_config_option`(`{sessionId, configId, value}`),`ConfigOption{id,name,description,category,type,currentValue,options}`,`category ∈ {mode, model, thought_level}`(有 `model`、**无 `provider`**),`type` 仅 `select`,`value` 为 agent 自定义不透明字符串;`session/set_mode` 字段为 `modeId`,配 `availableModes` / `currentModeId`;`initialize` 响应标准字段为 `protocolVersion` / `agentCapabilities` / `agentInfo` / `authMethods` —— **无顶层 `extensions` 数组**(扩展走 `_meta`)。
 - ACP `session/update` 变体含 **`config_option_update`**(刷新 `configOptions`)与 **`current_mode_update`**(`currentModeId`);`session/new` / `session/load` 响应带初始 `configOptions` / `modes` —— 这是取代 `list_models` 的标准动态刷新路径。
-- `agentao/` 与 `docs/` 全仓无 `providers.json`(grep:0 命中)。`factory.py` 是**单 provider**:`LLM_PROVIDER` 构造期选一个;无多 provider 注册表。
-- `agentao/acp/schema.py:87-115` —— `AcpInitializeExtension` + `AcpInitializeResponse` 顶层 `extensions` 字段。`agentao/acp/initialize.py:140-145` —— 在该数组里声明 `_agentao.cn/ask_user`。
-- `agentao/acp/schema.py:306-320` —— `AcpSessionSetModeRequest.mode: Literal["read-only","workspace-write","full-access","plan"]`(非标准 `mode` 字段,锁死为权限预设)。
-- 工作树:`agentao/acp_client/` 与 `tests/test_acp_client_*.py` 在 `main` 存在;`agentao/transport/` 无 `acp.py` / `acp_server.py`;`agentao/tools/ask_user.py` 在 `main` 为 `execute(self, question)` 纯文本。
+- `arbiter/` 与 `docs/` 全仓无 `providers.json`(grep:0 命中)。`factory.py` 是**单 provider**:`LLM_PROVIDER` 构造期选一个;无多 provider 注册表。
+- `arbiter/acp/schema.py:87-115` —— `AcpInitializeExtension` + `AcpInitializeResponse` 顶层 `extensions` 字段。`arbiter/acp/initialize.py:140-145` —— 在该数组里声明 `_agentao.cn/ask_user`。
+- `arbiter/acp/schema.py:306-320` —— `AcpSessionSetModeRequest.mode: Literal["read-only","workspace-write","full-access","plan"]`(非标准 `mode` 字段,锁死为权限预设)。
+- 工作树:`arbiter/acp_client/` 与 `tests/test_acp_client_*.py` 在 `main` 存在;`arbiter/transport/` 无 `acp.py` / `acp_server.py`;`arbiter/tools/ask_user.py` 在 `main` 为 `execute(self, question)` 纯文本。
 - 决议研究(3 个 Explore agent,2026-05-29):
-  - **#3 消费方:** `agentao/acp_client/` 对 `list_models`/`set_model` **0 引用**;CLI 用 **core** `agent.set_model()`/`list_available_models()`(`cli/commands/provider.py:87,120`、`sessions.py:124`),非 wire 方法。只影响 `tests/test_acp_session_set_model.py` + 外部 client。
+  - **#3 消费方:** `arbiter/acp_client/` 对 `list_models`/`set_model` **0 引用**;CLI 用 **core** `agent.set_model()`/`list_available_models()`(`cli/commands/provider.py:87,120`、`sessions.py:124`),非 wire 方法。只影响 `tests/test_acp_session_set_model.py` + 外部 client。
   - **#4 free-form:** patch 把 DeepChat 的 `modelId` 无白名单直接传 `agent.set_model()`(patch hunk `session_set_model.py` 行 538-539、589-591);现网 `session_set_model.py:52` 只校验非空。`select` 表达不了。
   - **#1 A2 风险:** `ask_user_callback` 是 8 个 deprecated 构造回调之一,签名 `Callable[[str], str]`(`agent.py:52`);也经 `transport/sdk.py:72-75` 暴露。加参破坏 1 参 host 回调。
   - **#5 extensions:** `acp_client/` 对 `extensions` 0 引用;快照 `docs/schema/host.acp.v1.json` + `tests/test_acp_schema.py:102-125` 覆盖;`AcpInitializeResponse` 现为 `extra="forbid"`、无 `_meta` 字段。

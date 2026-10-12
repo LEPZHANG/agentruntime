@@ -1,20 +1,20 @@
-"""WeChat polling bridge: each inbound message runs one ``Agentao`` turn.
+"""WeChat polling bridge: each inbound message runs one ``Arbiter`` turn.
 
 Inspired by `Wechat-ggGitHub/wechat-claude-code`, which long-polls the
-ilink bot API from a Node daemon. Same shape, Python and Agentao
+ilink bot API from a Node daemon. Same shape, Python and Arbiter
 instead of TypeScript and the Claude Code SDK:
 
-    WeChat (phone) → ilink-style bot API → polling daemon → Agentao
+    WeChat (phone) → ilink-style bot API → polling daemon → Arbiter
 
 WeChat has no de-facto Python SDK — production deployments wire any
 client (ilink HTTP, wechaty, itchat, custom hooks) behind the
 ``WeChatClient`` Protocol below. The example is dependency-free
-beyond ``agentao`` so the offline smoke test runs in CI without a
+beyond ``arbiter`` so the offline smoke test runs in CI without a
 phone, a QR-code login, or a third-party network call.
 
 Heavy-handed simplifications: one in-process daemon (no HA), agent
 constructed per inbound message (pool per ``contact_id`` for higher
-throughput), reply sent in one shot (use ``Agentao.events()`` if you
+throughput), reply sent in one shot (use ``Arbiter.events()`` if you
 want streaming previews like the reference repo).
 """
 
@@ -27,9 +27,9 @@ import tempfile
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional, Protocol
 
-from agentao import Agentao
-from agentao.llm import LLMClient
-from agentao.permissions import PermissionEngine, PermissionMode
+from arbiter import Arbiter
+from arbiter.llm import LLMClient
+from arbiter.permissions import PermissionEngine, PermissionMode
 
 
 # Allowlist holds wxid contact ids (e.g. ``wxid_owner_self``) and group
@@ -70,7 +70,7 @@ def make_permission_engine_for_contact(
 ) -> PermissionEngine:
     """Build a ``PermissionEngine`` rooted at ``project_root``.
 
-    The engine reads ``<project_root>/.agentao/permissions.json`` if
+    The engine reads ``<project_root>/.arbiter/permissions.json`` if
     present and falls back to no project rules otherwise — so the
     caller need not pre-create that file.
     """
@@ -105,8 +105,8 @@ async def handle_message(
     is the test seam — production reads from env, smoke tests inject a
     fake.
     """
-    work_dir = Path(tempfile.mkdtemp(prefix="agentao-wechat-"))
-    agent = Agentao(
+    work_dir = Path(tempfile.mkdtemp(prefix="arbiter-wechat-"))
+    agent = Arbiter(
         working_directory=work_dir,
         llm_client=llm_client_factory(),
         permission_engine=make_permission_engine_for_contact(

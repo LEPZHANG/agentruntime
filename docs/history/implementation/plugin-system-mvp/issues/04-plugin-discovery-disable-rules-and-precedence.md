@@ -10,8 +10,8 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Scope
 
-- `<home>/.agentao/plugins`
-- `<project-root>/.agentao/plugins`
+- `<home>/.arbiter/plugins`
+- `<project-root>/.arbiter/plugins`
 - `--plugin-dir`
 - `plugins_config.json`
 - `discover_candidates()`
@@ -20,7 +20,7 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Deliverables
 
-- `agentao/plugins/manager.py`
+- `arbiter/plugins/manager.py`
 - discovery/preference 单测
 
 ## Dependencies

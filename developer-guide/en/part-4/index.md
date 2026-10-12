@@ -6,7 +6,7 @@ The only interface between the agent runtime and your UI is the **Transport**. T
 - **Transport** — push interface (`emit` / `ask_confirmation` / `ask_user` / `bailout`); the only seam between runtime and your UI · [§4.1](/en/part-4/1-transport-protocol), [G.2](/en/appendix/g-glossary#g-2-extension-points)
 - **AgentEvent** — internal event types (text chunk, tool started/completed, LLM call) — debug only, **not stable across releases** · [§4.2](/en/part-4/2-agent-events), [G.6](/en/appendix/g-glossary#g-6-event-types-quick-reference)
 - **HostEvent** — Pydantic-typed lifecycle event (tool / permission / subagent); **stable**, with schema snapshots · [§4.7](/en/part-4/7-host-contract), [G.1](/en/appendix/g-glossary#g-1-core-concepts)
-- **`agent.events()`** — async pull iterator on the *stable* `agentao.host` surface; use for audit / SIEM / billing · [§4.7](/en/part-4/7-host-contract)
+- **`agent.events()`** — async pull iterator on the *stable* `arbiter.host` surface; use for audit / SIEM / billing · [§4.7](/en/part-4/7-host-contract)
 - **`active_permissions()`** — JSON-safe snapshot of the effective policy; use for "who can do what" UIs · [§4.7](/en/part-4/7-host-contract#the-active-permissions-snapshot), [G.5](/en/appendix/g-glossary#g-5-security-vocabulary)
 :::
 

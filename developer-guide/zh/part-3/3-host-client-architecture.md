@@ -1,6 +1,6 @@
 # 3.3 宿主作为 ACP 客户端 — 架构
 
-[3.2](./2-agentao-as-server) 讲了线协议。本节讲**围绕它要搭的那套机器**：子进程生命周期、stdio IO 回路、并发、权限 UI 桥接，以及跨语言的形态。任何能起子进程 + 读写 stdio 的语言都能做——下面给了 Node/TypeScript 和 Go 的示例。
+[3.2](./2-arbiter-as-server) 讲了线协议。本节讲**围绕它要搭的那套机器**：子进程生命周期、stdio IO 回路、并发、权限 UI 桥接，以及跨语言的形态。任何能起子进程 + 读写 stdio 的语言都能做——下面给了 Node/TypeScript 和 Go 的示例。
 
 ## 3.3.1 一个 ACP 宿主的六件事
 
@@ -13,7 +13,7 @@
 | **分发** | 根据 JSON 形状路由：response / notification / server→client request |
 | **匹配** | 把 response 关联回当初那个 request 的 `id` |
 | **UI 桥接** | 展示 `session/request_permission` 提示，把结果回传 |
-| **观测** | 每个 RPC 都记日志；需要深挖时 tail agent 的 `agentao.log` |
+| **观测** | 每个 RPC 都记日志；需要深挖时 tail agent 的 `arbiter.log` |
 
 生产环境一个都不能省。
 
@@ -39,7 +39,7 @@
 └──────────────────────────────────────────────────────────┘
                      ▲ stdio
                      │
-           agentao --acp --stdio（子进程）
+           arbiter --acp --stdio（子进程）
 ```
 
 为什么是三个？因为处理消息时**不能**阻塞读端——agent 的下一条通知已经来了。要解耦：
@@ -99,7 +99,7 @@ export class ACPClient {
     async () => ({ result: { outcome: { outcome: "cancelled" } } });
 
   async start() {
-    this.proc = spawn("agentao", ["--acp", "--stdio"], {
+    this.proc = spawn("arbiter", ["--acp", "--stdio"], {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
@@ -107,8 +107,8 @@ export class ACPClient {
     rl.on("line", (line) => this.dispatch(line));
 
     this.proc.stderr.on("data", (chunk) => {
-      // agentao 的日志在这里；转给你的 logger
-      process.stderr.write(`[agentao] ${chunk}`);
+      // arbiter 的日志在这里；转给你的 logger
+      process.stderr.write(`[arbiter] ${chunk}`);
     });
 
     await this.call("initialize", {
@@ -211,7 +211,7 @@ type Client struct {
 }
 
 func Start() (*Client, error) {
-    cmd := exec.Command("agentao", "--acp", "--stdio")
+    cmd := exec.Command("arbiter", "--acp", "--stdio")
     stdin, _ := cmd.StdinPipe()
     stdout, _ := cmd.StdoutPipe()
     if err := cmd.Start(); err != nil { return nil, err }
@@ -303,7 +303,7 @@ ACP server 会死。宿主必须扛得住：
 | 进程非零退出 | 子进程 `exit` 事件 | 抛错上浮；别在不知道为什么时自动重启 |
 | stdout EOF / 流关闭 | 读回路收到 EOF | 把所有 pending 请求标记失败；不要泄漏它们的 future |
 | 无响应（N 秒没回） | 每请求定时器 | 让那条请求失败；看要不要顺带发 `session/cancel` |
-| `initialize` 返回了更低版本 | response payload | Agentao 会回 `protocolVersion=1`；你发了 `2` 也要接受降级 |
+| `initialize` 返回了更低版本 | response payload | Arbiter 会回 `protocolVersion=1`；你发了 `2` 也要接受降级 |
 | JSON 解析失败 | 读端异常 | 日志大声喊；丢掉那行（别崩） |
 
 重启策略：开发期**别**自动重启（bug 会被掩盖）。生产上指数退避 + 熔断器。每次重启起一个新的 ACP 进程；已有 `sessionId` 会丢——除非重连时用 `session/load` 恢复。
@@ -313,7 +313,7 @@ ACP server 会死。宿主必须扛得住：
 - 每条 outgoing 请求记 `id`、`method`、`params`（大 payload 截断）
 - 每条 incoming 响应记 `id` + `duration_ms`
 - 在调试面板展示 `session/update` 流
-- 需要深挖时 tail `<session_cwd>/agentao.log`——stack trace 在那边
+- 需要深挖时 tail `<session_cwd>/arbiter.log`——stack trace 在那边
 - 告警：RPC 超时率、进程重启次数、权限弹窗超时率
 
 ---

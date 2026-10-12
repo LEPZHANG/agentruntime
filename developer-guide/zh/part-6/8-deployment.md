@@ -29,7 +29,7 @@ WORKDIR /app
 COPY --from=builder --chown=agent:agent /app/.venv /app/.venv
 COPY --chown=agent:agent your_app/ ./your_app/
 COPY --chown=agent:agent skills/ ./skills/
-COPY --chown=agent:agent AGENTAO.md ./
+COPY --chown=agent:agent ARBITER.md ./
 
 # 只读根，可写的只有这些
 RUN mkdir -p /data /tmp/agent && chown agent:agent /data /tmp/agent
@@ -44,7 +44,7 @@ ENV PYTHONPATH=/app \
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-    CMD python -c "from agentao import Agentao; print('ok')" || exit 1
+    CMD python -c "from arbiter import Arbiter; print('ok')" || exit 1
 
 # 入口——根据你的封装
 CMD ["python", "-m", "your_app.server"]
@@ -85,7 +85,7 @@ services:
     cpus: 1.0
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "from agentao import Agentao"]
+      test: ["CMD", "python", "-c", "from arbiter import Arbiter"]
       interval: 30s
       timeout: 5s
 ```
@@ -128,7 +128,7 @@ spec:
           mountPath: /tmp
         livenessProbe:
           exec:
-            command: ["python", "-c", "from agentao import Agentao"]
+            command: ["python", "-c", "from arbiter import Arbiter"]
           periodSeconds: 30
       volumes:
       - name: tmp
@@ -153,15 +153,15 @@ Agent 产品**可以独立灰度**的维度比普通服务多得多：
 | **模型版本** | 小流量切新模型观察 | 中——行为可能变 |
 | **代码版本** | 常规蓝绿/金丝雀 | 中——同普通服务 |
 | **技能** | `skills/` 目录按租户分叉 | 低 |
-| **权限规则** | `.agentao/permissions.json` 渐进收紧 | 高——规则松变紧可能挡掉合法工具 |
-| **沙箱 profile** | `.agentao/sandbox.json` 改 default | 高——错配全停 |
-| **AGENTAO.md** | 项目级改动 | 中——影响所有指令遵从性 |
+| **权限规则** | `.arbiter/permissions.json` 渐进收紧 | 高——规则松变紧可能挡掉合法工具 |
+| **沙箱 profile** | `.arbiter/sandbox.json` 改 default | 高——错配全停 |
+| **ARBITER.md** | 项目级改动 | 中——影响所有指令遵从性 |
 
-**建议节奏**：模型和技能可**周级**灰度；规则/沙箱/AGENTAO.md 改动必须**全面测试 + 灰度 + 回滚预案**。
+**建议节奏**：模型和技能可**周级**灰度；规则/沙箱/ARBITER.md 改动必须**全面测试 + 灰度 + 回滚预案**。
 
 ## 模型切换策略
 
-Agentao 支持运行时切换（[2.3 节](/zh/part-2/3-lifecycle)）：
+Arbiter 支持运行时切换（[2.3 节](/zh/part-2/3-lifecycle)）：
 
 ```python
 # 某些用户用新模型观察
@@ -185,7 +185,7 @@ Agent 的改动容易**用户看不到问题但积累中**（比如行为漂移�
 | 模型表现变差 | 切回旧模型 ID | < 1 min |
 | 技能写错 | git revert + 重启 | < 10 min |
 
-**实现**：关键配置进 git（`.agentao/*.json`、`skills/`、`AGENTAO.md`），任何改动有 commit，能立即 revert。
+**实现**：关键配置进 git（`.arbiter/*.json`、`skills/`、`ARBITER.md`），任何改动有 commit，能立即 revert。
 
 ## 会话迁移（优雅 pod 下线）
 
@@ -213,7 +213,7 @@ def on_sigterm(signum, frame):
 | 阶段 | 测试 |
 |------|-----|
 | 构建 | 单元测试（工具、技能 YAML 格式） |
-| 打包前 | 系统提示长度、AGENTAO.md 无密钥扫描 |
+| 打包前 | 系统提示长度、ARBITER.md 无密钥扫描 |
 | 部署前 | 红队 prompt 注入测试（[6.5](./5-secrets-injection)） |
 | 预发 | 完整用户旅程 smoke test |
 | 生产 | 持续的 canary session（每小时固定 prompt 对比输出） |

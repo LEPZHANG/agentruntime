@@ -1,4 +1,4 @@
-"""One ``Agentao`` per kernel; ``events()`` drives a notebook display.
+"""One ``Arbiter`` per kernel; ``events()`` drives a notebook display.
 
 The notebook (``session.ipynb``) calls :func:`build_session` once at
 the top, then runs cells that invoke :func:`turn` and
@@ -14,16 +14,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from agentao import Agentao
-from agentao.host.models import HostEvent
-from agentao.llm import LLMClient
+from arbiter import Arbiter
+from arbiter.host.models import HostEvent
+from arbiter.llm import LLMClient
 
 
 @dataclass
 class KernelSession:
     """Kernel-scoped state. Construct once per notebook."""
 
-    agent: Agentao
+    agent: Arbiter
     history: list[HostEvent] = field(default_factory=list)
 
 
@@ -32,7 +32,7 @@ def build_session(
     llm_client: Optional[LLMClient] = None,
     working_directory: Optional[Path] = None,
 ) -> KernelSession:
-    """Construct an Agentao for the kernel lifetime.
+    """Construct an Arbiter for the kernel lifetime.
 
     Pass ``llm_client`` to inject a fake or pre-configured LLM
     (the smoke test uses this; a real notebook reads from env).
@@ -45,8 +45,8 @@ def build_session(
             base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
             model=os.environ.get("OPENAI_MODEL", "gpt-5.5"),
         )
-    wd = working_directory or Path(tempfile.mkdtemp(prefix="agentao-jupyter-"))
-    agent = Agentao(working_directory=wd, llm_client=llm_client)
+    wd = working_directory or Path(tempfile.mkdtemp(prefix="arbiter-jupyter-"))
+    agent = Arbiter(working_directory=wd, llm_client=llm_client)
     return KernelSession(agent=agent)
 
 

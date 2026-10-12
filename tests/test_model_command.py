@@ -1,8 +1,8 @@
 """Tests for model switching functionality.
 
 This test runs offline in CI and can use the live provider locally.
-Set ``AGENTAO_TEST_LIVE_MODELS=0`` to force offline mode locally.
-Set ``AGENTAO_TEST_LIVE_MODELS=1`` to force live mode explicitly.
+Set ``ARBITER_TEST_LIVE_MODELS=0`` to force offline mode locally.
+Set ``ARBITER_TEST_LIVE_MODELS=1`` to force live mode explicitly.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from agentao.agent import Agentao
+from arbiter.agent import Arbiter
 
 
 _FAKE_KEY = "test-key"
@@ -26,7 +26,7 @@ def _has_fake_openai_key() -> bool:
 
 def _use_live_models() -> bool:
     """Return whether the test should call the configured model API."""
-    env = os.getenv("AGENTAO_TEST_LIVE_MODELS")
+    env = os.getenv("ARBITER_TEST_LIVE_MODELS")
     if env is not None:
         return env.strip().lower() in {"1", "true", "yes", "on"}
     # If the default provider only has a placeholder key (often injected by
@@ -37,7 +37,7 @@ def _use_live_models() -> bool:
     return os.getenv("GITHUB_ACTIONS") != "true"
 
 
-def _build_agent() -> Agentao:
+def _build_agent() -> Arbiter:
     """Create an agent without clobbering any real local credentials.
 
     LLMClient reads credentials for whatever provider LLM_PROVIDER points at
@@ -47,7 +47,7 @@ def _build_agent() -> Agentao:
     """
     os.environ.setdefault("LLM_PROVIDER", "OPENAI")
     os.environ.setdefault("OPENAI_API_KEY", _FAKE_KEY)
-    return Agentao(working_directory=Path.cwd())
+    return Arbiter(working_directory=Path.cwd())
 
 
 def test_model_switching_flow(monkeypatch: pytest.MonkeyPatch) -> None:

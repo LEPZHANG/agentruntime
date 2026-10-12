@@ -10,7 +10,7 @@ check mis-sizes the new history (spurious or skipped compaction). The fix calls
 
 from unittest.mock import Mock
 
-from agentao.context_manager import ContextManager
+from arbiter.context_manager import ContextManager
 
 
 def _make_mock_llm():
@@ -21,7 +21,7 @@ def _make_mock_llm():
 
 
 def test_resume_session_invalidates_token_anchor(monkeypatch):
-    from agentao.cli.commands import sessions as sess_mod
+    from arbiter.cli.commands import sessions as sess_mod
 
     cm = ContextManager(_make_mock_llm(), Mock(), max_tokens=1_000)
     # Stale anchor from a prior conversation in this process.
@@ -36,11 +36,11 @@ def test_resume_session_invalidates_token_anchor(monkeypatch):
     cli.agent.working_directory = "."
 
     monkeypatch.setattr(
-        "agentao.embedding.sessions.list_sessions",
+        "arbiter.embedding.sessions.list_sessions",
         lambda project_root=None: [{"id": "s1", "session_id": "s1", "title": "t"}],
     )
     monkeypatch.setattr(
-        "agentao.embedding.sessions.load_session",
+        "arbiter.embedding.sessions.load_session",
         lambda sid, project_root=None: (resumed, "saved-model", []),
     )
 

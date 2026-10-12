@@ -12,7 +12,7 @@ import sys
 
 import pytest
 
-import agentao
+import arbiter
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only contract")
@@ -21,7 +21,7 @@ def test_ensure_utf8_noop_on_posix(monkeypatch):
     sentinel = object()
     monkeypatch.setattr(sys.stdout, "reconfigure", lambda **_: sentinel, raising=False)
 
-    agentao._ensure_utf8()
+    arbiter._ensure_utf8()
 
     assert "PYTHONIOENCODING" not in os.environ
     # ``reconfigure`` must NOT have been called — if the function ran past
@@ -32,5 +32,5 @@ def test_ensure_utf8_noop_on_posix(monkeypatch):
 
 def test_ensure_utf8_is_idempotent():
     """Calling multiple times must not raise; relevant on hosts that re-import."""
-    agentao._ensure_utf8()
-    agentao._ensure_utf8()
+    arbiter._ensure_utf8()
+    arbiter._ensure_utf8()

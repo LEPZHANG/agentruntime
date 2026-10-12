@@ -1,9 +1,9 @@
 # 附录 D · AcpErrorCode 参考
 
-当 Agentao 被当作 **ACP 客户端**（`from agentao.acp_client import ACPManager`）使用时，所有失败都会以 `AcpClientError`（或其子类）抛出，携带结构化 `code: AcpErrorCode`。分支判断请用 `code` 而非消息字符串——消息不稳定。
+当 Arbiter 被当作 **ACP 客户端**（`from arbiter.acp_client import ACPManager`）使用时，所有失败都会以 `AcpClientError`（或其子类）抛出，携带结构化 `code: AcpErrorCode`。分支判断请用 `code` 而非消息字符串——消息不稳定。
 
 ```python
-from agentao.acp_client import ACPManager, AcpClientError, AcpErrorCode
+from arbiter.acp_client import ACPManager, AcpClientError, AcpErrorCode
 
 try:
     result = manager.prompt_once(name="x", prompt="hi", timeout=30)
@@ -22,7 +22,7 @@ except AcpClientError as e:
 
 | 代码 | 典型原因 | 处置 |
 |------|----------|------|
-| `config_invalid` | `.agentao/acp.json` 格式错、缺必填字段、env 变量展开失败 | 校验 JSON；打印 `e.details`——含 `server` 及出问题的字段 |
+| `config_invalid` | `.arbiter/acp.json` 格式错、缺必填字段、env 变量展开失败 | 校验 JSON；打印 `e.details`——含 `server` 及出问题的字段 |
 | `server_not_found` | `prompt_once(name=...)` / `start_server(name=...)` 传了未声明的名字 | `ACPManager().get_status()` 看已声明名字 |
 | `process_start_fail` | `command` 不在 PATH、无可执行权限、子进程启动时崩 | 看 `e.cause` 与 `e.details['stderr']`；手动跑 `command` + `args` 复现 |
 | `handshake_fail` | 服务器进程启动了但 `initialize` / `session/new` 阶段失败（setup 阶段的 protocol/transport/timeout）。**manager 对非 RPC `AcpClientError` 会自动重分类**：把 `code` 从 `PROTOCOL_ERROR` / `TRANSPORT_DISCONNECT` / `REQUEST_TIMEOUT` 改成 `HANDSHAKE_FAIL`，同时把原 code 保存到 `details["underlying_code"]`——这样 `case HANDSHAKE_FAIL` 分支继续命中，调用方也能进一步区分底层原因（见 §D.7）。`AcpRpcError` **不会**被改 code（见 §D.2 合约）；RPC 握手失败请用 `isinstance(err, AcpRpcError) and err.details["phase"] == "handshake"` 识别。 | 查服务器日志；`details["underlying_code"]` 告诉你根因是超时、断连、还是协议错 |
@@ -44,7 +44,7 @@ except AcpClientError as e:
 `AcpRpcError` 的 `error_code` 永远是 `AcpErrorCode.PROTOCOL_ERROR`——那是它的分类。需要数值码时明确读 `rpc_code`：
 
 ```python
-from agentao.acp_client import AcpRpcError
+from arbiter.acp_client import AcpRpcError
 
 try:
     ...
@@ -124,7 +124,7 @@ AcpClientError                           # 基类——有 .code / .details / .c
 两支都会打 `details["phase"] = "handshake"`，所以这个键是跨子类的规范判定——而老代码里的 `case AcpErrorCode.HANDSHAKE_FAIL:` 对非 RPC 路径依旧继续工作。
 
 ```python
-from agentao.acp_client import AcpClientError, AcpErrorCode, AcpRpcError
+from arbiter.acp_client import AcpClientError, AcpErrorCode, AcpRpcError
 
 try:
     manager.connect_server("x", timeout=30)

@@ -27,7 +27,7 @@ Embedding an agent into your product isn't about one security boundary — it's 
               ▼
   ┌─────────────────────────────┐
   │ 3. Prompt-injection defense │  "Can user input override LLM rules?"
-  │    (AGENTAO.md constraints, │
+  │    (ARBITER.md constraints, │
   │     tool-output tagging)    │
   └─────────────────────────────┘
               │
@@ -82,7 +82,7 @@ Embedding an agent into your product isn't about one security boundary — it's 
 |-------|-------|-----------|
 | 1. Access control | Your app | When users/roles change |
 | 2. Credentials | DevOps | On issuance / rotation |
-| 3. Prompt-injection defense | Developers (AGENTAO.md) | Design time |
+| 3. Prompt-injection defense | Developers (ARBITER.md) | Design time |
 | 4. Permission rules | Developers + security | Each new tool |
 | 5. Confirmation UI | Frontend developers | Design time |
 | 6. Shell sandbox | Platform team | Config time |
@@ -97,7 +97,7 @@ Embedding an agent into your product isn't about one security boundary — it's 
 2. `PermissionEngine` on `WORKSPACE_WRITE` preset
 3. `working_directory=` per session
 4. Basic `confirm_tool` implementation
-5. Default `agentao.log`
+5. Default `arbiter.log`
 
 Enough for demos and internal use, not customer-facing.
 
@@ -116,11 +116,11 @@ Subsequent sections land each layer.
 
 ## Pre-deployment checklist
 
-- [ ] No credentials hard-coded in code or AGENTAO.md
+- [ ] No credentials hard-coded in code or ARBITER.md
 - [ ] `PermissionEngine` rules cover every custom tool and MCP server
 - [ ] `confirm_tool` has a timeout (no infinite wait)
 - [ ] `working_directory` isolated per session
-- [ ] `agentao.log` path is writable and persisted
+- [ ] `arbiter.log` path is writable and persisted
 - [ ] Unit tests cover "expected rule hits"
 - [ ] Alerts: tool failure rate, LLM 5xx rate, confirm-timeout rate
 

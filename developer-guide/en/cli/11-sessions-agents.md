@@ -4,7 +4,7 @@ This page covers the REPL commands that behave like a workbench: resume saved se
 
 ## `/sessions` — saved sessions
 
-`/exit`, `/clear`, and `/new` save the current session under `.agentao/sessions/`. The restore entry point is `/sessions`, not replay.
+`/exit`, `/clear`, and `/new` save the current session under `.arbiter/sessions/`. The restore entry point is `/sessions`, not replay.
 
 ```text
 > /sessions
@@ -23,13 +23,13 @@ This page covers the REPL commands that behave like a workbench: resume saved se
 You can also resume at launch:
 
 ```bash
-agentao --resume          # latest session
-agentao --resume a1b2c3   # matching prefix
+arbiter --resume          # latest session
+arbiter --resume a1b2c3   # matching prefix
 ```
 
 ## `/agent` and `/agents` — sub-agents
 
-Sub-agents are predefined capabilities that can run in the foreground or background. Built-ins live under `agentao/agents/definitions/`, and plugins can register more.
+Sub-agents are predefined capabilities that can run in the foreground or background. Built-ins live under `arbiter/agents/definitions/`, and plugins can register more.
 
 ```text
 > /agent
@@ -86,5 +86,5 @@ Use this when debugging “why didn't the agent call that tool”: first confirm
 ---
 
 ::: tip Authoritative help
-Command syntax: `/help`. Session restore: [`agentao/cli/commands.py:handle_sessions_command`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands.py). Sub-agents: [`agentao/cli/commands_ext/agents.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands_ext/agents.py). Tool listing: [`agentao/cli/commands.py:handle_tools_command`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands.py).
+Command syntax: `/help`. Session restore: [`arbiter/cli/commands.py:handle_sessions_command`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands.py). Sub-agents: [`arbiter/cli/commands_ext/agents.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands_ext/agents.py). Tool listing: [`arbiter/cli/commands.py:handle_tools_command`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands.py).
 :::

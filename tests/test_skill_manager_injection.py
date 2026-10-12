@@ -18,16 +18,16 @@ def test_injected_skill_manager_used_verbatim(tmp_path):
     fake_manager.disabled_skills = set()
     fake_manager.get_active_skills = Mock(return_value={})
 
-    with patch("agentao.agent.LLMClient") as mock_llm_cls, \
-         patch("agentao.tooling.mcp_tools.load_mcp_config", return_value={}), \
-         patch("agentao.tooling.mcp_tools.McpClientManager"), \
-         patch("agentao.agent.SkillManager") as mock_default_cls:
+    with patch("arbiter.agent.LLMClient") as mock_llm_cls, \
+         patch("arbiter.tooling.mcp_tools.load_mcp_config", return_value={}), \
+         patch("arbiter.tooling.mcp_tools.McpClientManager"), \
+         patch("arbiter.agent.SkillManager") as mock_default_cls:
         mock_llm_cls.return_value.logger = Mock()
         mock_llm_cls.return_value.model = "gpt-test"
 
-        from agentao.agent import Agentao
+        from arbiter.agent import Arbiter
 
-        agent = Agentao(
+        agent = Arbiter(
             working_directory=tmp_path,
             skill_manager=fake_manager,
         )

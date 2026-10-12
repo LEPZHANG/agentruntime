@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start kanban daemon with --executor agentao (REAL sub-agents) + Web UI.
+# Start kanban daemon with --executor arbiter (REAL sub-agents) + Web UI.
 # Caller MUST already have explicit user confirmation. Refuses to attach to
 # an already-running daemon since the executor is fixed at daemon start.
 # Env: BOARD (default workspace/board), PORT (default 8000).
@@ -19,8 +19,8 @@ if uv run kanban daemon status 2>&1 | grep -E '^status:[[:space:]]+running' >/de
   exit 2
 fi
 
-uv run kanban --executor agentao daemon --detach
-echo "daemon: started (--executor agentao)"
+uv run kanban --executor arbiter daemon --detach
+echo "daemon: started (--executor arbiter)"
 
 PID_FILE="$BOARD/.web.pid"
 if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then

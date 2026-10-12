@@ -5,7 +5,7 @@
 > - Routing patterns: cheap-vs-expensive, primary-with-fallback, A/B
 > - Why there's no `OpenAIProvider` / `AnthropicProvider` abstraction
 
-One running `Agentao` is bound to one LLM at construction. But you often want to **change which model answers the next turn**: route cheap models for small talk, expensive models for planning, fall back to a secondary provider when the primary times out. This section covers the three public APIs that let you do that without rebuilding the agent.
+One running `Arbiter` is bound to one LLM at construction. But you often want to **change which model answers the next turn**: route cheap models for small talk, expensive models for planning, fall back to a secondary provider when the primary times out. This section covers the three public APIs that let you do that without rebuilding the agent.
 
 ## 2.5.1 The three methods
 
@@ -36,7 +36,7 @@ All four are **synchronous** and cheap (no network traffic on `set_*`). They onl
 | LLM client's `model`, `api_key`, `base_url` | `agent.messages` (full history) |
 | tiktoken encoding (for token accounting) | Active skills |
 | Token accounting cache (`_last_api_prompt_tokens` is invalidated) | Memory (both scopes) |
-| `agentao.log` line `"Model changed from X to Y"` | Working directory / transport / MCP |
+| `arbiter.log` line `"Model changed from X to Y"` | Working directory / transport / MCP |
 
 **Important**: conversation history is **not cleared**. The new model sees all prior turns the old model saw, including every tool-call trace. If you don't want that context bleed, call `clear_history()` **before** swapping.
 
@@ -49,7 +49,7 @@ CHEAP_MODEL     = "gpt-5.4"
 SMART_MODEL     = "gpt-5.4"
 SMART_KEYWORDS  = ("plan", "design", "refactor", "architecture")
 
-def route(agent: Agentao, user_message: str) -> str:
+def route(agent: Arbiter, user_message: str) -> str:
     wants_smart = any(kw in user_message.lower() for kw in SMART_KEYWORDS)
     target = SMART_MODEL if wants_smart else CHEAP_MODEL
     if agent.get_current_model() != target:
@@ -66,7 +66,7 @@ PROVIDERS = [
     {"api_key": os.environ["MOONSHOT_API_KEY"], "base_url": "https://api.moonshot.cn/v1","model": "moonshot-v1-8k"},
 ]
 
-def chat_with_fallback(agent: Agentao, msg: str) -> str:
+def chat_with_fallback(agent: Arbiter, msg: str) -> str:
     last_err = None
     for p in PROVIDERS:
         try:
@@ -83,8 +83,8 @@ Note: this retries **the same turn** on the next provider. Because history is pr
 ### Per-tenant model choice (SaaS)
 
 ```python
-def build_agent_for(tenant: Tenant) -> Agentao:
-    agent = Agentao(
+def build_agent_for(tenant: Tenant) -> Arbiter:
+    agent = Arbiter(
         working_directory=tenant.workdir,
         model=tenant.plan.default_model,     # "gpt-5.4" or "gpt-5.4"
     )
@@ -106,7 +106,7 @@ real_reply = agent.chat(msg)
 log_ab(real=real_reply, shadow=shadow_reply)
 ```
 
-⚠️ Calling `chat()` twice per user turn doubles cost and appends **two** assistant responses to history. For proper A/B tests use **two separate `Agentao` instances** and replay the same prompt.
+⚠️ Calling `chat()` twice per user turn doubles cost and appends **two** assistant responses to history. For proper A/B tests use **two separate `Arbiter` instances** and replay the same prompt.
 
 ## 2.5.4 `list_available_models()` — when and when not to call
 
@@ -137,7 +137,7 @@ except RuntimeError:
    `set_provider()` rewrites the tiktoken encoding to match the new model name. But OpenAI's tokenizer is still used for non-OpenAI providers (there's no universal tokenizer). Budget estimates on DeepSeek / Moonshot / Qwen are therefore **approximate**. Leave headroom.
 
 2. **Tool-call schema is provider-dependent**
-   All Agentao-supported providers must speak the **OpenAI-compatible** tool-calls schema. If you swap to a provider that doesn't, `chat()` will either error ("function not supported") or silently drop the tool call. Test each provider in your fallback chain.
+   All Arbiter-supported providers must speak the **OpenAI-compatible** tool-calls schema. If you swap to a provider that doesn't, `chat()` will either error ("function not supported") or silently drop the tool call. Test each provider in your fallback chain.
 
 3. **Streaming behavior may differ**
    Some providers send smaller/larger chunks or delay the first token. UI-perceived latency can change noticeably after a swap. Your `Transport.emit(...)` still fires — but chunk boundaries are different.
@@ -150,9 +150,9 @@ except RuntimeError:
 
 ## 2.5.6 Why provider is not a construction arg
 
-You might notice `Agentao(...)` takes `api_key / base_url / model` directly but no abstract `provider=` parameter. That's deliberate:
+You might notice `Arbiter(...)` takes `api_key / base_url / model` directly but no abstract `provider=` parameter. That's deliberate:
 
-- Agentao speaks only the OpenAI-compatible protocol
+- Arbiter speaks only the OpenAI-compatible protocol
 - Any provider (OpenAI, Azure, DeepSeek, Moonshot, Together, local Ollama, vLLM…) that exposes the OpenAI schema is a valid target
 - "Switching provider" is just "switching key + base_url + model"
 

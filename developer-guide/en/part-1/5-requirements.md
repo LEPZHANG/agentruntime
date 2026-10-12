@@ -5,7 +5,7 @@
 > - Which extras to install for the features you want
 > - A 7-line checklist to verify your environment is ready
 
-Verify your environment before embedding Agentao.
+Verify your environment before embedding Arbiter.
 
 ## Python version
 
@@ -15,31 +15,31 @@ Verify your environment before embedding Agentao.
 
 ## Package management
 
-Agentao's own repo uses **`uv`**. When embedding, **pip is fine** — `agentao` is a standard PyPI package.
+Arbiter's own repo uses **`uv`**. When embedding, **pip is fine** — `arbiter` is a standard PyPI package.
 
-Starting in 0.4.0, `pip install agentao` ships only the embedding core; pick the
+Starting in 0.4.0, `pip install arbiter` ships only the embedding core; pick the
 install line that matches your usage:
 
 ```bash
-# Embedding host (`from agentao import Agentao`) — minimum closure
-pip install agentao
+# Embedding host (`from arbiter import Arbiter`) — minimum closure
+pip install arbiter
 
 # Need the web_fetch / web_search tools — adds beautifulsoup4
-pip install 'agentao[web]'
+pip install 'arbiter[web]'
 
 # Need Chinese-text memory recall — adds jieba
-pip install 'agentao[i18n]'
+pip install 'arbiter[i18n]'
 
-# CLI users (the `agentao` console script) — adds rich/prompt-toolkit/readchar/pygments
-pip install 'agentao[cli]'
+# CLI users (the `arbiter` console script) — adds rich/prompt-toolkit/readchar/pygments
+pip install 'arbiter[cli]'
 
 # uv users mirror the same pattern
-uv add 'agentao[cli]'
+uv add 'arbiter[cli]'
 ```
 
 ## LLM credentials
 
-Agentao calls LLMs through an OpenAI-compatible interface. Configure at least one credential set:
+Arbiter calls LLMs through an OpenAI-compatible interface. Configure at least one credential set:
 
 | Env var | Purpose | Example |
 |--------|---------|---------|
@@ -74,44 +74,44 @@ Agentao calls LLMs through an OpenAI-compatible interface. Configure at least on
 ## Network
 
 - **Outbound**: LLM calls hit your configured `base_url`; some tools (`web_fetch`, `web_search`) hit the public internet
-- **Inbound**: **none**. Agentao does not listen on a port; ACP mode uses stdio
+- **Inbound**: **none**. Arbiter does not listen on a port; ACP mode uses stdio
 - **MCP SSE servers**: if you use SSE-based MCP servers, the host must reach their URLs
 
 ## Disk layout
 
-When embedded, Agentao reads/writes these paths:
+When embedded, Arbiter reads/writes these paths:
 
 | Path | Purpose | Can disable? |
 |------|---------|--------------|
-| `<working_directory>/.agentao/` | Project-level config (MCP, permissions, memory) | Constrained by permission rules |
-| `<working_directory>/AGENTAO.md` | Project instructions (you write this) | Skip the file and nothing loads |
-| `<working_directory>/agentao.log` | Runtime log | Disable via custom logger |
-| `~/.agentao/` | User-level config, memory | Relocate or skip |
+| `<working_directory>/.arbiter/` | Project-level config (MCP, permissions, memory) | Constrained by permission rules |
+| `<working_directory>/ARBITER.md` | Project instructions (you write this) | Skip the file and nothing loads |
+| `<working_directory>/arbiter.log` | Runtime log | Disable via custom logger |
+| `~/.arbiter/` | User-level config, memory | Relocate or skip |
 
 In production, set `<working_directory>` to a **per-tenant / per-session temp dir** so sessions stay isolated (Part 7.1 covers this).
 
 ## Optional dependencies
 
 Capabilities split into extras post-0.4.0; combine them with comma syntax
-(`agentao[cli,web]`):
+(`arbiter[cli,web]`):
 
 ```bash
 # CLI / interactive UI (P0.9 demoted these from the bundled core)
-pip install 'agentao[cli]'       # rich + prompt-toolkit + readchar + pygments
-pip install 'agentao[web]'       # beautifulsoup4 — required for web_fetch / web_search
-pip install 'agentao[i18n]'      # jieba — Chinese-text memory recall
+pip install 'arbiter[cli]'       # rich + prompt-toolkit + readchar + pygments
+pip install 'arbiter[web]'       # beautifulsoup4 — required for web_fetch / web_search
+pip install 'arbiter[i18n]'      # jieba — Chinese-text memory recall
 
 # Heavy file-format tools
-pip install 'agentao[pdf]'       # PDF reading (pymupdf, pdfplumber)
-pip install 'agentao[excel]'     # Excel read/write (pandas, openpyxl)
-pip install 'agentao[image]'     # Image processing (Pillow)
-pip install 'agentao[crypto]'    # pycryptodome
-pip install 'agentao[google]'    # google-genai
-pip install 'agentao[crawl4ai]'  # crawl4ai
-pip install 'agentao[tokenizer]' # tiktoken — precise token accounting
+pip install 'arbiter[pdf]'       # PDF reading (pymupdf, pdfplumber)
+pip install 'arbiter[excel]'     # Excel read/write (pandas, openpyxl)
+pip install 'arbiter[image]'     # Image processing (Pillow)
+pip install 'arbiter[crypto]'    # pycryptodome
+pip install 'arbiter[google]'    # google-genai
+pip install 'arbiter[crawl4ai]'  # crawl4ai
+pip install 'arbiter[tokenizer]' # tiktoken — precise token accounting
 
 # Meta extras
-pip install 'agentao[full]'      # Everything (0.3.x-equivalent closure)
+pip install 'arbiter[full]'      # Everything (0.3.x-equivalent closure)
 ```
 
 > Without `[web]`, the registry **omits** `web_fetch` and `web_search` entirely
@@ -119,33 +119,33 @@ pip install 'agentao[full]'      # Everything (0.3.x-equivalent closure)
 > model calls a tool that fails with a generic ImportError. Without `[i18n]`,
 > CJK memory recall degrades gracefully (one-time warning + empty CJK tokens);
 > Latin queries skip jieba entirely so they pay no cost. The `[cli]` extra is
-> required to run the `agentao` console script — bare installs print a friendly
-> `pip install agentao[cli]` hint and exit 2.
+> required to run the `arbiter` console script — bare installs print a friendly
+> `pip install arbiter[cli]` hint and exit 2.
 
 See [`docs/migration/0.3.x-to-0.4.0.md`](https://github.com/jin-bo/agentao/blob/main/docs/migration/0.3.x-to-0.4.0.md) for the full 0.3.x → 0.4.0 migration matrix.
 
 ## Version compatibility
 
-- Agentao is currently in **0.x (Beta)**. Breaking changes can land between minor versions — pin exact versions:
+- Arbiter is currently in **0.x (Beta)**. Breaking changes can land between minor versions — pin exact versions:
   ```
-  agentao>=0.4.0,<0.5
+  arbiter>=0.4.0,<0.5
   ```
 - This guide targets **v0.4.0 GA**. Version-specific notes will be flagged inline.
 - The single break in 0.4.0 is the dependency split (P0.9). 0.3.x users who
-  want zero behaviour change can use `pip install 'agentao[full]'`.
+  want zero behaviour change can use `pip install 'arbiter[full]'`.
 
 ## Checklist
 
 ```bash
 # All of these should succeed
 python --version                        # >= 3.10
-pip show agentao | grep Version          # your pinned version
+pip show arbiter | grep Version          # your pinned version
 echo $OPENAI_API_KEY | head -c 10       # key prefix visible
 echo $OPENAI_BASE_URL                   # must be non-empty
 echo $OPENAI_MODEL                      # must be non-empty
-agentao --help                          # CLI reachable (optional)
-python -c "from agentao import Agentao; print('OK')"
-python -c "from agentao.transport import SdkTransport; print('OK')"
+arbiter --help                          # CLI reachable (optional)
+python -c "from arbiter import Arbiter; print('OK')"
+python -c "from arbiter.transport import SdkTransport; print('OK')"
 ```
 
 Environment green — move on to Part 2 for actual integration work.
@@ -156,6 +156,6 @@ Environment green — move on to Part 2 for actual integration work.
 - **3 env vars** required: `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL` (constructor args also work).
 - **Default install is embedding-only**. Add extras as needed: `[web]`, `[i18n]`, `[cli]`, `[pdf]`, `[excel]`, `[image]`, `[full]` (everything).
 - **No inbound port** — agent is a library or stdio subprocess; outbound goes to your LLM endpoint and any tool URLs.
-- **Pin a version range** in production: `agentao>=0.4.0,<0.5`.
+- **Pin a version range** in production: `arbiter>=0.4.0,<0.5`.
 
 → [Part 2 · Python In-Process Embedding](/en/part-2/)

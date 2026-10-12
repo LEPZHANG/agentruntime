@@ -13,7 +13,7 @@ tightened; two borderline calls were left as judgment for the executor.
 The body below is the **revised** plan — all sections reflect the
 post-review decisions. The cuts:
 
-1. **Dropped `@runtime_checkable` on the Protocol.** No `isinstance(store, MemoryStore)` callsite is planned, and the existing `isinstance(...)` checks in `agentao/tools/shell.py:237` / `agentao/tools/search.py:234` test the **concrete class** (`LocalShellExecutor` / `LocalFileSystem`), which doesn't need the decorator. The "match `filesystem.py` precedent" justification in the original draft was cargo-cult.
+1. **Dropped `@runtime_checkable` on the Protocol.** No `isinstance(store, MemoryStore)` callsite is planned, and the existing `isinstance(...)` checks in `arbiter/tools/shell.py:237` / `arbiter/tools/search.py:234` test the **concrete class** (`LocalShellExecutor` / `LocalFileSystem`), which doesn't need the decorator. The "match `filesystem.py` precedent" justification in the original draft was cargo-cult.
 2. **Dropped the `MemoryManager.from_paths()` classmethod (Strategy A).** The first draft picked it explicitly to avoid test churn — but ~25 mechanical edits across 12 test files is exactly what `sed` is for, and a single constructor surface beats two for a public API. Strategy B (purist) below.
 3. **Replaced `open_or_memory(..., fallback_to_memory: bool)` with two methods** (`SQLiteMemoryStore.open()` strict, `SQLiteMemoryStore.open_or_memory()` falls back). Two callsites with two different bool values is a weak abstraction; method names disambiguate semantics directly.
 4. **Dropped the new file `tests/test_factory_memory_store_fallback.py`.** One assertion doesn't justify a new file. The ACP regression tests in `tests/test_per_session_cwd.py:603-655` already cover factory-level memory fallback at the right layer; the user-DB-failure case is one more assertion in that suite.
@@ -28,19 +28,19 @@ Two borderline items left as judgment calls for the executor:
 
 ## Pre-flight verification (verify before executing)
 
-- **Assumes** the only callers reaching into `MemoryManager.project_store` / `user_store` directly are `MemoryCrystallizer.submit_to_review` (`agentao/memory/crystallizer.py:213`), `.promote` (`:252`), and the two test fault-injection tests (`tests/test_memory_manager.py:392-454`, `tests/test_per_session_cwd.py:603-614`). **Verify** by `grep -rn "\.project_store\|\.user_store" agentao/ tests/`.
-- **Assumes** `MemoryRetriever` accesses `manager.write_version` and `manager.get_all_entries()` only — no SQLite-specific access. Confirmed by reading `agentao/memory/retriever.py:234-247`.
-- **Assumes** `agentao/memory/render.py` does not depend on store internals. Confirmed (no `store`/`SQLite`/`sqlite3` references).
+- **Assumes** the only callers reaching into `MemoryManager.project_store` / `user_store` directly are `MemoryCrystallizer.submit_to_review` (`arbiter/memory/crystallizer.py:213`), `.promote` (`:252`), and the two test fault-injection tests (`tests/test_memory_manager.py:392-454`, `tests/test_per_session_cwd.py:603-614`). **Verify** by `grep -rn "\.project_store\|\.user_store" arbiter/ tests/`.
+- **Assumes** `MemoryRetriever` accesses `manager.write_version` and `manager.get_all_entries()` only — no SQLite-specific access. Confirmed by reading `arbiter/memory/retriever.py:234-247`.
+- **Assumes** `arbiter/memory/render.py` does not depend on store internals. Confirmed (no `store`/`SQLite`/`sqlite3` references).
 
 ---
 
-## 1. Protocol surface (`agentao/capabilities/memory.py`)
+## 1. Protocol surface (`arbiter/capabilities/memory.py`)
 
 **Bias toward byte-equivalent lift, not redesign.** The Protocol is exactly the public methods of `SQLiteMemoryStore` minus the internal helpers. The leaky-abstraction audit is at the bottom.
 
 ### 1.1 Methods to put on `MemoryStore` Protocol
 
-Mirrors `SQLiteMemoryStore` (`agentao/memory/storage.py:86-512`) lift-and-shift, **all model dataclasses, no `sqlite3.Row`** at the boundary:
+Mirrors `SQLiteMemoryStore` (`arbiter/memory/storage.py:86-512`) lift-and-shift, **all model dataclasses, no `sqlite3.Row`** at the boundary:
 
 ```python
 from __future__ import annotations
@@ -58,7 +58,7 @@ class MemoryStore(Protocol):
     Embedded hosts inject this to redirect memory + session-summary +
     review-queue persistence through their own storage (Redis,
     Postgres, in-memory, remote API). The default
-    :class:`agentao.memory.storage.SQLiteMemoryStore` is byte-equivalent
+    :class:`arbiter.memory.storage.SQLiteMemoryStore` is byte-equivalent
     to the pre-Protocol implementation.
 
     Schema-less contract: implementations only need to round-trip the
@@ -136,31 +136,31 @@ Reasoning:
 - The epic's `Issue 5` deletion (already shipped per `git log b3b403f`) was explicit: *delete `Path.home()` fallback from `MemoryManager`; project_root and global_root required*. Issue #16 should continue that direction, not regress it. After M5, `MemoryManager` knows nothing about disk.
 - Option (a) — `MemoryStoreFactory` callables — pollutes the Protocol with constructor semantics. Hosts injecting an in-process store don't need a callable layer.
 - Option (b) — fallback in `SQLiteMemoryStore` — pushes filesystem awareness into the storage class, which the Protocol abstraction is supposed to keep concrete-class-private. Also doesn't help non-SQLite backends.
-- **Option (c) keeps the load-bearing tests green** because the factory (`agentao/embedding/factory.py:118-123`) is the *only* path that constructs `MemoryManager` with disk roots today. The two regression tests (`test_memory_manager.py:392`, `test_per_session_cwd.py:603-614`) monkeypatch `SQLiteMemoryStore.__init__` — those tests **migrate** to a new `tests/test_sqlite_memory_store_fallback.py` that asserts `SQLiteMemoryStore.open_or_memory(path)` (a new classmethod on the concrete class) returns a `:memory:` store on `OSError` / `sqlite3.Error`. Then the factory calls that classmethod.
+- **Option (c) keeps the load-bearing tests green** because the factory (`arbiter/embedding/factory.py:118-123`) is the *only* path that constructs `MemoryManager` with disk roots today. The two regression tests (`test_memory_manager.py:392`, `test_per_session_cwd.py:603-614`) monkeypatch `SQLiteMemoryStore.__init__` — those tests **migrate** to a new `tests/test_sqlite_memory_store_fallback.py` that asserts `SQLiteMemoryStore.open_or_memory(path)` (a new classmethod on the concrete class) returns a `:memory:` store on `OSError` / `sqlite3.Error`. Then the factory calls that classmethod.
 - After the refactor, an embedded host that wants the fallback semantic uses the factory; an embedded host that wants strict construction passes its own pre-built `MemoryStore` and gets a clean `TypeError` if it can't open.
 
 ---
 
 ## 3. Recommendation: File layout
 
-**Answer: Protocol in `agentao/capabilities/memory.py`. Concrete `SQLiteMemoryStore` STAYS at `agentao/memory/storage.py`.**
+**Answer: Protocol in `arbiter/capabilities/memory.py`. Concrete `SQLiteMemoryStore` STAYS at `arbiter/memory/storage.py`.**
 
 Reasoning:
 
 - Capability precedent (`capabilities/filesystem.py`) co-locates `LocalFileSystem` next to its Protocol. But that's a pure-IO shim with no schema, no models, no `_init_db`, no soft-delete logic.
 - `SQLiteMemoryStore` is 513 lines of schema-aware persistence that **lives next to** `models.py`, `guards.py`, `crystallizer.py`, `manager.py`. Moving it into `capabilities/` splits a cohesive subsystem across the package for cosmetic consistency.
-- Compromise: re-export from `capabilities/__init__.py` so embedded hosts see `from agentao.capabilities import MemoryStore, SQLiteMemoryStore` — same import ergonomics as `FileSystem` / `LocalFileSystem`.
+- Compromise: re-export from `capabilities/__init__.py` so embedded hosts see `from arbiter.capabilities import MemoryStore, SQLiteMemoryStore` — same import ergonomics as `FileSystem` / `LocalFileSystem`.
 
 ---
 
-## 4. Factory wiring change (`agentao/embedding/factory.py:118-123`)
+## 4. Factory wiring change (`arbiter/embedding/factory.py:118-123`)
 
 **Current:**
 ```python
 memory_manager = overrides.pop("memory_manager", None)
 if memory_manager is None:
     memory_manager = MemoryManager(
-        project_root=wd / ".agentao",
+        project_root=wd / ".arbiter",
         global_root=user_root(),
     )
 ```
@@ -171,7 +171,7 @@ memory_manager = overrides.pop("memory_manager", None)
 if memory_manager is None:
     from ..memory.storage import SQLiteMemoryStore
     # Project store always succeeds — degrades to ``:memory:`` on disk error.
-    project_store = SQLiteMemoryStore.open_or_memory(wd / ".agentao" / "memory.db")
+    project_store = SQLiteMemoryStore.open_or_memory(wd / ".arbiter" / "memory.db")
     # User store is optional — disabled on disk error, not degraded.
     user_store: Optional[SQLiteMemoryStore] = None
     user = user_root()
@@ -211,9 +211,9 @@ manager never reaches for SQLite when a fake is injected.
 from __future__ import annotations
 from typing import Dict, List, Optional
 import pytest
-from agentao.capabilities import MemoryStore  # re-exported
-from agentao.memory import MemoryManager, SaveMemoryRequest
-from agentao.memory.models import (
+from arbiter.capabilities import MemoryStore  # re-exported
+from arbiter.memory import MemoryManager, SaveMemoryRequest
+from arbiter.memory.models import (
     MemoryRecord, MemoryReviewItem, SessionSummaryRecord,
 )
 
@@ -306,8 +306,8 @@ Sites to update (from `grep MemoryManager(` audit):
 | `tests/test_retriever.py` | 24 | explicit-store construction |
 | `tests/test_memory_manager.py` | 14 (via `_make_manager`), 248, 409, 441 | factor into `_make_manager` helper using `SQLiteMemoryStore.open_or_memory` |
 | `tests/test_no_subsystem_fallback_reads.py` | 89-91, 166 | the `TypeError` test on 89-91 still passes (required-arg semantic preserved); line 166 constructs stores explicitly |
-| `agentao/agent.py` | 216 | inline: `MemoryManager(project_store=SQLiteMemoryStore.open_or_memory(self._working_directory / ".agentao" / "memory.db"))` |
-| `agentao/embedding/factory.py` | 118-123 | explicit-store construction per §4 |
+| `arbiter/agent.py` | 216 | inline: `MemoryManager(project_store=SQLiteMemoryStore.open_or_memory(self._working_directory / ".arbiter" / "memory.db"))` |
+| `arbiter/embedding/factory.py` | 118-123 | explicit-store construction per §4 |
 
 **Test-helper option:** if the per-test `SQLiteMemoryStore.open_or_memory(...)` boilerplate adds noise, extract a `tests/support/memory.py::make_memory_manager(tmp_path, *, with_user=False)` helper. ~10 lines of test infra; not part of the public API. Optional — only adopt if the inline form gets ugly.
 
@@ -333,8 +333,8 @@ Place under the existing `[Unreleased]` block (currently has `### BREAKING` and 
   remote API — without subclassing or forking `MemoryManager`. The
   `SQLiteMemoryStore` default is unchanged and remains the CLI/ACP
   backing store. Re-exported as
-  `from agentao.capabilities import MemoryStore` /
-  `from agentao.capabilities import SQLiteMemoryStore` to mirror the
+  `from arbiter.capabilities import MemoryStore` /
+  `from arbiter.capabilities import SQLiteMemoryStore` to mirror the
   `FileSystem` / `LocalFileSystem` ergonomics shipped in 0.2.16.
 - `SQLiteMemoryStore.open(path)` — strict path-based constructor that
   raises on disk error. `SQLiteMemoryStore.open_or_memory(path)` —
@@ -363,7 +363,7 @@ Place under the existing `[Unreleased]` block (currently has `### BREAKING` and 
   classmethod; behavior is observably identical (project store still
   degrades to `:memory:` on `OSError` / `sqlite3.OperationalError`,
   user store is still disabled with a warning on the same errors).
-- `agentao.memory.MemoryManager` no longer imports `sqlite3` and has
+- `arbiter.memory.MemoryManager` no longer imports `sqlite3` and has
   no filesystem knowledge. Embedded hosts that construct it directly
   with custom stores see zero disk I/O from the manager.
 
@@ -374,7 +374,7 @@ Place under the existing `[Unreleased]` block (currently has `### BREAKING` and 
   `SQLiteMemoryStore.open_or_memory(path)` (or `.open(path)`) and pass
   them as `project_store=` / `user_store=` kwargs. CLI and ACP users
   see no change because the factory
-  (`agentao.embedding.build_from_environment()`) absorbs the new
+  (`arbiter.embedding.build_from_environment()`) absorbs the new
   construction shape internally.
 ```
 
@@ -395,15 +395,15 @@ Suggested message header: `refactor(memory): extract MemoryStore Protocol from S
 
 ## 8. Risks the prompt didn't list
 
-1. **`MemoryRetriever` index invalidation** (`agentao/memory/retriever.py:234`): the inverted index keys off `manager.write_version`. If a fake store mutates state without `MemoryManager` incrementing `write_version`, the retriever returns stale results. **Mitigation:** the Protocol only sees `MemoryStore` calls; `write_version` increments stay inside `MemoryManager.upsert/delete/clear` (manager.py:147,243,246,267). No risk if callers go through the manager. Document the invariant: "direct store mutation bypasses retriever index — always go through the manager."
+1. **`MemoryRetriever` index invalidation** (`arbiter/memory/retriever.py:234`): the inverted index keys off `manager.write_version`. If a fake store mutates state without `MemoryManager` incrementing `write_version`, the retriever returns stale results. **Mitigation:** the Protocol only sees `MemoryStore` calls; `write_version` increments stay inside `MemoryManager.upsert/delete/clear` (manager.py:147,243,246,267). No risk if callers go through the manager. Document the invariant: "direct store mutation bypasses retriever index — always go through the manager."
 
 2. **`MemoryCrystallizer` reaches into `manager.project_store`** (`crystallizer.py:213,252`). After the refactor, `manager.project_store` is now a `MemoryStore` Protocol type. Crystallizer calls `store.upsert_review_item` and `store.update_review_status` — both on the Protocol surface. **Verified safe.** Add a type annotation `manager.project_store: MemoryStore` so the static checker keeps an eye on this.
 
-3. **`agentao/memory/__init__.py:6,23`** re-exports `SQLiteMemoryStore`. After the refactor, also export `MemoryStore` for symmetry, but keep `SQLiteMemoryStore` exported (`test_memory_store.py:8` imports it directly).
+3. **`arbiter/memory/__init__.py:6,23`** re-exports `SQLiteMemoryStore`. After the refactor, also export `MemoryStore` for symmetry, but keep `SQLiteMemoryStore` exported (`test_memory_store.py:8` imports it directly).
 
 4. **`tests/test_memory_store.py`** is 519 lines of `SQLiteMemoryStore` direct tests. None of them go through `MemoryManager`. They keep working unchanged — `SQLiteMemoryStore` keeps its public API. Verify by re-running.
 
-5. **`@runtime_checkable` deliberately omitted.** Verified during the over-design review: no `isinstance(store, MemoryStore)` callsite is planned. Existing `isinstance` checks in `agentao/tools/shell.py:237` and `agentao/tools/search.py:234` test the **concrete class** (`LocalShellExecutor` / `LocalFileSystem`), which doesn't require `@runtime_checkable` on the Protocol. Add the decorator later if a real isinstance use case shows up.
+5. **`@runtime_checkable` deliberately omitted.** Verified during the over-design review: no `isinstance(store, MemoryStore)` callsite is planned. Existing `isinstance` checks in `arbiter/tools/shell.py:237` and `arbiter/tools/search.py:234` test the **concrete class** (`LocalShellExecutor` / `LocalFileSystem`), which doesn't require `@runtime_checkable` on the Protocol. Add the decorator later if a real isinstance use case shows up.
 
 6. **`MemoryGuard` is constructor-injected into `MemoryManager`** (`manager.py:46,50`). The new constructor must keep `guard: Optional[MemoryGuard] = None` for back-compat — none of the test callsites pass it but the API surface should stay.
 
@@ -417,9 +417,9 @@ Suggested message header: `refactor(memory): extract MemoryStore Protocol from S
 
 Each step's deliverable is verifiable in isolation. Run `pytest tests/` after step 6 expecting full pass.
 
-1. **Create `agentao/capabilities/memory.py`** — paste the Protocol from §1.1. Imports models from `agentao.memory.models`.
+1. **Create `arbiter/capabilities/memory.py`** — paste the Protocol from §1.1. Imports models from `arbiter.memory.models`.
 
-2. **Add `agentao/memory/storage.py:open_or_memory` classmethod** to `SQLiteMemoryStore`. Signature:
+2. **Add `arbiter/memory/storage.py:open_or_memory` classmethod** to `SQLiteMemoryStore`. Signature:
    ```python
    @classmethod
    def open_or_memory(
@@ -449,7 +449,7 @@ Each step's deliverable is verifiable in isolation. Run `pytest tests/` after st
    ```
    Add `import logging; logger = logging.getLogger(__name__)` reusing the existing module logger (`storage.py:13`). Two methods, no boolean — semantic asymmetry between project store (always succeeds) and user store (disabled on failure) is now explicit at every call site.
 
-3. **Rewrite `agentao/memory/manager.py:42-95`** — new constructor:
+3. **Rewrite `arbiter/memory/manager.py:42-95`** — new constructor:
    ```python
    def __init__(
        self,
@@ -468,31 +468,31 @@ Each step's deliverable is verifiable in isolation. Run `pytest tests/` after st
    - Delete `import sqlite3` and `from pathlib import Path` if unused after edit (Path stays — it's used in `_USERDICT_PATH`-style code? Confirm by re-reading). Path is not used after the edit; remove the import.
    - Update `_store_for_scope` return type to `"MemoryStore"` (manager.py:442).
 
-4. **Update `agentao/memory/__init__.py`** to also export `MemoryStore` (Protocol). Re-export from `capabilities/memory.py`:
+4. **Update `arbiter/memory/__init__.py`** to also export `MemoryStore` (Protocol). Re-export from `capabilities/memory.py`:
    ```python
    from ..capabilities.memory import MemoryStore
    __all__ = [..., "MemoryStore", ...]
    ```
 
-5. **Update `agentao/capabilities/__init__.py:9-33`** to add `MemoryStore` and re-export `SQLiteMemoryStore`:
+5. **Update `arbiter/capabilities/__init__.py:9-33`** to add `MemoryStore` and re-export `SQLiteMemoryStore`:
    ```python
    from .memory import MemoryStore
    from ..memory.storage import SQLiteMemoryStore
    __all__ = [..., "MemoryStore", "SQLiteMemoryStore"]
    ```
 
-6. **Update `agentao/agent.py:216`** — replace the bare `MemoryManager(project_root=..., global_root=None)` call with explicit-store construction:
+6. **Update `arbiter/agent.py:216`** — replace the bare `MemoryManager(project_root=..., global_root=None)` call with explicit-store construction:
    ```python
    from .memory.storage import SQLiteMemoryStore
    self._memory_manager = MemoryManager(
        project_store=SQLiteMemoryStore.open_or_memory(
-           self.working_directory / ".agentao" / "memory.db"
+           self.working_directory / ".arbiter" / "memory.db"
        ),
    )
    ```
    The bare-construction path stays project-scope-only (matches current `global_root=None` behavior).
 
-7. **Rewrite `agentao/embedding/factory.py:118-123`** per §4. Add `import sqlite3` (used for the user-store try/except). Re-use the existing module logger.
+7. **Rewrite `arbiter/embedding/factory.py:118-123`** per §4. Add `import sqlite3` (used for the user-store try/except). Re-use the existing module logger.
 
 8. **Migrate test callsites** per §5.2 — the 12-file mechanical migration from `MemoryManager(project_root=p, global_root=g)` → explicit-store construction. Use `grep -rln "MemoryManager(project_root=" tests/` to find them. Optional: extract a `tests/support/memory.py::make_memory_manager()` helper if the per-test boilerplate gets noisy.
 
@@ -513,8 +513,8 @@ Each step's deliverable is verifiable in isolation. Run `pytest tests/` after st
 
 ## Critical Files for Implementation
 
-- `/Users/bluerose/Documents/Data/ToDo/2024-AGI/src/agentao/agentao/memory/manager.py`
-- `/Users/bluerose/Documents/Data/ToDo/2024-AGI/src/agentao/agentao/memory/storage.py`
-- `/Users/bluerose/Documents/Data/ToDo/2024-AGI/src/agentao/agentao/capabilities/memory.py` (new)
-- `/Users/bluerose/Documents/Data/ToDo/2024-AGI/src/agentao/agentao/embedding/factory.py`
-- `/Users/bluerose/Documents/Data/ToDo/2024-AGI/src/agentao/tests/test_memory_store_swap.py` (new)
+- `/Users/bluerose/Documents/Data/ToDo/2024-AGI/src/arbiter/arbiter/memory/manager.py`
+- `/Users/bluerose/Documents/Data/ToDo/2024-AGI/src/arbiter/arbiter/memory/storage.py`
+- `/Users/bluerose/Documents/Data/ToDo/2024-AGI/src/arbiter/arbiter/capabilities/memory.py` (new)
+- `/Users/bluerose/Documents/Data/ToDo/2024-AGI/src/arbiter/arbiter/embedding/factory.py`
+- `/Users/bluerose/Documents/Data/ToDo/2024-AGI/src/arbiter/tests/test_memory_store_swap.py` (new)

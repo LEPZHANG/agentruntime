@@ -2,10 +2,10 @@
 
 > **What you'll learn**
 > - When MCP is the right answer vs. a custom Tool
-> - The three transport types Agentao supports (stdio, Streamable HTTP, SSE)
+> - The three transport types Arbiter supports (stdio, Streamable HTTP, SSE)
 > - Multi-tenant patterns: per-session `extra_mcp_servers`, env-var expansion, `trust:` caveats
 
-**MCP (Model Context Protocol)** is the de-facto standard for tool interoperability. Agentao is an MCP client — it can connect to any MCP-compliant server (GitHub, filesystem, Postgres, Slack, Jira, your own…), and every tool the server exposes shows up in the agent's registry as `mcp_{server}_{tool}` automatically.
+**MCP (Model Context Protocol)** is the de-facto standard for tool interoperability. Arbiter is an MCP client — it can connect to any MCP-compliant server (GitHub, filesystem, Postgres, Slack, Jira, your own…), and every tool the server exposes shows up in the agent's registry as `mcp_{server}_{tool}` automatically.
 
 ## What MCP is good for
 
@@ -26,8 +26,8 @@ Win: **no `Tool` subclass needed** — the community has already written and mai
 **Locations** (user wins on name collision; project file is **add-only**):
 
 ```
-~/.agentao/mcp.json               ← user-level (cross-project; authoritative for any name it declares)
-<working_dir>/.agentao/mcp.json   ← project-level (may declare new names only — cannot override user-scope names)
+~/.arbiter/mcp.json               ← user-level (cross-project; authoritative for any name it declares)
+<working_dir>/.arbiter/mcp.json   ← project-level (may declare new names only — cannot override user-scope names)
 ```
 
 ::: tip Why add-only?
@@ -70,9 +70,9 @@ A project `mcp.json` checked into git could otherwise silently redirect a known 
 Pass `extra_mcp_servers` to the constructor — **bypass JSON files entirely** and build configs per session/tenant:
 
 ```python
-from agentao import Agentao
+from arbiter import Arbiter
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path(f"/tmp/tenant-{tenant.id}"),
     extra_mcp_servers={
         "github-per-tenant": {
@@ -84,7 +84,7 @@ agent = Agentao(
 )
 ```
 
-Merge rule: **same-name entries override** those from `.agentao/mcp.json`.
+Merge rule: **same-name entries override** those from `.arbiter/mcp.json`.
 
 ## Configuration fields
 
@@ -120,7 +120,7 @@ Merge rule: **same-name entries override** those from `.agentao/mcp.json`.
 | `trust` | ❌ | Same as above |
 
 ::: info Streamable HTTP is supported
-Agentao's MCP client imports `stdio_client`, `sse_client`, **and** `streamable_http_client` (plus `create_mcp_http_client`), so all three transports connect. `type` selects the transport (`"stdio"` / `"http"` / `"sse"`); if omitted it's inferred — `command` → stdio, a bare `url` → **Streamable HTTP**. Legacy SSE requires an explicit `"type": "sse"`. An unknown `type` or a missing required key fails closed (`McpTransportConfigError`). The ACP handshake advertises `mcpCapabilities.http: true`.
+Arbiter's MCP client imports `stdio_client`, `sse_client`, **and** `streamable_http_client` (plus `create_mcp_http_client`), so all three transports connect. `type` selects the transport (`"stdio"` / `"http"` / `"sse"`); if omitted it's inferred — `command` → stdio, a bare `url` → **Streamable HTTP**. Legacy SSE requires an explicit `"type": "sse"`. An unknown `type` or a missing required key fails closed (`McpTransportConfigError`). The ACP handshake advertises `mcpCapabilities.http: true`.
 :::
 
 ## Env var expansion
@@ -138,12 +138,12 @@ Unset variables become empty strings (no error).
 
 ## MCP tool naming
 
-Each tool discovered from an MCP server becomes an Agentao `Tool` with a **prefixed name**:
+Each tool discovered from an MCP server becomes an Arbiter `Tool` with a **prefixed name**:
 
 ```
 Server: "github"
 MCP tool: "create_issue"
-Agentao name: "mcp_github_create_issue"
+Arbiter name: "mcp_github_create_issue"
 ```
 
 Characters outside `[a-zA-Z0-9_]` become underscores.
@@ -166,7 +166,7 @@ if agent.mcp_manager:
     print(f"{len(agent.mcp_manager.clients)} server(s) connected")
 ```
 
-`agentao.log` records:
+`arbiter.log` records:
 - MCP server start success/failure
 - Every tool discovered
 - Tool call arguments and results
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     mcp.run()   # stdio by default
 ```
 
-Then in `.agentao/mcp.json`:
+Then in `.arbiter/mcp.json`:
 
 ```json
 {
@@ -258,7 +258,7 @@ Full permission details: [5.4](./4-permissions).
 
 ### MCP tool annotations: `readOnlyHint` / `destructiveHint`
 
-If a server declares standard MCP `ToolAnnotations`, Agentao consults them — **but only when `trust: true`** (per the MCP spec: clients must not make tool-use decisions on annotations from untrusted servers).
+If a server declares standard MCP `ToolAnnotations`, Arbiter consults them — **but only when `trust: true`** (per the MCP spec: clients must not make tool-use decisions on annotations from untrusted servers).
 
 | `trust` | annotation | effect |
 |---|---|---|
@@ -281,7 +281,7 @@ Each pitfall below has the full fix.
 
 ### ❌ Server fails but the agent keeps going silently
 
-Agentao's MCP init is **fault-tolerant** — one failing server only logs a warning and doesn't block construction. Always check `agentao.log`:
+Arbiter's MCP init is **fault-tolerant** — one failing server only logs a warning and doesn't block construction. Always check `arbiter.log`:
 
 ```
 MCP: failed to start 'github': ...
@@ -302,7 +302,7 @@ Don't lightly set `trust: true` on servers that can write/delete — you bypass 
 
 - Use **MCP** to consume an existing third-party tool ecosystem (GitHub, filesystem, Postgres, Slack…); use **custom Tool** for your own business logic.
 - Three transports: **stdio** subprocess, **Streamable HTTP** URL (default for a bare `url`), or legacy **SSE** URL (`"type":"sse"`).
-- Per-tenant tokens: pass `extra_mcp_servers` at construction (`{name: {command, args, env}}`); merges over `.agentao/mcp.json`. Project `.agentao/mcp.json` is **add-only** — it cannot override a user-scope name.
+- Per-tenant tokens: pass `extra_mcp_servers` at construction (`{name: {command, args, env}}`); merges over `.arbiter/mcp.json`. Project `.arbiter/mcp.json` is **add-only** — it cannot override a user-scope name.
 - Tool naming: `mcp_{server}_{tool}` — auto-prefixed to avoid name collisions across servers.
 - Never set `trust: true` on write-capable servers — it bypasses confirmation entirely.
 

@@ -101,11 +101,11 @@ Tool confirmation reset. Will prompt for each tool.
 
 ### CLI 改动
 
-**文件**: `agentao/cli/app.py`
+**文件**: `arbiter/cli/app.py`
 
 1. **添加会话状态**
    ```python
-   class AgentaoCLI:
+   class ArbiterCLI:
        def __init__(self):
            self.allow_all_tools = False  # 跟踪"允许全部"状态
    ```
@@ -287,7 +287,7 @@ Tool confirmation reset. Will prompt for each tool.
 
 ### 修改的文件
 
-1. **agentao/cli/app.py** (+45 行)
+1. **arbiter/cli/app.py** (+45 行)
    - 添加 `allow_all_tools` 状态
    - 改进 `confirm_tool_execution()` 方法
    - 更新 `show_status()` 显示

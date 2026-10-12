@@ -6,12 +6,12 @@
 
 | English | 中文 | 定义 |
 |---------|------|------|
-| Agent | 智能体 / Agent | 调工具、返回文本的 LLM 驱动循环。本指南里特指**一个 `Agentao` 实例** |
-| Harness | 框架 / 运行容器 | 封装 agent 的可复用运行时——Agentao 本身 |
-| Embedded Harness Contract | 嵌入式 Harness 合约 / 前向兼容宿主合约 | `agentao.host` 暴露的**稳定宿主 API**（自 0.3.1）：Pydantic 建模的事件、策略快照、能力协议；wire 形态有 schema 快照并在 CI 强制。只触这个面的宿主代码可以跨版本不断。详见 [4.7](/zh/part-4/7-host-contract)。 |
+| Agent | 智能体 / Agent | 调工具、返回文本的 LLM 驱动循环。本指南里特指**一个 `Arbiter` 实例** |
+| Harness | 框架 / 运行容器 | 封装 agent 的可复用运行时——Arbiter 本身 |
+| Embedded Harness Contract | 嵌入式 Harness 合约 / 前向兼容宿主合约 | `arbiter.host` 暴露的**稳定宿主 API**（自 0.3.1）：Pydantic 建模的事件、策略快照、能力协议；wire 形态有 schema 快照并在 CI 强制。只触这个面的宿主代码可以跨版本不断。详见 [4.7](/zh/part-4/7-host-contract)。 |
 | Harness event | Harness 事件 | `ToolLifecycleEvent` / `SubagentLifecycleEvent` / `PermissionDecisionEvent` 三种之一——schema 稳定的投影，通过 `agent.events()` 消费（与内部 `AgentEvent` 不同） |
 | Active permissions snapshot | 策略快照 / 当前权限快照 | `agent.active_permissions()` 返回的 `ActivePermissions`：`mode` + `rules` + `loaded_sources`，JSON 安全，可钉进审计日志 |
-| Capability protocol | 能力协议 | `agentao.host.protocols` 下的 `FileSystem` / `ShellExecutor` 运行时可检 Protocol，构造时注入，把 IO 路由到 Docker / 虚拟 FS / 审计代理 |
+| Capability protocol | 能力协议 | `arbiter.host.protocols` 下的 `FileSystem` / `ShellExecutor` 运行时可检 Protocol，构造时注入，把 IO 路由到 Docker / 虚拟 FS / 审计代理 |
 | Schema snapshot | Schema 快照 | 仓库里 checked-in 的 JSON schema 文件（`docs/schema/host.events.v1.json`、`host.acp.v1.json`），由 Pydantic 模型重生成并 CI 断言字节级一致——是 wire 形态的合约 |
 | Session | 会话 | 一个 agent 实例的完整对话生命周期，绑定在一个 `working_directory` 上 |
 | Turn | 一轮 / 一次 | 一次 `chat()` 调用；内部可能触发多次工具调用 |
@@ -19,7 +19,7 @@
 | Working directory | 工作目录 | 构造时固定的文件系统根；工具调用与 memory DB 都在它下面 |
 | Tool | 工具 | LLM 可调用的能力单元——`Tool` 抽象基类的子类 |
 | Skill | 技能 | 一份 `SKILL.md` 组合，激活后注入系统提示 |
-| System prompt | 系统提示 | 每轮拼装的头部（AGENTAO.md + 日期 + 技能 + 记忆） |
+| System prompt | 系统提示 | 每轮拼装的头部（ARBITER.md + 日期 + 技能 + 记忆） |
 
 ## G.2 扩展点
 
@@ -30,7 +30,7 @@
 | Permission engine | 权限引擎 | `PermissionEngine`——决定每次工具调用 allow / deny / ask |
 | Permission mode | 权限模式 | `READ_ONLY` / `WORKSPACE_WRITE` / `FULL_ACCESS` / `PLAN` 预设 |
 | Memory | 记忆 | 存在 SQLite 里的持久笔记（project + user 两个作用域） |
-| Memory scope | 记忆作用域 | `project`（`working_directory` 内）vs `user`（`~/.agentao/`） |
+| Memory scope | 记忆作用域 | `project`（`working_directory` 内）vs `user`（`~/.arbiter/`） |
 | MCP | MCP / Model Context Protocol | 第三方工具服务器协议（stdio / Streamable HTTP / SSE） |
 | Sandbox | 沙箱 | macOS `sandbox-exec` 对 shell 工具的封装 |
 | Skill activation | 激活技能 | 把技能对当前 agent 打开，让它的提示文本被注入 |
@@ -41,8 +41,8 @@
 
 | English | 中文 | 定义 |
 |---------|------|------|
-| ACP | ACP / Agent Client Protocol | Agentao 在 `--acp --stdio` 模式下说的 stdio + NDJSON JSON-RPC 2.0 协议 |
-| ACP server | ACP 服务器 | ACP 连接里的 Agentao 子进程 |
+| ACP | ACP / Agent Client Protocol | Arbiter 在 `--acp --stdio` 模式下说的 stdio + NDJSON JSON-RPC 2.0 协议 |
+| ACP server | ACP 服务器 | ACP 连接里的 Arbiter 子进程 |
 | ACP client | ACP 客户端 | 启动并驱动 ACP 服务器的宿主进程 |
 | `initialize` | 初始化 | 第一个 RPC——协商 `protocolVersion` 和能力 |
 | `session/new` | 新建会话 | 创建绑定到一个 cwd 的新会话 |
@@ -57,13 +57,13 @@
 
 | English | 中文 | 定义 |
 |---------|------|------|
-| In-process SDK | 进程内 SDK | 以 Python 库形式 `import agentao`——与宿主同进程 |
-| ACP stdio | ACP stdio 集成 | 把 Agentao 作为子进程，通过 stdio 讲 JSON-RPC |
-| Session pool | 会话池 | 按 `session_id` 缓存长生命周期 `Agentao` 实例 |
+| In-process SDK | 进程内 SDK | 以 Python 库形式 `import arbiter`——与宿主同进程 |
+| ACP stdio | ACP stdio 集成 | 把 Arbiter 作为子进程，通过 stdio 讲 JSON-RPC |
+| Session pool | 会话池 | 按 `session_id` 缓存长生命周期 `Arbiter` 实例 |
 | TTL eviction | TTL 驱逐 | 移除闲置超过 TTL 的会话池条目 |
 | LRU eviction | LRU 驱逐 | 容量满时移除最久未使用的会话池条目 |
 | `prompt_once` | 一次性提示 | `ACPManager.prompt_once()`——单轮 fire-and-forget API |
-| Headless runtime | 无头运行时 | 把 Agentao 作为非交互 embedding 目标运行——`ACPManager` 驱动 ACP 服务器，`get_status()` 返回类型化快照，全程无需人工介入。见 [`docs/guides/headless-runtime.md`](../../../docs/guides/headless-runtime.md)。 |
+| Headless runtime | 无头运行时 | 把 Arbiter 作为非交互 embedding 目标运行——`ACPManager` 驱动 ACP 服务器，`get_status()` 返回类型化快照，全程无需人工介入。见 [`docs/guides/headless-runtime.md`](../../../docs/guides/headless-runtime.md)。 |
 | Tenant | 租户 | 多租户 SaaS 中最外层的隔离单元；每租户独立 working directory + memory |
 | Canary | 灰度 | 先放小比例流量再全量部署 |
 

@@ -1,10 +1,10 @@
 [project]
-name = "agentao-example-fastapi-background"
+name = "arbiter-example-fastapi-background"
 version = "0.1.0"
-description = "Minimal FastAPI route that runs an Agentao turn in a background task."
+description = "Minimal FastAPI route that runs an Arbiter turn in a background task."
 requires-python = ">=3.10"
 dependencies = [
-    "agentao",
+    "arbiter",
     "fastapi>=0.115",
     "httpx>=0.25",
 ]
@@ -15,7 +15,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-agentao = { path = "../..", editable = true }
+arbiter = { path = "../..", editable = true }
 
 [build-system]
 requires = ["hatchling"]

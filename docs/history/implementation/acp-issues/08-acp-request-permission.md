@@ -1,8 +1,8 @@
-# Map Agentao Tool Confirmations To ACP Session Request Permission
+# Map Arbiter Tool Confirmations To ACP Session Request Permission
 
 ## Problem
 
-Agentao tool confirmation is currently synchronous and transport-local. ACP requires a protocol-level permission request flow.
+Arbiter tool confirmation is currently synchronous and transport-local. ACP requires a protocol-level permission request flow.
 
 ## Scope
 

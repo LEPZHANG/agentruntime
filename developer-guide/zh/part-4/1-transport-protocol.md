@@ -5,7 +5,7 @@
 > - 每个方法的契约：哪个阻塞、哪个 fire-and-forget
 > - `NullTransport` 的行为以及什么时候它就是合适的默认
 
-Transport 是 Agent 运行时与宿主 UI/业务逻辑之间的**唯一接口**。理解它的四个方法，你就能在任何 UI 框架下集成 Agentao。
+Transport 是 Agent 运行时与宿主 UI/业务逻辑之间的**唯一接口**。理解它的四个方法，你就能在任何 UI 框架下集成 Arbiter。
 
 ## 协议定义
 
@@ -151,10 +151,10 @@ if sub is not None:
         unsubscribe()
 ```
 
-`NullTransport` 和 `SdkTransport` 通过组合 `agentao.transport.EventBroadcaster` 拿到 `subscribe()`。从零实现的 transport（如 ACP）想要 fan-out，可以照搬同样的写法：
+`NullTransport` 和 `SdkTransport` 通过组合 `arbiter.transport.EventBroadcaster` 拿到 `subscribe()`。从零实现的 transport（如 ACP）想要 fan-out，可以照搬同样的写法：
 
 ```python
-from agentao.transport import EventBroadcaster
+from arbiter.transport import EventBroadcaster
 
 class MyTransport:
     def __init__(self):
@@ -181,7 +181,7 @@ class MyTransport:
 参见 [4.3](./3-sdk-transport)：
 
 ```python
-from agentao.transport import SdkTransport
+from arbiter.transport import SdkTransport
 
 transport = SdkTransport(
     on_event=handle,
@@ -196,7 +196,7 @@ transport = SdkTransport(
 当你只关心**部分事件**且想显式控制每个方法时：
 
 ```python
-from agentao.transport import NullTransport, EventType
+from arbiter.transport import NullTransport, EventType
 
 class MyTransport(NullTransport):
     def __init__(self, on_token):
@@ -248,7 +248,7 @@ class MyCustomTransport:
 ## 测试你的 Transport
 
 ```python
-from agentao.transport import AgentEvent, EventType
+from arbiter.transport import AgentEvent, EventType
 
 def test_my_transport():
     t = MyTransport()

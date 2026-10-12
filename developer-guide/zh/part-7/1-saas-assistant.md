@@ -7,7 +7,7 @@
 **运行** —— `uv sync && uv run uvicorn app.main:app --reload`
 :::
 
-**场景**：你做的是一款项目管理 SaaS。用户希望在产品里说"帮我排一下这个项目的计划"或者"总结上周任务"。你想把 Agentao 当作大脑嵌进去，只暴露它需要的那几个工具，流式返回给前端。
+**场景**：你做的是一款项目管理 SaaS。用户希望在产品里说"帮我排一下这个项目的计划"或者"总结上周任务"。你想把 Arbiter 当作大脑嵌进去，只暴露它需要的那几个工具，流式返回给前端。
 
 ## 谁 & 为什么
 
@@ -27,7 +27,7 @@ FastAPI 后端
    ├─ 会话池      (见 6.7)
    │    │
    │    ▼
-   └─ 每个 (tenant_id, session_id) 一个 Agentao 实例
+   └─ 每个 (tenant_id, session_id) 一个 Arbiter 实例
         ├─ working_directory = /data/tenants/{tenant_id}/{session_id}
         ├─ 自定义工具: list_projects, create_task, assign_user
         ├─ PermissionEngine: 默认 READ_ONLY，经确认后放宽 WORKSPACE_WRITE
@@ -40,7 +40,7 @@ FastAPI 后端
 
 ```python
 # tools/project_tools.py
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 import httpx
 
 class ListProjectsTool(Tool):
@@ -103,9 +103,9 @@ class CreateTaskTool(Tool):
 # app.py
 from fastapi import FastAPI, Depends
 from fastapi.responses import StreamingResponse
-from agentao import Agentao
-from agentao.transport import SdkTransport
-from agentao.transport.events import AgentEvent, EventType
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
+from arbiter.transport.events import AgentEvent, EventType
 from pathlib import Path
 import asyncio, httpx, json
 
@@ -158,8 +158,8 @@ async def chat(payload: dict, user=Depends(current_user)):
 
 ```python
 # pool.py
-from agentao import Agentao
-from agentao.permissions import PermissionEngine, PermissionMode
+from arbiter import Arbiter
+from arbiter.permissions import PermissionEngine, PermissionMode
 from .tools.project_tools import ListProjectsTool, CreateTaskTool
 
 async def get_or_create_agent(session_id, workdir, tenant_id, transport):
@@ -169,7 +169,7 @@ async def get_or_create_agent(session_id, workdir, tenant_id, transport):
         return existing
     engine = PermissionEngine(project_root=workdir)
     engine.set_mode(PermissionMode.READ_ONLY)
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=workdir,
         transport=transport,
         permission_engine=engine,

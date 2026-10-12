@@ -9,7 +9,7 @@ Three sub-cases:
 
 from __future__ import annotations
 
-from agentao.plugins.models import ParsedHookRule
+from arbiter.plugins.models import ParsedHookRule
 
 from tests.support.stop_precompact import make_runner_with_rules
 

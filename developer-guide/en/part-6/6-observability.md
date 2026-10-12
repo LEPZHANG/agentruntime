@@ -12,7 +12,7 @@ Agents are classic "long-tail bug" workloads — fine 90% of the time, then 10% 
 ```
 ┌─────────────────────────────────────────────┐
 │ 1. Structured logs: what happened?           │
-│    agentao.log + your app logs               │
+│    arbiter.log + your app logs               │
 ├─────────────────────────────────────────────┤
 │ 2. Metrics: how much, how fast, how expensive? │
 │    calls / latency / tokens / failure rate   │
@@ -27,9 +27,9 @@ Agents are classic "long-tail bug" workloads — fine 90% of the time, then 10% 
 
 ## Axis one: structured logs
 
-### The built-in agentao.log
+### The built-in arbiter.log
 
-Defaults to `<working_directory>/agentao.log`. It's **very thorough**:
+Defaults to `<working_directory>/arbiter.log`. It's **very thorough**:
 
 - Every LLM request/response (full content — untruncated, but credential-shaped strings are redacted to `[REDACTED:<kind>]` on write — plus tokens, model)
 - Every tool call with args and result
@@ -44,27 +44,27 @@ This is your most important **debugging tool**. In production:
 3. Scrub (see [6.5](./5-secrets-injection#four-log-scrubbing))
 4. Isolate per tenant (natural with `working_directory`)
 
-### Take over Agentao's logger
+### Take over Arbiter's logger
 
-By default `LLMClient.__init__` mutates `logging.getLogger("agentao")` —
+By default `LLMClient.__init__` mutates `logging.getLogger("arbiter")` —
 sets level to `DEBUG`, attaches a `RotatingFileHandler` for
-`<wd>/agentao.log`, and evicts its own marker-tagged handlers on
+`<wd>/arbiter.log`, and evicts its own marker-tagged handlers on
 re-construction. Hosts that want to own their logging stack should
 **inject a logger explicitly** so that mutation never runs:
 
 ```python
 import logging
-from agentao import Agentao
+from arbiter import Arbiter
 
 # Your own logger — JSON handler shipped to Loki / CloudWatch / ELK
 import pythonjsonlogger.jsonlogger as jl
-my_logger = logging.getLogger("myapp.agentao")
+my_logger = logging.getLogger("myapp.arbiter")
 handler = logging.StreamHandler()
 handler.setFormatter(jl.JsonFormatter())
 my_logger.addHandler(handler)
 my_logger.setLevel(logging.INFO)
 
-agent = Agentao(
+agent = Arbiter(
     api_key=..., base_url=..., model=...,
     working_directory=workdir,
     logger=my_logger,            # ← skips package-root mutation
@@ -72,26 +72,26 @@ agent = Agentao(
 ```
 
 When you pass `logger=`, `LLMClient` short-circuits before building any
-file handler — so even the default `<wd>/agentao.log` is **not** created.
+file handler — so even the default `<wd>/arbiter.log` is **not** created.
 For a fully silent agent, use a `NullHandler`:
 
 ```python
-quiet = logging.getLogger("myapp.agentao")
+quiet = logging.getLogger("myapp.arbiter")
 quiet.addHandler(logging.NullHandler())
 quiet.propagate = False
-agent = Agentao(..., logger=quiet)
+agent = Arbiter(..., logger=quiet)
 ```
 
 ::: warning Gotcha
-Adding a handler to `getLogger("agentao")` **without** also passing
+Adding a handler to `getLogger("arbiter")` **without** also passing
 `logger=` works, but the package-root level still gets forced to `DEBUG`
-and the rolling `agentao.log` file still gets written alongside your
+and the rolling `arbiter.log` file still gets written alongside your
 handler. To fully suppress the file, either inject your own logger
 (above) or pass `log_file=None` when building `LLMClient` yourself.
 :::
 
 Full reference (knob matrix, code anchors, `LLMClient` direct path) in
-[`docs/guides/embedding.md` §2 → "Optional: silencing or redirecting agentao.log"](https://github.com/jin-bo/agentao/blob/main/docs/guides/embedding.md#optional-silencing-or-redirecting-agentaolog).
+[`docs/guides/embedding.md` §2 → "Optional: silencing or redirecting arbiter.log"](https://github.com/jin-bo/agentao/blob/main/docs/guides/embedding.md#optional-silencing-or-redirecting-arbiterlog).
 
 ### Essential fields
 
@@ -158,13 +158,13 @@ turn_dur.observe((time.time() - start) * 1000)
 
 ## Axis three: session replay
 
-Agentao can record each session's runtime timeline as append-only JSONL under `.agentao/replays/`. Enable it per project:
+Arbiter can record each session's runtime timeline as append-only JSONL under `.arbiter/replays/`. Enable it per project:
 
 ```bash
 /replay on
 ```
 
-This writes `.agentao/settings.json`:
+This writes `.arbiter/settings.json`:
 
 ```json
 {
@@ -187,7 +187,7 @@ Replay enables:
 
 ```bash
 /replay list            # list replay instances (also the default of bare /replay)
-/replay on | /replay off  # toggle recording (persists to .agentao/settings.json)
+/replay on | /replay off  # toggle recording (persists to .arbiter/settings.json)
 /replay show <id>       # grouped render
 /replay show <id> --raw
 /replay show <id> --turn <turn_id>
@@ -203,7 +203,7 @@ Replay files are separate from saved sessions: `save_session` / `load_session` r
 
 Default replay capture includes turn boundaries, user messages, assistant chunks, tool lifecycle, permission decisions, sub-agent lifecycle, errors, state changes, and compact LLM deltas.
 
-Deep capture flags live under `replay.capture_flags` in `.agentao/settings.json`:
+Deep capture flags live under `replay.capture_flags` in `.arbiter/settings.json`:
 
 | Flag | Default | Risk |
 |------|---------|------|
@@ -287,16 +287,16 @@ Under compliance regimes: append-only storage (WORM) required.
 
 On a budget:
 
-1. `agentao.log` → per-tenant files, daily rotate, 14d retention
+1. `arbiter.log` → per-tenant files, daily rotate, 14d retention
 2. `prometheus_client` → the 5 key metrics, Grafana dashboard
-3. Built-in replay JSONL → `.agentao/replays/`, tune `replay.max_instances`
+3. Built-in replay JSONL → `.arbiter/replays/`, tune `replay.max_instances`
 4. No OpenTelemetry
 
 Enough for 99% of small/mid SaaS. Add APM when you scale.
 
 ## TL;DR
 
-- **Four axes**: structured logs (`agentao.log`), metrics (Prometheus / StatsD), traces (OpenTelemetry), session replay.
+- **Four axes**: structured logs (`arbiter.log`), metrics (Prometheus / StatsD), traces (OpenTelemetry), session replay.
 - Minimum metrics: tool call rate by name, tool failure rate, LLM 5xx rate, confirm-timeout rate, turn duration p50/p95/p99, max-iterations hit rate.
 - **Session replay** is the killer feature — when "why did the agent do X?" comes up, replay deterministically with `replay_config=` and step through.
 - Cost monitoring is a first-class observable: track tokens-per-turn and tokens-per-tenant; sudden 2× spikes usually mean a model swap or skill change.

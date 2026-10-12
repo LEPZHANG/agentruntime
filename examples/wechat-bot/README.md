@@ -1,6 +1,6 @@
-# WeChat · contact-scoped Agentao bot
+# WeChat · contact-scoped Arbiter bot
 
-A polling daemon where each inbound WeChat message runs one Agentao
+A polling daemon where each inbound WeChat message runs one Arbiter
 turn and the reply is sent back to the same contact. Contact id (or
 group room id) selects a permission preset: an explicit allowlist
 gets workspace-write, every other contact falls back to read-only.
@@ -38,10 +38,10 @@ recording client and a fake LLM.
 
 ## What this demonstrates
 
-- **Per-message agent** — fresh `Agentao` per inbound message.
+- **Per-message agent** — fresh `Arbiter` per inbound message.
 - **Contact-scoped permissions** — `make_permission_engine_for_contact`
   returns a fresh `PermissionEngine` whose `active_mode` reflects the
-  allowlist, injected via `Agentao(permission_engine=...)`.
+  allowlist, injected via `Arbiter(permission_engine=...)`.
 - **`llm_client_factory` seam** — production reads env, tests inject
   a `MagicMock`. No conditional code paths.
 - **Transport-agnostic** — the Protocol lets you wire ilink, wechaty,

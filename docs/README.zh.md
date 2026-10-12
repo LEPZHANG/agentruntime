@@ -1,6 +1,6 @@
-# Agentao 文档中心
+# Arbiter 文档中心
 
-这里是 Agentao 的文档入口页。
+这里是 Arbiter 的文档入口页。
 
 如果你要了解产品概览、安装路径和第一次运行体验，优先看根目录的 [README.zh.md](../README.zh.md)。如果你已经确定要深入 `docs/` 中的某类文档，这一页可以帮你更快找到入口。
 
@@ -22,7 +22,7 @@ docs/
 
 > **不确定该用哪一面？** 先看 [design/embedding-vs-acp.zh.md](design/embedding-vs-acp.zh.md)——它把 in-process embedding、ACP server、ACP client 以及 ACP schema surface 区分清楚（这四者可以任意组合）。
 
-> **你是一个编码 agent**（Claude Code、Codex…）要把 Agentao 嵌入到另一个项目？先看精炼版手册 [guides/embed-for-agents.md](guides/embed-for-agents.md)，再顺着它进入 [guides/embedding.md](guides/embedding.md) 和 [reference/host-api.md](reference/host-api.md)。
+> **你是一个编码 agent**（Claude Code、Codex…）要把 Arbiter 嵌入到另一个项目？先看精炼版手册 [guides/embed-for-agents.md](guides/embed-for-agents.md)，再顺着它进入 [guides/embedding.md](guides/embedding.md) 和 [reference/host-api.md](reference/host-api.md)。
 
 按目标选择阅读路径：
 
@@ -48,9 +48,9 @@ docs/
 
 | 文档 | 适用场景 |
 |------|----------|
-| [guides/embed-for-agents.md](guides/embed-for-agents.md) | 你是编码 agent，要把 Agentao 嵌入另一个项目——精炼可复制手册 |
-| [guides/embedding.md](guides/embedding.md) | 你是开发者，在 Python 宿主中嵌入 Agentao——完整参考 |
-| [guides/acp.md](guides/acp.md) | 你要把 Agentao 作为 ACP 服务端运行 |
+| [guides/embed-for-agents.md](guides/embed-for-agents.md) | 你是编码 agent，要把 Arbiter 嵌入另一个项目——精炼可复制手册 |
+| [guides/embedding.md](guides/embedding.md) | 你是开发者，在 Python 宿主中嵌入 Arbiter——完整参考 |
+| [guides/acp.md](guides/acp.md) | 你要把 Arbiter 作为 ACP 服务端运行 |
 | [guides/acp-client.md](guides/acp-client.md) | 项目级 ACP 客户端/服务管理 |
 | [guides/acp-embedding.md](guides/acp-embedding.md) | 专门嵌入 ACP 面 |
 | [guides/logging.md](guides/logging.md) | 你在排查会话、工具调用或模型行为 |
@@ -62,7 +62,7 @@ docs/
 | [guides/macos-sandbox-exec.md](guides/macos-sandbox-exec.md) | macOS `sandbox-exec` shell 隔离 |
 | [guides/tool-confirmation.md](guides/tool-confirmation.md) | 工具确认与安全模型 |
 | [guides/date-context.md](guides/date-context.md) | 日期时间上下文注入 |
-| [guides/chatagent-md.md](guides/chatagent-md.md) | 项目指令自动加载（`AGENTAO.md`） |
+| [guides/chatagent-md.md](guides/chatagent-md.md) | 项目指令自动加载（`ARBITER.md`） |
 | [guides/headless-runtime.md](guides/headless-runtime.md) | 非交互 / headless 运行时行为 |
 | [guides/funds-data-cleaning-parallelism.md](guides/funds-data-cleaning-parallelism.md) | 一个特定功能工作流说明 |
 
@@ -73,7 +73,7 @@ docs/
 | 文档 | 范围 |
 |------|------|
 | [reference/configuration.md](reference/configuration.md) | 每个配置文件、环境变量、公开 API——权威 schema 级参考（[English](reference/configuration.md)） |
-| [reference/host-api.md](reference/host-api.md) | `agentao.host` 包：`ActivePermissions`、`ToolLifecycleEvent`、`SubagentLifecycleEvent`、`PermissionDecisionEvent`、`EventStream`、schema 导出辅助（[中文](reference/host-api.zh.md)） |
+| [reference/host-api.md](reference/host-api.md) | `arbiter.host` 包：`ActivePermissions`、`ToolLifecycleEvent`、`SubagentLifecycleEvent`、`PermissionDecisionEvent`、`EventStream`、schema 导出辅助（[中文](reference/host-api.zh.md)） |
 | [reference/replay-schema-policy.md](reference/replay-schema-policy.md) | replay JSONL schema 的稳定性策略 |
 | [schema/host.events.v1.json](schema/host.events.v1.json) | 公共事件 + 权限快照面的发布期 schema 快照；`tests/test_host_schema.py` 强制字节相等 |
 | [schema/host.acp.v1.json](schema/host.acp.v1.json) | 宿主面 ACP 载荷的发布期 schema 快照 |

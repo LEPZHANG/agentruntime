@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from agentao.mcp.config import (
+from arbiter.mcp.config import (
     expand_env_vars,
     _expand_config_env,
     _load_json_file,
@@ -29,7 +29,7 @@ def test_resolve_timeouts_absent_defaults_to_startup_60_request_none():
 
 
 def test_resolve_timeouts_legacy_int_maps_to_startup_only():
-    # Legacy int form: agentao's timeout governed the *connect* phase, so it
+    # Legacy int form: arbiter's timeout governed the *connect* phase, so it
     # must map to startup (NOT request — that is the opencode mapping).
     assert resolve_timeouts({"timeout": 30}) == (30.0, None)
 
@@ -73,21 +73,21 @@ def test_resolve_timeouts_non_finite_or_overflow_never_raises(bad):
 
 
 def test_resolve_timeouts_warns_on_invalid_scalar(caplog):
-    with caplog.at_level(logging.WARNING, logger="agentao.mcp.config"):
+    with caplog.at_level(logging.WARNING, logger="arbiter.mcp.config"):
         out = resolve_timeouts({"timeout": "90"})
     assert out == (60.0, None)
     assert "timeout" in caplog.text.lower()
 
 
 def test_resolve_timeouts_warns_on_zero_request(caplog):
-    with caplog.at_level(logging.WARNING, logger="agentao.mcp.config"):
+    with caplog.at_level(logging.WARNING, logger="arbiter.mcp.config"):
         out = resolve_timeouts({"timeout": {"request": 0}})
     assert out == (60.0, None)
     assert "request" in caplog.text.lower()
 
 
 def test_resolve_timeouts_warns_on_unknown_key(caplog):
-    with caplog.at_level(logging.WARNING, logger="agentao.mcp.config"):
+    with caplog.at_level(logging.WARNING, logger="arbiter.mcp.config"):
         out = resolve_timeouts({"timeout": {"requets": 90}})  # typo'd 'request'
     assert out == (60.0, None)
     assert "unknown" in caplog.text.lower()
@@ -95,7 +95,7 @@ def test_resolve_timeouts_warns_on_unknown_key(caplog):
 
 def test_resolve_timeouts_absent_request_does_not_warn(caplog):
     # An unset request is normal, not a misconfiguration — no noise.
-    with caplog.at_level(logging.WARNING, logger="agentao.mcp.config"):
+    with caplog.at_level(logging.WARNING, logger="arbiter.mcp.config"):
         resolve_timeouts({"timeout": {"startup": 15}})
     assert caplog.text == ""
 
@@ -204,7 +204,7 @@ def _write_mcp(path: Path, servers: dict):
 
 
 def test_load_mcp_config_global_only(tmp_path):
-    user_root = tmp_path / "home" / ".agentao"
+    user_root = tmp_path / "home" / ".arbiter"
     _write_mcp(user_root / "mcp.json", {
         "global-server": {"command": "npx", "args": []}
     })
@@ -213,7 +213,7 @@ def test_load_mcp_config_global_only(tmp_path):
 
 
 def test_load_mcp_config_project_only(tmp_path):
-    _write_mcp(tmp_path / ".agentao" / "mcp.json", {
+    _write_mcp(tmp_path / ".arbiter" / "mcp.json", {
         "project-server": {"command": "python", "args": ["-m", "server"]}
     })
     result = load_mcp_config(project_root=tmp_path)
@@ -224,19 +224,19 @@ def test_load_mcp_config_user_wins_on_name_collision(tmp_path, caplog):
     """Project-scope entry with the same name as a user entry is ignored.
 
     Locks in the load-bearing security invariant: a checked-in
-    ``.agentao/mcp.json`` cannot silently redirect a known server
+    ``.arbiter/mcp.json`` cannot silently redirect a known server
     name (e.g. ``github``) to a different transport.
     """
     import logging
 
-    user_root = tmp_path / "home" / ".agentao"
+    user_root = tmp_path / "home" / ".arbiter"
     _write_mcp(user_root / "mcp.json", {
         "shared": {"command": "global-cmd", "args": []}
     })
-    _write_mcp(tmp_path / ".agentao" / "mcp.json", {
+    _write_mcp(tmp_path / ".arbiter" / "mcp.json", {
         "shared": {"command": "project-cmd", "args": []}
     })
-    with caplog.at_level(logging.WARNING, logger="agentao.mcp.config"):
+    with caplog.at_level(logging.WARNING, logger="arbiter.mcp.config"):
         result = load_mcp_config(project_root=tmp_path, user_root=user_root)
     assert result["shared"]["command"] == "global-cmd"
     assert any(
@@ -248,11 +248,11 @@ def test_load_mcp_config_user_wins_on_name_collision(tmp_path, caplog):
 def test_load_mcp_config_project_can_add_new_names(tmp_path):
     """Project-scope may declare *new* server names that do not exist
     in user scope. Both end up in the merged result."""
-    user_root = tmp_path / "home" / ".agentao"
+    user_root = tmp_path / "home" / ".arbiter"
     _write_mcp(user_root / "mcp.json", {
         "user-only": {"command": "u", "args": []}
     })
-    _write_mcp(tmp_path / ".agentao" / "mcp.json", {
+    _write_mcp(tmp_path / ".arbiter" / "mcp.json", {
         "project-only": {"command": "p", "args": []}
     })
     result = load_mcp_config(project_root=tmp_path, user_root=user_root)
@@ -261,11 +261,11 @@ def test_load_mcp_config_project_can_add_new_names(tmp_path):
 
 
 def test_load_mcp_config_merged(tmp_path):
-    user_root = tmp_path / "home" / ".agentao"
+    user_root = tmp_path / "home" / ".arbiter"
     _write_mcp(user_root / "mcp.json", {
         "global-svc": {"command": "ga", "args": []}
     })
-    _write_mcp(tmp_path / ".agentao" / "mcp.json", {
+    _write_mcp(tmp_path / ".arbiter" / "mcp.json", {
         "project-svc": {"command": "pa", "args": []}
     })
     result = load_mcp_config(project_root=tmp_path, user_root=user_root)
@@ -275,7 +275,7 @@ def test_load_mcp_config_merged(tmp_path):
 
 def test_load_mcp_config_env_vars_expanded(tmp_path, monkeypatch):
     monkeypatch.setenv("API_KEY", "secret")
-    _write_mcp(tmp_path / ".agentao" / "mcp.json", {
+    _write_mcp(tmp_path / ".arbiter" / "mcp.json", {
         "svc": {"headers": {"Authorization": "Bearer $API_KEY"}}
     })
     result = load_mcp_config(project_root=tmp_path)
@@ -284,15 +284,15 @@ def test_load_mcp_config_env_vars_expanded(tmp_path, monkeypatch):
 
 def test_load_mcp_config_no_files_returns_empty(tmp_path):
     assert load_mcp_config(
-        project_root=tmp_path, user_root=tmp_path / "home" / ".agentao"
+        project_root=tmp_path, user_root=tmp_path / "home" / ".arbiter"
     ) == {}
 
 
 def test_load_mcp_config_user_root_none_skips_user_scope(tmp_path):
     """``user_root=None`` (default) must not read any cross-project
-    location, even if a stale ``~/.agentao/mcp.json`` is present in
+    location, even if a stale ``~/.arbiter/mcp.json`` is present in
     the test environment."""
-    _write_mcp(tmp_path / ".agentao" / "mcp.json", {"only-project": {}})
+    _write_mcp(tmp_path / ".arbiter" / "mcp.json", {"only-project": {}})
     result = load_mcp_config(project_root=tmp_path, user_root=None)
     assert list(result.keys()) == ["only-project"]
 
@@ -308,7 +308,7 @@ def test_load_mcp_config_requires_project_root():
 # ---------------------------------------------------------------------------
 
 def test_save_mcp_config_project(tmp_path):
-    project_dir = tmp_path / ".agentao"
+    project_dir = tmp_path / ".arbiter"
     servers = {"my-server": {"command": "cmd", "args": []}}
     path = save_mcp_config(servers, config_dir=project_dir)
     saved = json.loads(path.read_text(encoding="utf-8"))
@@ -316,7 +316,7 @@ def test_save_mcp_config_project(tmp_path):
 
 
 def test_save_mcp_config_global(tmp_path):
-    user_root = tmp_path / "home" / ".agentao"
+    user_root = tmp_path / "home" / ".arbiter"
     servers = {"global-svc": {"url": "https://example.com/sse"}}
     path = save_mcp_config(servers, config_dir=user_root)
     assert "home" in str(path)
@@ -325,7 +325,7 @@ def test_save_mcp_config_global(tmp_path):
 
 
 def test_save_mcp_config_preserves_other_keys(tmp_path):
-    cfg_dir = tmp_path / ".agentao"
+    cfg_dir = tmp_path / ".arbiter"
     cfg_dir.mkdir()
     (cfg_dir / "mcp.json").write_text(
         json.dumps({"otherKey": "preserved", "mcpServers": {}}), encoding="utf-8"

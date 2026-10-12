@@ -25,12 +25,12 @@ The capability plane is "the agent doesn't know your business; you write an X to
 The control plane is "the agent is already mid-action; the runtime **exposes that moment to you**, and you decide whether to allow, block, or rewrite."
 :::
 
-A note on format: Agentao's hook system is **wire-compatible with Claude Code's `hooks.json`** — rules written for Agentao can be picked up by Claude Code and vice versa. The two exceptions are `Stop` and `PreCompact`, which keep Claude Code's flat snake_case top-level schema instead of Agentao's `{event, data}` envelope (see `CLAUDE_FLAT_EVENTS`).
+A note on format: Arbiter's hook system is **wire-compatible with Claude Code's `hooks.json`** — rules written for Arbiter can be picked up by Claude Code and vice versa. The two exceptions are `Stop` and `PreCompact`, which keep Claude Code's flat snake_case top-level schema instead of Arbiter's `{event, data}` envelope (see `CLAUDE_FLAT_EVENTS`).
 
 ::: warning This chapter is the **rule-author** view
 You'll learn how to write a hook rule, when it fires, what it can output.
 
-The host-side hooks list / disable / hot-reload API is **deliberately not exposed** — that surface is *out* of [4.7 The Embedded Harness Contract](/en/part-4/7-host-contract#4-7-8-whats-not-in-the-contract). If you're building a SaaS platform that wants to give tenants a "manage hooks" toggle, the answer today is: do it inside your own plugin-loading layer, **not** by reaching into `agentao.host`.
+The host-side hooks list / disable / hot-reload API is **deliberately not exposed** — that surface is *out* of [4.7 The Embedded Harness Contract](/en/part-4/7-host-contract#4-7-8-whats-not-in-the-contract). If you're building a SaaS platform that wants to give tenants a "manage hooks" toggle, the answer today is: do it inside your own plugin-loading layer, **not** by reaching into `arbiter.host`.
 :::
 
 ## 5.7.2 The eight events at a glance
@@ -46,7 +46,7 @@ The host-side hooks list / disable / hot-reload API is **deliberately not expose
 | `Stop` | Turn exit (`final_response` / `max_iterations` / `doom_loop`) | `force_continue` for one more turn / `suppress_output` / `system_message` |
 | `PreCompact` | Before compaction (`microcompact` / `full` / `minimal_history`) | Observe only — record, alert; cannot block or rewrite |
 
-Source: `SUPPORTED_HOOK_EVENTS` in `agentao/plugins/models.py`.
+Source: `SUPPORTED_HOOK_EVENTS` in `arbiter/plugins/models.py`.
 
 ::: info `Stop` is a control point. `PreCompact` is an observation point.
 After Phase B landed, a `Stop` hook can ask the chat loop to **issue one more LLM call** (via `force_continue` + `follow_up_message`) — that's a real **control signal** that bends the turn's trajectory.
@@ -123,7 +123,7 @@ Hook type 'prompt' is not supported for event 'Stop' — skipped.
 { "matcher": { "tool_name": "Bash" } }
 ```
 
-Note that `Bash` is Claude Code's tool name; Agentao internally calls it `run_shell_command`. The runtime's [`ToolAliasResolver`](https://github.com/jin-bo/agentao/blob/main/agentao/plugins/hooks.py) bridges the two **bidirectionally** — writing either `Bash` or `run_shell_command` matches the same tool.
+Note that `Bash` is Claude Code's tool name; Arbiter internally calls it `run_shell_command`. The runtime's [`ToolAliasResolver`](https://github.com/jin-bo/agentao/blob/main/arbiter/plugins/hooks.py) bridges the two **bidirectionally** — writing either `Bash` or `run_shell_command` matches the same tool.
 
 Matcher string values support glob (`*`, `?`) and **full-string regex** (patterns of the form `^...$` are interpreted as regex). A `null` matcher matches every invocation of that event.
 
@@ -278,7 +278,7 @@ Full field table: [4.2 AgentEvent · Replay observability events](/en/part-4/2-a
 
 The replay subsystem also records hook dispatches. By default it captures hook metadata (event name, rule count, outcome); the hook's `output_preview` field (a snippet of the command's stdout) is truncated.
 
-If you need full stdout in the replay log, flip the flag in `.agentao/settings.json`:
+If you need full stdout in the replay log, flip the flag in `.arbiter/settings.json`:
 
 ```json
 {

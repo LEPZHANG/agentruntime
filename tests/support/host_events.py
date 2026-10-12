@@ -11,8 +11,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
-from agentao.runtime.tool_planning import ToolCallDecision, ToolCallPlan
-from agentao.transport import AgentEvent, EventType
+from arbiter.runtime.tool_planning import ToolCallDecision, ToolCallPlan
+from arbiter.transport import AgentEvent, EventType
 
 
 class NullTransport:

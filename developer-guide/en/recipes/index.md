@@ -10,7 +10,7 @@
 
 ### …choose between Tool, Skill, MCP, Permission, and Hook
 
-→ **[Part 5 · Extend Agent Behavior](/en/part-5/)** — start with the "Read by task" table: business APIs use Tools, LLM-side conventions use Skills / AGENTAO.md, existing external services use MCP, safety boundaries use Permissions, lifecycle interception / audit / continuation use Hooks.
+→ **[Part 5 · Extend Agent Behavior](/en/part-5/)** — start with the "Read by task" table: business APIs use Tools, LLM-side conventions use Skills / ARBITER.md, existing external services use MCP, safety boundaries use Permissions, lifecycle interception / audit / continuation use Hooks.
 
 ### …audit, intercept, or continue at lifecycle points
 
@@ -48,7 +48,7 @@
 
 → **[6.3 Network & SSRF Defense](/en/part-6/3-network-ssrf)** — default blocklist coverage, the `.github.com` (suffix) vs `github.com` (exact) rule, redirect-disabling pattern. **Don't disable the default blocklist** — extend it.
 
-### …drive Agentao from Node / Go / Rust / IDE
+### …drive Arbiter from Node / Go / Rust / IDE
 
 → **[Part 3 · ACP Protocol](/en/part-3/)** — start with [3.1 Quick Try](/en/part-3/1-acp-tour#quick-try-in-60-seconds) for a 60-second taste, then [3.3 Host as ACP Client](/en/part-3/3-host-client-architecture) for the full client architecture (TS + Go skeletons).
 
@@ -60,27 +60,27 @@
 
 → **[6.8 Deployment](/en/part-6/8-deployment)** — multi-stage Dockerfile (build with `uv`, ship only the venv), `StatefulSet` + PVC + `sessionAffinity` for sticky sessions, canary by dimension.
 
-### …keep my host code working across Agentao releases (audit pipeline / observability)
+### …keep my host code working across Arbiter releases (audit pipeline / observability)
 
-→ **[4.7 Embedded Harness Contract](/en/part-4/7-host-contract)** — the `agentao.host` package is the **stable**, schema-snapshotted host API. Use `agent.events()` (async pull iterator) for audit / SIEM / billing, and `agent.active_permissions()` for policy-snapshot UIs. Don't touch internal `AgentEvent` from production code.
+→ **[4.7 Embedded Harness Contract](/en/part-4/7-host-contract)** — the `arbiter.host` package is the **stable**, schema-snapshotted host API. Use `agent.events()` (async pull iterator) for audit / SIEM / billing, and `agent.active_permissions()` for policy-snapshot UIs. Don't touch internal `AgentEvent` from production code.
 
 Two runnable starting points: [`examples/host_events.py`](https://github.com/jin-bo/agentao/blob/main/examples/host_events.py) (~50 lines, prints to stdout) and [`examples/host_audit_pipeline.py`](https://github.com/jin-bo/agentao/blob/main/examples/host_audit_pipeline.py) (full SQLite audit loop).
 
-### …embed Agentao in a Jupyter notebook
+### …embed Arbiter in a Jupyter notebook
 
-→ **[`examples/jupyter-session/`](https://github.com/jin-bo/agentao/tree/main/examples/jupyter-session)** — one `Agentao` per kernel; `agent.events()` drives `IPython.display`. Includes a `session.ipynb` you can open immediately and a passing test suite. Pair with **[1.3 Integration Modes](/en/part-1/3-integration-modes)** for the in-process SDK background.
+→ **[`examples/jupyter-session/`](https://github.com/jin-bo/agentao/tree/main/examples/jupyter-session)** — one `Arbiter` per kernel; `agent.events()` drives `IPython.display`. Includes a `session.ipynb` you can open immediately and a passing test suite. Pair with **[1.3 Integration Modes](/en/part-1/3-integration-modes)** for the in-process SDK background.
 
 ### …build a Slack or WeChat bot
 
 → **[`examples/slack-bot/`](https://github.com/jin-bo/agentao/tree/main/examples/slack-bot)** uses `slack-bolt` `app_mention` → one turn, with channel-scoped permissions. **[`examples/wechat-bot/`](https://github.com/jin-bo/agentao/tree/main/examples/wechat-bot)** is the WeChat polling-daemon equivalent with contact-scoped permissions. Both are minimum-shape (offline smoke, no API key).
 
-### …get hermetic pytest fixtures for Agentao
+### …get hermetic pytest fixtures for Arbiter
 
 → **[`examples/pytest-fixture/`](https://github.com/jin-bo/agentao/tree/main/examples/pytest-fixture)** ships drop-in `agent` / `agent_with_reply` / `fake_llm_client` fixtures. Hermetic, no `OPENAI_API_KEY` needed. Pair with [Appendix F.8](/en/appendix/f-faq#f-8-development-testing) for the assertion patterns.
 
-### …replace Agentao's IO surfaces (FS / shell / MCP / memory) with my own backend
+### …replace Arbiter's IO surfaces (FS / shell / MCP / memory) with my own backend
 
-→ **[2.2 Capability protocols](/en/part-2/2-constructor-reference#tier-3-advanced-injections)** lists all four host→Agentao injection slots (`filesystem` / `shell` / `mcp_registry` / `memory_manager`) and how each is bound. **TL;DR**: import the Protocols from `agentao.host.protocols`, pass implementations into the `Agentao(...)` constructor — `None` falls back to local defaults, not "disabled". Runnable end-to-end shape: **[`examples/protocol-injection/`](https://github.com/jin-bo/agentao/tree/main/examples/protocol-injection)** replaces all four slots with small adapters and asserts each one is consulted (6 smoke tests, no API key).
+→ **[2.2 Capability protocols](/en/part-2/2-constructor-reference#tier-3-advanced-injections)** lists all four host→Arbiter injection slots (`filesystem` / `shell` / `mcp_registry` / `memory_manager`) and how each is bound. **TL;DR**: import the Protocols from `arbiter.host.protocols`, pass implementations into the `Arbiter(...)` constructor — `None` falls back to local defaults, not "disabled". Runnable end-to-end shape: **[`examples/protocol-injection/`](https://github.com/jin-bo/agentao/tree/main/examples/protocol-injection)** replaces all four slots with small adapters and asserts each one is consulted (6 smoke tests, no API key).
 
 ## Don't see your task?
 

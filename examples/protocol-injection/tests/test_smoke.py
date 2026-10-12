@@ -1,7 +1,7 @@
 """Smoke tests proving every injected protocol is actually consulted.
 
 Each test exercises one slot and asserts the host-side adapter saw the
-call. Together they confirm the four ``agentao.host.protocols`` extension
+call. Together they confirm the four ``arbiter.host.protocols`` extension
 points are real, not theoretical.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentao.memory.models import SaveMemoryRequest
+from arbiter.memory.models import SaveMemoryRequest
 
 from src.protocol_demo import (
     AuditingShellExecutor,
@@ -64,7 +64,7 @@ def test_shell_protocol_can_refuse_background(tmp_path: Path) -> None:
 
 
 def test_mcp_registry_is_consulted_at_construction(tmp_path: Path) -> None:
-    """``Agentao()`` calls ``list_servers()`` once during construction."""
+    """``Arbiter()`` calls ``list_servers()`` once during construction."""
     handles = make_agent(tmp_path, mcp_servers={})
 
     assert handles.mcp.calls == 1

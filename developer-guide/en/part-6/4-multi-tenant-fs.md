@@ -19,7 +19,7 @@ The most common security incident in multi-tenant agent embeddings: **cross-tena
 │  │ Path.cwd()│◄─┤ Path.cwd()│   │
 │  └───────────┘  └───────────┘   │
 │        └────────────────┘        │
-│  Read each other's .agentao/memory.db │
+│  Read each other's .arbiter/memory.db │
 └─────────────────────────────────┘
 
 ✅ Right: explicit isolation
@@ -43,8 +43,8 @@ The most common security incident in multi-tenant agent embeddings: **cross-tena
 ```
 /data/
 ├── tenant-acme/
-│   ├── AGENTAO.md            ← acme's project doc
-│   ├── .agentao/
+│   ├── ARBITER.md            ← acme's project doc
+│   ├── .arbiter/
 │   │   ├── memory.db          ← memory
 │   │   ├── mcp.json           ← MCP config (add-only — see below)
 │   │   └── sandbox.json       ← sandbox rules
@@ -57,13 +57,13 @@ The most common security incident in multi-tenant agent embeddings: **cross-tena
 Construction:
 
 ```python
-agent = Agentao(working_directory=Path(f"/data/tenant-{tenant.id}"))
+agent = Arbiter(working_directory=Path(f"/data/tenant-{tenant.id}"))
 ```
 
 **Benefits**: directory-anchored config (memory, MCP add-on servers, skills, sandbox, project doc) is auto-isolated — no tenant_id filtering logic in code.
 
 ::: warning Permissions don't live here
-There is **no `permissions.json`** in the per-tenant directory. The engine deliberately ignores `<wd>/.agentao/permissions.json` (a checked-in allow-rule could escalate any tenant). For per-tenant policy, build a `PermissionEngine` programmatically and inject it:
+There is **no `permissions.json`** in the per-tenant directory. The engine deliberately ignores `<wd>/.arbiter/permissions.json` (a checked-in allow-rule could escalate any tenant). For per-tenant policy, build a `PermissionEngine` programmatically and inject it:
 
 ```python
 engine = PermissionEngine(
@@ -72,7 +72,7 @@ engine = PermissionEngine(
 )
 engine.add_loaded_source(f"injected:tenant-{tenant.id}")
 # ... apply tenant-specific rules via your own layer ...
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path(f"/data/tenant-{tenant.id}"),
     permission_engine=engine,
 )
@@ -91,9 +91,9 @@ from tempfile import mkdtemp
 import shutil
 
 def make_session_workdir(tenant_id: str, user_id: str) -> Path:
-    root = Path(mkdtemp(prefix=f"agentao-{tenant_id}-{user_id}-"))
+    root = Path(mkdtemp(prefix=f"arbiter-{tenant_id}-{user_id}-"))
     template = Path(f"/data/tenant-{tenant_id}/template")
-    (root / "AGENTAO.md").write_text((template / "AGENTAO.md").read_text())
+    (root / "ARBITER.md").write_text((template / "ARBITER.md").read_text())
     shutil.copytree(template / "skills", root / "skills")
     return root
 
@@ -107,54 +107,54 @@ def cleanup_session_workdir(workdir: Path):
 
 ```python
 # What the factory wires by default — note the user_store path.
-from agentao.memory import MemoryManager, SQLiteMemoryStore
+from arbiter.memory import MemoryManager, SQLiteMemoryStore
 agent._memory_manager = MemoryManager(
     project_store=SQLiteMemoryStore.open_or_memory(
-        working_directory / ".agentao" / "memory.db"
+        working_directory / ".arbiter" / "memory.db"
     ),
     user_store=SQLiteMemoryStore.open(
-        Path.home() / ".agentao" / "memory.db"   # ← process-global!
+        Path.home() / ".arbiter" / "memory.db"   # ← process-global!
     ),
 )
 ```
 
-Even with `working_directory` isolated, `~/.agentao/memory.db` is **process-global** — two tenants' agents read/write the same user-level memory DB.
+Even with `working_directory` isolated, `~/.arbiter/memory.db` is **process-global** — two tenants' agents read/write the same user-level memory DB.
 
 **Solution A · Capability injection** (preferred for multi-tenant in-process):
 
 ```python
 from pathlib import Path
-from agentao import Agentao
-from agentao.memory import MemoryManager, SQLiteMemoryStore
+from arbiter import Arbiter
+from arbiter.memory import MemoryManager, SQLiteMemoryStore
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=tenant_dir,
-    filesystem=YourTenantFS(),          # agentao.capabilities.FileSystem impl
+    filesystem=YourTenantFS(),          # arbiter.capabilities.FileSystem impl
     memory_manager=MemoryManager(
         project_store=SQLiteMemoryStore.open_or_memory(
-            tenant_dir / ".agentao" / "memory.db"
+            tenant_dir / ".arbiter" / "memory.db"
         ),
-        # user_store=None disables the process-global ~/.agentao/memory.db
+        # user_store=None disables the process-global ~/.arbiter/memory.db
     ),
 )
 ```
 
 Constructor injection replaces private attribute mutation (`agent._memory_manager = …`) — inject once at construction, no shared mutable state between tenants.
 
-The `FileSystem` Protocol (`agentao.capabilities.FileSystem`) covers all file and search tool IO. Any compliant implementation works as a drop-in: a Docker-exec remote that delegates reads/writes into a container, an in-memory virtual filesystem for test isolation, or an audit proxy that logs every access before delegating to the real disk — without changing any tool code.
+The `FileSystem` Protocol (`arbiter.capabilities.FileSystem`) covers all file and search tool IO. Any compliant implementation works as a drop-in: a Docker-exec remote that delegates reads/writes into a container, an in-memory virtual filesystem for test isolation, or an audit proxy that logs every access before delegating to the real disk — without changing any tool code.
 
 > To enforce a **path-domain write boundary** (declare some subpaths read-only, or additional roots writable) rather than just isolate/redirect/audit IO, see the `PolicyFileSystem` interim recipe in [`docs/design/host-fs-policy.md`](../../../docs/design/host-fs-policy.md) — a leaf-symlink-safe wrapper over this same `filesystem=` injection point. (Proposal-stage / demand-gated; the recipe covers the within-cwd read-only facet today.)
 
 **Solution B · One process per tenant** (strongest isolation, highest cost):
 
-Use ACP — each tenant gets its own Agentao subprocess. Cleanest isolation; most resource-intensive.
+Use ACP — each tenant gets its own Arbiter subprocess. Cleanest isolation; most resource-intensive.
 
 **Solution C · Mutate HOME per tenant** (discouraged):
 
 ```python
 import os
 os.environ["HOME"] = f"/data/tenant-{tenant.id}/home"
-agent = Agentao(working_directory=...)
+agent = Arbiter(working_directory=...)
 ```
 
 Affects the whole process's `Path.home()` — only works with one tenant per process (ACP subprocess model). **Do not use in multi-tenant in-process deployments.**
@@ -193,7 +193,7 @@ engine.rules.insert(0, {
 })
 engine.rules.append({"tool": "write_file", "action": "deny"})
 
-agent = Agentao(working_directory=workdir, permission_engine=engine)
+agent = Arbiter(working_directory=workdir, permission_engine=engine)
 ```
 
 ## MCP cross-tenant pollution
@@ -203,7 +203,7 @@ A single MCP server instance **should not be shared** across tenants — it may 
 **Correct pattern**: per-tenant MCP subprocess:
 
 ```python
-agent = Agentao(
+agent = Arbiter(
     working_directory=workdir,
     extra_mcp_servers={
         "github": {
@@ -220,10 +220,10 @@ agent = Agentao(
 If the host owns the MCP lifecycle entirely — managing server startup order, shared transport pools, or custom auth — pass a fully-built `McpClientManager` via `mcp_manager=` instead:
 
 ```python
-from agentao.mcp import McpClientManager
+from arbiter.mcp import McpClientManager
 
 manager = McpClientManager(...)   # built and connected by the host
-agent = Agentao(
+agent = Arbiter(
     working_directory=workdir,
     mcp_manager=manager,           # agent does not start/stop subprocesses
 )
@@ -233,9 +233,9 @@ agent = Agentao(
 
 ## Warm state: logs & temp files
 
-### agentao.log
+### arbiter.log
 
-Defaults to `<working_directory>/agentao.log` — auto-isolated. **Don't** redirect it back to a global path (e.g. `/var/log/agentao.log`) or you mix tenants' logs.
+Defaults to `<working_directory>/arbiter.log` — auto-isolated. **Don't** redirect it back to a global path (e.g. `/var/log/arbiter.log`) or you mix tenants' logs.
 
 ### Python temp files
 
@@ -246,11 +246,11 @@ The LLM may invoke `tempfile.mkdtemp()` → `/tmp` by default, **visible across 
 
 ### MCP subprocess cwd
 
-MCP subprocesses inherit the parent's cwd by default. If `working_directory` isn't threaded through, cross-tenant bleed happens. Agentao auto-merges session cwd into `extra_mcp_servers`, but **when you write your own MCP server** respect the incoming environment.
+MCP subprocesses inherit the parent's cwd by default. If `working_directory` isn't threaded through, cross-tenant bleed happens. Arbiter auto-merges session cwd into `extra_mcp_servers`, but **when you write your own MCP server** respect the incoming environment.
 
 ## Tenant boundaries for DB / API calls
 
-Not an Agentao issue, but critical: **your custom tools** (Tools calling DB/API) must carry their own `tenant_id` guard — never trust LLM-provided args.
+Not an Arbiter issue, but critical: **your custom tools** (Tools calling DB/API) must carry their own `tenant_id` guard — never trust LLM-provided args.
 
 ```python
 class GetUserTool(Tool):
@@ -271,20 +271,20 @@ class GetUserTool(Tool):
 
 Before deployment, answer "if two tenants use the product simultaneously, could they…":
 
-- [ ] Read each other's AGENTAO.md? (check `working_directory`)
+- [ ] Read each other's ARBITER.md? (check `working_directory`)
 - [ ] Read each other's memory? (check project + global memory DB paths)
 - [ ] Read each other's permission rules? (check `PermissionEngine.project_root`)
 - [ ] Read each other's skills? (check SkillManager's 3 layers)
 - [ ] Share an MCP server process? (per-session `extra_mcp_servers`?)
 - [ ] Share `/tmp`? (container / isolation)
 - [ ] Cross-tenant queries from business tools? (tenant_id guard in Tool)
-- [ ] Mixed logs? (agentao.log path)
+- [ ] Mixed logs? (arbiter.log path)
 
 ## TL;DR
 
-- **One session = one `working_directory` = one `Agentao` instance.** Never share an agent across tenants — even briefly.
+- **One session = one `working_directory` = one `Arbiter` instance.** Never share an agent across tenants — even briefly.
 - Three layers of isolation, stack as needed: per-session `working_directory`, OS user namespace, container/VM.
-- Memory user-scope (`~/.agentao/memory.db`) is **process-global** — disable it in multi-tenant or key memories by `tenant_id+user_id`.
+- Memory user-scope (`~/.arbiter/memory.db`) is **process-global** — disable it in multi-tenant or key memories by `tenant_id+user_id`.
 - Custom Tools that capture `tenant_id` at construction must be **created per session**, not pulled from a process-wide pool.
 
 → [6.5 Secrets & Prompt Injection](./5-secrets-injection)

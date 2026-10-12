@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import subprocess
 
-from agentao.plugins.hooks import (
+from arbiter.plugins.hooks import (
     ClaudeHookPayloadAdapter,
     ClaudeHooksParser,
     PluginHookDispatcher,
 )
-from agentao.plugins.models import ParsedHookRule, PluginWarning
+from arbiter.plugins.models import ParsedHookRule, PluginWarning
 
 
 def test_stop_prompt_type_dropped_at_parse_time():

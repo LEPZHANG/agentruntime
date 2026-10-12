@@ -1,15 +1,15 @@
-# Agentao System Prompt 改进计划
+# Arbiter System Prompt 改进计划
 
 ## Context
 
-参考两份外部样本，研究 agentao 当前 system prompt（入口
-`agentao/agent.py::_build_system_prompt` L603-734）的改进方向：
+参考两份外部样本，研究 arbiter 当前 system prompt（入口
+`arbiter/agent.py::_build_system_prompt` L603-734）的改进方向：
 
 1. `~/Downloads/Claude-Design-Sys-Prompt.txt`（Claude.ai 设计 agent，422 行）
 2. `../Claude-Code/src/constants/prompts.ts` + `system.ts` + 相关模块
    （Claude Code CLI 生产源码，1402 行）
 
-**Agentao 定位**：个人知识工作 agent，默认覆盖 **研究 / 数据分析 / 项目编排 /
+**Arbiter 定位**：个人知识工作 agent，默认覆盖 **研究 / 数据分析 / 项目编排 /
 编程实现** 四域，四域权重均衡；编程是核心能力之一，但不是唯一主轴。
 对混合任务先识别主类型，再组织行动与输出形式。
 
@@ -50,7 +50,7 @@ Plan suffix
 ### 稳定前缀的新拼装顺序
 
 ```
-1. Project Instructions（AGENTAO.md，可选）
+1. Project Instructions（ARBITER.md，可选）
 2. Identity                                ← _build_identity_section()
 3. Reliability Principles（含 #5/#6/#7）    ← _build_reliability_section() 扩充
 4. === Task Classification ===             ← _build_task_classification_section()
@@ -73,7 +73,7 @@ Plan suffix
 ### 各 section 要点
 
 **Identity**（替换 L609-620 的 "helpful AI assistant"）
-- Agentao 是**四域知识工作 agent**：研究、数据分析、项目编排、编程实现。
+- Arbiter 是**四域知识工作 agent**：研究、数据分析、项目编排、编程实现。
 - 四域权重均衡，编程不独占主轴。
 - 混合任务先识别主类型，再行动。
 - Working directory: {cwd}。
@@ -194,7 +194,7 @@ _build_operational_guidelines()             # 重排现有
 
 - **`SYSTEM_PROMPT_DYNAMIC_BOUNDARY` 硬标记**：依赖 section 顺序测试守护即可，
   不引入新 cache 边界机制。
-- **Scratchpad 目录**（`.agentao/scratch/<session>/`）：涉及路径/工具默认写入
+- **Scratchpad 目录**（`.arbiter/scratch/<session>/`）：涉及路径/工具默认写入
   语义，属独立设计议题。
 - **CYBER_RISK 等价物**：科研领域安全边界作为未来独立议题。
 - **Autonomous / Proactive 模式蓝本**：依赖 runtime 新模式支持。
@@ -204,7 +204,7 @@ _build_operational_guidelines()             # 重排现有
 
 ## Critical Files
 
-- **`agentao/agent.py`** — 本轮全部改动集中于此
+- **`arbiter/agent.py`** — 本轮全部改动集中于此
   - `_build_system_prompt` (L603-734)：新增 5 个 helper 的调用；拼装顺序按
     上表调整
   - `_build_reliability_section` (L518-530)：扩充至 7 条
@@ -212,9 +212,9 @@ _build_operational_guidelines()             # 重排现有
     retry / tool-result summarization
   - 新增：identity / task_classification / execution_protocol /
     completion_standard / untrusted_input 五个 helper
-- **`agentao/plan/prompt.py`**：plan mode 后缀；本轮不改（语气已在 L11-104
+- **`arbiter/plan/prompt.py`**：plan mode 后缀；本轮不改（语气已在 L11-104
   自洽）。若 PR1 后身份/完成定义变化导致 plan mode 冲突，再单独评估。
-- **`AGENTAO.md`**（项目级）：用户可附加本项目研究方向；**本次改动不涉及**
+- **`ARBITER.md`**（项目级）：用户可附加本项目研究方向；**本次改动不涉及**
 - **测试文件**（新增/更新）：
   - `tests/test_reliability_prompt.py`（扩到 7 条）
   - `tests/test_system_prompt_sections.py`（新：section 顺序 + 关键短语断言）
@@ -229,8 +229,8 @@ _build_operational_guidelines()             # 重排现有
 
 ```
 uv run python - <<'PY'
-from agentao.agent import Agentao
-a = Agentao()
+from arbiter.agent import Arbiter
+a = Arbiter()
 sp = a._build_system_prompt()
 print(f"system prompt: {len(sp)} chars, ~{len(sp)//4} tokens")
 PY
@@ -299,7 +299,7 @@ uv run python -m pytest tests/ -x
 
 ### 4. 日志
 
-看 `agentao.log`：
+看 `arbiter.log`：
 - 多轮对话稳定前缀字符串保持不变（cache 命中正常）
 - 新增小节顺序符合预期
 - 不出现被废条款（长度硬锚、scratchpad 引用、DYNAMIC_BOUNDARY 标记）
@@ -352,7 +352,7 @@ uv run python -m pytest tests/ -x
 - 决策示例表（L186-206）— 本方案"先探索后提问"4 触发 采纳精神但未平铺示例
 - 反模式清单（L297-313）— 精神采纳于 Completion Standard 四域
 - 协议化交互格式（L222-254）— 领域不适用，不采纳
-- 验证外包（L216）— agentao 无独立 verifier，不采纳
+- 验证外包（L216）— arbiter 无独立 verifier，不采纳
 - 上下文主动管理（L179-183）— 作为未来议题（LLM 侧 snip）
 
 ---
@@ -361,7 +361,7 @@ uv run python -m pytest tests/ -x
 
 按优先级粗排：
 
-1. **Scratchpad 路径语义**：`.agentao/scratch/<session>/` + `get_scratchpad_dir()`
+1. **Scratchpad 路径语义**：`.arbiter/scratch/<session>/` + `get_scratchpad_dir()`
    helper + 工具默认写入规则
 2. **`SYSTEM_PROMPT_DYNAMIC_BOUNDARY` 硬标记**：防 cache 命中率回归
 3. **CYBER_RISK 等价物**：科研领域敏感数据 + 授权安全研究边界

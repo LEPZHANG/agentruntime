@@ -18,10 +18,10 @@ from pathlib import Path
 
 import pytest
 
-from agentao.acp import initialize as acp_initialize
-from agentao.acp import session_new as acp_session_new
-from agentao.acp.models import AcpSessionState
-from agentao.acp.protocol import (
+from arbiter.acp import initialize as acp_initialize
+from arbiter.acp import session_new as acp_session_new
+from arbiter.acp.models import AcpSessionState
+from arbiter.acp.protocol import (
     ACP_PROTOCOL_VERSION,
     INTERNAL_ERROR,
     INVALID_PARAMS,
@@ -29,10 +29,10 @@ from agentao.acp.protocol import (
     METHOD_SESSION_NEW,
     SERVER_NOT_INITIALIZED,
 )
-from agentao.acp.server import AcpServer
-from agentao.acp.session_manager import DuplicateSessionError
-from agentao.acp.transport import ACPTransport
-from agentao.permissions import PermissionMode
+from arbiter.acp.server import AcpServer
+from arbiter.acp.session_manager import DuplicateSessionError
+from arbiter.acp.transport import ACPTransport
+from arbiter.permissions import PermissionMode
 
 from .support.acp_agents import (
     ExplodingAgent,
@@ -79,7 +79,7 @@ def _minimal_params(cwd: str) -> dict:
 def test_session_new_before_initialize_raises_server_not_initialized(server, abs_tmp_dir):
     factory, _ = make_recording_factory()
 
-    from agentao.acp.server import JsonRpcHandlerError
+    from arbiter.acp.server import JsonRpcHandlerError
     with pytest.raises(JsonRpcHandlerError) as exc_info:
         acp_session_new.handle_session_new(
             server, _minimal_params(abs_tmp_dir), agent_factory=factory
@@ -193,7 +193,7 @@ def test_capabilities_snapshot_is_independent_of_server_state(initialized_server
 
 
 def test_factory_receives_permission_engine(initialized_server, abs_tmp_dir):
-    from agentao.permissions import PermissionEngine
+    from arbiter.permissions import PermissionEngine
 
     factory, calls = make_recording_factory()
 
@@ -333,7 +333,7 @@ def test_mcp_servers_http_entry_accepted(initialized_server, abs_tmp_dir):
     """``type: "http"`` (Streamable HTTP) is accepted at parse time.
 
     The agent advertises ``mcpCapabilities.http: true`` because
-    :class:`agentao.mcp.client.McpClient` now dispatches http through
+    :class:`arbiter.mcp.client.McpClient` now dispatches http through
     ``streamable_http_client``. It shares the sse url/headers shape.
     """
     factory, _ = make_recording_factory()

@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from agentao.embedding.plugins.mcp import (
+from arbiter.embedding.plugins.mcp import (
     McpMergeResult,
     merge_plugin_mcp_servers,
     resolve_plugin_mcp_servers,
 )
-from agentao.plugins.models import LoadedPlugin, PluginManifest
+from arbiter.plugins.models import LoadedPlugin, PluginManifest
 
 
 # ======================================================================

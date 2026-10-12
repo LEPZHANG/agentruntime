@@ -6,15 +6,15 @@ turn with no text and no tool calls. Persisting ``{"role": "assistant",
 the next turn. The chat loop substitutes a neutral placeholder instead.
 
 The placeholder keeps history valid but is not an answer, so TURN_END also
-classifies the turn via ``incomplete_reason`` — that is what lets ``agentao
+classifies the turn via ``incomplete_reason`` — that is what lets ``arbiter
 run`` exit non-zero instead of handing a pipeline the placeholder as a result.
 """
 
 from pathlib import Path
 from types import SimpleNamespace
 
-from agentao import Agentao
-from agentao.transport import EventType
+from arbiter import Arbiter
+from arbiter.transport import EventType
 
 
 def _fake_response(content, *, reasoning=None):
@@ -23,8 +23,8 @@ def _fake_response(content, *, reasoning=None):
     return SimpleNamespace(choices=[choice], usage=None, model="test-model")
 
 
-def _make_agent() -> Agentao:
-    return Agentao(
+def _make_agent() -> Arbiter:
+    return Arbiter(
         api_key="test-key",
         base_url="https://example.test/v1",
         model="test-model",
@@ -32,7 +32,7 @@ def _make_agent() -> Agentao:
     )
 
 
-def _capture_incomplete_reason(agent: Agentao) -> list:
+def _capture_incomplete_reason(agent: Arbiter) -> list:
     """Collect the ``incomplete_reason`` field of every TURN_END the agent emits."""
     seen: list = []
 
@@ -44,7 +44,7 @@ def _capture_incomplete_reason(agent: Agentao) -> list:
     return seen
 
 
-def _assert_no_contentless_assistant_message(agent: Agentao) -> None:
+def _assert_no_contentless_assistant_message(agent: Arbiter) -> None:
     assistant_msgs = [m for m in agent.messages if m.get("role") == "assistant"]
     assert assistant_msgs, "expected an assistant message in history"
     for m in assistant_msgs:
@@ -91,7 +91,7 @@ def test_nonempty_final_content_passes_through():
 
 
 # ---------------------------------------------------------------------------
-# TURN_END classification — the signal ``agentao run`` exits non-zero on
+# TURN_END classification — the signal ``arbiter run`` exits non-zero on
 # ---------------------------------------------------------------------------
 
 
@@ -120,7 +120,7 @@ def test_turn_end_distinguishes_reasoning_only_turn():
 def test_turn_end_reports_none_for_real_answer():
     """The guard against false failures: a normal turn must never classify.
 
-    ``agentao run`` maps a non-None ``incomplete_reason`` to a non-zero exit, so
+    ``arbiter run`` maps a non-None ``incomplete_reason`` to a non-zero exit, so
     a turn that actually answered leaking a classification here would fail runs
     that succeeded.
     """
@@ -149,7 +149,7 @@ def test_answer_matching_placeholder_prefix_is_not_classified_empty():
 
 # ---------------------------------------------------------------------------
 # Harness-halted turns — the other family of "no complete answer". These end
-# with a canned harness string, which without a classification `agentao run`
+# with a canned harness string, which without a classification `arbiter run`
 # would serve to a pipeline at exit 0 as if the model had said it.
 # ---------------------------------------------------------------------------
 
@@ -274,7 +274,7 @@ def test_llm_api_error_is_classified_llm_error():
     retries) is swallowed into a ``[LLM API error: …]`` notice and returned.
 
     That notice is the harness's, not a model answer, so the turn must classify
-    ``llm_error`` — otherwise ``agentao run`` serves the notice at exit 0. This
+    ``llm_error`` — otherwise ``arbiter run`` serves the notice at exit 0. This
     return path bypasses ``_resolve_stop_hook``, so it is the one most likely to
     be forgotten; the classification is committed at the return site itself.
     """
@@ -302,7 +302,7 @@ def test_llm_api_error_is_classified_llm_error():
 def _stub_stop(monkeypatch, *results):
     """Patch the runner's Stop dispatch to yield ``results`` in order (the last
     repeats), so a test can drive block / force-continue / decorate."""
-    from agentao.runtime.chat_loop._runner import ChatLoopRunner
+    from arbiter.runtime.chat_loop._runner import ChatLoopRunner
 
     calls = {"n": 0}
 
@@ -321,7 +321,7 @@ def test_additional_contexts_decoration_stays_classified_empty(monkeypatch):
     returned text is no longer the bare placeholder — but the model still
     never answered, and the run must still report the turn empty.
     """
-    from agentao.plugins.models import StopHookResult
+    from arbiter.plugins.models import StopHookResult
 
     _stub_stop(monkeypatch, StopHookResult(
         matched_rule_count=1, additional_contexts=["audit-note"],
@@ -340,7 +340,7 @@ def test_additional_contexts_decoration_stays_classified_empty(monkeypatch):
 def test_blocking_stop_hook_clears_empty_classification(monkeypatch):
     """A blocking hook replaces the text the caller receives, so the turn is
     no longer answerless and must not be reported empty."""
-    from agentao.plugins.models import StopHookResult
+    from arbiter.plugins.models import StopHookResult
 
     _stub_stop(monkeypatch, StopHookResult(
         matched_rule_count=1, blocking_error="not so fast",
@@ -358,8 +358,8 @@ def test_blocking_stop_hook_clears_empty_classification(monkeypatch):
 def test_blocking_stop_hook_does_not_mask_a_doom_loop_halt(monkeypatch):
     """A blocking hook substitutes its own text, but a doom-looped turn still
     never converged — hook text is not a model answer, so the halt
-    classification must survive and keep ``agentao run`` at exit 1."""
-    from agentao.plugins.models import StopHookResult
+    classification must survive and keep ``arbiter run`` at exit 1."""
+    from arbiter.plugins.models import StopHookResult
 
     _stub_stop(monkeypatch, StopHookResult(
         matched_rule_count=1, blocking_error="policy gate",
@@ -380,7 +380,7 @@ def test_blocking_stop_hook_does_not_mask_a_doom_loop_halt(monkeypatch):
 
 def test_blocking_stop_hook_does_not_mask_length_truncation(monkeypatch):
     """The length-truncation twin of the doom-loop block case."""
-    from agentao.plugins.models import StopHookResult
+    from arbiter.plugins.models import StopHookResult
 
     _stub_stop(monkeypatch, StopHookResult(
         matched_rule_count=1, blocking_error="policy gate",
@@ -398,7 +398,7 @@ def test_blocking_stop_hook_does_not_mask_length_truncation(monkeypatch):
 def test_force_continue_to_a_real_answer_is_not_reported_empty(monkeypatch):
     """An empty iteration that the hook forces past must not stick to a turn
     that goes on to answer."""
-    from agentao.plugins.models import StopHookResult
+    from arbiter.plugins.models import StopHookResult
 
     _stub_stop(
         monkeypatch,
@@ -421,7 +421,7 @@ def test_cancelled_stream_is_not_reported_as_an_empty_answer():
     """A token cancelled mid-stream makes the LLM return a normally-built
     empty message without raising, so the turn reaches the ordinary ending
     site with status "ok" — it must be reported as interrupted, not empty."""
-    from agentao.cancellation import CancellationToken
+    from arbiter.cancellation import CancellationToken
 
     agent = _make_agent()
     token = CancellationToken()

@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import json
 
-from agentao.plugins.hooks import PluginHookDispatcher
-from agentao.plugins.models import ParsedHookRule, StopHookResult
+from arbiter.plugins.hooks import PluginHookDispatcher
+from arbiter.plugins.models import ParsedHookRule, StopHookResult
 
 
 def _parse(stdout_payload: dict) -> StopHookResult:
@@ -51,7 +51,7 @@ def test_hook_specific_additional_context_list():
 
 
 def test_legacy_top_level_additional_context():
-    """Agentao tolerance for older hook scripts that use the top-level
+    """Arbiter tolerance for older hook scripts that use the top-level
     ``additionalContext`` (no ``hookSpecificOutput`` envelope)."""
     result = _parse({"additionalContext": "legacy-note"})
     assert "legacy-note" in result.additional_contexts

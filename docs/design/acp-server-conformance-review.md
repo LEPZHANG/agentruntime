@@ -1,12 +1,12 @@
 # ACP Server — Standard-Conformance Gap Review
 
 **Status:** Review record. Drafted 2026-06-18 from a file-by-file read of the
-`agentao.acp` server package cross-checked against the Agent Client Protocol
+`arbiter.acp` server package cross-checked against the Agent Client Protocol
 (ACP, protocol version 1). **This is a gap analysis + prioritized improvement
 proposal, not an approved plan.** It records what the ACP server implements,
 where it diverges from the standard, and — *for the maintainer's judgment* —
 what to build, document, or deliberately decline.
-**Audience:** Agentao maintainers; anyone embedding agentao behind an ACP
+**Audience:** Arbiter maintainers; anyone embedding arbiter behind an ACP
 client (Zed, DeepChat, …).
 **Companion:** `acp-server-conformance-review.zh.md`.
 **Related:**
@@ -31,22 +31,22 @@ TL;DR for the first-draft claims that fix superseded.
 
 ## TL;DR
 
-Agentao's ACP server is **high-quality engineering that implements only the
+Arbiter's ACP server is **high-quality engineering that implements only the
 "agent half" of the protocol.** The *core* client→agent request surface
 (`initialize`, `session/new|load|prompt|cancel`, mode/config) is robust — though
 the v1 session-management methods (`session/list|delete|resume|close`, `logout`)
 are unimplemented. What is largely absent is *consuming the capabilities the
 client offers back* — the `fs/*` and `terminal/*` methods. The result: embedded
-in a real ACP client, agentao behaves like a headless agent that happens to speak
+in a real ACP client, arbiter behaves like a headless agent that happens to speak
 ACP rather than one deeply integrated into the editor.
 
 > **Correction (2026-06-18, post-review):** the official ACP v1 schema (release
 > dated 2026-06-18) was re-fetched after this doc's first draft. Three first-draft
 > claims were wrong and are fixed below: (i) the request surface is **not**
 > "complete" — v1 defines `session/list|delete|resume|close` and `logout`, which
-> agentao does not implement; (ii) `session/set_model` and `session/list_models`
-> are **Agentao extensions, not ACP v1 methods**; (iii) G2/G3 are **not**
-> runtime-only — agentao's own frozen contract (`agentao/acp/schema.py` →
+> arbiter does not implement; (ii) `session/set_model` and `session/list_models`
+> are **Arbiter extensions, not ACP v1 methods**; (iii) G2/G3 are **not**
+> runtime-only — arbiter's own frozen contract (`arbiter/acp/schema.py` →
 > `docs/schema/host.acp.v1.json`) currently *forbids* `locations`/`diff` and omits
 > the `max_tokens` stop reason, so those must be updated too. Source: official ACP
 > schema at `schema/v1/schema.json` on `main`.
@@ -54,10 +54,10 @@ ACP rather than one deeply integrated into the editor.
 > **Positioning premise (determines G1's priority).** ACP makes `fs/*` and
 > `terminal/*` *capability-gated*: the agent uses them only when the client
 > advertises `fs.readTextFile`/`writeTextFile`/`terminal`. A **chat-class host
-> typically does not** — so agentao's current local-file/local-shell behavior is
+> typically does not** — so arbiter's current local-file/local-shell behavior is
 > **already correct and conformant** there, and G1 is **not a gap for non-IDE
 > hosts**. G1 only bites when an **editor-class client (Zed/Cursor)** advertises
-> those capabilities and agentao ignores them. The design docs
+> those capabilities and arbiter ignores them. The design docs
 > (`embedding-vs-acp.md:13`) name Zed/Cursor/IDE as ACP targets, but the only
 > *live* integration is **DeepChat** (an Electron chat UI,
 > `deepchat-acp-patch-revision.md`). By the project's demand-gated rule (gap ≠
@@ -69,7 +69,7 @@ ACP rather than one deeply integrated into the editor.
 > **Decision (2026-06-18): target-client class = chat/automation.** The maintainer
 > has set the positioning to **chat/automation hosts** (DeepChat the live
 > integration), not editor-class IDEs. Per §4 P0 option (b), **G1 (fs/terminal
-> proxy) is a documented non-goal**: *agentao is a self-contained ACP agent that
+> proxy) is a documented non-goal**: *arbiter is a self-contained ACP agent that
 > owns its own filesystem and shell (sandbox, permission engine, provider-neutral);
 > routing file/terminal operations through the client is intentionally out of
 > scope.* Its current local-fs/local-shell behavior is the intended, conformant
@@ -105,24 +105,24 @@ bidirectional:
   `session/load`, `session/prompt`, `session/cancel` (notification),
   `session/list`, `session/delete`, `session/resume`, `session/close`,
   `session/set_mode`, `session/set_config_option`. (Note: `session/set_model`
-  and `session/list_models` are **not** in v1 — they are Agentao extensions.)
+  and `session/list_models` are **not** in v1 — they are Arbiter extensions.)
 - **agent → client**: `session/update` (notification), `session/request_permission`,
   and the capability-gated **`fs/read_text_file`**, **`fs/write_text_file`**,
   **`terminal/create`**, **`terminal/output`**, **`terminal/wait_for_exit`**,
   **`terminal/kill`**, **`terminal/release`**.
 
-Protocol version: **1** (`agentao/acp/protocol.py:18`).
+Protocol version: **1** (`arbiter/acp/protocol.py:18`).
 
 A *complete* ACP agent does two things: it answers the client's requests **and**
 it drives the client's fs/terminal so file edits and shell commands flow through
-the editor's own view (unsaved buffers, diff review, terminal panel). Agentao
+the editor's own view (unsaved buffers, diff review, terminal panel). Arbiter
 does the first thoroughly and the second almost not at all.
 
 ---
 
 ## 2. What is implemented (the agent half — done well)
 
-Registered handlers (`agentao/acp/__main__.py:99-108`):
+Registered handlers (`arbiter/acp/__main__.py:99-108`):
 
 | Method | File | Notes |
 |---|---|---|
@@ -131,12 +131,12 @@ Registered handlers (`agentao/acp/__main__.py:99-108`):
 | `session/load` | `session_load.py` | History replay via `_ReplayMixin` |
 | `session/prompt` | `session_prompt.py` | `text` / `resource_link` / `image` content blocks; returns `stopReason` |
 | `session/cancel` | `session_cancel.py` | Spec notification; tolerant of clients that send it as a request |
-| `session/set_model` ⚠ | `session_set_model.py` | **Agentao extension — not in ACP v1.** Vendor-free model switch |
+| `session/set_model` ⚠ | `session_set_model.py` | **Arbiter extension — not in ACP v1.** Vendor-free model switch |
 | `session/set_config_option` | `session_set_config_option.py` | Standard config path; host `provider_resolver` keeps credentials off-wire |
 | `session/set_mode` | `session_set_mode.py` | `modeId` field; accept-unknown (DeepChat `code`/`ask`) |
-| `session/list_models` ⚠ | `session_list_models.py` | **Agentao extension — not in ACP v1.** `{models: [...]}` |
+| `session/list_models` ⚠ | `session_list_models.py` | **Arbiter extension — not in ACP v1.** `{models: [...]}` |
 | `_agentao.cn/ask_user` | extension | Underscore-prefixed per ACP, declared in `_meta` |
-| `_agentao.cn/set_model` | `agentao_set_model.py` | Free-form model setter (DeepChat "type any model" UX) |
+| `_agentao.cn/set_model` | `arbiter_set_model.py` | Free-form model setter (DeepChat "type any model" UX) |
 
 Outbound (agent → client): `session/update` notifications (rich event mapping,
 `transport.py`) and `session/request_permission` (`_transport_interaction.py:161`).
@@ -166,7 +166,7 @@ Outbound (agent → client): `session/update` notifications (rich event mapping,
 
 > **Resolved as a non-goal (Decision 2026-06-18: chat/automation).** Because ACP
 > gates `fs/*`/`terminal/*` on client-advertised capabilities, a chat-class host
-> that doesn't advertise them gets the *correct, conformant* behavior from agentao
+> that doesn't advertise them gets the *correct, conformant* behavior from arbiter
 > today — so with the target class set to chat/automation, **this is a documented
 > non-goal, not a gap.** The analysis below is retained as the **reactivation
 > clause**: it describes what would need building *if* an editor-class client
@@ -175,11 +175,11 @@ Outbound (agent → client): `session/update` notifications (rich event mapping,
 **Evidence.** The entire server makes exactly **two** outbound `server.call`
 invocations (`_transport_interaction.py:161,328`): `session/request_permission`
 and `_agentao.cn/ask_user`. There is **no** call to `fs/read_text_file`,
-`fs/write_text_file`, or any `terminal/*` method anywhere in `agentao/` (grep:
+`fs/write_text_file`, or any `terminal/*` method anywhere in `arbiter/` (grep:
 no outbound `fs/` or `terminal/` string).
 
 **Consequences.**
-- **Filesystem**: file reads/writes go through agentao's *local* file tools, not
+- **Filesystem**: file reads/writes go through arbiter's *local* file tools, not
   the client. In an editor like Zed this bypasses unsaved buffers and the
   editor's own fs view; the client cannot mediate, diff, or track the edit
   through its native path.
@@ -193,7 +193,7 @@ no outbound `fs/` or `terminal/` string).
 `fs.readTextFile: true` to choose between local file tools and ACP-proxied file
 tools."* The branch is designed; it is just not implemented.
 
-**Framing.** This is **a choice with a cost, not merely a bug.** Agentao is an
+**Framing.** This is **a choice with a cost, not merely a bug.** Arbiter is an
 embedded harness that owns its own sandbox, permission engine, and
 provider-neutral runtime (`embedding-vs-acp.md`, `host-fs-policy.md`). Routing
 fs/terminal through the client *inverts* that ownership for ACP sessions, and
@@ -213,11 +213,11 @@ supports and editor clients render:
 - **`content` of `type:"diff"` (`oldText`/`newText`)** — edit-tool results are
   sent as plain text (`_tool_content_text`), so the client renders them as a text
   blob instead of a reviewable diff. **The diff view is ACP's signature UX for
-  edit tools; agentao forgoes it.**
-- **Human-readable `title`** — ACP expects e.g. "Writing config.py"; agentao
+  edit tools; arbiter forgoes it.**
+- **Human-readable `title`** — ACP expects e.g. "Writing config.py"; arbiter
   sends "write_file".
 
-**This is a contract change, not only an emit change.** Agentao's own frozen ACP
+**This is a contract change, not only an emit change.** Arbiter's own frozen ACP
 schema is *more* restrictive than ACP v1 and currently **forbids** these shapes:
 `AcpSessionUpdateToolCall` has no `locations` field and is `extra="forbid"`
 (`schema.py:536-552`); `AcpToolCallContentEntry` accepts **only** `type:"content"`
@@ -225,11 +225,11 @@ with an inner text block — no `diff`, no `terminal` (`schema.py:630-642`). The
 local `kind` enum also has just 6 values (`read, edit, search, execute, fetch,
 other`, `schema.py:547`) versus ACP v1's 9 (adds `delete, move, think`) — so the
 `_tool_kind` map in `transport.py:39` can already produce a value its own schema
-rejects. Implementing G2 therefore means: update `agentao/acp/schema.py`,
+rejects. Implementing G2 therefore means: update `arbiter/acp/schema.py`,
 regenerate `docs/schema/host.acp.v1.json`, and update the schema snapshot tests —
 otherwise the emit will fail the project's own contract test.
 
-Minor, related: `TOOL_COMPLETE` maps agentao's `cancelled`→ACP `failed`
+Minor, related: `TOOL_COMPLETE` maps arbiter's `cancelled`→ACP `failed`
 (`transport.py:261-268`) because ACP tool calls have no cancelled status —
 acceptable but lossy.
 
@@ -265,11 +265,11 @@ Two layers, not one:
   is emitted. `session_set_mode.py:15-19` explicitly defers this and the
   UI-mode-vs-permission-axis split.
 - **Plan**: ACP has a `plan` `sessionUpdate` variant (entries with status that
-  clients render as a task checklist). Agentao has plan mode **and** a todo tool,
+  clients render as a task checklist). Arbiter has plan mode **and** a todo tool,
   but neither is mapped to `plan` — they stay internal. Sub-agents are likewise
   flattened to `agent_thought_chunk` text markers rather than structured
   `tool_call` timelines (`transport.py:30-35,279-301`).
-- **Commands**: no `available_commands_update`. Agentao's rich slash-command set
+- **Commands**: no `available_commands_update`. Arbiter's rich slash-command set
   is CLI-only and never advertised to ACP clients.
 
 ### G5 — Thin capability surface *(mostly demand-gated)*
@@ -286,7 +286,7 @@ From `initialize.py`:
 - `loadSession:true` **is** implemented — good.
 - **Confirmed-in-v1, unimplemented**: `session/list`, `session/delete`,
   `session/close`, `session/resume`, and `logout` **are** defined in the official
-  ACP v1 schema (verified 2026-06-18) — they are not "proposed/newer." Agentao
+  ACP v1 schema (verified 2026-06-18) — they are not "proposed/newer." Arbiter
   registers none of them. Still demand-gated (build when a target client uses the
   session-management UI), but they are a real conformance shortfall, not an
   unknown.
@@ -297,10 +297,10 @@ From `initialize.py`:
 
 ### G6 — No upstream-schema conformance test
 
-`schema_export.py` exports agentao's own ACP Pydantic models to JSON Schema
+`schema_export.py` exports arbiter's own ACP Pydantic models to JSON Schema
 (good foundation), and the test suite asserts the *internal* event→update
 mapping — but **nothing validates the wire against the upstream ACP schema** or
-runs agentao against the reference client. Drift from the spec would not be
+runs arbiter against the reference client. Drift from the spec would not be
 caught.
 
 ---
@@ -313,7 +313,7 @@ host-injectable and don't bake editor assumptions into the core.
 **P0 — Target-client class: DECIDED = chat/automation (2026-06-18).** This gates
 everything below. The decision is **chat/automation hosts** (DeepChat the live
 integration), so:
-- **G1 is a documented non-goal** — agentao stays a self-contained ACP agent that
+- **G1 is a documented non-goal** — arbiter stays a self-contained ACP agent that
   owns its own fs/shell; its current local-fs/local-shell behavior is the intended,
   conformant behavior. No fs/terminal proxy is built.
 - **Reactivation clause**: if editor-class clients (Zed/Cursor) ever become a
@@ -339,7 +339,7 @@ for the automation surface and any client UI.
 
 **P1 — `tool_call` `diff` content (G2, diff half).** Emit `diff`
 (`oldText`/`newText`) for edit tools — it renders in chat clients too, not only
-editors. Widen the frozen contract first (`agentao/acp/schema.py`: add the
+editors. Widen the frozen contract first (`arbiter/acp/schema.py`: add the
 `diff`/`terminal` variants to `AcpToolCallContentEntry`, extend the `kind` enum to
 v1's 9 values), regenerate `docs/schema/host.acp.v1.json`, update the snapshot
 tests, then emit. The **`locations` half is editor-only — defer it with G1.**
@@ -349,7 +349,7 @@ tests, then emit. The **`locations` half is editor-only — defer it with G1.**
 passes HTTP MCP servers in `session/new`.
 
 **P3 — Upstream conformance test (G6).** Wire `schema_export.py` to the official
-ACP schema (or run agentao under the reference ACP client) as a CI check so spec
+ACP schema (or run arbiter under the reference ACP client) as a CI check so spec
 drift is caught mechanically.
 
 ---
@@ -369,10 +369,10 @@ client-agnostic / chat-relevant wins — **G4** (plan/modes/commands), **G3**
 
 ## 6. Method coverage matrix
 
-`I` = implemented, `—` = not implemented, `ext` = Agentao extension (not in ACP
+`I` = implemented, `—` = not implemented, `ext` = Arbiter extension (not in ACP
 v1). All v1 method membership verified against the official schema on 2026-06-18.
 
-| ACP method | Dir | Agentao | Note |
+| ACP method | Dir | Arbiter | Note |
 |---|---|---|---|
 | `initialize` | c→a | I | version negotiate + `_meta` extensions |
 | `authenticate` | c→a | — | `authMethods:[]` ⇒ never called; OK |
@@ -384,8 +384,8 @@ v1). All v1 method membership verified against the official schema on 2026-06-18
 | `session/set_mode` | c→a | I | no `availableModes`/`current_mode_update` (G4) |
 | `session/set_config_option` | c→a | I | host `provider_resolver` |
 | `session/list`/`delete`/`close`/`resume` | c→a | — | **v1 methods, unimplemented**; demand-gated (G5) |
-| `session/set_model` | c→a | ext | **Agentao extension, not ACP v1** |
-| `session/list_models` | c→a | ext | **Agentao extension, not ACP v1** |
+| `session/set_model` | c→a | ext | **Arbiter extension, not ACP v1** |
+| `session/list_models` | c→a | ext | **Arbiter extension, not ACP v1** |
 | `_agentao.cn/set_model` | c→a | ext | free-form model setter |
 | `session/update` | a→c | I | rich mapping; no `plan`/`diff`/`locations` (G2/G4) |
 | `session/request_permission` | a→c | I | blocking, concurrency-safe |
@@ -404,7 +404,7 @@ v1). All v1 method membership verified against the official schema on 2026-06-18
 
 The ACP server is well-built where it exists and secure by construction on the
 inbound path. Its conformance ceiling **depends on the target-client class.** For
-the live chat host (DeepChat) agentao's current behavior is already conformant —
+the live chat host (DeepChat) arbiter's current behavior is already conformant —
 G1 is not a gap there — and the now-work is the client-agnostic / chat-relevant
 wins: **G4** (plan/modes/commands), **G3** (stopReason), and **G2's `diff`**, each
 a local schema + emit change with no protocol round-trip. **G1** (drive the

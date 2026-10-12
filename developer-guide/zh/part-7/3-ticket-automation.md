@@ -7,7 +7,7 @@
 **运行** —— `uv run python -m src.triage "工单内容"`
 :::
 
-**场景**：工单进来的速度比客服分拣的速度快。你希望 Agentao 读新工单 → 分类 → 从 CRM 拉上下文 → 草拟回复 → **只在置信度够高时自动发**，否则留个草稿给人工审核。
+**场景**：工单进来的速度比客服分拣的速度快。你希望 Arbiter 读新工单 → 分类 → 从 CRM 拉上下文 → 草拟回复 → **只在置信度够高时自动发**，否则留个草稿给人工审核。
 
 ## 谁 & 为什么
 
@@ -23,7 +23,7 @@ Zendesk / Intercom / HubSpot
           ▼
     FastAPI worker
           │
-          ├─ Agentao 实例（单例复用——无状态分拣）
+          ├─ Arbiter 实例（单例复用——无状态分拣）
           │    ├─ 自定义工具:
           │    │    - get_customer_profile(email)
           │    │    - search_kb(query)
@@ -42,7 +42,7 @@ Zendesk / Intercom / HubSpot
 
 ```python
 # tools/support.py
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 import httpx
 
 class GetCustomerProfile(Tool):
@@ -88,7 +88,7 @@ class SendReply(Tool):
 
 ```python
 # permissions.py
-from agentao.permissions import PermissionEngine, PermissionDecision, PermissionMode
+from arbiter.permissions import PermissionEngine, PermissionDecision, PermissionMode
 
 class ConfidenceGatedEngine(PermissionEngine):
     def decide(self, tool_name: str, tool_args: dict):
@@ -141,7 +141,7 @@ description: 用于每一条新进工单。定义分拣流程、语气与升级�
 ```python
 # worker.py
 from fastapi import FastAPI
-from agentao import Agentao
+from arbiter import Arbiter
 from pathlib import Path
 from .tools.support import GetCustomerProfile, SearchKb, GetOrderStatus, DraftReply, SendReply
 from .permissions import ConfidenceGatedEngine
@@ -153,7 +153,7 @@ def build_agent(ticket):
     workdir.mkdir(exist_ok=True)
     engine = ConfidenceGatedEngine(project_root=workdir)
     engine.set_mode(PermissionMode.READ_ONLY)
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=workdir,
         permission_engine=engine,
     )
@@ -185,7 +185,7 @@ async def on_ticket(ticket: dict):
 把每一轮都写进审计日志——主管需要看 agent 为什么这么草拟：
 
 ```python
-from agentao.transport import SdkTransport
+from arbiter.transport import SdkTransport
 
 def archive(ev):
     db.insert("ticket_agent_events", {
@@ -193,7 +193,7 @@ def archive(ev):
         "data": ev.data, "ts": time.time(),
     })
 
-agent = Agentao(transport=SdkTransport(on_event=archive), ...)
+agent = Arbiter(transport=SdkTransport(on_event=archive), ...)
 ```
 
 审核员会查："上周所有 confidence 在 0.85–0.92 之间的案子"——这就是你持续训练的信号。

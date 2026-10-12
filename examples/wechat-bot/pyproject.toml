@@ -1,10 +1,10 @@
 [project]
-name = "agentao-example-wechat-bot"
+name = "arbiter-example-wechat-bot"
 version = "0.1.0"
-description = "WeChat polling daemon: each inbound message runs one Agentao turn, contact-scoped permissions."
+description = "WeChat polling daemon: each inbound message runs one Arbiter turn, contact-scoped permissions."
 requires-python = ">=3.10"
 dependencies = [
-    "agentao",
+    "arbiter",
 ]
 
 [project.optional-dependencies]
@@ -14,7 +14,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-agentao = { path = "../..", editable = true }
+arbiter = { path = "../..", editable = true }
 
 [build-system]
 requires = ["hatchling"]

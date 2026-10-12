@@ -4,17 +4,17 @@
 PR-1/PR-2/PR-3 and the core ACP rework PR-4/PR-5/PR-6 (B1/B2/B3) all landed
 (see PR sequencing); PR-7 (retire legacy model methods) deferred to a later
 release.
-**Audience:** Agentao maintainers; the DeepChat/TensorChat integration fork owner.
+**Audience:** Arbiter maintainers; the DeepChat/TensorChat integration fork owner.
 **Related docs:** `docs/design/embedded-host-contract.md`,
 `docs/design/embedding-vs-acp.md` (if present),
-`agentao/embedding/factory.py`, `agentao/acp/`.
+`arbiter/embedding/factory.py`, `arbiter/acp/`.
 
 ## Scope (read this first)
 
-A ~405 KB local-changes patch (`agentaolocal-changes.patch`, 56 files,
-+4448 / −6153) wires Agentao up as an **ACP subprocess backend for a
+A ~405 KB local-changes patch (`arbiterlocal-changes.patch`, 56 files,
++4448 / −6153) wires Arbiter up as an **ACP subprocess backend for a
 DeepChat / TensorChat (Electron) desktop chat UI**. This document is the
-triage + revision plan for that patch: what to upstream into Agentao
+triage + revision plan for that patch: what to upstream into Arbiter
 core, what to rework, what to keep in the fork, and what to reject.
 
 The patch is **not** a single feature. It bundles four unrelated
@@ -22,7 +22,7 @@ concerns: (1) genuine harness capabilities, (2) one wrongly-exposed
 capability, (3) DeepChat-only glue and packaging, and (4) repo
 deletions that regress current `main`. The plan separates them.
 
-**This plan's actionable scope on agentao `main` is the A-series, the
+**This plan's actionable scope on arbiter `main` is the A-series, the
 B-series, and D1.** The disposition table below is *patch triage*, not a
 main work-list: only the A groups (upstream), the B groups (rework +
 upstream), and **D1 (restore the deleted `acp_client` tests)** are
@@ -31,12 +31,12 @@ verdicts — they describe what does *not* come into `main`, and the
 fork-side ones are collected as **advisory recommendations** under
 *Suggestions for the DeepChat fork*. The core redesign and the PR
 sequencing are the actual `main` work; this plan does **not** implement
-the fork-side items. agentao `main` only ships the seams the fork
+the fork-side items. arbiter `main` only ships the seams the fork
 consumes.
 
 The single load-bearing design decision is **credential handling for
 runtime provider/model switching**: the patch sends `apiKey` / `baseUrl`
-over the ACP wire (and into `agentao.log`). This document replaces that
+over the ACP wire (and into `arbiter.log`). This document replaces that
 with the ACP-standard `session/set_config_option` mechanism plus a
 server-side, host-injectable `provider_resolver`.
 
@@ -44,12 +44,12 @@ server-side, host-injectable `provider_resolver`.
 
 | Theme | Files (representative) |
 |---|---|
-| ACP handlers grow a DeepChat wire shape (`modelId`, `_meta`, `apiKey`, `baseUrl`) | `agentao/acp/session_set_model.py`, `session_set_mode.py`, `models.py`, `server.py`, `transport.py` |
-| Multimodal (image) input through the turn | `agentao/agent.py`, `agentao/runtime/turn.py`, `agentao/runtime/chat_loop/_runner.py`, `agentao/llm/client.py` |
-| Structured `ask_user` (options/header/multiple/custom) | `agentao/tools/ask_user.py`, `agentao/tools/base.py` |
-| Second, parallel ACP transport implementation | `agentao/transport/acp.py` (new), `transport/acp_server.py` (new) |
+| ACP handlers grow a DeepChat wire shape (`modelId`, `_meta`, `apiKey`, `baseUrl`) | `arbiter/acp/session_set_model.py`, `session_set_mode.py`, `models.py`, `server.py`, `transport.py` |
+| Multimodal (image) input through the turn | `arbiter/agent.py`, `arbiter/runtime/turn.py`, `arbiter/runtime/chat_loop/_runner.py`, `arbiter/llm/client.py` |
+| Structured `ask_user` (options/header/multiple/custom) | `arbiter/tools/ask_user.py`, `arbiter/tools/base.py` |
+| Second, parallel ACP transport implementation | `arbiter/transport/acp.py` (new), `transport/acp_server.py` (new) |
 | PyInstaller binary packaging, 6-platform CI | `run.py`, `pyinstaller.spec`, `scripts/build_binaries.sh`, `.github/workflows/build-matrix.yml` |
-| `$HOME`-based path resolution | `agentao/paths.py` + callers |
+| `$HOME`-based path resolution | `arbiter/paths.py` + callers |
 | Deletions | `tests/test_acp_client_*.py`, `docs/dev-notes/*` |
 
 ## Verified findings (boundary analysis)
@@ -58,13 +58,13 @@ All claims below were grep-verified against the working tree and the ACP
 spec (`agentclientprotocol.com`), not asserted from memory. See the
 Appendix for the evidence.
 
-1. **`reconfigure()` already exists in core** (`agentao/llm/client.py:233`,
+1. **`reconfigure()` already exists in core** (`arbiter/llm/client.py:233`,
    `reconfigure(api_key, base_url, model)`). Runtime provider switching is
    already a harness primitive; the patch only *calls* it from a new wire
    shape. No new capability is needed — only a safe way to trigger it.
 
 2. **Server-side credential resolution already exists**
-   (`agentao/embedding/factory.py:71-77`): `LLM_PROVIDER` selects a
+   (`arbiter/embedding/factory.py:71-77`): `LLM_PROVIDER` selects a
    provider, then `{PROVIDER}_API_KEY` / `_BASE_URL` / `_MODEL` are read
    from the environment. Secrets already resolve server-side at
    construction time. The wire has never needed to carry a key.
@@ -73,7 +73,7 @@ Appendix for the evidence.
    there is no `session/set_model`, `session/select_model`, or
    `session/list_models`. Model selection is handled by the generic
    **`session/set_config_option`** (with `category: "model"`) or by
-   agent-internal mechanisms. Agentao's existing `session/set_model` /
+   agent-internal mechanisms. Arbiter's existing `session/set_model` /
    `session/list_models` are therefore **already non-standard
    extensions** sitting in the bare `session/` namespace — inconsistent
    with `ask_user`, which correctly uses the vendor prefix
@@ -82,19 +82,19 @@ Appendix for the evidence.
 4. **`session/set_mode` with `modeId` *is* the ACP standard.** The spec's
    field is `modeId` (not `mode`), with `availableModes` /
    `currentModeId`. The patch's `modeId` change actually moves *toward*
-   the standard; Agentao's pre-patch `mode` field was the non-standard
+   the standard; Arbiter's pre-patch `mode` field was the non-standard
    one.
 
-5. **`agentao/acp_client/` and its tests are live in `main`.** The
+5. **`arbiter/acp_client/` and its tests are live in `main`.** The
    patch's deletion of `tests/test_acp_client_*` is a regression against
    current coverage, not cleanup.
 
-6. **`agentao/transport/` has no ACP implementation today.** The new
+6. **`arbiter/transport/` has no ACP implementation today.** The new
    `transport/acp.py` + `acp_server.py` are a *second*, parallel ACP impl
-   duplicating the complete `agentao/acp/` server package — fork debt.
+   duplicating the complete `arbiter/acp/` server package — fork debt.
 
 7. **Full private-schema inventory on `main`.** An audit of
-   `agentao/acp/` against the spec found these non-standard surfaces
+   `arbiter/acp/` against the spec found these non-standard surfaces
    *already in `main`* (independent of the patch):
 
    | Private surface | schema | Verdict |
@@ -103,7 +103,7 @@ Appendix for the evidence.
    | `session/list_models` | `AcpSessionListModelsRequest/Response`, `AcpModelInfo` (`extra="allow"`) | Non-standard method, same namespace problem. |
    | `_agentao.cn/ask_user` | `AcpAskUserParams`, `AcpAskUserAnswered/Cancelled` | Non-standard but **correctly vendor-prefixed** and advertised in `initialize` — the model citizen. |
    | `initialize` response `extensions: [...]` | `AcpInitializeExtension` | **Non-standard top-level field.** ACP advertises extensions through **`_meta`**, not a top-level `extensions` array. |
-   | `session/set_mode` `mode` field | `AcpSessionSetModeRequest` (`mode: Literal["read-only","workspace-write","full-access","plan"]`) | **Two deviations:** the ACP field is `modeId` (not `mode`), and the value is wrongly pinned to Agentao **permission presets**, conflating ACP's "mode" (a UI/behavioural selector) with permission posture. |
+   | `session/set_mode` `mode` field | `AcpSessionSetModeRequest` (`mode: Literal["read-only","workspace-write","full-access","plan"]`) | **Two deviations:** the ACP field is `modeId` (not `mode`), and the value is wrongly pinned to Arbiter **permission presets**, conflating ACP's "mode" (a UI/behavioural selector) with permission posture. |
 
    For contrast, these are confirmed **standard** and need no change:
    `protocolVersion`, `agentCapabilities` (`loadSession` /
@@ -126,14 +126,14 @@ Legend: ✅ upstream · 🔧 rework then upstream · 🟠 keep in fork · ❌ dr
 | **A3 — `$HOME` path robustness** (`paths.py` + `memory/storage.py`, `skills/manager.py`, `llm/client.py` fallback, `tests/test_memory_store.py`) | ✅ | Small PR. Confirm the fallback when `$HOME` is unset. |
 | **B1 — Secret-wire fix (PR-4, core)** (`acp/session_set_model.py`, `models.py`, `server.py`, `transport.py`, `initialize.py`, `schema.py`, `session_new.py`, `test_acp_set_model.py`) | ✅ done (`#56`) | **Drop** `apiKey`/`baseUrl`/`modelId`/`_meta`. Add `session/set_config_option` (`configId="model"` only; single `category:"model"` option, `provider/model` value) + injectable `provider_resolver` (server-side secret; **handler whitelist + `extra="forbid"` rejects `apiKey`/`baseUrl`/`_meta`**). **Add `_agentao.cn/set_model`** (`{sessionId, model}`, free-form, secret-free; shares the core code path — Decision #4) and **keep the existing `session/set_model` unchanged** as a one-release compatibility alias — its current shape `{sessionId, model?, contextLength?, maxTokens?}` is already `extra="forbid"` and secret-free; PR-4 simply **does not adopt the patch's `modelId`/`apiKey`/`baseUrl`/`_meta` additions** to it (CHANGELOG-deprecate; retires with `list_models` in PR-7). Default catalog = the **single current env** `provider/model` (model from live `agent.llm.model`); richer catalog host-injected. **Keep `session/list_models` as a compatibility endpoint** in this PR. See "Core redesign". |
 | **B2 — `session/set_mode` field (PR-5, separate)** (`acp/session_set_mode.py`, `schema.py`, `test_acp_set_mode.py`) | ✅ done (`#57`) | Minimal: rename `mode` → **`modeId`** and **accept unknown values** (always persist; map to a preset only on match) — so DeepChat's `code`/`ask` aren't rejected. **Deferred** (Decision #6 — decoupling is a large refactor): the permission-axis split *and* `availableModes`/`currentModeId` + `current_mode_update`. Not in the model/provider PR. |
-| **B3 — `initialize` `extensions` array → `_meta` (PR-6, low priority)** (`acp/initialize.py`, `acp/schema.py`) | ✅ done (`#58`) | **Decision #5: move under `_meta`** (spec-clean). agentao's own client doesn't read `extensions`; only the schema snapshot + `test_acp_schema.py` change. Its own small PR; **not** bundled into the secret-wire fix; schedule last. Snapshot bump (`docs/schema/host.acp.v1.json`). |
+| **B3 — `initialize` `extensions` array → `_meta` (PR-6, low priority)** (`acp/initialize.py`, `acp/schema.py`) | ✅ done (`#58`) | **Decision #5: move under `_meta`** (spec-clean). arbiter's own client doesn't read `extensions`; only the schema snapshot + `test_acp_schema.py` change. Its own small PR; **not** bundled into the secret-wire fix; schedule last. Snapshot bump (`docs/schema/host.acp.v1.json`). |
 | **B4 — Retire the legacy model methods (PR-7, later)** | 🔧 | After a host consumes the standard `configOptions` path: remove **both** compatibility endpoints together — `session/list_models` **and** the `session/set_model` name alias (the canonical `_agentao.cn/set_model` stays). Direction is standard-alignment; staged across releases. |
-| **C1 — Duplicate ACP transport** (`transport/acp.py`, `transport/acp_server.py`, `transport/__init__.py`, `transport/sdk.py`) | ❌ | Drop the whole group. `agentao/acp/` is already a complete server package. |
-| **C2 — PyInstaller packaging** (`run.py`, `pyinstaller.spec`, `scripts/build_binaries.sh`, `.github/workflows/build-matrix.yml`, `pyproject.toml`) | 🟠 | Keep in the DeepChat fork. It conflicts with Agentao's embedded-library positioning (`pip install agentao`). Upstream only if the project decides to ship binaries — a separate product decision. |
+| **C1 — Duplicate ACP transport** (`transport/acp.py`, `transport/acp_server.py`, `transport/__init__.py`, `transport/sdk.py`) | ❌ | Drop the whole group. `arbiter/acp/` is already a complete server package. |
+| **C2 — PyInstaller packaging** (`run.py`, `pyinstaller.spec`, `scripts/build_binaries.sh`, `.github/workflows/build-matrix.yml`, `pyproject.toml`) | 🟠 | Keep in the DeepChat fork. It conflicts with Arbiter's embedded-library positioning (`pip install arbiter`). Upstream only if the project decides to ship binaries — a separate product decision. |
 | **C3 — skill-creator HTML drift** (`skills/skill-creator/assets/eval_review.html`, `eval-viewer/viewer.html`) | ❌ | Unrelated front-end drift (no ACP/provider references). Remove from the patch. |
 | **D1 — `tests/test_acp_client_*` deletions** | 🚫 | Reject. `acp_client` is live in `main`; restore the tests. |
 | **D2 — `docs/dev-notes/*` deletions** | ⚪ | Neutral. If intended, do it as a separate housekeeping PR, not bundled with features. |
-| **D3 — New Chinese fork notes** (`docs/agentao/*.md`) | ⚪ | Keep in the fork; do not upstream. |
+| **D3 — New Chinese fork notes** (`docs/arbiter/*.md`) | ⚪ | Keep in the fork; do not upstream. |
 
 ## Core redesign — provider/model switching over ACP
 
@@ -163,7 +163,7 @@ same way: ACP's `category` enum is `{mode, model, thought_level}` — it has
 `model` but **no `provider`**, so the spec's mental model is "pick a
 model," not "pick a provider then a model."
 
-`provider/model` is an **Agentao value convention, not an ACP standard** —
+`provider/model` is an **Arbiter value convention, not an ACP standard** —
 document it as such on the option.
 
 ### Wire shape
@@ -240,13 +240,13 @@ Two separate concerns, do not conflate them:
   `LLM_PROVIDER`, model from the **live `agent.llm.model`** (the value
   resolved at construction) — **not** a re-read of `{PROVIDER}_MODEL`, so a
   missing `{PROVIDER}_MODEL` env var does not block advertising the current
-  model. Agentao is **single-provider today** (`LLM_PROVIDER` selects one at
+  model. Arbiter is **single-provider today** (`LLM_PROVIDER` selects one at
   construction; there is no `providers.json` and no registry), so a default
   agent honestly advertises exactly one option, and `set_config_option` is a
   no-op switch until a host enriches it. A **multi-entry catalog must be
   host-injected** — the implementation must **never scan env or guess the
   provider list**.
-- **No `.agentao/providers.json`.** A new secret-at-rest config format is
+- **No `.arbiter/providers.json`.** A new secret-at-rest config format is
   orthogonal to "keep secrets off the wire" and only widens the attack
   surface. A host wanting a richer secret store (e.g. the OS keychain) or a
   multi-provider catalog injects its own resolver / catalog — that is
@@ -344,7 +344,7 @@ status-quo method left in place.
 
 ## PR sequencing
 
-All of the following land in agentao `main`. Fork-side items
+All of the following land in arbiter `main`. Fork-side items
 (PyInstaller, the duplicate transport, fork notes, DeepChat client
 adaptation) are **not** numbered PRs here — they are collected under
 *Suggestions for the DeepChat fork*, below.
@@ -367,7 +367,7 @@ regression guard was already in place before the extraction PRs landed.
    constructed `AskUserTool`, and 1-arg replay inner transports — keep
    working. Tested (`tests/test_ask_user_structured.py`).
 3. **PR-3 — `$HOME` path robustness** (A3). ✅ **Done** — merged in `#55`
-   (squash `0b8b4f4`). Added `agentao.paths.user_home()` and routed the
+   (squash `0b8b4f4`). Added `arbiter.paths.user_home()` and routed the
    scattered `Path.home()` sites through it; the no-home fallback is a
    private, per-user, ownership-validated temp dir (cached per process).
    Tested (`tests/test_paths.py`).
@@ -415,29 +415,29 @@ regression guard was already in place before the extraction PRs landed.
 
 The items below are **recommendations for the DeepChat / TensorChat fork
 owner**, not work this plan implements. They sit on the fork side of the
-embedded-harness boundary; agentao `main` only provides the seams they
+embedded-harness boundary; arbiter `main` only provides the seams they
 consume (the `provider_resolver` / catalog injection points, the
 secret-free wire, and the vendor `_agentao.cn/set_model` method that PR-4
 ships).
 
-> **This section is non-normative for agentao `main`.** Do not create
+> **This section is non-normative for arbiter `main`.** Do not create
 > upstream PRs from these bullets unless an item is explicitly promoted
 > into the A/B/D1 scope later.
 
 - **Keep PyInstaller packaging & 6-platform CI on the fork** (C2). It
-  conflicts with agentao's library-first positioning (`pip install
-  agentao`); upstream only if the project later makes a separate decision
+  conflicts with arbiter's library-first positioning (`pip install
+  arbiter`); upstream only if the project later makes a separate decision
   to ship binaries.
-- **Keep the Chinese fork notes on the fork** (`docs/agentao/*.md`, D3).
+- **Keep the Chinese fork notes on the fork** (`docs/arbiter/*.md`, D3).
   Not upstreamed.
-- **Drop the duplicate ACP transport** (C1). Target `agentao/acp/`
+- **Drop the duplicate ACP transport** (C1). Target `arbiter/acp/`
   directly instead of carrying a second `transport/acp*.py` server; the
   duplicate is fork debt with no upstream path.
 - **Drop the skill-creator HTML drift** (C3). Unrelated front-end change;
   don't carry it on the integration branch.
 - **Adapt the model-switch UI to the secret-free wire.** Map the fork's UI
   `modelId` → the wire **`model`** field; never put `apiKey` / `baseUrl` /
-  `_meta` on the wire (agentao rejects them). Credentials resolve
+  `_meta` on the wire (arbiter rejects them). Credentials resolve
   server-side via `provider_resolver`.
   - Free-form "type any model" → call the vendor `_agentao.cn/set_model`
     (`{sessionId, model}`).
@@ -445,22 +445,22 @@ ships).
     `session/set_config_option` (`configId="model"`, value
     `provider/model`).
 - **Migrate off the legacy methods.** Once the fork consumes the standard
-  `configOptions` path, agentao retires `session/list_models` and the
+  `configOptions` path, arbiter retires `session/list_models` and the
   `session/set_model` alias (PR-7). That retirement is **gated on this
   migration** — the fork's move is the trigger.
 - **Inject a multi-provider resolver + catalog if you need real provider
-  switching.** agentao's default is single-provider (current
+  switching.** arbiter's default is single-provider (current
   `LLM_PROVIDER`). A fork wanting multiple providers injects its own
   `provider_resolver` + catalog through the **constructor kwargs /
   injection seam** (no new host protocol to design) — no
-  `providers.json`, no env-scanning on the agentao side.
+  `providers.json`, no env-scanning on the arbiter side.
 
 ## Decisions (resolved)
 
 All six were researched with cited evidence (see Appendix). Resolutions:
 
 1. **Upstream target → A1/A2/A3 and the B-series core fixes go to
-   `agentao/main`; fork packaging (C2) and fork notes (D3) stay out.**
+   `arbiter/main`; fork packaging (C2) and fork notes (D3) stay out.**
    This is *not* "upstream the whole patch" — only the harness-capability
    and ACP-correctness groups land in `main`. A1 (image input)
    and A3 (`$HOME`) are LOW-risk: `add_message` widening to
@@ -473,10 +473,10 @@ All six were researched with cited evidence (see Appendix). Resolutions:
    hosts. That constraint is in PR-2, not a blocker to the decision.
 2. **PyInstaller → keep in fork.** Conflicts with the library-first
    positioning (single console script `pyproject.toml:63`; `CLAUDE.md:51`
-   "embedded harness"; `pip install agentao` = library). Shipping binaries
+   "embedded harness"; `pip install arbiter` = library). Shipping binaries
    is a separate product decision; not bundled here.
 3. **Retirement → `session/list_models` and the `session/set_model` alias
-   retire together (PR-7).** Zero internal blockers: agentao's own
+   retire together (PR-7).** Zero internal blockers: arbiter's own
    `acp_client` does **not** call these wire methods, and the CLI `/model` /
    `/sessions resume` use the **core** `agent.set_model()` /
    `list_available_models()` (`cli/commands/provider.py:87,120`), not the
@@ -497,7 +497,7 @@ All six were researched with cited evidence (see Appendix). Resolutions:
    PR-4 (DeepChat needs it to keep working). See "Free-form model entry"
    above.
 5. **`initialize.extensions` → move under `_meta` (PR-6, low priority).**
-   agentao's own `acp_client` doesn't read `extensions` (0 refs); only the
+   arbiter's own `acp_client` doesn't read `extensions` (0 refs); only the
    schema snapshot (`docs/schema/host.acp.v1.json`) + `test_acp_schema.py`
    are affected. Small change (add `_meta`, regen snapshot). Non-blocking;
    schedule last.
@@ -511,17 +511,17 @@ All six were researched with cited evidence (see Appendix). Resolutions:
 
 ## Appendix — verification evidence
 
-- `agentao/llm/client.py:233` — `def reconfigure(self, api_key, base_url=None, model=None)`.
-- `agentao/embedding/factory.py:71-77` — `LLM_PROVIDER` + `{PROVIDER}_API_KEY/_BASE_URL/_MODEL`.
-- `agentao/acp/protocol.py:47-61` — method constants; `_agentao.cn/ask_user` is the only vendor-prefixed one; `set_model`/`list_models` sit in the bare `session/` namespace.
+- `arbiter/llm/client.py:233` — `def reconfigure(self, api_key, base_url=None, model=None)`.
+- `arbiter/embedding/factory.py:71-77` — `LLM_PROVIDER` + `{PROVIDER}_API_KEY/_BASE_URL/_MODEL`.
+- `arbiter/acp/protocol.py:47-61` — method constants; `_agentao.cn/ask_user` is the only vendor-prefixed one; `set_model`/`list_models` sit in the bare `session/` namespace.
 - ACP spec (`agentclientprotocol.com`): no `session/set_model`; model selection via `session/set_config_option` (`{sessionId, configId, value}`), `ConfigOption{id,name,description,category,type,currentValue,options}`, `category ∈ {mode, model, thought_level}` (has `model`, **no `provider`**), `type` only `select`, `value` an opaque agent-defined string; `session/set_mode` field is `modeId` with `availableModes` / `currentModeId`; `initialize` response standard fields are `protocolVersion` / `agentCapabilities` / `agentInfo` / `authMethods` — **no top-level `extensions` array** (extensions go under `_meta`).
 - ACP `session/update` variants include **`config_option_update`** (refreshed `configOptions`) and **`current_mode_update`** (`currentModeId`); `session/new` / `session/load` responses carry initial `configOptions` / `modes` — the standard dynamic-refresh path that supersedes `list_models`.
-- No `providers.json` anywhere in `agentao/` or `docs/` (grep: 0 hits). `factory.py` is **single-provider**: `LLM_PROVIDER` selects one provider at construction; no multi-provider registry exists.
-- `agentao/acp/schema.py:87-115` — `AcpInitializeExtension` + top-level `extensions` field on `AcpInitializeResponse`. `agentao/acp/initialize.py:140-145` — advertises `_agentao.cn/ask_user` in that array.
-- `agentao/acp/schema.py:306-320` — `AcpSessionSetModeRequest.mode: Literal["read-only","workspace-write","full-access","plan"]` (non-standard `mode` field, pinned to permission presets).
-- Working tree: `agentao/acp_client/` and `tests/test_acp_client_*.py` present on `main`; `agentao/transport/` has no `acp.py` / `acp_server.py`; `agentao/tools/ask_user.py` `execute(self, question)` is plain-text on `main`.
+- No `providers.json` anywhere in `arbiter/` or `docs/` (grep: 0 hits). `factory.py` is **single-provider**: `LLM_PROVIDER` selects one provider at construction; no multi-provider registry exists.
+- `arbiter/acp/schema.py:87-115` — `AcpInitializeExtension` + top-level `extensions` field on `AcpInitializeResponse`. `arbiter/acp/initialize.py:140-145` — advertises `_agentao.cn/ask_user` in that array.
+- `arbiter/acp/schema.py:306-320` — `AcpSessionSetModeRequest.mode: Literal["read-only","workspace-write","full-access","plan"]` (non-standard `mode` field, pinned to permission presets).
+- Working tree: `arbiter/acp_client/` and `tests/test_acp_client_*.py` present on `main`; `arbiter/transport/` has no `acp.py` / `acp_server.py`; `arbiter/tools/ask_user.py` `execute(self, question)` is plain-text on `main`.
 - Decision research (3 Explore agents, 2026-05-29):
-  - **#3 consumers:** `agentao/acp_client/` has **0 refs** to `list_models`/`set_model`; CLI uses **core** `agent.set_model()`/`list_available_models()` (`cli/commands/provider.py:87,120`, `sessions.py:124`), not the wire methods. Only `tests/test_acp_session_set_model.py` + external clients affected.
+  - **#3 consumers:** `arbiter/acp_client/` has **0 refs** to `list_models`/`set_model`; CLI uses **core** `agent.set_model()`/`list_available_models()` (`cli/commands/provider.py:87,120`, `sessions.py:124`), not the wire methods. Only `tests/test_acp_session_set_model.py` + external clients affected.
   - **#4 free-form:** patch passes DeepChat's `modelId` straight to `agent.set_model()` with no whitelist (patch hunk `session_set_model.py` lines 538-539, 589-591); current `session_set_model.py:52` only checks non-empty. `select` cannot express this.
   - **#1 A2 risk:** `ask_user_callback` is one of the 8 deprecated constructor callbacks, typed `Callable[[str], str]` (`agent.py:52`); also surfaces via `transport/sdk.py:72-75`. Adding params breaks 1-arg host callbacks.
   - **#5 extensions:** `acp_client/` 0 refs to `extensions`; snapshot `docs/schema/host.acp.v1.json` + `tests/test_acp_schema.py:102-125` cover it; `AcpInitializeResponse` is `extra="forbid"` with no `_meta` field today.

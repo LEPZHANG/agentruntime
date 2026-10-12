@@ -12,22 +12,22 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from agentao.prompts.builder import SystemPromptBuilder
+from arbiter.prompts.builder import SystemPromptBuilder
 
 
 def _make_agent(**kwargs):
-    """Construct a minimally-mocked Agentao for prompt-builder tests.
+    """Construct a minimally-mocked Arbiter for prompt-builder tests.
 
     Mirrors the helper in tests/test_system_prompt_sections.py — keeps
     the LLMClient stubbed so we don't need real credentials.
     """
     from pathlib import Path
     kwargs.setdefault("working_directory", Path.cwd())
-    with patch("agentao.agent.LLMClient") as mock_llm_client:
+    with patch("arbiter.agent.LLMClient") as mock_llm_client:
         mock_llm_client.return_value.logger = Mock()
         mock_llm_client.return_value.model = "gpt-4"
-        from agentao.agent import Agentao
-        return Agentao(**kwargs)
+        from arbiter.agent import Arbiter
+        return Arbiter(**kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ def test_empty_optional_sections_are_omitted():
     not have those keys in the section dict.
 
     We explicitly clear ``project_instructions`` because the test cwd
-    may carry a real AGENTAO.md (it does in this repo)."""
+    may carry a real ARBITER.md (it does in this repo)."""
     agent = _make_agent()
     agent.project_instructions = None
     sections = SystemPromptBuilder(agent)._build_sections()
@@ -117,10 +117,10 @@ def test_project_instructions_section_appears_when_set():
 
 def test_build_emits_prompt_sections_log_line(caplog):
     agent = _make_agent()
-    with caplog.at_level(logging.INFO, logger="agentao.prompt_diag"):
+    with caplog.at_level(logging.INFO, logger="arbiter.prompt_diag"):
         SystemPromptBuilder(agent).build()
 
-    diag_records = [r for r in caplog.records if r.name == "agentao.prompt_diag"]
+    diag_records = [r for r in caplog.records if r.name == "arbiter.prompt_diag"]
     assert len(diag_records) == 1
     msg = diag_records[0].getMessage()
     assert "prompt_sections" in msg
@@ -130,12 +130,12 @@ def test_build_emits_prompt_sections_log_line(caplog):
 
 def test_log_breakdown_matches_section_keys(caplog):
     agent = _make_agent()
-    with caplog.at_level(logging.INFO, logger="agentao.prompt_diag"):
+    with caplog.at_level(logging.INFO, logger="arbiter.prompt_diag"):
         builder = SystemPromptBuilder(agent)
         sections = builder._build_sections()
         builder.build()
 
-    record = next(r for r in caplog.records if r.name == "agentao.prompt_diag")
+    record = next(r for r in caplog.records if r.name == "arbiter.prompt_diag")
     msg = record.getMessage()
     # Parse the JSON breakdown out of the log line.
     breakdown_json = msg.split("breakdown=", 1)[1]
@@ -149,10 +149,10 @@ def test_log_breakdown_matches_section_keys(caplog):
 
 def test_log_total_matches_sum_of_breakdown(caplog):
     agent = _make_agent()
-    with caplog.at_level(logging.INFO, logger="agentao.prompt_diag"):
+    with caplog.at_level(logging.INFO, logger="arbiter.prompt_diag"):
         SystemPromptBuilder(agent).build()
 
-    record = next(r for r in caplog.records if r.name == "agentao.prompt_diag")
+    record = next(r for r in caplog.records if r.name == "arbiter.prompt_diag")
     msg = record.getMessage()
     total = int(msg.split("total_tokens=", 1)[1].split(" ", 1)[0])
     breakdown = json.loads(msg.split("breakdown=", 1)[1])
@@ -169,12 +169,12 @@ def test_diagnostics_swallow_estimator_failure(caplog, monkeypatch):
     monkeypatch.setattr(
         agent.context_manager, "count_tokens_in_text", _boom
     )
-    with caplog.at_level(logging.INFO, logger="agentao.prompt_diag"):
+    with caplog.at_level(logging.INFO, logger="arbiter.prompt_diag"):
         prompt = SystemPromptBuilder(agent).build()
 
     assert prompt  # build still produces output
     # No diagnostic line emitted (the try/except swallowed it).
-    diag = [r for r in caplog.records if r.name == "agentao.prompt_diag"]
+    diag = [r for r in caplog.records if r.name == "arbiter.prompt_diag"]
     assert diag == []
 
 
@@ -195,7 +195,7 @@ def test_section_token_counts_are_cached_across_builds(monkeypatch, caplog):
     )
 
     builder = SystemPromptBuilder(agent)
-    with caplog.at_level(logging.INFO, logger="agentao.prompt_diag"):
+    with caplog.at_level(logging.INFO, logger="arbiter.prompt_diag"):
         builder.build()
         first_call_count = len(calls)
         assert first_call_count > 0  # sanity
@@ -215,9 +215,9 @@ def test_diagnostics_handle_missing_context_manager(caplog):
     agent = _make_agent()
     # Drop the attribute entirely
     del agent.context_manager
-    with caplog.at_level(logging.INFO, logger="agentao.prompt_diag"):
+    with caplog.at_level(logging.INFO, logger="arbiter.prompt_diag"):
         prompt = SystemPromptBuilder(agent).build()
 
     assert prompt
-    diag = [r for r in caplog.records if r.name == "agentao.prompt_diag"]
+    diag = [r for r in caplog.records if r.name == "arbiter.prompt_diag"]
     assert diag == []

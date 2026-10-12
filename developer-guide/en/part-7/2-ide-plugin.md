@@ -1,13 +1,13 @@
 # 7.2 Blueprint B · IDE / Editor Plugin
 
 ::: tip ⚡ Runnable end-to-end
-**Outcome** — VS Code extension that spawns `agentao --acp --stdio` as a subprocess and shows the agent's streaming output, tool approvals, and `session/load` restore in the editor.
+**Outcome** — VS Code extension that spawns `arbiter --acp --stdio` as a subprocess and shows the agent's streaming output, tool approvals, and `session/load` restore in the editor.
 **Stack** — TypeScript · VS Code Extension API · ACP JSON-RPC 2.0 over stdio · NDJSON framing.
 **Source** — [`examples/ide-plugin-ts/`](https://github.com/jin-bo/agentao/tree/main/examples/ide-plugin-ts)
 **Run** — `npm install && npm run compile`, then press **F5** in VS Code to launch the extension host.
 :::
 
-**Scenario**: you're building a VS Code / Zed / JetBrains / Neovim plugin that adds "chat with your codebase" to the editor. You want process isolation (one Agentao per workspace), language-agnostic glue (your plugin might be TypeScript), and the ability to resume a conversation after the IDE restarts.
+**Scenario**: you're building a VS Code / Zed / JetBrains / Neovim plugin that adds "chat with your codebase" to the editor. You want process isolation (one Arbiter per workspace), language-agnostic glue (your plugin might be TypeScript), and the ability to resume a conversation after the IDE restarts.
 
 ## Who & why
 
@@ -26,10 +26,10 @@ IDE main process
    │   ACPClient  (stdio JSON-RPC)
    │    │  ▲
    │    ▼  │
-   │   subprocess: `agentao --acp --stdio`
+   │   subprocess: `arbiter --acp --stdio`
    │      ├─ working_directory = workspace root
-   │      ├─ MCP: filesystem + git (auto-loaded from .agentao/mcp.json)
-   │      └─ Skills: repo conventions (from .agentao/skills/)
+   │      ├─ MCP: filesystem + git (auto-loaded from .arbiter/mcp.json)
+   │      └─ Skills: repo conventions (from .arbiter/skills/)
    │
    └─ UI: chat panel, inline suggestions, diff review
 ```
@@ -51,13 +51,13 @@ export class ACPClient {
   private notifHandlers = new Map<string, (p: any) => void>();
 
   constructor(workspaceRoot: string) {
-    this.proc = spawn("agentao", ["--acp", "--stdio"], {
+    this.proc = spawn("arbiter", ["--acp", "--stdio"], {
       cwd: workspaceRoot,
-      env: { ...process.env, AGENTAO_WORKING_DIRECTORY: workspaceRoot },
+      env: { ...process.env, ARBITER_WORKING_DIRECTORY: workspaceRoot },
     });
     this.rl = readline.createInterface({ input: this.proc.stdout });
     this.rl.on("line", (line) => this.handleLine(line));
-    this.proc.stderr.on("data", (d) => console.error("[agentao]", d.toString()));
+    this.proc.stderr.on("data", (d) => console.error("[arbiter]", d.toString()));
   }
 
   async initialize(): Promise<any> {
@@ -139,40 +139,40 @@ export async function activate(ctx: vscode.ExtensionContext) {
     const tool = p.toolCall.toolName;
     const pick = await vscode.window.showQuickPick(
       ["Allow once", "Allow always", "Deny"],
-      { placeHolder: `Agentao wants to run ${tool}` }
+      { placeHolder: `Arbiter wants to run ${tool}` }
     );
     return { outcome: pick === "Deny" ? { outcome: "cancelled" }
                                       : { outcome: "selected", optionId: "allow" } };
   });
 
   ctx.subscriptions.push(
-    vscode.commands.registerCommand("agentao.ask", async () => {
-      const q = await vscode.window.showInputBox({ prompt: "Ask Agentao" });
+    vscode.commands.registerCommand("arbiter.ask", async () => {
+      const q = await vscode.window.showInputBox({ prompt: "Ask Arbiter" });
       if (q) await client.prompt(sessionId, q);
     }),
-    vscode.commands.registerCommand("agentao.cancel", () => client.cancel(sessionId)),
+    vscode.commands.registerCommand("arbiter.cancel", () => client.cancel(sessionId)),
   );
 }
 ```
 
 ### 3 · Persist + resume across IDE restart
 
-ACP's `session/load` (advertised by `loadSession: true` in `initialize`) lets you hand the same `sessionId` back after a restart. Agentao will replay stored history into `agent.messages`.
+ACP's `session/load` (advertised by `loadSession: true` in `initialize`) lets you hand the same `sessionId` back after a restart. Arbiter will replay stored history into `agent.messages`.
 
 ```ts
 // on startup
-const saved = ctx.globalState.get<string>("agentao.sessionId");
+const saved = ctx.globalState.get<string>("arbiter.sessionId");
 const sessionId = saved
   ? (await client.request("session/load", { sessionId: saved }), saved)
   : await client.newSession(ws);
-ctx.globalState.update("agentao.sessionId", sessionId);
+ctx.globalState.update("arbiter.sessionId", sessionId);
 ```
 
-> If your plugin doesn't track ids and just wants the **last** conversation back, spawn the server with `agentao --acp --resume` instead — the first `session/new` then resumes the latest session automatically (no `session/load` round trip). See [3.2 → Resume a session on startup](/en/part-3/2-agentao-as-server#resume-a-session-on-startup).
+> If your plugin doesn't track ids and just wants the **last** conversation back, spawn the server with `arbiter --acp --resume` instead — the first `session/new` then resumes the latest session automatically (no `session/load` round trip). See [3.2 → Resume a session on startup](/en/part-3/2-arbiter-as-server#resume-a-session-on-startup).
 
 ## Configuration file the plugin ships with
 
-Drop `.agentao/acp.json` at workspace root so users can customize without touching extension code:
+Drop `.arbiter/acp.json` at workspace root so users can customize without touching extension code:
 
 ```json
 {

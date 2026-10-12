@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from agentao.memory.manager import MemoryManager
+from arbiter.memory.manager import MemoryManager
 
 
 def _make_manager(tmp_path: Path, with_global: bool = True) -> MemoryManager:
@@ -249,7 +249,7 @@ def test_save_session_summary_noop_on_exception(tmp_path):
     that an unwritable path doesn't crash construction or subsequent
     writes.
     """
-    from agentao.memory import SQLiteMemoryStore
+    from arbiter.memory import SQLiteMemoryStore
     mgr = MemoryManager(
         project_store=SQLiteMemoryStore.open_or_memory(
             Path("/nonexistent/readonly/path/memory.db")

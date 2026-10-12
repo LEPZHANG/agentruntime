@@ -1,4 +1,4 @@
-"""Tests for ACP startup-resume (``agentao --acp --resume [SESSION_ID]``).
+"""Tests for ACP startup-resume (``arbiter --acp --resume [SESSION_ID]``).
 
 ACP is client-driven, so the server cannot proactively create a session.
 The ``--resume`` directive is therefore consumed by the *first*
@@ -22,9 +22,9 @@ from typing import Any, Dict, List
 
 import pytest
 
-from agentao.acp import session_new as acp_session_new
-from agentao.acp.models import AcpSessionState, ResumeDirective
-from agentao.embedding.sessions import save_session
+from arbiter.acp import session_new as acp_session_new
+from arbiter.acp.models import AcpSessionState, ResumeDirective
+from arbiter.embedding.sessions import save_session
 
 from .support.acp_agents import FakeAgent, make_factory
 from .support.acp_server import make_initialized_server
@@ -120,7 +120,7 @@ def test_first_session_new_resumes_latest(initialized_server, tmp_path):
 def test_resume_advertises_modes_like_fresh_session_new(initialized_server, tmp_path):
     """A --resume client must get the same SessionModeState a fresh
     session/new advertises — the resumed session owns an identical engine."""
-    from agentao.permissions import PermissionMode
+    from arbiter.permissions import PermissionMode
 
     class _StubEngine:
         active_mode = PermissionMode.WORKSPACE_WRITE
@@ -219,7 +219,7 @@ def test_resume_missing_specific_id_falls_back_to_fresh(initialized_server, tmp_
 def test_resume_corrupt_session_falls_back_to_fresh(initialized_server, tmp_path):
     """A corrupt persisted file degrades to a fresh session instead of
     failing the client's first session/new with a JSONDecodeError."""
-    sessions_dir = tmp_path / ".agentao" / "sessions"
+    sessions_dir = tmp_path / ".arbiter" / "sessions"
     sessions_dir.mkdir(parents=True)
     (sessions_dir / "20990101_000000_000000.json").write_text(
         "{ this is not valid json", encoding="utf-8"
@@ -287,7 +287,7 @@ def test_no_directive_starts_fresh(initialized_server, tmp_path):
 
 class TestMainBuildsDirective:
     def _capture_directive(self, monkeypatch, resume_arg):
-        from agentao.acp import __main__ as acp_main_module
+        from arbiter.acp import __main__ as acp_main_module
 
         captured: Dict[str, Any] = {}
         original = acp_main_module.AcpServer

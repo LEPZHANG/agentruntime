@@ -2,7 +2,7 @@
 
 > **本节你会学到**
 > - 系统提示每轮拼接的 11 个块来自哪里
-> - 你真正能定制的 3 个块：AGENTAO.md、技能、自定义 Tool description
+> - 你真正能定制的 3 个块：ARBITER.md、技能、自定义 Tool description
 > - 另外 8 个由运行时注入、不该被覆盖
 
 Agent 的系统提示是**每轮 chat() 动态重建**的，不是一个静态字符串。本节讲 11 个拼接块的来源、哪些可以被你定制、哪些不建议碰。
@@ -14,7 +14,7 @@ Agent 的系统提示是**每轮 chat() 动态重建**的，不是一个静态�
 │ 系统提示                                    │
 │                                            │
 │ ┌─────────────────────────────────────┐    │
-│ │ 1. 项目说明 (AGENTAO.md)            │    │  ← 你可以写
+│ │ 1. 项目说明 (ARBITER.md)            │    │  ← 你可以写
 │ ├─────────────────────────────────────┤    │
 │ │ 2. Agent 基础能力描述                │    │  ← 固定
 │ ├─────────────────────────────────────┤    │
@@ -51,7 +51,7 @@ Agent 的系统提示是**每轮 chat() 动态重建**的，不是一个静态�
 
 ## 你能定制的 3 个注入点
 
-### 1. `AGENTAO.md` — 项目级指令
+### 1. `ARBITER.md` — 项目级指令
 
 放在 `working_directory` 根下，构造 Agent 时**自动读取**。
 
@@ -100,16 +100,16 @@ save_memory("user-profile", "Senior Python dev, prefers tabs, UTC+8 Shanghai")
 | 块 | 原因 |
 |----|------|
 | Agent 基础能力 | 决定 Agent 怎么用工具、怎么思考 |
-| 可靠性 / 操作规范 | Agentao 核心质量保证 |
+| 可靠性 / 操作规范 | Arbiter 核心质量保证 |
 | 可用子 Agent / 技能清单 | 来自注册状态，不是静态文本 |
 
-如果你想彻底改造 Agent 行为（比如去掉某些能力），目前没有公开 API。**推荐做法**：通过 `AGENTAO.md` 和技能**覆盖/增强**，而不是试图替换。
+如果你想彻底改造 Agent 行为（比如去掉某些能力），目前没有公开 API。**推荐做法**：通过 `ARBITER.md` 和技能**覆盖/增强**，而不是试图替换。
 
 ## 验证系统提示
 
 ```python
 # 构造后立即看
-agent = Agentao(working_directory=Path.cwd())
+agent = Arbiter(working_directory=Path.cwd())
 print(agent._build_system_prompt())
 ```
 
@@ -129,15 +129,15 @@ logger.info("system_prompt_chars", extra={"len": len(sp)})
 
 ## Prompt Cache 的实战技巧
 
-Agentao 把系统提示分成"稳定前缀 + 动态后缀"——前缀的内容在多轮 `chat()` 间不变，利用大多数 LLM 厂商的 prompt cache 可以**显著降本降延迟**。
+Arbiter 把系统提示分成"稳定前缀 + 动态后缀"——前缀的内容在多轮 `chat()` 间不变，利用大多数 LLM 厂商的 prompt cache 可以**显著降本降延迟**。
 
 ### 什么进了稳定前缀
 
-块 1-6（AGENTAO.md、基础能力、规范、推理、子 Agent）。
+块 1-6（ARBITER.md、基础能力、规范、推理、子 Agent）。
 
 ### 什么破坏 cache
 
-- 每轮 `chat()` 前改 `AGENTAO.md` 内容
+- 每轮 `chat()` 前改 `ARBITER.md` 内容
 - 切换激活技能（块 8 一变，后面的 cache 失效没关系——但块 1-6 还在 cache）
 - 添加 todos、memories（块 9-11）**不**破坏前缀 cache，因为它们在后面
 
@@ -152,31 +152,31 @@ def on_event(ev):
     ...
 ```
 
-## 为不同业务配置不同 `AGENTAO.md`
+## 为不同业务配置不同 `ARBITER.md`
 
-多租户 / 多业务线时，每个 `working_directory` 可以有**不同**的 `AGENTAO.md`：
+多租户 / 多业务线时，每个 `working_directory` 可以有**不同**的 `ARBITER.md`：
 
 ```
 /data/tenants/acme-corp/
-├── AGENTAO.md           ← acme 的规范
-└── .agentao/
+├── ARBITER.md           ← acme 的规范
+└── .arbiter/
 
 /data/tenants/globex/
-├── AGENTAO.md           ← globex 的规范
-└── .agentao/
+├── ARBITER.md           ← globex 的规范
+└── .arbiter/
 ```
 
 这是**最干净**的租户级定制方式——不需要代码分支，只靠目录布局。
 
-## 动态生成 AGENTAO.md
+## 动态生成 ARBITER.md
 
-有些信息是每个会话动态的（例如用户当前的订阅等级、语言偏好、所在地区）。做法：构造 Agent 前把 `AGENTAO.md` **写到会话专属目录**：
+有些信息是每个会话动态的（例如用户当前的订阅等级、语言偏好、所在地区）。做法：构造 Agent 前把 `ARBITER.md` **写到会话专属目录**：
 
 ```python
 def prepare_workdir(tenant, user) -> Path:
     workdir = Path(f"/tmp/session-{user.id}")
     workdir.mkdir(exist_ok=True)
-    (workdir / "AGENTAO.md").write_text(f"""
+    (workdir / "ARBITER.md").write_text(f"""
 # User Context
 
 - Tenant: {tenant.name} ({tenant.plan})
@@ -189,50 +189,50 @@ def prepare_workdir(tenant, user) -> Path:
 """)
     return workdir
 
-agent = Agentao(working_directory=prepare_workdir(tenant, user))
+agent = Arbiter(working_directory=prepare_workdir(tenant, user))
 ```
 
 这让每个会话看到的系统提示就是**为它量身定制**的。
 
 ## 我要是真的想把整个系统提示换掉呢？
 
-没有公开 API。但你可以继承 `Agentao` 并 override 私有方法：
+没有公开 API。但你可以继承 `Arbiter` 并 override 私有方法：
 
 ```python
-from agentao import Agentao
+from arbiter import Arbiter
 
-class MyAgentao(Agentao):
+class MyArbiter(Arbiter):
     def _build_system_prompt(self) -> str:
         parent = super()._build_system_prompt()
         # 在最前面加一段你的总纲
         return "# Your company's top-level charter\n\n...\n\n" + parent
 
-agent = MyAgentao(working_directory=Path.cwd())
+agent = MyArbiter(working_directory=Path.cwd())
 ```
 
-⚠️ 这依赖私有方法名，版本升级要重新测试。**尽量用 AGENTAO.md + 技能组合替代**。
+⚠️ 这依赖私有方法名，版本升级要重新测试。**尽量用 ARBITER.md + 技能组合替代**。
 
 ## ⚠️ 常见陷阱
 
 ::: warning 上线前先确认这几条
-- ❌ **AGENTAO.md 过长** —— 长篇前置说明稀释模型对真正用户消息的注意力
-- ❌ **不同会话共享同一 AGENTAO.md** —— 一个租户的规则跑到了另一个租户身上
-- ❌ **把敏感信息写进 AGENTAO.md** —— 会被发到每次 LLM 调用，且可能被记日志
+- ❌ **ARBITER.md 过长** —— 长篇前置说明稀释模型对真正用户消息的注意力
+- ❌ **不同会话共享同一 ARBITER.md** —— 一个租户的规则跑到了另一个租户身上
+- ❌ **把敏感信息写进 ARBITER.md** —— 会被发到每次 LLM 调用，且可能被记日志
 
 下面每一条都附完整修法。
 :::
 
-### ❌ AGENTAO.md 过长
+### ❌ ARBITER.md 过长
 
-2000+ 字的 AGENTAO.md 会吃掉太多 context。把"操作指南类"内容拆成技能，AGENTAO.md 只保留"硬约束+关键事实"。
+2000+ 字的 ARBITER.md 会吃掉太多 context。把"操作指南类"内容拆成技能，ARBITER.md 只保留"硬约束+关键事实"。
 
-### ❌ 不同会话共享同一 AGENTAO.md
+### ❌ 不同会话共享同一 ARBITER.md
 
-多租户场景如果所有 Agent 都指向同一个 `working_directory`，他们会共享 AGENTAO.md——但你可能有想按租户定制的需求。**按会话独立 working_directory** 是唯一干净解。
+多租户场景如果所有 Agent 都指向同一个 `working_directory`，他们会共享 ARBITER.md——但你可能有想按租户定制的需求。**按会话独立 working_directory** 是唯一干净解。
 
-### ❌ 把敏感信息写进 AGENTAO.md
+### ❌ 把敏感信息写进 ARBITER.md
 
-AGENTAO.md 是项目文件，可能进 git、被 LLM 记忆、出现在日志里。**不要**放 API key、真实凭据、客户 PII。
+ARBITER.md 是项目文件，可能进 git、被 LLM 记忆、出现在日志里。**不要**放 API key、真实凭据、客户 PII。
 
 ---
 
@@ -241,8 +241,8 @@ AGENTAO.md 是项目文件，可能进 git、被 LLM 记忆、出现在日志里
 ## TL;DR
 
 - 系统提示**每轮重建**——不要假设它是个静态字符串可以缓存。
-- 你拥有 11 个块中的 3 个：**`AGENTAO.md`**（项目硬规则）、**技能正文**（激活后的知识）、**自定义 Tool 的 description**（什么时候/怎么调）。
+- 你拥有 11 个块中的 3 个：**`ARBITER.md`**（项目硬规则）、**技能正文**（激活后的知识）、**自定义 Tool 的 description**（什么时候/怎么调）。
 - 另外 8 个（日期、工作目录、可用工具/技能目录、记忆召回、todos 等）是运行时注入的，不该被覆盖。
-- `AGENTAO.md` 写得**短而绝对**（"永远不要做 X"、"永远用 Y 格式"）——长篇前置说明会稀释注意力。
+- `ARBITER.md` 写得**短而绝对**（"永远不要做 X"、"永远用 Y 格式"）——长篇前置说明会稀释注意力。
 
 → [第 6 部分 · 安全与生产化部署](/zh/part-6/)

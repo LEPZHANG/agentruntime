@@ -7,7 +7,7 @@
 **Run** — `uv sync && uv run uvicorn app.main:app --reload`
 :::
 
-**Scenario**: you run a project-management SaaS. Users want "help me schedule this project plan" or "summarize last week's tasks" inside the product. You want to embed Agentao as the brain, expose only the tools it needs, and stream responses to the browser.
+**Scenario**: you run a project-management SaaS. Users want "help me schedule this project plan" or "summarize last week's tasks" inside the product. You want to embed Arbiter as the brain, expose only the tools it needs, and stream responses to the browser.
 
 ## Who & why
 
@@ -27,7 +27,7 @@ FastAPI backend
    ├─ Session pool     (see 6.7)
    │    │
    │    ▼
-   └─ Agentao instance per (tenant_id, session_id)
+   └─ Arbiter instance per (tenant_id, session_id)
         ├─ working_directory = /data/tenants/{tenant_id}/{session_id}
         ├─ Custom tools: list_projects, create_task, assign_user
         ├─ PermissionEngine: READ_ONLY by default, WORKSPACE_WRITE after confirm
@@ -40,7 +40,7 @@ FastAPI backend
 
 ```python
 # tools/project_tools.py
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 import httpx
 
 class ListProjectsTool(Tool):
@@ -103,9 +103,9 @@ class CreateTaskTool(Tool):
 # app.py
 from fastapi import FastAPI, Depends
 from fastapi.responses import StreamingResponse
-from agentao import Agentao
-from agentao.transport import SdkTransport
-from agentao.transport.events import AgentEvent, EventType
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
+from arbiter.transport.events import AgentEvent, EventType
 from pathlib import Path
 import asyncio, httpx, json
 
@@ -158,8 +158,8 @@ async def chat(payload: dict, user=Depends(current_user)):
 
 ```python
 # pool.py
-from agentao import Agentao
-from agentao.permissions import PermissionEngine, PermissionMode
+from arbiter import Arbiter
+from arbiter.permissions import PermissionEngine, PermissionMode
 from .tools.project_tools import ListProjectsTool, CreateTaskTool
 
 async def get_or_create_agent(session_id, workdir, tenant_id, transport):
@@ -169,7 +169,7 @@ async def get_or_create_agent(session_id, workdir, tenant_id, transport):
         return existing
     engine = PermissionEngine(project_root=workdir)
     engine.set_mode(PermissionMode.READ_ONLY)
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=workdir,
         transport=transport,
         permission_engine=engine,

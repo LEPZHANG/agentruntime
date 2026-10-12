@@ -10,12 +10,12 @@ test pins the safer behavior — drop at parse time, no-match at runtime.
 
 from __future__ import annotations
 
-from agentao.plugins.hooks import (
+from arbiter.plugins.hooks import (
     ClaudeHookPayloadAdapter,
     ClaudeHooksParser,
     PluginHookDispatcher,
 )
-from agentao.plugins.models import ParsedHookRule, PluginWarning
+from arbiter.plugins.models import ParsedHookRule, PluginWarning
 
 
 def test_string_matcher_dropped_at_parse_time():

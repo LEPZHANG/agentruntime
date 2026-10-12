@@ -1,6 +1,6 @@
 # FastAPI · Background Task
 
-The minimum 1-route shape: each `POST /run` enqueues an Agentao turn
+The minimum 1-route shape: each `POST /run` enqueues an Arbiter turn
 to an asyncio background task. Per-request agent, per-request
 cancellation token, no shared mutable state. For multi-tenant SaaS
 shapes (per-tenant pool, SSE), see `examples/saas-assistant/` instead.
@@ -34,7 +34,7 @@ with a `MagicMock` so the test runs offline.
 
 ## What this demonstrates
 
-- **Per-request `Agentao(...)`** — `app.main._run_turn` constructs and
+- **Per-request `Arbiter(...)`** — `app.main._run_turn` constructs and
   closes the agent inside the background task; nothing leaks across
   requests.
 - **`llm_client=` injection seam** — production reads from env;

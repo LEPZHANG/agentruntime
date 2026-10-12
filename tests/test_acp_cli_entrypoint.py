@@ -7,11 +7,11 @@ Three layers:
    instead of the interactive CLI, and that ``--stdio`` without
    ``--acp`` is rejected with a clear error.
 
-2. **Handler registration** — verify that ``agentao.acp.__main__.main``
+2. **Handler registration** — verify that ``arbiter.acp.__main__.main``
    registers every handler that has shipped (initialize, session/new,
    session/prompt, session/cancel, session/load).
 
-3. **Subprocess smoke test** — spawn ``python -m agentao --acp --stdio``
+3. **Subprocess smoke test** — spawn ``python -m arbiter --acp --stdio``
    in a subprocess, send an ``initialize`` request, and verify that
    stdout contains exactly one valid JSON-RPC response with the
    negotiated protocol version. This is the closest end-to-end check
@@ -39,8 +39,8 @@ import pytest
 
 class TestEntrypointArgparse:
     def test_acp_flag_routes_to_run_acp_mode(self, monkeypatch):
-        """``agentao --acp`` should call ``run_acp_mode``, not main()."""
-        from agentao import cli
+        """``arbiter --acp`` should call ``run_acp_mode``, not main()."""
+        from arbiter import cli
 
         called: Dict[str, bool] = {}
 
@@ -56,7 +56,7 @@ class TestEntrypointArgparse:
         monkeypatch.setattr(cli, "run_acp_mode", fake_acp_mode)
         monkeypatch.setattr(cli, "main", fake_main)
         monkeypatch.setattr(cli, "run_print_mode", fake_print)
-        monkeypatch.setattr(sys, "argv", ["agentao", "--acp"])
+        monkeypatch.setattr(sys, "argv", ["arbiter", "--acp"])
 
         cli.entrypoint()
 
@@ -65,14 +65,14 @@ class TestEntrypointArgparse:
         assert "print" not in called
 
     def test_acp_with_stdio_routes_to_run_acp_mode(self, monkeypatch):
-        """``agentao --acp --stdio`` is the documented invocation."""
-        from agentao import cli
+        """``arbiter --acp --stdio`` is the documented invocation."""
+        from arbiter import cli
 
         called: Dict[str, bool] = {}
 
         monkeypatch.setattr(cli, "run_acp_mode", lambda **kw: called.setdefault("acp", True))
         monkeypatch.setattr(cli, "main", lambda **kw: called.setdefault("main", True))
-        monkeypatch.setattr(sys, "argv", ["agentao", "--acp", "--stdio"])
+        monkeypatch.setattr(sys, "argv", ["arbiter", "--acp", "--stdio"])
 
         cli.entrypoint()
 
@@ -80,11 +80,11 @@ class TestEntrypointArgparse:
         assert "main" not in called
 
     def test_help_flag_prints_help_and_exits(self, monkeypatch, capsys):
-        """``agentao --help`` must print argparse help and exit(0) rather
+        """``arbiter --help`` must print argparse help and exit(0) rather
         than fall through into interactive mode (regression test for the
         pre-0.2.13 smoke failure where ``add_help=False`` combined with
         ``parse_known_args`` silently swallowed ``--help``)."""
-        from agentao import cli
+        from arbiter import cli
 
         monkeypatch.setattr(
             cli, "main", lambda **kw: pytest.fail("interactive main called"),
@@ -95,34 +95,34 @@ class TestEntrypointArgparse:
         monkeypatch.setattr(
             cli, "run_acp_mode", lambda **kw: pytest.fail("acp mode called"),
         )
-        monkeypatch.setattr(sys, "argv", ["agentao", "--help"])
+        monkeypatch.setattr(sys, "argv", ["arbiter", "--help"])
 
         with pytest.raises(SystemExit) as exc:
             cli.entrypoint()
         assert exc.value.code == 0
 
         out = capsys.readouterr().out
-        assert "usage: agentao" in out
+        assert "usage: arbiter" in out
         assert "--acp" in out
 
     def test_short_help_flag_prints_help_and_exits(self, monkeypatch, capsys):
-        """``agentao -h`` is the standard POSIX short form and must behave
+        """``arbiter -h`` is the standard POSIX short form and must behave
         identically to ``--help``."""
-        from agentao import cli
+        from arbiter import cli
 
         monkeypatch.setattr(
             cli, "main", lambda **kw: pytest.fail("interactive main called"),
         )
-        monkeypatch.setattr(sys, "argv", ["agentao", "-h"])
+        monkeypatch.setattr(sys, "argv", ["arbiter", "-h"])
 
         with pytest.raises(SystemExit) as exc:
             cli.entrypoint()
         assert exc.value.code == 0
-        assert "usage: agentao" in capsys.readouterr().out
+        assert "usage: arbiter" in capsys.readouterr().out
 
     def test_stdio_without_acp_exits_with_error(self, monkeypatch, capsys):
         """``--stdio`` alone is a typo guard — fail fast on stderr."""
-        from agentao import cli
+        from arbiter import cli
 
         # If anything routes to interactive/print mode by mistake, fail loudly.
         monkeypatch.setattr(
@@ -131,7 +131,7 @@ class TestEntrypointArgparse:
         monkeypatch.setattr(
             cli, "run_print_mode", lambda *a, **kw: pytest.fail("print mode called")
         )
-        monkeypatch.setattr(sys, "argv", ["agentao", "--stdio"])
+        monkeypatch.setattr(sys, "argv", ["arbiter", "--stdio"])
 
         with pytest.raises(SystemExit) as exc:
             cli.entrypoint()
@@ -142,7 +142,7 @@ class TestEntrypointArgparse:
 
     def test_no_acp_flag_routes_to_interactive(self, monkeypatch):
         """The default path (no flags) still launches interactive ``main()``."""
-        from agentao import cli
+        from arbiter import cli
 
         called: Dict[str, Any] = {}
 
@@ -150,7 +150,7 @@ class TestEntrypointArgparse:
         monkeypatch.setattr(
             cli, "main", lambda **kw: called.setdefault("main", kw)
         )
-        monkeypatch.setattr(sys, "argv", ["agentao"])
+        monkeypatch.setattr(sys, "argv", ["arbiter"])
 
         cli.entrypoint()
 
@@ -159,7 +159,7 @@ class TestEntrypointArgparse:
 
     def test_acp_overrides_print_mode(self, monkeypatch):
         """If both ``--acp`` and ``-p`` are passed, ACP wins (no terminal output)."""
-        from agentao import cli
+        from arbiter import cli
 
         called: Dict[str, bool] = {}
 
@@ -167,7 +167,7 @@ class TestEntrypointArgparse:
         monkeypatch.setattr(
             cli, "run_print_mode", lambda *a, **kw: called.setdefault("print", True)
         )
-        monkeypatch.setattr(sys, "argv", ["agentao", "--acp", "-p", "hi"])
+        monkeypatch.setattr(sys, "argv", ["arbiter", "--acp", "-p", "hi"])
         # Print mode reads stdin if not a TTY; we don't want that to interact
         # with our test, so make it look like a TTY.
         monkeypatch.setattr("sys.stdin.isatty", lambda: True)
@@ -180,7 +180,7 @@ class TestEntrypointArgparse:
     def test_acp_overrides_resume(self, monkeypatch):
         """``--acp --resume X`` should take the ACP branch AND forward the
         resume selector into ACP mode."""
-        from agentao import cli
+        from arbiter import cli
 
         called: Dict[str, Any] = {}
 
@@ -190,7 +190,7 @@ class TestEntrypointArgparse:
         monkeypatch.setattr(
             cli, "main", lambda **kw: called.setdefault("main", True)
         )
-        monkeypatch.setattr(sys, "argv", ["agentao", "--acp", "--resume", "abc"])
+        monkeypatch.setattr(sys, "argv", ["arbiter", "--acp", "--resume", "abc"])
 
         cli.entrypoint()
 
@@ -199,14 +199,14 @@ class TestEntrypointArgparse:
 
     def test_acp_resume_latest_forwards_empty_string(self, monkeypatch):
         """``--acp --resume`` (no id) forwards ``""`` → resume latest."""
-        from agentao import cli
+        from arbiter import cli
 
         called: Dict[str, Any] = {}
 
         monkeypatch.setattr(
             cli, "run_acp_mode", lambda **kw: called.setdefault("acp", kw)
         )
-        monkeypatch.setattr(sys, "argv", ["agentao", "--acp", "--resume"])
+        monkeypatch.setattr(sys, "argv", ["arbiter", "--acp", "--resume"])
 
         cli.entrypoint()
 
@@ -214,14 +214,14 @@ class TestEntrypointArgparse:
 
     def test_acp_without_resume_forwards_none(self, monkeypatch):
         """``--acp`` alone forwards ``resume=None`` → always start fresh."""
-        from agentao import cli
+        from arbiter import cli
 
         called: Dict[str, Any] = {}
 
         monkeypatch.setattr(
             cli, "run_acp_mode", lambda **kw: called.setdefault("acp", kw)
         )
-        monkeypatch.setattr(sys, "argv", ["agentao", "--acp"])
+        monkeypatch.setattr(sys, "argv", ["arbiter", "--acp"])
 
         cli.entrypoint()
 
@@ -235,7 +235,7 @@ class TestEntrypointArgparse:
 
 class TestRunAcpMode:
     def test_run_acp_mode_calls_acp_main(self, monkeypatch):
-        from agentao import cli
+        from arbiter import cli
 
         called: Dict[str, bool] = {}
 
@@ -245,7 +245,7 @@ class TestRunAcpMode:
 
         # The import is local inside run_acp_mode, so monkeypatch the
         # target module directly.
-        from agentao.acp import __main__ as acp_main_module
+        from arbiter.acp import __main__ as acp_main_module
         monkeypatch.setattr(acp_main_module, "main", fake_acp_main)
 
         cli.run_acp_mode()
@@ -257,15 +257,15 @@ class TestRunAcpMode:
 
     def test_acp_main_registers_all_shipped_handlers(self, monkeypatch):
         """``acp.__main__.main()`` must register every handler that has shipped."""
-        from agentao.acp import __main__ as acp_main_module
-        from agentao.acp.protocol import (
+        from arbiter.acp import __main__ as acp_main_module
+        from arbiter.acp.protocol import (
             METHOD_INITIALIZE,
             METHOD_SESSION_CANCEL,
             METHOD_SESSION_LOAD,
             METHOD_SESSION_NEW,
             METHOD_SESSION_PROMPT,
         )
-        from agentao.acp.server import AcpServer
+        from arbiter.acp.server import AcpServer
 
         captured_server: Dict[str, AcpServer] = {}
         original_acp_server = acp_main_module.AcpServer
@@ -300,7 +300,7 @@ class TestRunAcpMode:
 # ===========================================================================
 
 
-def _agentao_repo_root() -> Path:
+def _arbiter_repo_root() -> Path:
     """Return the repository root so the subprocess can find the package."""
     here = Path(__file__).resolve()
     # tests/test_acp_cli_entrypoint.py → tests/ → repo root
@@ -313,7 +313,7 @@ def _agentao_repo_root() -> Path:
 )
 class TestAcpSubprocessSmoke:
     def _spawn_acp(self) -> subprocess.Popen:
-        """Spawn ``python -m agentao --acp --stdio`` with the repo on PYTHONPATH."""
+        """Spawn ``python -m arbiter --acp --stdio`` with the repo on PYTHONPATH."""
         env = os.environ.copy()
         # Force a deterministic, non-interactive environment.
         env.setdefault("PYTHONUNBUFFERED", "1")
@@ -324,8 +324,8 @@ class TestAcpSubprocessSmoke:
         env.setdefault("OPENAI_BASE_URL", "https://api.openai.com/v1")
         env.setdefault("OPENAI_MODEL", "gpt-5.4")
         return subprocess.Popen(
-            [sys.executable, "-m", "agentao", "--acp", "--stdio"],
-            cwd=str(_agentao_repo_root()),
+            [sys.executable, "-m", "arbiter", "--acp", "--stdio"],
+            cwd=str(_arbiter_repo_root()),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -336,7 +336,7 @@ class TestAcpSubprocessSmoke:
     def test_initialize_handshake_round_trip(self):
         """Send ``initialize`` over stdin; expect a single JSON-RPC response
         on stdout with the negotiated protocol version."""
-        from agentao.acp.protocol import ACP_PROTOCOL_VERSION
+        from arbiter.acp.protocol import ACP_PROTOCOL_VERSION
 
         proc = self._spawn_acp()
         try:
@@ -356,7 +356,7 @@ class TestAcpSubprocessSmoke:
         except subprocess.TimeoutExpired:
             proc.kill()
             stdout, stderr = proc.communicate()
-            pytest.fail(f"agentao --acp --stdio timed out\nstdout={stdout}\nstderr={stderr}")
+            pytest.fail(f"arbiter --acp --stdio timed out\nstdout={stdout}\nstderr={stderr}")
 
         # Acceptance: stdout contains exactly one valid JSON-RPC response.
         lines = [ln for ln in stdout.splitlines() if ln.strip()]
@@ -376,14 +376,14 @@ class TestAcpSubprocessSmoke:
         assert result["agentCapabilities"]["loadSession"] is True
         # Process exited cleanly because we closed stdin (EOF after our line).
         assert proc.returncode == 0, (
-            f"agentao exited with code {proc.returncode}\nstderr={stderr}"
+            f"arbiter exited with code {proc.returncode}\nstderr={stderr}"
         )
 
     def test_session_new_then_eof_shuts_down_cleanly(self, tmp_path):
         """Verify the full new+EOF lifecycle: session/new succeeds, EOF
         triggers clean shutdown, no stray output on stdout, exit code 0.
         """
-        from agentao.acp.protocol import ACP_PROTOCOL_VERSION
+        from arbiter.acp.protocol import ACP_PROTOCOL_VERSION
 
         proc = self._spawn_acp()
         # Build two requests on a single stdin payload — initialize then
@@ -415,7 +415,7 @@ class TestAcpSubprocessSmoke:
             proc.kill()
             stdout, stderr = proc.communicate()
             pytest.fail(
-                f"agentao --acp --stdio timed out\nstdout={stdout}\nstderr={stderr}"
+                f"arbiter --acp --stdio timed out\nstdout={stdout}\nstderr={stderr}"
             )
 
         lines = [ln for ln in stdout.splitlines() if ln.strip()]
@@ -438,7 +438,7 @@ class TestAcpSubprocessSmoke:
 
         # Clean shutdown.
         assert proc.returncode == 0, (
-            f"agentao exited with code {proc.returncode}\nstderr={stderr}"
+            f"arbiter exited with code {proc.returncode}\nstderr={stderr}"
         )
 
     def test_logs_go_to_stderr_not_stdout(self):
@@ -457,7 +457,7 @@ class TestAcpSubprocessSmoke:
         except subprocess.TimeoutExpired:
             proc.kill()
             stdout, stderr = proc.communicate()
-            pytest.fail("agentao timed out on malformed input")
+            pytest.fail("arbiter timed out on malformed input")
 
         # Stdout: a single PARSE_ERROR JSON-RPC envelope, nothing else.
         stdout_lines = [ln for ln in stdout.splitlines() if ln.strip()]

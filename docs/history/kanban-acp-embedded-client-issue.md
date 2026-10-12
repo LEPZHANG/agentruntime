@@ -4,16 +4,16 @@ Implementation plan: [ACP Embedding Implementation Plan](implementation/acp-embe
 
 ## Summary
 
-Kanban (and similar workflow runtimes) want to reuse `agentao`'s ACP client as a backend for roles such as:
+Kanban (and similar workflow runtimes) want to reuse `arbiter`'s ACP client as a backend for roles such as:
 
 - `worker → claude-code-worker`
 - `reviewer → codex-reviewer`
 
-Most of the plumbing already exists in `agentao/acp_client/`. The remaining work is **not** a new facade — it is (1) non-interactive semantics, (2) a structured error taxonomy, (3) an ephemeral `prompt_once` helper, (4) per-call `cwd`, and (5) an explicit public/internal API boundary on top of `ACPManager`.
+Most of the plumbing already exists in `arbiter/acp_client/`. The remaining work is **not** a new facade — it is (1) non-interactive semantics, (2) a structured error taxonomy, (3) an ephemeral `prompt_once` helper, (4) per-call `cwd`, and (5) an explicit public/internal API boundary on top of `ACPManager`.
 
 ## Current State (what already works)
 
-From `agentao/acp_client/manager.py` and `agentao/acp_client/client.py`:
+From `arbiter/acp_client/manager.py` and `arbiter/acp_client/client.py`:
 
 | Need                                     | Existing API                                                 |
 | ---------------------------------------- | ------------------------------------------------------------ |
@@ -128,7 +128,7 @@ Required invariant:
 
 ### Gap 5 — Declare the stable embedding surface
 
-`agentao/acp_client/__init__.py` re-exports 20+ names with no indication of which are embedding contract vs. internal. A kanban integration that imports `Inbox`, `InteractionRegistry`, or `ACPProcessHandle` directly will break on every refactor.
+`arbiter/acp_client/__init__.py` re-exports 20+ names with no indication of which are embedding contract vs. internal. A kanban integration that imports `Inbox`, `InteractionRegistry`, or `ACPProcessHandle` directly will break on every refactor.
 
 **Proposal:** define a real public boundary instead of only adding advisory lists:
 
@@ -146,8 +146,8 @@ __all__ = [
 
 And move/refactor internal helpers behind explicit internal modules, for example:
 
-- keep `agentao.acp_client` limited to the stable embedding surface
-- treat `agentao.acp_client.client`, `.process`, `.interaction`, `.inbox`, and similar modules as internal implementation details
+- keep `arbiter.acp_client` limited to the stable embedding surface
+- treat `arbiter.acp_client.client`, `.process`, `.interaction`, `.inbox`, and similar modules as internal implementation details
 - if compatibility pressure requires temporary re-exports, mark them deprecated and time-box their removal
 
 Document this boundary in `docs/guides/acp-embedding.md` (new) with a minimal kanban-shaped example and a short "imports you may rely on" section.
@@ -168,13 +168,13 @@ To keep implementation bounded, v1 should make the following explicit choices:
 - Error metadata may include the raw method name (`session/request_permission` or `_agentao.cn/ask_user`) for diagnostics, but callers should branch on `code`, not method.
 - `prompt_once(ephemeral=True)` closes the client/session it created and also stops the subprocess before returning. This gives daemon callers deterministic cleanup.
 - `send_prompt(..., cwd=...)` uses a fresh connection/session whenever the requested `cwd` differs from the connected session's `cwd`.
-- `agentao.acp_client` becomes the only semver-stable import surface for embedding. Direct imports from `.client`, `.process`, `.interaction`, `.inbox`, and similar modules remain supported only for internal/CLI code.
+- `arbiter.acp_client` becomes the only semver-stable import surface for embedding. Direct imports from `.client`, `.process`, `.interaction`, `.inbox`, and similar modules remain supported only for internal/CLI code.
 
 ## Detailed Design
 
 ### 1. Error Model
 
-Add structured client-side error codes in `agentao/acp_client/client.py` or a dedicated `errors.py` module:
+Add structured client-side error codes in `arbiter/acp_client/client.py` or a dedicated `errors.py` module:
 
 ```python
 class AcpErrorCode(str, Enum):
@@ -348,7 +348,7 @@ This is the smallest change that preserves existing protocol behavior and avoids
 
 The stable embedding surface should be enforced with exports, docs, and import cleanup:
 
-- narrow `agentao/acp_client/__init__.py` to the supported embedding names
+- narrow `arbiter/acp_client/__init__.py` to the supported embedding names
 - update internal callers to import implementation details from concrete modules instead of relying on top-level re-exports
 - add `docs/guides/acp-embedding.md` with:
   - supported imports
@@ -364,9 +364,9 @@ This makes the public boundary real instead of advisory.
 
 Files:
 
-- `agentao/acp_client/client.py`
-- `agentao/acp_client/models.py`
-- `agentao/acp_client/__init__.py`
+- `arbiter/acp_client/client.py`
+- `arbiter/acp_client/models.py`
+- `arbiter/acp_client/__init__.py`
 
 Changes:
 
@@ -379,9 +379,9 @@ Changes:
 
 Files:
 
-- `agentao/acp_client/manager.py`
-- `agentao/acp_client/interaction.py`
-- `agentao/acp_client/client.py`
+- `arbiter/acp_client/manager.py`
+- `arbiter/acp_client/interaction.py`
+- `arbiter/acp_client/client.py`
 
 Changes:
 
@@ -395,8 +395,8 @@ Changes:
 
 Files:
 
-- `agentao/acp_client/manager.py`
-- `agentao/acp_client/client.py`
+- `arbiter/acp_client/manager.py`
+- `arbiter/acp_client/client.py`
 
 Changes:
 
@@ -409,7 +409,7 @@ Changes:
 
 Files:
 
-- `agentao/acp_client/__init__.py`
+- `arbiter/acp_client/__init__.py`
 - `docs/guides/acp-embedding.md` (new)
 - existing ACP client docs as needed
 
@@ -459,14 +459,14 @@ Coverage matrix:
 - During non-interactive auto-rejection, the server does not report `READY` until the outstanding `session/prompt` has completed or failed.
 - Every failure path sets an `AcpErrorCode`; a caller can `except AcpClientError as e: match e.code:` without string matching.
 - `send_prompt(..., cwd=...)` applies the passed `cwd` to the turn.
-- `agentao.acp_client` documents and enforces its public vs. internal surface; existing `CLI /acp` behavior and `.agentao/acp.json` format are unchanged.
+- `arbiter.acp_client` documents and enforces its public vs. internal surface; existing `CLI /acp` behavior and `.arbiter/acp.json` format are unchanged.
 - Tests cover: non-interactive permission rejection, non-interactive `ask_user` rejection, `prompt_once` cleanup on exception, per-call `cwd`, and each `AcpErrorCode` branch.
 
 ## Why This Matters
 
 With these five deltas, kanban (and any other workflow runtime) can build on `ACPManager` directly:
 
-- reuse `.agentao/acp.json` unchanged
+- reuse `.arbiter/acp.json` unchanged
 - run ACP servers safely in a daemon context
 - map ACP failures to kanban's `config_error` / `infra_error` / `interaction_required` buckets without brittle string parsing
 - rely on a declared public API that survives internal refactors

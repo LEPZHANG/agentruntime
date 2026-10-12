@@ -4,7 +4,7 @@ Parent design doc: [Promote `ACPManager` as a Stable Embedding Facade for Non-In
 
 ## Goal
 
-Implement a stable embedding-oriented ACP client surface on top of `agentao.acp_client` so workflow runtimes can:
+Implement a stable embedding-oriented ACP client surface on top of `arbiter.acp_client` so workflow runtimes can:
 
 - run one-shot prompts safely in daemon contexts
 - detect non-interactive permission/input requests without CLI scraping
@@ -17,7 +17,7 @@ Implement a stable embedding-oriented ACP client surface on top of `agentao.acp_
 - `prompt_once(...)`
 - structured client-side error taxonomy
 - per-call `cwd` behavior
-- public/internal API boundary for `agentao.acp_client`
+- public/internal API boundary for `arbiter.acp_client`
 - tests and embedding docs
 
 ## Non-Goals
@@ -54,9 +54,9 @@ Implement a stable embedding-oriented ACP client surface on top of `agentao.acp_
 
 Files:
 
-- `agentao/acp_client/client.py`
-- `agentao/acp_client/models.py`
-- `agentao/acp_client/__init__.py`
+- `arbiter/acp_client/client.py`
+- `arbiter/acp_client/models.py`
+- `arbiter/acp_client/__init__.py`
 
 Deliverables:
 
@@ -85,9 +85,9 @@ Acceptance:
 
 Files:
 
-- `agentao/acp_client/manager.py`
-- `agentao/acp_client/client.py`
-- `agentao/acp_client/interaction.py`
+- `arbiter/acp_client/manager.py`
+- `arbiter/acp_client/client.py`
+- `arbiter/acp_client/interaction.py`
 
 Deliverables:
 
@@ -116,8 +116,8 @@ Acceptance:
 
 Files:
 
-- `agentao/acp_client/manager.py`
-- `agentao/acp_client/client.py`
+- `arbiter/acp_client/manager.py`
+- `arbiter/acp_client/client.py`
 
 Deliverables:
 
@@ -143,7 +143,7 @@ Acceptance:
 
 Files:
 
-- `agentao/acp_client/__init__.py`
+- `arbiter/acp_client/__init__.py`
 - `docs/guides/acp-embedding.md` (new)
 - ACP client docs as needed
 
@@ -155,14 +155,14 @@ Deliverables:
 
 Implementation notes:
 
-- keep `agentao.acp_client` as the only stable embedding root
+- keep `arbiter.acp_client` as the only stable embedding root
 - update internal imports that currently rely on broad top-level re-exports
 - if any compatibility aliases are kept, mark them deprecated in comments/docs
 - migration notes must enumerate the symbols being removed from the public package root
 
 Acceptance:
 
-- embedding example imports only from `agentao.acp_client`
+- embedding example imports only from `arbiter.acp_client`
 - internal helpers are no longer presented as supported API
 
 ## Phase Plan
@@ -217,7 +217,7 @@ Exit criteria:
 Steps:
 
 1. Add `docs/guides/acp-embedding.md`.
-2. Tighten `agentao.acp_client` exports.
+2. Tighten `arbiter.acp_client` exports.
 3. Update any affected docs/tests/imports.
 4. Add a short migration note if internal top-level re-exports are removed.
 
@@ -367,7 +367,7 @@ Mitigation:
 
 ### Public Export Breakage
 
-Tightening `agentao.acp_client.__all__` can break internal imports or tests that relied on broad re-exports.
+Tightening `arbiter.acp_client.__all__` can break internal imports or tests that relied on broad re-exports.
 
 Mitigation:
 
@@ -422,5 +422,5 @@ The work is done when:
 - `ACPManager.prompt_once(...)` exists and cleans up deterministically
 - all client-side failures expose `AcpErrorCode`
 - per-call `cwd` and `mcp_servers` are honored
-- `agentao.acp_client` exposes a documented stable embedding surface
+- `arbiter.acp_client` exposes a documented stable embedding surface
 - ACP client tests and relevant CLI regression tests pass

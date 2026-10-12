@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from agentao.host import (
+from arbiter.host import (
     ActivePermissions,
     HostEvent,
     PermissionDecisionEvent,
@@ -22,8 +22,8 @@ from agentao.host import (
     ToolLifecycleEvent,
     export_host_event_json_schema,
 )
-from agentao.host.schema import normalized_schema_json
-from agentao.runtime import identity as runtime_identity
+from arbiter.host.schema import normalized_schema_json
+from arbiter.runtime import identity as runtime_identity
 
 
 SNAPSHOT_PATH = (
@@ -53,7 +53,7 @@ def test_event_schema_matches_snapshot():
         "Generated harness event schema diverged from "
         f"{SNAPSHOT_PATH.relative_to(Path.cwd()) if SNAPSHOT_PATH.is_relative_to(Path.cwd()) else SNAPSHOT_PATH}. "
         "If the change is intentional, regenerate the snapshot via "
-        "agentao.host.schema.export_host_event_json_schema() and re-run."
+        "arbiter.host.schema.export_host_event_json_schema() and re-run."
     )
 
 

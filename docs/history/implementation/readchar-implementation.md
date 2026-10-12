@@ -46,7 +46,7 @@ uv add readchar
 
 ### 2. 修改代码
 
-**agentao/cli/app.py**:
+**arbiter/cli/app.py**:
 
 ```python
 import readchar

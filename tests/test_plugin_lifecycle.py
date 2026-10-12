@@ -7,20 +7,20 @@ from pathlib import Path
 
 import pytest
 
-from agentao.plugins.hooks import (
+from arbiter.plugins.hooks import (
     ClaudeHookPayloadAdapter,
     PluginHookDispatcher,
     ToolAliasResolver,
     resolve_all_hook_rules,
 )
-from agentao.plugins.models import (
+from arbiter.plugins.models import (
     HookAttachmentRecord,
     LoadedPlugin,
     ParsedHookRule,
     PluginManifest,
 )
-from agentao.embedding.plugins.diagnostics import PluginDiagnostics, build_diagnostics
-from agentao.embedding.plugins.manager import PluginManager
+from arbiter.embedding.plugins.diagnostics import PluginDiagnostics, build_diagnostics
+from arbiter.embedding.plugins.manager import PluginManager
 
 
 # ======================================================================
@@ -268,7 +268,7 @@ class TestFailureIsolation:
 
 class TestUnsupportedWarnings:
     def test_unsupported_hook_type_warning(self):
-        from agentao.plugins.hooks import ClaudeHooksParser
+        from arbiter.plugins.hooks import ClaudeHooksParser
 
         parser = ClaudeHooksParser()
         rules, warnings = parser.parse_dict({
@@ -280,7 +280,7 @@ class TestUnsupportedWarnings:
         assert any("http" in w.message and "not supported" in w.message.lower() for w in warnings)
 
     def test_unsupported_event_warning(self):
-        from agentao.plugins.hooks import ClaudeHooksParser
+        from arbiter.plugins.hooks import ClaudeHooksParser
 
         parser = ClaudeHooksParser()
         rules, warnings = parser.parse_dict({
@@ -299,14 +299,14 @@ class TestUnsupportedWarnings:
 
 class TestPluginDirArg:
     def test_repeatable_plugin_dir(self):
-        from agentao.cli import _build_parser
+        from arbiter.cli import _build_parser
 
         parser = _build_parser()
         args, _ = parser.parse_known_args(["--plugin-dir", "/a", "--plugin-dir", "/b"])
         assert args.plugin_dirs == ["/a", "/b"]
 
     def test_default_empty(self):
-        from agentao.cli import _build_parser
+        from arbiter.cli import _build_parser
 
         parser = _build_parser()
         args, _ = parser.parse_known_args([])
@@ -314,14 +314,14 @@ class TestPluginDirArg:
 
 
 # ======================================================================
-# CLI — agentao plugin list
+# CLI — arbiter plugin list
 # ======================================================================
 
 
 class TestPluginListCli:
     def test_plugin_list_no_plugins(self, tmp_path, capsys):
         """plugin list with no plugins doesn't crash."""
-        from agentao.cli import _plugin_list_cli
+        from arbiter.cli import _plugin_list_cli
         import argparse
 
         args = argparse.Namespace(plugin_dirs=[], json_output=False)
@@ -330,7 +330,7 @@ class TestPluginListCli:
         with unittest.mock.patch.object(PluginManager, "__init__", lambda self, **kw: (
             setattr(self, '_cwd', tmp_path.resolve()),
             setattr(self, '_inline_dirs', []),
-            setattr(self, '_parser', __import__('agentao.embedding.plugins.manifest', fromlist=['PluginManifestParser']).PluginManifestParser()),
+            setattr(self, '_parser', __import__('arbiter.embedding.plugins.manifest', fromlist=['PluginManifestParser']).PluginManifestParser()),
             setattr(self, '_loaded', []),
             setattr(self, '_warnings', []),
             setattr(self, '_errors', []),
@@ -340,12 +340,12 @@ class TestPluginListCli:
 
     def test_plugin_list_json(self, tmp_path, capsys):
         """plugin list --json produces valid JSON."""
-        from agentao.cli import _plugin_list_cli
+        from arbiter.cli import _plugin_list_cli
         import argparse
         import unittest.mock
 
         # Create a plugin directory under local/.
-        plugins_dir = tmp_path / ".agentao" / "plugins" / "local" / "demo"
+        plugins_dir = tmp_path / ".arbiter" / "plugins" / "local" / "demo"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "plugin.json").write_text(
             json.dumps({"name": "demo", "version": "1.0"}), encoding="utf-8",
@@ -355,7 +355,7 @@ class TestPluginListCli:
         with unittest.mock.patch.object(PluginManager, "__init__", lambda self, **kw: (
             setattr(self, '_cwd', tmp_path.resolve()),
             setattr(self, '_inline_dirs', []),
-            setattr(self, '_parser', __import__('agentao.embedding.plugins.manifest', fromlist=['PluginManifestParser']).PluginManifestParser()),
+            setattr(self, '_parser', __import__('arbiter.embedding.plugins.manifest', fromlist=['PluginManifestParser']).PluginManifestParser()),
             setattr(self, '_loaded', []),
             setattr(self, '_warnings', []),
             setattr(self, '_errors', []),
@@ -379,7 +379,7 @@ class TestPluginListCli:
 
 class TestDiagnosticsRenderer:
     def test_format_report_includes_plugin_name_and_source(self, tmp_path):
-        from agentao.plugins.models import LoadedPlugin, PluginManifest, PluginWarning
+        from arbiter.plugins.models import LoadedPlugin, PluginManifest, PluginWarning
 
         plugin = LoadedPlugin(
             name="my-plugin", version="1.2.3",
@@ -401,7 +401,7 @@ class TestDiagnosticsRenderer:
         assert "outputStyles" in report
 
     def test_format_report_shows_errors(self):
-        from agentao.plugins.models import PluginLoadError
+        from arbiter.plugins.models import PluginLoadError
 
         error = PluginLoadError(plugin_name="bad", message="JSON parse failed")
         diag = build_diagnostics([], [], [error])
@@ -411,7 +411,7 @@ class TestDiagnosticsRenderer:
         assert "JSON parse failed" in report
 
     def test_summary_counts(self):
-        from agentao.plugins.models import LoadedPlugin, PluginManifest, PluginWarning, PluginLoadError
+        from arbiter.plugins.models import LoadedPlugin, PluginManifest, PluginWarning, PluginLoadError
 
         diag = PluginDiagnostics(
             loaded=[

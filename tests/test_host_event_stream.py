@@ -24,13 +24,13 @@ import time
 
 import pytest
 
-from agentao.host.events import (
+from arbiter.host.events import (
     DEFAULT_SUBSCRIBER_QUEUE_SIZE,
     EventStream,
     StreamSubscribeError,
 )
-from agentao.host.models import ToolLifecycleEvent
-from agentao.runtime import identity as runtime_identity
+from arbiter.host.models import ToolLifecycleEvent
+from arbiter.runtime import identity as runtime_identity
 
 
 def _ev(session_id: str, *, tool_call_id: str = "tc", phase: str = "started"):
@@ -268,8 +268,8 @@ def test_second_subscriber_for_same_filter_rejected():
 
 
 def test_session_id_construction_time_fallback():
-    """``Agentao`` must allocate a non-empty ``_session_id`` at construction."""
-    from agentao.runtime.identity import new_session_id
+    """``Arbiter`` must allocate a non-empty ``_session_id`` at construction."""
+    from arbiter.runtime.identity import new_session_id
 
     a = new_session_id()
     b = new_session_id()
@@ -320,7 +320,7 @@ def test_turn_id_minted_at_turn_entry_and_cleared(tmp_path, monkeypatch):
     The agent's _chat_inner is patched so we can inspect
     ``agent._current_turn_id`` mid-turn without spinning up the LLM.
     """
-    from agentao.agent import Agentao
+    from arbiter.agent import Arbiter
 
     captured: list[str | None] = []
 
@@ -328,9 +328,9 @@ def test_turn_id_minted_at_turn_entry_and_cleared(tmp_path, monkeypatch):
         captured.append(self._current_turn_id)
         return "ok"
 
-    monkeypatch.setattr(Agentao, "_chat_inner", fake_inner)
+    monkeypatch.setattr(Arbiter, "_chat_inner", fake_inner)
 
-    agent = Agentao(
+    agent = Arbiter(
         api_key="k", base_url="https://example", model="x",
         working_directory=tmp_path,
     )
@@ -348,10 +348,10 @@ def test_turn_id_minted_at_turn_entry_and_cleared(tmp_path, monkeypatch):
 
 
 def test_agent_session_id_default_set_at_construction(tmp_path):
-    """``Agentao`` populates ``_session_id`` before any session/replay logic runs."""
-    from agentao.agent import Agentao
+    """``Arbiter`` populates ``_session_id`` before any session/replay logic runs."""
+    from arbiter.agent import Arbiter
 
-    agent = Agentao(
+    agent = Arbiter(
         api_key="k", base_url="https://example", model="x",
         working_directory=tmp_path,
     )
@@ -360,9 +360,9 @@ def test_agent_session_id_default_set_at_construction(tmp_path):
 
 
 def test_agent_events_returns_async_iterator(tmp_path):
-    from agentao.agent import Agentao
+    from arbiter.agent import Arbiter
 
-    agent = Agentao(
+    agent = Arbiter(
         api_key="k", base_url="https://example", model="x",
         working_directory=tmp_path,
     )
@@ -526,7 +526,7 @@ def test_on_loop_publish_caps_pending_puts(caplog):
         consume_task = asyncio.create_task(gen.__anext__())
         await asyncio.sleep(0)
 
-        with caplog.at_level(logging.WARNING, "agentao.host.events"):
+        with caplog.at_level(logging.WARNING, "arbiter.host.events"):
             # max_queue_size=2 → cap on pending tasks is 2. Total
             # in-flight ceiling: 2 (queue) + 2 (pending) = 4.
             # Publishing 6 should drop at least 2 events.
@@ -583,15 +583,15 @@ def test_on_loop_publish_does_not_drop_when_queue_full():
 
 
 def test_subagent_tools_capture_live_host_emitter(tmp_path, monkeypatch):
-    """``Agentao.__init__`` previously created the harness subagent emitter
+    """``Arbiter.__init__`` previously created the harness subagent emitter
     AFTER ``_register_agent_tools`` ran, so every ``AgentToolWrapper`` saw
     ``None`` and the lifecycle emitter was a no-op. Hoisting the harness
     setup before agent-tool registration restores the wiring; this test
     pins that ordering by inspecting the registered wrappers."""
-    from agentao.agent import Agentao
-    from agentao.agents.tools import AgentToolWrapper
+    from arbiter.agent import Arbiter
+    from arbiter.agents.tools import AgentToolWrapper
 
-    agent = Agentao(
+    agent = Arbiter(
         api_key="k", base_url="https://example", model="x",
         working_directory=tmp_path,
         enable_builtin_agents=True,

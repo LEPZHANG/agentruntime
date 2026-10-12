@@ -1,4 +1,4 @@
-"""FastAPI route that runs an Agentao turn in a background task.
+"""FastAPI route that runs an Arbiter turn in a background task.
 
 The minimum 1-route shape:
 
@@ -6,7 +6,7 @@ The minimum 1-route shape:
     GET  /run/{job_id}                    → result or 404 / 425 (still running)
     POST /run/{job_id}/cancel             → cancels the in-flight token
 
-Per-request agent: each POST constructs an ``Agentao`` against the
+Per-request agent: each POST constructs an ``Arbiter`` against the
 ``llm_client`` returned by :func:`get_llm_client` (overridable for
 tests). Cancellation propagates from the asyncio task to the in-flight
 ``chat()`` token via ``arun``.
@@ -26,9 +26,9 @@ from typing import Any, Awaitable, Callable
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 
-from agentao import Agentao
-from agentao.cancellation import CancellationToken
-from agentao.llm import LLMClient
+from arbiter import Arbiter
+from arbiter.cancellation import CancellationToken
+from arbiter.llm import LLMClient
 
 
 # ---------------------------------------------------------------------------
@@ -72,12 +72,12 @@ _JOBS: dict[str, _Job] = {}
 
 def create_app(llm_client_factory: Callable[[], LLMClient] = get_llm_client) -> FastAPI:
     """Construct the FastAPI app. ``llm_client_factory`` is the test seam."""
-    app = FastAPI(title="agentao-fastapi-background-example")
+    app = FastAPI(title="arbiter-fastapi-background-example")
     app.state.llm_client_factory = llm_client_factory
 
     async def _run_turn(job: _Job, prompt: str) -> str:
-        agent = Agentao(
-            working_directory=Path(tempfile.mkdtemp(prefix="agentao-job-")),
+        agent = Arbiter(
+            working_directory=Path(tempfile.mkdtemp(prefix="arbiter-job-")),
             llm_client=app.state.llm_client_factory(),
         )
         try:

@@ -2,7 +2,7 @@
 
 import pytest
 
-from agentao.memory.guards import MemoryGuard, SensitiveMemoryError
+from arbiter.memory.guards import MemoryGuard, SensitiveMemoryError
 
 
 @pytest.fixture

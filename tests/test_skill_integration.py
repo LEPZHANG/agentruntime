@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Test skill integration with Agentao."""
+"""Test skill integration with Arbiter."""
 
 import os
 from pathlib import Path
 
-from agentao import Agentao
+from arbiter import Arbiter
 
 
 def test_skill_with_resources():
     """Test that agent can access skill resources."""
     # Create agent
-    agent = Agentao(working_directory=Path.cwd())
+    agent = Arbiter(working_directory=Path.cwd())
 
     print("=" * 70)
     print("Testing Skill Resource Access")

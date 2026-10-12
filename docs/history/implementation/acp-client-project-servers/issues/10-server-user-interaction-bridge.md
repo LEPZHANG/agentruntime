@@ -6,7 +6,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Goal
 
-定义当外部 ACP server 请求用户确认或请求用户输入时，Agentao 如何以异步、可控、不破坏当前 CLI 输入体验的方式桥接这些交互。
+定义当外部 ACP server 请求用户确认或请求用户输入时，Arbiter 如何以异步、可控、不破坏当前 CLI 输入体验的方式桥接这些交互。
 
 ## Scope
 
@@ -26,10 +26,10 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
   - `/acp reject <name> <request-id>`
   - `/acp reply <name> <request-id> <text>`
 - CLI 集成位置：
-  - `agentao/cli/app.py`
-  - `agentao/cli/commands.py`
-  - `agentao/cli/commands_ext.py`
-  - `agentao/cli/transport.py`
+  - `arbiter/cli/app.py`
+  - `arbiter/cli/commands.py`
+  - `arbiter/cli/commands_ext.py`
+  - `arbiter/cli/transport.py`
 - 相关测试
 
 ## Dependencies
@@ -42,15 +42,15 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Design Notes
 
-- v1 不直接复用前台 Agentao 的 `confirm_tool()` 和 `ask_user()` 交互
-- 这里的“前台 Agentao 交互”在当前代码结构中主要位于：
-  - `agentao/cli/transport.py`
-  - `agentao/cli/app.py`
+- v1 不直接复用前台 Arbiter 的 `confirm_tool()` 和 `ask_user()` 交互
+- 这里的“前台 Arbiter 交互”在当前代码结构中主要位于：
+  - `arbiter/cli/transport.py`
+  - `arbiter/cli/app.py`
 - 原因：
   - 它们是同步阻塞模型
   - 会打断 prompt_toolkit 输入态
   - 无法优雅处理多个 ACP server 的并发请求
-  - 会混淆“本地 Agentao 在问”与“外部 ACP server 在问”
+  - 会混淆“本地 Arbiter 在问”与“外部 ACP server 在问”
 - 因此外部请求统一转为 `pending interaction`
 - 其中自由文本输入对应的 ACP extension method 固定为：
   - `_agentao.cn/ask_user`
@@ -156,5 +156,5 @@ v1 建议保守策略：
 
 - 抢占式菜单弹窗
 - 自动代替用户做确认
-- 自动将 interaction 转为当前 Agentao 会话里的 ask_user
+- 自动将 interaction 转为当前 Arbiter 会话里的 ask_user
 - `max_iterations` 的 ACP 扩展设计

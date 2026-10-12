@@ -26,10 +26,10 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 ## Deliverables
 
 - CLI 集成：
-  - `agentao/cli/app.py`
-  - `agentao/cli/commands.py`
-  - `agentao/cli/commands_ext.py`
-  - `agentao/cli/_utils.py`
+  - `arbiter/cli/app.py`
+  - `arbiter/cli/commands.py`
+  - `arbiter/cli/commands_ext.py`
+  - `arbiter/cli/_utils.py`
 - CLI tests
 
 ## Dependencies

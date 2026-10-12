@@ -1,7 +1,7 @@
 """Tests for the ACP session registry and per-session lifecycle (Issue 03).
 
 These drive :class:`AcpSessionManager` and :class:`AcpSessionState`
-directly with a fake ``Agentao``-shaped stub so we don't need real API
+directly with a fake ``Arbiter``-shaped stub so we don't need real API
 credentials or an LLM client. The one integration test at the bottom
 verifies the ``AcpServer.run()`` finally-block shutdown hook.
 
@@ -16,14 +16,14 @@ from pathlib import Path
 
 import pytest
 
-from agentao.acp.models import AcpSessionState
-from agentao.acp.server import AcpServer
-from agentao.acp.session_manager import (
+from arbiter.acp.models import AcpSessionState
+from arbiter.acp.server import AcpServer
+from arbiter.acp.session_manager import (
     AcpSessionManager,
     DuplicateSessionError,
     SessionNotFoundError,
 )
-from agentao.cancellation import CancellationToken
+from arbiter.cancellation import CancellationToken
 
 from .support.acp_agents import ExplodingAgent, FakeAgent
 
@@ -100,7 +100,7 @@ def test_close_saves_session_for_resume(tmp_path):
 
     Regression: stopping the ACP subprocess used to drop the chat history.
     """
-    from agentao.embedding.sessions import load_session
+    from arbiter.embedding.sessions import load_session
 
     agent = FakeAgent()
     agent.messages = [
@@ -120,7 +120,7 @@ def test_close_saves_session_for_resume(tmp_path):
 
 def test_close_skips_save_for_empty_conversation(tmp_path):
     """A session that never ran a turn must not litter the sessions dir."""
-    from agentao.embedding.sessions import list_sessions
+    from arbiter.embedding.sessions import list_sessions
 
     state = _state(session_id="sess-empty", agent=FakeAgent(), cwd=tmp_path)
 
@@ -366,7 +366,7 @@ def test_concurrent_create_and_get_do_not_crash():
 
 def test_server_run_closes_all_sessions_on_eof():
     """AcpServer.run() must call sessions.close_all() in its finally block
-    so stdio EOF tears down every session-owned Agentao instance."""
+    so stdio EOF tears down every session-owned Arbiter instance."""
     stdin = io.StringIO("")  # empty → immediate EOF
     stdout = io.StringIO()
     server = AcpServer(stdin=stdin, stdout=stdout)

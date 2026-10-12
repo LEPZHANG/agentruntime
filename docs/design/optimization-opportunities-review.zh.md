@@ -1,10 +1,10 @@
-# Agentao — 优化机会评审
+# Arbiter — 优化机会评审
 
-**状态：** 评审记录。2026-06-19 起草，基于对 `agentao` 运行时、打包、CLI/ACP
+**状态：** 评审记录。2026-06-19 起草，基于对 `arbiter` 运行时、打包、CLI/ACP
 表面的多维度审计。**这是一份带实证的发现清单 + 优先级改进提案，不是已批准的计划。**
 它记录代码库在哪些地方存在局部性能成本、打包死重量、或易漂移的重复代码——并
 *交由维护者判断*：哪些现在修、哪些收敛、哪些保持不动。
-**读者：** Agentao 维护者。
+**读者：** Arbiter 维护者。
 
 > **部分被取代（2026-07-25）。** Tier 1–2 已随 v0.4.12 落地（见文末*实施状态*）。
 > **Tier 3 已正式否决**——`refactor-audit-2026-07.md` §5 重新核查了三项，发现
@@ -32,9 +32,9 @@
 
 ## TL;DR
 
-Agentao 是一个**成熟、维护良好的代码库，没有成堆触手可及的技术债**。262 个源文件
+Arbiter 是一个**成熟、维护良好的代码库，没有成堆触手可及的技术债**。262 个源文件
 / ~54.5k 行，测试比近 1:1（195 个测试文件 / ~54.8k 行），仅 4 个 TODO 标记（其中
-3 个是误报），惰性导入边界干净（`import agentao` 实测**不加载任何**重模块）。
+3 个是误报），惰性导入边界干净（`import arbiter` 实测**不加载任何**重模块）。
 **不存在架构性紧急问题。**
 
 这里的「优化」指三类具体、有界的工作：
@@ -76,7 +76,7 @@ bug 修复**作为单点改动（T2.3 settings.json 读+写 cwd、T2.5 ACP cwd �
 | `TODO`/`FIXME`/`XXX`/`HACK` | 4（3 个误报：`XXXX` provider 占位符） | 实质零债务标记 |
 | 弃用标记 | 31 | 活的、有文档的向后兼容 shim（非腐烂） |
 | 90 天提交数 | 316 | 活跃开发 |
-| `import agentao` 重模块 | 0 | openai/mcp/httpx/jinja2/rich/bs4/tiktoken 全 `loaded=False` |
+| `import arbiter` 重模块 | 0 | openai/mcp/httpx/jinja2/rich/bs4/tiktoken 全 `loaded=False` |
 
 结论：通常表征疏于维护的廉价信号都不存在。下列发现是残余的，不是系统性的。
 
@@ -85,7 +85,7 @@ bug 修复**作为单点改动（T2.3 settings.json 读+写 cwd、T2.5 ACP cwd �
 ## 第一档 — 快赢（低风险）
 
 ### T1.1 — 5 个打包 extras 是死重量（`google` 明确可删）· HIGH
-`pyproject.toml:48-52`。5 个 extras 在 `agentao/` 已发布代码中**零导入**（按实际导入名
+`pyproject.toml:48-52`。5 个 extras 在 `arbiter/` 已发布代码中**零导入**（按实际导入名
 grep 验证——`google.genai`、`Crypto`、`fitz`/`pdfplumber`、`pandas`/`openpyxl`、`PIL`）：
 
 ```
@@ -149,7 +149,7 @@ tests/test_dependency_split.py -m slow`）。
 `tool_runner.py:60-64`。`confirmation_callback`、`step_callback`、`output_callback`、
 `tool_complete_callback` **声明了但从不存储、从不引用**（body 65-90 行一个都没存），
 且**无调用方传入**——唯一生产构造点（`agent.py:587`）和全部 5 个测试构造点都不传。
-区别于 `Agentao.__init__` 那些会发 `DeprecationWarning` 并喂给 `build_compat_transport`
+区别于 `Arbiter.__init__` 那些会发 `DeprecationWarning` 并喂给 `build_compat_transport`
 的活 shim，这 4 个是无警告、无存储、无使用的惰性签名噪音。
 
 - 它们位于 keyword-only `*` 之后，只能按关键字传，grep 显示无人传。可直接删除。
@@ -181,7 +181,7 @@ view 带删除注记。（注释/结构修复，**不要**删方法。）
 ### T2.1 — 3 个 ACP handler 仍内联 `require_active_session()` 已集中的 session 门禁 · MEDIUM（顺手）
 `_handler_utils.py:52-81` 是为此专建的 helper；其 docstring（`:10-12`）自己点名了落后者。
 5 个较新 handler 已采用（`session_set_mode`、`session_set_model`、`session_list_models`、
-`session_set_config_option`、`agentao_set_model`——已确认）。仍在手写同一个 4 步门禁的：
+`session_set_config_option`、`arbiter_set_model`——已确认）。仍在手写同一个 4 步门禁的：
 `session_cancel.py:112-129`、`session_prompt.py:235-253`、`session_load.py:157-166`。
 逐字复制的 `_parse_session_id`（cancel `:82-84`、prompt `:100-101`、load `:109-111`）
 就是该 helper 里的 sessionId 子句。
@@ -202,12 +202,12 @@ prefix 方案。内联重实现于：`cli/diagnostics/collectors.py:47-50`、
   让三个取值站点走它。一个小的新导出，单看价值不高——不作为排期任务。
   （`provider._list_providers_from_env` *扫描全部* `*_API_KEY` 键，形状确实不同——保留。）
 
-### T2.3 — `cli/app.py` 用 cwd 相对而非解析后的 project root *读和写* `.agentao/settings.json` · MEDIUM（bug — 现在修）+ 可选后续
+### T2.3 — `cli/app.py` 用 cwd 相对而非解析后的 project root *读和写* `.arbiter/settings.json` · MEDIUM（bug — 现在修）+ 可选后续
 可执行项是一个 **横跨 settings 往返两端的 bug**：`cli/app.py:140`（`_load_settings`）
 **和** `cli/app.py:149`（`_save_settings`）都用 **cwd 相对** 的
-`Path(".agentao") / "settings.json"` 而非解析后的 project root。`factory.py:37-45` 和
+`Path(".arbiter") / "settings.json"` 而非解析后的 project root。`factory.py:37-45` 和
 `replay/config.py:107-115` 则从解析后的根读取*同一文件*。于是从子目录启动的 CLI 会把
-`mode` 持久化到 cwd 下的 `.agentao/settings.json`（甚至会 `mkdir` 一个），而 factory 永远
+`mode` 持久化到 cwd 下的 `.arbiter/settings.json`（甚至会 `mkdir` 一个），而 factory 永远
 读不到——**读和写都**与 factory 冻结的 `working_directory` 契约不一致。
 
 - **修法（单点）：** 让 `_load_settings()` **和** `_save_settings()` **都**用解析后的
@@ -267,7 +267,7 @@ post-tool hook 派发——有 5 个 `return call_id, ToolExecutionResult(...)` 
 - **约束：** TOOL_START/TOOL_COMPLETE 配对、「host `started` 仅在 ALLOW 时触发」的顺序、
   以及每个 `call_id` 单次 emit 保证，对 ACP/replay/CLI 都是载荷。任何抽取必须保序。
 
-### T3.2 — `Agentao.get_conversation_summary` 是住在 core 里的 64 行展示方法 · LOW/MEDIUM
+### T3.2 — `Arbiter.get_conversation_summary` 是住在 core 里的 64 行展示方法 · LOW/MEDIUM
 `agent.py:1188-1250`。纯字符串拼装的 CLI/状态显示，伸手进 `context_manager`、
 `memory_manager`、`skill_manager`、`todo_tool`、`mcp_manager`、`llm` 只为拼文本。
 这是展示关注点，更适合 `runtime/summarize(agent)`（对齐已确立的 `run_turn(agent, …)` /
@@ -291,9 +291,9 @@ post-tool hook 派发——有 5 个 `return call_id, ToolExecutionResult(...)` 
 
 记录在此，免得未来某次扫描把有意设计重新当问题标记（本仓库文化是 *gap ≠ need*）：
 
-- **`import agentao` 干净。** openai SDK、mcp、jieba、tiktoken、bs4、jinja2 全惰性 / 延迟；
-  `from agentao import Agentao` 不加载任何重模块。
-- **AGENTAO.md 不会每轮重读** — 构造时加载一次（`agent.py:504`）；builder 用缓存的
+- **`import arbiter` 干净。** openai SDK、mcp、jieba、tiktoken、bs4、jinja2 全惰性 / 延迟；
+  `from arbiter import Arbiter` 不加载任何重模块。
+- **ARBITER.md 不会每轮重读** — 构造时加载一次（`agent.py:504`）；builder 用缓存的
   `agent.project_instructions`。
 - **内存召回不是 O(n²)** — 倒排索引 + `write_version` 脏标门控（`retriever.py:300-319`）；
   token bundle 已缓存。
@@ -303,9 +303,9 @@ post-tool hook 派发——有 5 个 `return call_id, ToolExecutionResult(...)` 
   `Self`、`StrEnum`、`TaskGroup`、`datetime.UTC` 全无）。
 - **无「导入但未声明」依赖。** 每个导入都对应已声明依赖（`pygments` 0 导入但是
   `cli/__init__.py:81` 里有意的存在性探针）。
-- **`Agentao.__init__`（232 行）** 已分解为约 9 个 `_init_*`/`_resolve_*`/`_validate_*`
+- **`Arbiter.__init__`（232 行）** 已分解为约 9 个 `_init_*`/`_resolve_*`/`_validate_*`
   helper，顺序有文档——再拆只增间接、不减真复杂度。
-- **`chat_loop/` mixin、`harness→host` 别名、`Agentao` 遗留回调** 都是有意、有文档的 shim，
+- **`chat_loop/` mixin、`harness→host` 别名、`Arbiter` 遗留回调** 都是有意、有文档的 shim，
   非债务。
 - **`write_session_update` 信封集中化成立** — 三个 session/update emit 站点全走它
   （commit `c6d6406` 完好）。
@@ -339,11 +339,11 @@ pdf/excel/image/crypto 的「删除还是文档化」是属于维护者的 harne
 
 | 发现 | 验证 |
 |---|---|
-| T1.1 | `grep -rE "from google\|import Crypto\|import fitz\|pdfplumber\|import pandas\|import openpyxl\|from PIL" agentao/` → 0 命中；通读 `llm/client.py:493-495` Gemini-over-OpenAI 路径 |
+| T1.1 | `grep -rE "from google\|import Crypto\|import fitz\|pdfplumber\|import pandas\|import openpyxl\|from PIL" arbiter/` → 0 命中；通读 `llm/client.py:493-495` Gemini-over-OpenAI 路径 |
 | T1.2 / T1.3 | 通读 `context_manager.py`（`_heuristic_token_count`、`_threshold_token_estimate`、anchor）+ `_compaction.py`；**反向评审：** 确认 `_runner.py:268` 用 `message_count` 给 anchor 变暖，故慢循环仅冷路径 → 两条降为 LOW |
-| T1.4 | 通读 `tool_runner.py:60-90`；`grep "ToolRunner("` 跨 `agentao/` + `tests/`——无调用方传那 4 个参数 |
+| T1.4 | 通读 `tool_runner.py:60-90`；`grep "ToolRunner("` 跨 `arbiter/` + `tests/`——无调用方传那 4 个参数 |
 | T1.5 | `grep "start_replay\|end_replay\|reload_replay_config"` → 在用的 CLI + ACP 调用方 |
-| T2.1 | `grep "require_active_session" agentao/acp/` — 5 采用、3 落后 |
+| T2.1 | `grep "require_active_session" arbiter/acp/` — 5 采用、3 落后 |
 | T2.2 | `grep "LLM_PROVIDER\|discover_llm_kwargs"`；通读每个重实现站点 |
 | T2.3 | 通读 `app.py` 的 `_load_settings` **和** `_save_settings`——读写均 cwd 相对；与 `factory.py` / `replay/config.py` 的解析根读取对比 |
 | T2.4–T2.6 | 通读每对引用片段；确认漂移 / 单文件重复 |
@@ -370,7 +370,7 @@ Tier-1 与 Tier-2 全部一次性落地（Tier-3 仅记录、未做）。默认�
   决策完全一致（区间互斥，且 microcompaction 只会降 token）。
 - **T1.4 — 已回退。** Codex review 指出删除 `ToolRunner` 的 4 个弃用回调 kwargs 会提前
   结束其向后兼容窗口：外部 host/测试若仍直接用这些参数构造 `ToolRunner` 会触发
-  `TypeError`。已恢复为“接受但忽略”的 no-op，并按与 `Agentao.__init__` 同类遗留回调
+  `TypeError`。已恢复为“接受但忽略”的 no-op，并按与 `Arbiter.__init__` 同类遗留回调
   相同的兼容政策排期 0.5.0 移除，而非现在。净效果：`tool_runner.py` 无改动。
 - **T2.1 — “safe drop-in”仅对 `session_cancel` 成立。** 细读发现 `session_prompt`
   对 `require_active_session` **并非**行为保持（它在 session 查找**之前**解析 prompt，

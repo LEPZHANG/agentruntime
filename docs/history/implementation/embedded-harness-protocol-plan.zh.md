@@ -9,14 +9,14 @@
 
 ## Already in master(已核对,本 addendum 不重开)
 
-- `Agentao.arun()` async public surface —— `agentao/agent.py:556`。通过 `loop.run_in_executor(None, self.chat, ...)` 桥接 sync `chat()`(`agentao/agent.py:580`)。
-- `Agentao.__init__(*, working_directory: Path)` 已是 keyword-only required —— `agentao/agent.py:74`。docstring 写明 "required since 0.3.0;was a deprecated optional in 0.2.16"。
-- Factory:`agentao/embedding/factory.py::build_from_environment` 接管 env / dotenv / cwd / home 发现,显式构造好子系统后传给 `Agentao(...)`。
-- `MemoryStore` Protocol —— `agentao/capabilities/memory.py:33`,经 `agentao/capabilities/__init__.py` re-export。`MemoryManager.__init__` 直接接收 `MemoryStore` 实例(`agentao/memory/manager.py:57`)。
-- `FileSystem` / `ShellExecutor` capability,以及 `Tool` 内的 lazy `LocalFileSystem` / `LocalShellExecutor` 默认 —— `agentao/tools/base.py:32-44`、`agentao/capabilities/{filesystem,shell}.py`。
-- `BackgroundTaskStore`、`SandboxPolicy`、`ReplayConfig`、`MCPRegistry` 都是 `Agentao.__init__` 的显式 injection kwargs(`agentao/agent.py:83-91`);factory 负责按 CLI 行为从 `<wd>/.agentao/*` 装填默认。
+- `Arbiter.arun()` async public surface —— `arbiter/agent.py:556`。通过 `loop.run_in_executor(None, self.chat, ...)` 桥接 sync `chat()`(`arbiter/agent.py:580`)。
+- `Arbiter.__init__(*, working_directory: Path)` 已是 keyword-only required —— `arbiter/agent.py:74`。docstring 写明 "required since 0.3.0;was a deprecated optional in 0.2.16"。
+- Factory:`arbiter/embedding/factory.py::build_from_environment` 接管 env / dotenv / cwd / home 发现,显式构造好子系统后传给 `Arbiter(...)`。
+- `MemoryStore` Protocol —— `arbiter/capabilities/memory.py:33`,经 `arbiter/capabilities/__init__.py` re-export。`MemoryManager.__init__` 直接接收 `MemoryStore` 实例(`arbiter/memory/manager.py:57`)。
+- `FileSystem` / `ShellExecutor` capability,以及 `Tool` 内的 lazy `LocalFileSystem` / `LocalShellExecutor` 默认 —— `arbiter/tools/base.py:32-44`、`arbiter/capabilities/{filesystem,shell}.py`。
+- `BackgroundTaskStore`、`SandboxPolicy`、`ReplayConfig`、`MCPRegistry` 都是 `Arbiter.__init__` 的显式 injection kwargs(`arbiter/agent.py:83-91`);factory 负责按 CLI 行为从 `<wd>/.arbiter/*` 装填默认。
 
-本 addendum 不重新定义这些,也不再列 "PR 3b / PR 5b" 这类阶段性 tightening。残留的非 factory fallback(例如 `LLMClient` log-file 解析在 `agentao/llm/client.py:208,216`)不属本文档范围,如需收紧请单独建 issue 跟踪。
+本 addendum 不重新定义这些,也不再列 "PR 3b / PR 5b" 这类阶段性 tightening。残留的非 factory fallback(例如 `LLMClient` log-file 解析在 `arbiter/llm/client.py:208,216`)不属本文档范围,如需收紧请单独建 issue 跟踪。
 
 ---
 
@@ -30,9 +30,9 @@
 - `LLMCapability`、流式 `LLMDelta`、provider-normalized reasoning deltas。
 - 超出现有 confirmation flow 的 `ToolGovernanceResult`。
 - `MetacognitiveBoundary` runtime protocol —— 设计已在 `docs/design/metacognitive-boundary.md` / `.zh.md` 落档,实施推迟。
-- 暴露给 tool 的 public `AgentaoContext` / run-context 对象 —— 等到第一个真正消费它的 `AsyncTool` 出现再定义。AsyncTool 本身不带 `ctx` 参数。
+- 暴露给 tool 的 public `ArbiterContext` / run-context 对象 —— 等到第一个真正消费它的 `AsyncTool` 出现再定义。AsyncTool 本身不带 `ctx` 参数。
 - 把 `McpTool`(目前 `McpTool(Tool)`,通过 `McpClientManager` 做 sync→async 桥接)迁到 AsyncTool。等 in-tree 至少有一个 `AsyncTool` 消费者真跑起来再做。
-- 把 `agentao.tools.base.Tool` 本身改成结构性 `Protocol`。它继续作为 base class。
+- 把 `arbiter.tools.base.Tool` 本身改成结构性 `Protocol`。它继续作为 base class。
 - 重开 `MemoryStore` Protocol 契约。
 
 ---
@@ -45,9 +45,9 @@ P0 仅剩这一个值得文档化的协议层决策:**让 async 工具能干净�
 
 当前 runtime 不是只通过 `name / description / parameters / execute` 消费工具。它还会读:
 
-- `tool.to_openai_format()` —— `ToolRegistry.to_openai_format(plan_mode=...)` 遍历所有工具调用这个方法(`agentao/tools/base.py:182`)。
-- `tool.is_read_only` —— `ToolCallPlanner._decide` 根据它决定 `readonly_mode` 行为(`agentao/runtime/tool_planning.py:225`);`ToolExecutor` 在 deny 消息里也会回显(`agentao/runtime/tool_executor.py:152`)。
-- `tool.working_directory`、`tool.output_callback`、`tool.filesystem`、`tool.shell` —— 由 `Agentao` 在注册期/执行期写入或读取(`agentao/tools/base.py:17-44`)。
+- `tool.to_openai_format()` —— `ToolRegistry.to_openai_format(plan_mode=...)` 遍历所有工具调用这个方法(`arbiter/tools/base.py:182`)。
+- `tool.is_read_only` —— `ToolCallPlanner._decide` 根据它决定 `readonly_mode` 行为(`arbiter/runtime/tool_planning.py:225`);`ToolExecutor` 在 deny 消息里也会回显(`arbiter/runtime/tool_executor.py:152`)。
+- `tool.working_directory`、`tool.output_callback`、`tool.filesystem`、`tool.shell` —— 由 `Arbiter` 在注册期/执行期写入或读取(`arbiter/tools/base.py:17-44`)。
 
 如果 `AsyncTool` 只声明 `name / description / parameters / requires_confirmation / async_execute` 这套 metadata-only Protocol,把一个 fixture 注册进 `ToolRegistry` 之后,**还没走到 `async_execute`,在第一次 schema 导出或 readonly_mode 评估时就会 AttributeError**。
 
@@ -55,7 +55,7 @@ P0 让 AsyncToolBase 成为真正的 drop-in sibling。为避免 cargo-cult `Too
 
 ### 形态
 
-`agentao/tools/base.py` —— 抽出共享基类:
+`arbiter/tools/base.py` —— 抽出共享基类:
 
 ```python
 from abc import ABC, abstractmethod
@@ -158,7 +158,7 @@ class AsyncToolBase(_BaseTool):
 允许 `AsyncToolBase` 进入 registry,意味着 registration / planning / execution 路径上的注解必须更新,否则 type checker 与读代码的人看到的契约和实际不一致。具体引入一个 alias:
 
 ```python
-# agentao/tools/base.py
+# arbiter/tools/base.py
 RegistrableTool = Tool | AsyncToolBase
 ```
 
@@ -167,27 +167,27 @@ RegistrableTool = Tool | AsyncToolBase
 - `ToolRegistry.tools: Dict[str, RegistrableTool]`,
 - `ToolRegistry.register(tool: RegistrableTool) -> None`,
 - `ToolRegistry.get(...) -> RegistrableTool`,
-- `ToolRegistry.list_tools() -> List[RegistrableTool]`(`agentao/tools/base.py:174`),
-- `ToolCallPlan.tool: RegistrableTool`(`agentao/runtime/tool_planning.py:75`),
-- 经由同一 registry 流转的 sub-agent 表面:`AgentManager.create_agent_tools(..., all_tools: Dict[str, RegistrableTool], ...)`(`agentao/agents/manager.py:144`)与 `AgentToolWrapper.__init__(..., all_tools: Dict[str, RegistrableTool], ...)`(`agentao/agents/tools.py:235`;类定义在 `:221`),
+- `ToolRegistry.list_tools() -> List[RegistrableTool]`(`arbiter/tools/base.py:174`),
+- `ToolCallPlan.tool: RegistrableTool`(`arbiter/runtime/tool_planning.py:75`),
+- 经由同一 registry 流转的 sub-agent 表面:`AgentManager.create_agent_tools(..., all_tools: Dict[str, RegistrableTool], ...)`(`arbiter/agents/manager.py:144`)与 `AgentToolWrapper.__init__(..., all_tools: Dict[str, RegistrableTool], ...)`(`arbiter/agents/tools.py:235`;类定义在 `:221`),
 - 任何当前读 `plan.tool: Tool` 的 executor / formatter 签名。
 
 不做这步,duck-type 在 runtime 工作,但每条注解都在撒谎,IDE/`mypy` 会对 AsyncTool 子类上的 `tool.async_execute` 访问全部报错。alias 是 opt-in 的:确实只处理 sync 工具的辅助代码(例如 `Tool.execute`-only 的 helper)继续保留更窄的 `Tool` 注解。
 
 ### 分发(Dispatch)—— host-loop-aware 桥接
 
-朴素的"每次调用在 chat 线程上 `asyncio.run()`"方案**不能作为唯一路径**。`arun()` 已经把 host 主线程的 loop 与 chat 线程隔离 —— `chat()` 跑在 `loop.run_in_executor(None, ...)` 派生的 worker 线程上(`agentao/agent.py:580`)。在 chat 线程新起的 fresh loop 摸不到任何绑定在 host loop 上的资源 —— 比如 `aiohttp.ClientSession`、async DB client、`anyio` task group,任何在 host loop 上创建的对象。**持有这种资源的 async 工具是常态,不是特例**,把这个问题推到 P1 是可预见的坑。
+朴素的"每次调用在 chat 线程上 `asyncio.run()`"方案**不能作为唯一路径**。`arun()` 已经把 host 主线程的 loop 与 chat 线程隔离 —— `chat()` 跑在 `loop.run_in_executor(None, ...)` 派生的 worker 线程上(`arbiter/agent.py:580`)。在 chat 线程新起的 fresh loop 摸不到任何绑定在 host loop 上的资源 —— 比如 `aiohttp.ClientSession`、async DB client、`anyio` task group,任何在 host loop 上创建的对象。**持有这种资源的 async 工具是常态,不是特例**,把这个问题推到 P1 是可预见的坑。
 
 P0 因此在 `arun()` 入口捕获 host loop,并把它透传给 dispatcher:
 
-1. `Agentao.arun(...)`:在 `run_in_executor` 之前 `host_loop = asyncio.get_running_loop()`,把 `host_loop` 暴露给 chat runtime —— 具体可以挂在已经透传到 `chat()` 的 `CancellationToken` 上,或者新增一个 `runtime_loop` kwarg 一路透到 `ChatLoopRunner` → `ToolRunner` → `ToolExecutor`。两种实现都行,只有 dispatcher 需要读它。
+1. `Arbiter.arun(...)`:在 `run_in_executor` 之前 `host_loop = asyncio.get_running_loop()`,把 `host_loop` 暴露给 chat runtime —— 具体可以挂在已经透传到 `chat()` 的 `CancellationToken` 上,或者新增一个 `runtime_loop` kwarg 一路透到 `ChatLoopRunner` → `ToolRunner` → `ToolExecutor`。两种实现都行,只有 dispatcher 需要读它。
 
 2. `ToolExecutor` 分发到一个 `AsyncToolBase` 时:
 
    ```python
    # ToolRunner.execute 与 ToolExecutor.execute_batch 的当前签名都
-   # 允许 ``cancellation_token=None``(见 agentao/runtime/tool_runner.py:108、
-   # agentao/runtime/tool_executor.py:68)。dispatcher 必须容忍 None token,
+   # 允许 ``cancellation_token=None``(见 arbiter/runtime/tool_runner.py:108、
+   # arbiter/runtime/tool_executor.py:68)。dispatcher 必须容忍 None token,
    # 不能直接 AttributeError。两种等价写法,实施 PR 二选一即可:
    #
    #   (a) 入口处归一化:    token = token or CancellationToken()
@@ -224,7 +224,7 @@ P0 因此在 `arun()` 入口捕获 host loop,并把它透传给 dispatcher:
 
 token callback 触发 `fut.cancel()` 后,`fut.result()` 抛 `concurrent.futures.CancelledError` —— 这是 `concurrent.futures.Future.result()` 用的异常类,继承自 `concurrent.futures._base.Error` → `Exception`(在 3.8+ 中保持不变)。它**不是**与 `asyncio.CancelledError` 同一个类:自 Python 3.8 起两者已分开 —— `asyncio.CancelledError` 被移到 `asyncio.exceptions` 并改为继承 `BaseException`,而 `concurrent.futures.CancelledError` 仍继承 `Exception`。实施者必须显式 catch `concurrent.futures.CancelledError`;catch `asyncio.CancelledError` 不会匹配 bridge 的失败模式。
 
-当前 `ToolExecutor` 工具执行体用 `except Exception as exc: ... status = "error"` 包裹(`agentao/runtime/tool_executor.py:243-251`)。由于 `concurrent.futures.CancelledError` *是* `Exception`,如果让它落到那个 handler,token 触发的取消会被静默错标为 `status="error"`。async dispatch helper 因此必须**先于**那个 handler 显式 catch,并走**已有**的 cancelled 出口 —— `ToolExecutor` 在 permission-deny / readonly-mode 取消场景下已经产生 `ToolExecutionResult(..., status="cancelled", ...)` 并 emit `status="cancelled"` 的 `TOOL_COMPLETE`(`agentao/runtime/tool_executor.py:164,175,192`)。AsyncTool 取消复用同一契约。
+当前 `ToolExecutor` 工具执行体用 `except Exception as exc: ... status = "error"` 包裹(`arbiter/runtime/tool_executor.py:243-251`)。由于 `concurrent.futures.CancelledError` *是* `Exception`,如果让它落到那个 handler,token 触发的取消会被静默错标为 `status="error"`。async dispatch helper 因此必须**先于**那个 handler 显式 catch,并走**已有**的 cancelled 出口 —— `ToolExecutor` 在 permission-deny / readonly-mode 取消场景下已经产生 `ToolExecutionResult(..., status="cancelled", ...)` 并 emit `status="cancelled"` 的 `TOOL_COMPLETE`(`arbiter/runtime/tool_executor.py:164,175,192`)。AsyncTool 取消复用同一契约。
 
 #### Cancel 分支在 `_execute_one` 里的层级 —— 以及为什么需要显式 ack
 
@@ -281,7 +281,7 @@ try:
         # 与 executor 现有 cancelled 路径(:162 用
         # "denied by permission engine")保持一致,error 字段
         # 放一段简短人类可读的 reason。``token.reason`` 由
-        # Agentao.arun() / chat 调用方提前设好(典型为
+        # Arbiter.arun() / chat 调用方提前设好(典型为
         # "async-cancel" 或 CLI Ctrl+C 的 "user-cancel")。
         reason = token.reason if token is not None and token.reason else "async-cancel"
         self._emit_complete(fn, call_id, "cancelled", duration_ms, reason)
@@ -300,18 +300,18 @@ finally:
 
 1. **不双发**。`TOOL_COMPLETE` 每次调用恰好 emit 一次:成功走原 tail,取消走这条分支,其它异常走原 `except Exception`。
 2. **Cleanup-ordered cancel 上报**。emit `TOOL_COMPLETE(status="cancelled")` 时,用户 coroutine 自己的 `finally` 已经在 host loop 上跑完(或 bounded timeout 已到并记了 warning)。这是让 acceptance 的 "no dangling future" / "coroutine 收到 `CancelledError`" 从 flaky 变成 stable 的关键。
-3. **error 字段约定保持**。executor 现存的 cancelled 路径在 error 字段放简短 reason(`agentao/runtime/tool_executor.py:162` 是 `"denied by permission engine"`);AsyncTool 的 token 取消用 `token.reason` 镜像同一约定(典型为 `Agentao.arun()` 在 `agentao/agent.py:585` 设的 `"async-cancel"`,或 CLI Ctrl+C 的 `"user-cancel"`),token 没有 reason 时回退到 `"async-cancel"`。
+3. **error 字段约定保持**。executor 现存的 cancelled 路径在 error 字段放简短 reason(`arbiter/runtime/tool_executor.py:162` 是 `"denied by permission engine"`);AsyncTool 的 token 取消用 `token.reason` 镜像同一约定(典型为 `Arbiter.arun()` 在 `arbiter/agent.py:585` 设的 `"async-cancel"`,或 CLI Ctrl+C 的 `"user-cancel"`),token 没有 reason 时回退到 `"async-cancel"`。
 
 chat loop 已经把 `token.is_cancelled` 作为 unwind turn 的触发(在 `chat()` 边界抛 `AgentCancelledError`)。
 
 #### Cancellation —— 具体机制
 
-当前 `CancellationToken`(`agentao/cancellation.py:15-51`)只是一个 `threading.Event` 的薄包装,只暴露 `is_cancelled` / `check()` / `cancel()`,没有 callback / watcher API,而 `arun()` 也只把 `asyncio.CancelledError` 转成 `token.cancel("async-cancel")`(`agentao/agent.py:585`)。所以 dispatcher 阻塞在 `fut.result()` 期间根本观察不到 token 翻转 —— 上一稿那句 "dispatcher 调 `fut.cancel()`" 在现状下不可实现。
+当前 `CancellationToken`(`arbiter/cancellation.py:15-51`)只是一个 `threading.Event` 的薄包装,只暴露 `is_cancelled` / `check()` / `cancel()`,没有 callback / watcher API,而 `arun()` 也只把 `asyncio.CancelledError` 转成 `token.cancel("async-cancel")`(`arbiter/agent.py:585`)。所以 dispatcher 阻塞在 `fut.result()` 期间根本观察不到 token 翻转 —— 上一稿那句 "dispatcher 调 `fut.cancel()`" 在现状下不可实现。
 
 本 addendum 做一处小而 contained 的扩展:给 `CancellationToken` 加 callback 注册。
 
 ```python
-# agentao/cancellation.py
+# arbiter/cancellation.py
 class CancellationToken:
     ...
     def add_done_callback(self, fn: Callable[[], None]) -> Callable[[], None]:
@@ -347,11 +347,11 @@ sync `chat()` fallback(`asyncio.run(tool.async_execute(...))`)**仅支持 loop-i
 
 - 一个 `AsyncToolBase` 具体子类能直接注册到 `ToolRegistry`,经过 `ToolRegistry.to_openai_format(plan_mode=...)` 和 `ToolCallPlanner._decide` 对 `is_read_only` 的访问都不抛 AttributeError。(测试:注册 + 走这两个路径 + 断言无异常)
 - 类型边界已发布:`RegistrableTool = Tool | AsyncToolBase` 存在,正文 "类型边界" 一节列出的每个 surface 都使用它。当前项目并未配置 `mypy` / `pyright`(已查 `pyproject.toml` dev deps),因此用两条更轻的检查替代:
-  - (a) `python -m compileall agentao/tools/base.py agentao/runtime/tool_planning.py agentao/runtime/tool_executor.py agentao/agents/manager.py agentao/agents/tools.py` 通过。
+  - (a) `python -m compileall arbiter/tools/base.py arbiter/runtime/tool_planning.py arbiter/runtime/tool_executor.py arbiter/agents/manager.py arbiter/agents/tools.py` 通过。
   - (b) 一条单测,用 `typing.get_type_hints` 断言下列每一处解析为 `RegistrableTool`(或视情况是 `Dict[str, RegistrableTool]` / `List[RegistrableTool]`):
     - `ToolRegistry.register["tool"]`,
     - `ToolRegistry.get["return"]`,
-    - `ToolRegistry.tools` —— 注意当前代码中 `self.tools` 仅在 `__init__` 内做实例赋值(`agentao/tools/base.py:145`),`get_type_hints(ToolRegistry)` 看不到。实施 PR 必须把注解提到 class body(`class ToolRegistry: tools: Dict[str, RegistrableTool]` 加上现有 `__init__` 内的赋值),才能让这条检查可达。
+    - `ToolRegistry.tools` —— 注意当前代码中 `self.tools` 仅在 `__init__` 内做实例赋值(`arbiter/tools/base.py:145`),`get_type_hints(ToolRegistry)` 看不到。实施 PR 必须把注解提到 class body(`class ToolRegistry: tools: Dict[str, RegistrableTool]` 加上现有 `__init__` 内的赋值),才能让这条检查可达。
     - `ToolRegistry.list_tools["return"]`,
     - `ToolCallPlan` 的 `tool` 字段(经 `get_type_hints(ToolCallPlan)["tool"]`),
     - `AgentManager.create_agent_tools["all_tools"]`,
@@ -359,7 +359,7 @@ sync `chat()` fallback(`asyncio.run(tool.async_execute(...))`)**仅支持 loop-i
 
   引入 mypy 显式不在本 addendum 范围;若后续 PR 引入,此条 acceptance 可顺势收紧。
 - `_BaseTool` 抽取保持 `Tool` surface 字节等价:每个现存 `Tool` 子类(file_ops、shell、web、search、memory、agents、skill 等)无需改代码即可 import 与运行。`pytest tests/` 在不修改任何现存 tool 模块的前提下通过即视作满足。
-- public import surface 已发布:`agentao/tools/__init__.py` 在现有 `Tool` / `ToolRegistry`(`agentao/tools/__init__.py:3`)旁边 re-export `AsyncToolBase` 与 `RegistrableTool`,并在 `__all__` 中列出。一条 smoke test 断言 `from agentao.tools import AsyncToolBase, RegistrableTool` 成功、`RegistrableTool` 与 `agentao.tools.base` 中定义的 alias 一致、且测试内的 `AsyncToolBase` 子类可以实例化。(`_BaseTool` 刻意**不** re-export —— 保持 private。)
+- public import surface 已发布:`arbiter/tools/__init__.py` 在现有 `Tool` / `ToolRegistry`(`arbiter/tools/__init__.py:3`)旁边 re-export `AsyncToolBase` 与 `RegistrableTool`,并在 `__all__` 中列出。一条 smoke test 断言 `from arbiter.tools import AsyncToolBase, RegistrableTool` 成功、`RegistrableTool` 与 `arbiter.tools.base` 中定义的 alias 一致、且测试内的 `AsyncToolBase` 子类可以实例化。(`_BaseTool` 刻意**不** re-export —— 保持 private。)
 - `CancellationToken.add_done_callback(...)` 存在并满足:(a) 另一线程调 `cancel()` 时,callback 同步执行;(b) 若 token 已 cancelled,callback 立刻执行;(c) 返回的 unregister callable 是 idempotent 的。在 `cancellation.py` 上覆盖直接的单元测试。
 - 一条端到端测试经由 `await agent.arun(...)` 调用一个 `AsyncToolBase`,在其 `async_execute` 中断言 `asyncio.get_running_loop() is host_loop`(协程**确实**跑在 host loop 上,而不是 chat 线程的 fresh loop)。
 - 一条端到端测试经由 sync `agent.chat(...)` 调用一个 **loop-independent** 的 `AsyncToolBase`,验证 fresh-loop fallback 路径正常返回。测试 docstring 显式说明 sync-path 范围限制。
@@ -375,7 +375,7 @@ sync `chat()` fallback(`asyncio.run(tool.async_execute(...))`)**仅支持 loop-i
 
 由 CLI/ACP/examples 之外的真实消费者驱动,未来 P1/P2 工作可能引入:
 
-- public 的 `AgentaoContext` / run-context 对象 —— 等到第一个 `AsyncToolBase` 真正需要 run-local metadata,
+- public 的 `ArbiterContext` / run-context 对象 —— 等到第一个 `AsyncToolBase` 真正需要 run-local metadata,
 - 把 `McpTool` 迁到 `AsyncToolBase`(顺带消除 `McpClientManager` 的 sync bridge),
 - 独立的 `AsyncToolRunner` —— 若 chat 线程阻塞模型成为瓶颈,
 - run lifecycle 对象、structured event stream、async transport,

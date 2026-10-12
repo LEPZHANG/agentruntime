@@ -1,4 +1,4 @@
-"""``Agentao`` accepts ``replay_config`` / ``sandbox_policy`` /
+"""``Arbiter`` accepts ``replay_config`` / ``sandbox_policy`` /
 ``bg_store`` as opt-in keyword args.
 
 When ``None`` (the default), each subsystem is fully disabled:
@@ -9,10 +9,10 @@ When ``None`` (the default), each subsystem is fully disabled:
   notification drain short-circuits.
 - ``sandbox_policy=None`` → ``ToolRunner`` runs shell commands without
   the macOS sandbox-exec wrapper.
-- ``replay_config=None`` → ``Agentao._replay_config`` is the no-op
-  default, no ``<wd>/.agentao/replay.json`` is read.
+- ``replay_config=None`` → ``Arbiter._replay_config`` is the no-op
+  default, no ``<wd>/.arbiter/replay.json`` is read.
 
-The factory (:func:`agentao.embedding.build_from_environment`) wires
+The factory (:func:`arbiter.embedding.build_from_environment`) wires
 all three up from disk so CLI / ACP behavior is preserved.
 """
 
@@ -22,12 +22,12 @@ from pathlib import Path
 
 import pytest
 
-from agentao.agent import Agentao
-from agentao.agents.bg_store import BackgroundTaskStore
-from agentao.embedding import build_from_environment
-from agentao.embedding.factory import discover_llm_kwargs
-from agentao.replay import ReplayConfig
-from agentao.sandbox import SandboxPolicy
+from arbiter.agent import Arbiter
+from arbiter.agents.bg_store import BackgroundTaskStore
+from arbiter.embedding import build_from_environment
+from arbiter.embedding.factory import discover_llm_kwargs
+from arbiter.replay import ReplayConfig
+from arbiter.sandbox import SandboxPolicy
 
 
 # ---------------------------------------------------------------------------
@@ -35,9 +35,9 @@ from agentao.sandbox import SandboxPolicy
 # ---------------------------------------------------------------------------
 
 
-def _bare(tmp_path: Path) -> Agentao:
-    """Bare-construction Agentao with all opt-in subsystems left at None."""
-    return Agentao(
+def _bare(tmp_path: Path) -> Arbiter:
+    """Bare-construction Arbiter with all opt-in subsystems left at None."""
+    return Arbiter(
         working_directory=tmp_path,
         api_key="k",
         base_url="https://test.local/v1",
@@ -58,9 +58,9 @@ class TestDefaultsAreNone:
         """No disk read; ``ReplayConfig()`` (no-op default) is what's stored."""
         agent = _bare(tmp_path)
         assert isinstance(agent._replay_config, ReplayConfig)
-        # No ``<wd>/.agentao/replay.json`` was touched — confirm by
+        # No ``<wd>/.arbiter/replay.json`` was touched — confirm by
         # asserting the directory wasn't created as a side effect.
-        assert not (tmp_path / ".agentao" / "replay.json").exists()
+        assert not (tmp_path / ".arbiter" / "replay.json").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ class TestBgStoreNoneRemovesTools:
         assert "cancel_background_agent" not in names
 
     def test_check_and_cancel_tools_present_when_bg_store_supplied(self, tmp_path):
-        agent = Agentao(
+        agent = Arbiter(
             working_directory=tmp_path,
             api_key="k",
             base_url="https://test.local/v1",
@@ -91,7 +91,7 @@ class TestBgStoreNoneRemovesTools:
         """Sub-agent tools must NOT advertise ``run_in_background`` when
         the bg subsystem is disabled — the LLM should not see a phantom
         feature."""
-        from agentao.agents.tools import AgentToolWrapper
+        from arbiter.agents.tools import AgentToolWrapper
 
         wrapper = AgentToolWrapper(
             definition={
@@ -111,7 +111,7 @@ class TestBgStoreNoneRemovesTools:
         assert params["required"] == ["task"]
 
     def test_run_in_background_present_when_bg_store_supplied(self, tmp_path):
-        from agentao.agents.tools import AgentToolWrapper
+        from arbiter.agents.tools import AgentToolWrapper
 
         wrapper = AgentToolWrapper(
             definition={
@@ -153,7 +153,7 @@ def test_chat_loop_inject_background_notifications_handles_none(tmp_path):
     if runner is None:
         # ChatLoopRunner is constructed lazily on the first chat() call;
         # build one directly to test the drain path.
-        from agentao.runtime.chat_loop import ChatLoopRunner
+        from arbiter.runtime.chat_loop import ChatLoopRunner
 
         runner = ChatLoopRunner(agent)
 
@@ -170,7 +170,7 @@ def test_chat_loop_inject_background_notifications_handles_none(tmp_path):
 
 
 def test_sub_agent_construction_inherits_working_directory(tmp_path, monkeypatch):
-    """Spawning a sub-agent must construct ``Agentao`` with the parent's
+    """Spawning a sub-agent must construct ``Arbiter`` with the parent's
     ``working_directory`` — regression for the missing required kwarg that
     made every sub-agent invocation raise ``TypeError``.
 
@@ -185,7 +185,7 @@ def test_sub_agent_construction_inherits_working_directory(tmp_path, monkeypatch
     # 1) Build the REAL parent first. enable_builtin_agents wires up the
     #    sub-agent tools during construction (agent.py:545); patching before
     #    this would turn the parent into the recorder too.
-    parent = Agentao(
+    parent = Arbiter(
         working_directory=tmp_path,
         api_key="k",
         base_url="https://test.local/v1",
@@ -198,14 +198,14 @@ def test_sub_agent_construction_inherits_working_directory(tmp_path, monkeypatch
     sub_tool = parent.tools.tools["agent_generalist"]
 
     # 3) Patch the symbol _run_sync imports locally (`from ...agent import
-    #    Agentao`). Record kwargs, then abort the turn before it runs.
+    #    Arbiter`). Record kwargs, then abort the turn before it runs.
     captured: dict = {}
 
     def _recorder(*args, **kwargs):
         captured.update(kwargs)
         raise _Sentinel
 
-    monkeypatch.setattr("agentao.agent.Agentao", _recorder)
+    monkeypatch.setattr("arbiter.agent.Arbiter", _recorder)
 
     # 4) Drive the construction path and assert the kwarg is threaded through.
     with pytest.raises(_Sentinel):
@@ -227,7 +227,7 @@ def _stub_factory_env(monkeypatch):
     """Defang the factory's ``.env`` auto-discovery and pin the LLM
     provider/credentials so the test sees a deterministic env."""
     monkeypatch.setattr(
-        "agentao.embedding.factory.safe_load_dotenv", lambda *a, **kw: None
+        "arbiter.embedding.factory.safe_load_dotenv", lambda *a, **kw: None
     )
     monkeypatch.setenv("LLM_PROVIDER", "OPENAI")
     monkeypatch.setenv("OPENAI_API_KEY", "k")

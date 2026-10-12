@@ -20,9 +20,9 @@ from __future__ import annotations
 import io
 from typing import Any, Dict, Optional
 
-from agentao.acp import initialize as acp_initialize
-from agentao.acp.protocol import ACP_PROTOCOL_VERSION
-from agentao.acp.server import AcpServer
+from arbiter.acp import initialize as acp_initialize
+from arbiter.acp.protocol import ACP_PROTOCOL_VERSION
+from arbiter.acp.server import AcpServer
 
 
 _DEFAULT_CLIENT_INFO = {"name": "test-client", "version": "0.0.1"}

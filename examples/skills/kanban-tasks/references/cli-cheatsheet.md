@@ -61,7 +61,7 @@ uv run kanban run                        # 跑到 idle（全 DONE 或全 BLOCKED
 
 # 指定执行器（放在子命令前）：
 uv run kanban --executor mock          run    # 默认；离线安全
-uv run kanban --executor agentao       run    # 真调四角色 sub-agent
+uv run kanban --executor arbiter       run    # 真调四角色 sub-agent
 uv run kanban --executor multi-backend run    # 走 agent_profiles.yaml
 ```
 
@@ -122,7 +122,7 @@ uv run kanban mcp --help                  # 列子命令
 
 ```bash
 --board DIR                  # 指定板目录（一般不需要）
---executor mock|agentao|multi-backend
+--executor mock|arbiter|multi-backend
 --worktree | --no-worktree   # 默认 auto：在 git 仓库内启用，外面禁用
 --force                      # 绕过 daemon 锁；仅应急
 ```

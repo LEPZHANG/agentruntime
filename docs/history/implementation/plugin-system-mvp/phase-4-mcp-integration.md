@@ -2,7 +2,7 @@
 
 ## Goal
 
-把插件中的 `.mcp.json` 和 manifest `mcpServers` 接入 Agentao 的 MCP config merge 和 tool registration 流程。
+把插件中的 `.mcp.json` 和 manifest `mcpServers` 接入 Arbiter 的 MCP config merge 和 tool registration 流程。
 
 ## Why This Phase Exists
 
@@ -128,7 +128,7 @@ PluginManager.load_plugins()
 1. plugin MCP servers 能稳定读入
 2. merge 顺序符合设计
 3. 名称冲突有 clear diagnostics
-4. plugin MCP tools 能在 Agentao runtime 中使用
+4. plugin MCP tools 能在 Arbiter runtime 中使用
 
 ## Out Of Scope
 

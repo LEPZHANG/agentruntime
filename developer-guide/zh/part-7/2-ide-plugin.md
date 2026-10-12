@@ -1,13 +1,13 @@
 # 7.2 蓝图 B · IDE / 编辑器插件
 
 ::: tip ⚡ 端到端可跑
-**产出** —— VS Code 扩展启动 `agentao --acp --stdio` 子进程，在编辑器里看到 Agent 流式输出、工具审批、`session/load` 恢复。
+**产出** —— VS Code 扩展启动 `arbiter --acp --stdio` 子进程，在编辑器里看到 Agent 流式输出、工具审批、`session/load` 恢复。
 **技术栈** —— TypeScript · VS Code Extension API · 走 stdio 的 ACP JSON-RPC 2.0 · NDJSON 帧。
 **源代码** —— [`examples/ide-plugin-ts/`](https://github.com/jin-bo/agentao/tree/main/examples/ide-plugin-ts)
 **运行** —— `npm install && npm run compile`，再在 VS Code 里按 **F5** 启动扩展宿主。
 :::
 
-**场景**：你在做一个 VS Code / Zed / JetBrains / Neovim 插件，想给编辑器加"跟代码库对话"的能力。你希望进程隔离（每个 workspace 一个 Agentao），语言无关的胶水（插件可能是 TypeScript），并且 IDE 重启后能接着对话。
+**场景**：你在做一个 VS Code / Zed / JetBrains / Neovim 插件，想给编辑器加"跟代码库对话"的能力。你希望进程隔离（每个 workspace 一个 Arbiter），语言无关的胶水（插件可能是 TypeScript），并且 IDE 重启后能接着对话。
 
 ## 谁 & 为什么
 
@@ -26,10 +26,10 @@ IDE 主进程
    │   ACPClient  (stdio JSON-RPC)
    │    │  ▲
    │    ▼  │
-   │   子进程: `agentao --acp --stdio`
+   │   子进程: `arbiter --acp --stdio`
    │      ├─ working_directory = workspace 根目录
-   │      ├─ MCP: filesystem + git (从 .agentao/mcp.json 自动加载)
-   │      └─ Skills: 仓库约定 (从 .agentao/skills/)
+   │      ├─ MCP: filesystem + git (从 .arbiter/mcp.json 自动加载)
+   │      └─ Skills: 仓库约定 (从 .arbiter/skills/)
    │
    └─ UI: 聊天面板、行内建议、diff 审核
 ```
@@ -51,13 +51,13 @@ export class ACPClient {
   private notifHandlers = new Map<string, (p: any) => void>();
 
   constructor(workspaceRoot: string) {
-    this.proc = spawn("agentao", ["--acp", "--stdio"], {
+    this.proc = spawn("arbiter", ["--acp", "--stdio"], {
       cwd: workspaceRoot,
-      env: { ...process.env, AGENTAO_WORKING_DIRECTORY: workspaceRoot },
+      env: { ...process.env, ARBITER_WORKING_DIRECTORY: workspaceRoot },
     });
     this.rl = readline.createInterface({ input: this.proc.stdout });
     this.rl.on("line", (line) => this.handleLine(line));
-    this.proc.stderr.on("data", (d) => console.error("[agentao]", d.toString()));
+    this.proc.stderr.on("data", (d) => console.error("[arbiter]", d.toString()));
   }
 
   async initialize(): Promise<any> {
@@ -139,40 +139,40 @@ export async function activate(ctx: vscode.ExtensionContext) {
     const tool = p.toolCall.toolName;
     const pick = await vscode.window.showQuickPick(
       ["本次允许", "始终允许", "拒绝"],
-      { placeHolder: `Agentao 想要执行 ${tool}` }
+      { placeHolder: `Arbiter 想要执行 ${tool}` }
     );
     return { outcome: pick === "拒绝" ? { outcome: "cancelled" }
                                       : { outcome: "selected", optionId: "allow" } };
   });
 
   ctx.subscriptions.push(
-    vscode.commands.registerCommand("agentao.ask", async () => {
-      const q = await vscode.window.showInputBox({ prompt: "问 Agentao" });
+    vscode.commands.registerCommand("arbiter.ask", async () => {
+      const q = await vscode.window.showInputBox({ prompt: "问 Arbiter" });
       if (q) await client.prompt(sessionId, q);
     }),
-    vscode.commands.registerCommand("agentao.cancel", () => client.cancel(sessionId)),
+    vscode.commands.registerCommand("arbiter.cancel", () => client.cancel(sessionId)),
   );
 }
 ```
 
 ### 3 · IDE 重启后的会话恢复
 
-ACP 的 `session/load`（由 `initialize` 里的 `loadSession: true` 宣告）允许你在重启后用同一个 `sessionId`，Agentao 会把历史重新注入 `agent.messages`。
+ACP 的 `session/load`（由 `initialize` 里的 `loadSession: true` 宣告）允许你在重启后用同一个 `sessionId`，Arbiter 会把历史重新注入 `agent.messages`。
 
 ```ts
 // 启动时
-const saved = ctx.globalState.get<string>("agentao.sessionId");
+const saved = ctx.globalState.get<string>("arbiter.sessionId");
 const sessionId = saved
   ? (await client.request("session/load", { sessionId: saved }), saved)
   : await client.newSession(ws);
-ctx.globalState.update("agentao.sessionId", sessionId);
+ctx.globalState.update("arbiter.sessionId", sessionId);
 ```
 
-> 如果插件不想自己记 id，只想把**最近**那次对话拿回来，可以改用 `agentao --acp --resume` 启动 server——这样第一个 `session/new` 会自动恢复最近会话（省去一次 `session/load` 往返）。见 [3.2 → 启动时恢复会话](/zh/part-3/2-agentao-as-server#启动时恢复会话)。
+> 如果插件不想自己记 id，只想把**最近**那次对话拿回来，可以改用 `arbiter --acp --resume` 启动 server——这样第一个 `session/new` 会自动恢复最近会话（省去一次 `session/load` 往返）。见 [3.2 → 启动时恢复会话](/zh/part-3/2-arbiter-as-server#启动时恢复会话)。
 
 ## 插件自带的配置文件
 
-在 workspace 根目录放 `.agentao/acp.json`，用户无需改扩展代码就能定制：
+在 workspace 根目录放 `.arbiter/acp.json`，用户无需改扩展代码就能定制：
 
 ```json
 {

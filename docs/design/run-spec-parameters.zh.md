@@ -1,7 +1,7 @@
 # RunSpec 参数与指令：补齐 Recipe 缺口
 
 **状态：** 已落地 2026-05-25。实现说明见文末。
-**读者：** 关注 `agentao run` 易用性、以及 goose-recipes 对比的 agentao 维护者。
+**读者：** 关注 `arbiter run` 易用性、以及 goose-recipes 对比的 arbiter 维护者。
 **配套：** `run-spec-parameters.md`。
 
 ## 问题
@@ -12,15 +12,15 @@ goose 提供 "recipe" 概念（`crates/goose/src/recipe/`）：一个 YAML 文�
 享、可参数化的工作流产物"。
 
 直接照搬会在 `RunSpec` 旁边引入一个平行的 "Recipes" 概念——也就是给"如何启
-动一次非交互运行"引入第二个真理来源。**但对 agentao 不合适**，因为
-`RunSpec`（`agentao/cli/run_models.py:111`）已经覆盖了 ~75% 的 recipe 语义。
+动一次非交互运行"引入第二个真理来源。**但对 arbiter 不合适**，因为
+`RunSpec`（`arbiter/cli/run_models.py:111`）已经覆盖了 ~75% 的 recipe 语义。
 缺口窄、且是纯增量。
 
 本设计在不引入第二个概念的前提下补齐缺口。
 
 ## 现有覆盖
 
-goose recipe 字段 → `RunSpec` 字段，对照 `agentao/cli/run_models.py:111-131`：
+goose recipe 字段 → `RunSpec` 字段，对照 `arbiter/cli/run_models.py:111-131`：
 
 | Recipe 字段              | RunSpec 字段                            | 状态 |
 |--------------------------|----------------------------------------|------|
@@ -28,7 +28,7 @@ goose recipe 字段 → `RunSpec` 字段，对照 `agentao/cli/run_models.py:111
 | `settings.provider/model`| `model`, `base_url`                     | ✅ |
 | `settings.max_turns`     | `max_iterations`                        | ✅ |
 | `extensions.builtin`     | `skills`                                | ✅ |
-| `extensions.mcp`         | `.agentao/mcp.json`（独立配置，引用即可）| ✅ |
+| `extensions.mcp`         | `.arbiter/mcp.json`（独立配置，引用即可）| ✅ |
 | `permissions`            | `permissions` + `permission_mode`       | ✅ 更整洁 |
 | (replay)                 | `replay`                                | ✅ 领先 goose |
 | `instructions`           | —                                       | ❌ 缺口 |
@@ -45,7 +45,7 @@ goose recipe 字段 → `RunSpec` 字段，对照 `agentao/cli/run_models.py:111
 给 `RunSpec` 加两个字段、一道 Jinja 渲染流程。不引入新文件格式、不引入新
 CLI 子命令、不另建 Recipes 模块。
 
-### Pydantic 模型增量（`agentao/cli/run_models.py`）
+### Pydantic 模型增量（`arbiter/cli/run_models.py`）
 
 ```python
 import re
@@ -140,7 +140,7 @@ renderer。
 因为 `extra="forbid"` 会拒绝；即便不拒绝，把"参数声明"和"参数取值"混进同
 一个 Pydantic 模型也是把两个概念搅在一起。
 
-`agentao/cli/run.py` 新增两个辅助函数：
+`arbiter/cli/run.py` 新增两个辅助函数：
 
 ```python
 def _parse_cli_params(items: Optional[list[str]]) -> dict[str, str]:
@@ -150,7 +150,7 @@ def _parse_cli_params(items: Optional[list[str]]) -> dict[str, str]:
     """
 ```
 
-`_execute_with_args`（`agentao/cli/run.py:315`）按以下顺序调用：
+`_execute_with_args`（`arbiter/cli/run.py:315`）按以下顺序调用：
 
 1. `_load_spec(args)` —— 第 323 行（不变）。
 2. `_apply_cli_overrides(spec, args)` —— 第 337 行（不变）。
@@ -189,7 +189,7 @@ def _parse_cli_params(items: Optional[list[str]]) -> dict[str, str]:
 
 ### Renderer 细节
 
-`agentao/cli/run_template.py::render_spec(spec, params) -> RunSpec`：
+`arbiter/cli/run_template.py::render_spec(spec, params) -> RunSpec`：
 
 1. 用 `spec.parameters` 校验传入参数（required、choices、unknown）。
 2. 用 `undefined=StrictUndefined` 的沙箱 Jinja2 `Environment` 渲染
@@ -198,12 +198,12 @@ def _parse_cli_params(items: Optional[list[str]]) -> dict[str, str]:
 
 失败模式（全部 exit 2，`invalid_spec`）：
 
-- 必填参数缺失 → `agentao run: parameter '{name}' is required`
-- 未知参数 → `agentao run: unknown parameter '{name}'`
-- choices 违反 → `agentao run: parameter '{name}' must be one of {choices}`
-- Jinja 未定义变量 → `agentao run: template uses undefined variable
+- 必填参数缺失 → `arbiter run: parameter '{name}' is required`
+- 未知参数 → `arbiter run: unknown parameter '{name}'`
+- choices 违反 → `arbiter run: parameter '{name}' must be one of {choices}`
+- Jinja 未定义变量 → `arbiter run: template uses undefined variable
   '{name}' (declare it in spec.parameters)`
-- Jinja 语法错误 → `agentao run: template syntax error in spec.{field}: {msg}`
+- Jinja 语法错误 → `arbiter run: template syntax error in spec.{field}: {msg}`
 
 `StrictUndefined` 不能让步——静默替换为空串会让模板里的拼写错误悄悄上线。
 
@@ -213,7 +213,7 @@ def _parse_cli_params(items: Optional[list[str]]) -> dict[str, str]:
 惰性 import、额外测试——对一个 ~1MB、无 native 传递依赖的包来说不值得。
 直接加到 `pyproject.toml` 基础依赖，`run_template.py` 顶部 import，结束。
 
-### CLI 命令行旗标（`agentao/cli/run.py`）
+### CLI 命令行旗标（`arbiter/cli/run.py`）
 
 `add_run_subparser` 上新增一个 flag：
 
@@ -228,21 +228,21 @@ parser.add_argument(
 `_parse_cli_params` 规则（所有错误均为 `_UsageError` → exit 2，
 `invalid_spec`）：
 
-- **缺 `=`**：`--param foo` → `agentao run: malformed --param 'foo'
+- **缺 `=`**：`--param foo` → `arbiter run: malformed --param 'foo'
   (expected KEY=VALUE)`。
 - **key 为空**：`--param =1` → 同样的 malformed 报错。
 - **value 内多个 `=`**：`--param expr=a=b` → key=`expr`, value=`a=b`
   （只在**首个** `=` 拆分；value 原样保留）。
-- **重复 key**：`--param x=1 --param x=2` → `agentao run: --param 'x'
+- **重复 key**：`--param x=1 --param x=2` → `arbiter run: --param 'x'
   supplied multiple times`。**直接报错**而非 last-wins——后者更易引发意外。
 - **非 identifier key**：`--param foo-bar=v` 或 `--param 1foo=v` →
-  `agentao run: --param '{key}' is not a valid identifier (must match
+  `arbiter run: --param '{key}' is not a valid identifier (must match
   [A-Za-z_][A-Za-z0-9_]*)`。与 spec validator 同一条 regex；在此处报错
   比让它走到下游变成 "unknown parameter" 更清晰。
 
 ### Agent 接入（具体）
 
-`agentao/cli/run.py:404` 当前的 `factory_kwargs` 构造：
+`arbiter/cli/run.py:404` 当前的 `factory_kwargs` 构造：
 
 ```python
 factory_kwargs: Dict[str, Any] = dict(
@@ -263,15 +263,15 @@ if spec.instructions is not None:
     factory_kwargs["project_instructions"] = spec.instructions
 ```
 
-这条 kwarg 路径已经在 `agentao/agent.py:68` 存在，它会短路 AGENTAO.md
+这条 kwarg 路径已经在 `arbiter/agent.py:68` 存在，它会短路 ARBITER.md
 的磁盘读取（`agent.py:349-352`）。**优先级隐式生效**：`spec.instructions`
-非空时 AGENTAO.md 跳过；为空时 AGENTAO.md 正常读取。**不发警告、不做磁
+非空时 ARBITER.md 跳过；为空时 ARBITER.md 正常读取。**不发警告、不做磁
 盘存在性探测**。
 
 ## 完整示例
 
 ```yaml
-# .agentao/runs/review-pr.yaml
+# .arbiter/runs/review-pr.yaml
 parameters:
   - name: pr_number
     required: true
@@ -292,7 +292,7 @@ max_iterations: 30
 调用：
 
 ```bash
-agentao run --spec .agentao/runs/review-pr.yaml \
+arbiter run --spec .arbiter/runs/review-pr.yaml \
             --param pr_number=142 --param depth=deep
 ```
 
@@ -300,7 +300,7 @@ agentao run --spec .agentao/runs/review-pr.yaml \
 
 在 `tests/cli/test_run_parameters.py` 下新增：
 
-1. **正常渲染**：一个 required 参数，prompt 模板使用它 → `Agentao` 收到
+1. **正常渲染**：一个 required 参数，prompt 模板使用它 → `Arbiter` 收到
    渲染后的 prompt。
 2. **必填缺失**：参数标记 required、未提供 `--param` → exit 2，
    `invalid_spec`，消息中包含参数名。
@@ -343,11 +343,11 @@ agentao run --spec .agentao/runs/review-pr.yaml \
   再加。
 - **`response.json_schema` / FinalOutputTool 校验**：等真实消费方出现后
   另立设计。与 recipes 解耦。
-- **Recipe `activities` UI 快捷键**：agentao 无桌面 UI。
+- **Recipe `activities` UI 快捷键**：arbiter 无桌面 UI。
 - **Recipe `sub_recipes`**：等 subagents 落地后再说
   （[[project_async_tool_landed]] 给了 dispatch 原语，但还没有 agent-
   spawning 接口）。
-- **AGENTAO.md "两者同时存在" 警告**：不值得多一次磁盘探测。
+- **ARBITER.md "两者同时存在" 警告**：不值得多一次磁盘探测。
 - **除 `prompt` 和 `instructions` 之外字段的模板化**：给 `permissions`
   或 `skills` 加模板易出 footgun。
 - **`{% include %}` / 模板内文件 include**：文件系统解析作用域有歧义，
@@ -360,7 +360,7 @@ agentao run --spec .agentao/runs/review-pr.yaml \
 保留。
 
 无 deprecation。无 callback 签名变化。无 host-API 影响——
-`Agentao(project_instructions=...)` 已存在，本次不动。
+`Arbiter(project_instructions=...)` 已存在，本次不动。
 
 ## 风险与对策
 
@@ -436,16 +436,16 @@ runtime 注入名）。
 当 spec 声明参数名为 `self` 时触发。上面的黑名单已经拒掉了这个名字，
 但 positional 形式作为防御深度防止将来再忘记加入名单。
 
-### 仅有空白字符的 instructions 仍走 AGENTAO.md
+### 仅有空白字符的 instructions 仍走 ARBITER.md
 
 `run.py` 用 `if spec.instructions and spec.instructions.strip():` 守住
 `project_instructions` 接入路径，不是单纯的真值判断。YAML block scalar
 `instructions: |\n  {{ extra }}\n` 在 `extra` 为空时渲染结果为 `"\n"`
 （`keep_trailing_newline=True` 保留末尾换行）——这个独立换行符 truthy，
-若不加 `.strip()` 守卫，仍会把它当成有效指令并静默覆盖 AGENTAO.md。
+若不加 `.strip()` 守卫，仍会把它当成有效指令并静默覆盖 ARBITER.md。
 回归测试：原有的
-`test_empty_rendered_instructions_does_not_override_agentao_md` 加上
-`test_whitespace_only_rendered_instructions_does_not_override_agentao_md`。
+`test_empty_rendered_instructions_does_not_override_arbiter_md` 加上
+`test_whitespace_only_rendered_instructions_does_not_override_arbiter_md`。
 
 ### 诊断信息打磨
 
@@ -466,12 +466,12 @@ runtime 注入名）。
 
 ### 涉及文件
 
-- `agentao/cli/run_models.py` — `RunParameter`、`_JINJA_RESERVED_NAMES`、
+- `arbiter/cli/run_models.py` — `RunParameter`、`_JINJA_RESERVED_NAMES`、
   validator（标识符 + 保留名 + required-XOR-default + default∈choices +
   名字不重复）。
-- `agentao/cli/run_template.py` — `SandboxedEnvironment`、
+- `arbiter/cli/run_template.py` — `SandboxedEnvironment`、
   `RunTemplateError`、`render_spec`、`_validate_params`、`_render_field`。
-- `agentao/cli/run.py` — `--param` flag、`_parse_cli_params`、
+- `arbiter/cli/run.py` — `--param` flag、`_parse_cli_params`、
   `render_spec` 调用点、`project_instructions` 接入（含 strip 守卫）。
 - `tests/cli/test_run_parameters.py` — 30 个测试用例（原测试计划 15 个 +
   评审过程中追加 15 个）。

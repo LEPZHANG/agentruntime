@@ -7,7 +7,7 @@
 **Run** — `uv run python -m src.workbench "your question"`
 :::
 
-**Scenario**: internal analysts have a Jupyter-like workbench. You want to add "ask in English / Chinese, get back a chart and the SQL" — Agentao runs `duckdb`, writes a one-off Python script, and saves a PNG into the session's scratch directory. Since shell is involved, the sandbox is non-negotiable.
+**Scenario**: internal analysts have a Jupyter-like workbench. You want to add "ask in English / Chinese, get back a chart and the SQL" — Arbiter runs `duckdb`, writes a one-off Python script, and saves a PNG into the session's scratch directory. Since shell is involved, the sandbox is non-negotiable.
 
 ## Who & why
 
@@ -24,7 +24,7 @@ Web UI (chart viewer + transcript)
 Backend (FastAPI) ──┐
       │             │
       ▼             │
-Agentao instance    │
+Arbiter instance    │
   ├─ working_directory = /workspaces/alice/
   ├─ Tools:
   │    - run_shell_command  (sandbox: workspace-write-no-network)
@@ -39,7 +39,7 @@ Agentao instance    │
 ### 1 · Sandbox configuration
 
 ```json
-// .agentao/sandbox.json
+// .arbiter/sandbox.json
 {
   "shell": {
     "enabled": true,
@@ -111,9 +111,9 @@ The UI parses this marker to render the image.
 
 ```python
 # app.py (abridged)
-from agentao import Agentao
-from agentao.transport import SdkTransport
-from agentao.transport.events import EventType
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
+from arbiter.transport.events import EventType
 from pathlib import Path
 import re, asyncio
 
@@ -132,7 +132,7 @@ async def ask(req: dict, user=Depends(current_user)):
                 charts.append(m.group(1))
 
     transport = SdkTransport(on_event=on_event)
-    agent = Agentao(working_directory=workdir, transport=transport)
+    agent = Arbiter(working_directory=workdir, transport=transport)
     agent.skill_manager.activate_skill(
         "duckdb-analyst",
         task_description=f"Answer: {req['question']}",

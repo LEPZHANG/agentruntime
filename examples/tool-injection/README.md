@@ -7,7 +7,7 @@ calls keep working):
 
 | Surface | When | Tool | Jina endpoint | API |
 |---|---|---|---|---|
-| `Agentao(extra_tools=[...])` | **construction** | `web_fetch` | `https://r.jina.ai/{url}` (Reader) | `make_agent()` |
+| `Arbiter(extra_tools=[...])` | **construction** | `web_fetch` | `https://r.jina.ai/{url}` (Reader) | `make_agent()` |
 | `agent.add_tool(...)` | **runtime** | `web_search` | `https://s.jina.ai/{query}` (Search) | `inject_search_at_runtime()` |
 
 Runtime-added tools become model-visible on the **next** `chat()` / `arun()`

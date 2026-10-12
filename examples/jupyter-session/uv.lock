@@ -8,7 +8,7 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "agentao"
+name = "arbiter"
 source = { editable = "../../" }
 dependencies = [
     { name = "filelock" },
@@ -71,11 +71,11 @@ dev = [
 ]
 
 [[package]]
-name = "agentao-example-jupyter-session"
+name = "arbiter-example-jupyter-session"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "agentao" },
+    { name = "arbiter" },
 ]
 
 [package.optional-dependencies]
@@ -90,7 +90,7 @@ notebook = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentao", editable = "../../" },
+    { name = "arbiter", editable = "../../" },
     { name = "ipykernel", marker = "extra == 'notebook'", specifier = ">=6.0" },
     { name = "ipywidgets", marker = "extra == 'notebook'", specifier = ">=8.0" },
     { name = "jupyter", marker = "extra == 'notebook'", specifier = ">=1.0" },

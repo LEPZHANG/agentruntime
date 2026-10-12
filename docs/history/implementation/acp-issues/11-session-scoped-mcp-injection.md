@@ -2,16 +2,16 @@
 
 ## Problem
 
-ACP session creation may include MCP server configuration, but Agentao currently loads MCP mostly from local config files at startup.
+ACP session creation may include MCP server configuration, but Arbiter currently loads MCP mostly from local config files at startup.
 
 ## Scope
 
-- Convert ACP-provided MCP config into Agentao MCP client config
+- Convert ACP-provided MCP config into Arbiter MCP client config
 - Attach MCP tools to the session runtime
 
 ## Implementation Checklist
 
-- [ ] Define config translation from ACP `mcpServers` to Agentao MCP config
+- [ ] Define config translation from ACP `mcpServers` to Arbiter MCP config
 - [ ] Merge or override local MCP config with session-level config
 - [ ] Connect MCP servers for the session runtime
 - [ ] Register discovered MCP tools for that session

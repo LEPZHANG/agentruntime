@@ -7,12 +7,12 @@ import readchar
 def test_single_key_confirmation_1():
     """Test pressing '1' for Yes."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar.readkey', return_value='1'):
-                from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar.readkey', return_value='1'):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 result = cli.confirm_tool_execution(
                     "test_tool",
@@ -28,12 +28,12 @@ def test_single_key_confirmation_1():
 def test_single_key_confirmation_2():
     """Test pressing '2' for Yes to all."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar.readkey', return_value='2'):
-                from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar.readkey', return_value='2'):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 result = cli.confirm_tool_execution(
                     "test_tool",
@@ -49,12 +49,12 @@ def test_single_key_confirmation_2():
 def test_single_key_confirmation_3():
     """Test pressing '3' for No."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar.readkey', return_value='3'):
-                from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar.readkey', return_value='3'):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 result = cli.confirm_tool_execution(
                     "test_tool",
@@ -70,12 +70,12 @@ def test_single_key_confirmation_3():
 def test_esc_key_cancels():
     """Test pressing Esc to cancel."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar.readkey', return_value=readchar.key.ESC):
-                from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar.readkey', return_value=readchar.key.ESC):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 result = cli.confirm_tool_execution(
                     "test_tool",
@@ -90,12 +90,12 @@ def test_esc_key_cancels():
 def test_ctrl_c_cancels():
     """Test pressing Ctrl+C to cancel."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
-            with patch('agentao.cli.transport.readchar.readkey', return_value=readchar.key.CTRL_C):
-                from agentao.cli import AgentaoCLI
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
+            with patch('arbiter.cli.transport.readchar.readkey', return_value=readchar.key.CTRL_C):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 result = cli.confirm_tool_execution(
                     "test_tool",
@@ -110,13 +110,13 @@ def test_ctrl_c_cancels():
 def test_ignore_invalid_keys():
     """Test that invalid keys are ignored and prompt continues."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
             # Simulate pressing 'a' (invalid), then '1' (valid)
-            with patch('agentao.cli.transport.readchar.readkey', side_effect=['a', 'b', '1']):
-                from agentao.cli import AgentaoCLI
+            with patch('arbiter.cli.transport.readchar.readkey', side_effect=['a', 'b', '1']):
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 result = cli.confirm_tool_execution(
                     "test_tool",
@@ -131,13 +131,13 @@ def test_ignore_invalid_keys():
 def test_no_enter_required():
     """Test that pressing Enter is NOT required (single key input)."""
 
-    with patch('agentao.cli.app.safe_load_dotenv'), patch('agentao.cli.subcommands._load_and_register_plugins'):
-        with patch('agentao.cli.app.Agentao') as mock_agent_class:
+    with patch('arbiter.cli.app.safe_load_dotenv'), patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        with patch('arbiter.cli.app.Arbiter') as mock_agent_class:
             # Mock readkey to return '1' - no Enter simulation needed
-            with patch('agentao.cli.transport.readchar.readkey', return_value='1') as mock_readkey:
-                from agentao.cli import AgentaoCLI
+            with patch('arbiter.cli.transport.readchar.readkey', return_value='1') as mock_readkey:
+                from arbiter.cli import ArbiterCLI
 
-                cli = AgentaoCLI()
+                cli = ArbiterCLI()
 
                 result = cli.confirm_tool_execution(
                     "test_tool",

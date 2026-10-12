@@ -7,8 +7,8 @@ from unittest import mock
 
 import pytest
 
-from agentao.cli import _build_parser
-from agentao.skills.registry import InstalledSkillRecord, SkillRegistry
+from arbiter.cli import _build_parser
+from arbiter.skills.registry import InstalledSkillRecord, SkillRegistry
 
 
 # ------------------------------------------------------------------
@@ -113,13 +113,13 @@ class TestSkillRemove:
         reg.save()
 
         # Import and call _skill_remove
-        from agentao.cli import _skill_remove
+        from arbiter.cli import _skill_remove
 
         class FakeArgs:
             name = "test-skill"
 
         with mock.patch(
-            "agentao.skills.registry.registry_path_for_scope", return_value=reg_path
+            "arbiter.skills.registry.registry_path_for_scope", return_value=reg_path
         ):
             _skill_remove(FakeArgs(), "project")
 
@@ -133,13 +133,13 @@ class TestSkillRemove:
         reg_path = tmp_path / "skills_registry.json"
         SkillRegistry(reg_path).save()
 
-        from agentao.cli import _skill_remove
+        from arbiter.cli import _skill_remove
 
         class FakeArgs:
             name = "missing"
 
         with mock.patch(
-            "agentao.skills.registry.registry_path_for_scope", return_value=reg_path
+            "arbiter.skills.registry.registry_path_for_scope", return_value=reg_path
         ), pytest.raises(SystemExit):
             _skill_remove(FakeArgs(), "project")
 
@@ -166,7 +166,7 @@ class TestSkillList:
         ))
         reg.save()
 
-        from agentao.cli import _skill_list
+        from arbiter.cli import _skill_list
 
         class FakeArgs:
             json_output = True
@@ -179,7 +179,7 @@ class TestSkillList:
             return tmp_path / "nonexistent" / "registry.json"
 
         with mock.patch(
-            "agentao.skills.registry.registry_path_for_scope", side_effect=fake_path
+            "arbiter.skills.registry.registry_path_for_scope", side_effect=fake_path
         ):
             _skill_list(FakeArgs())
 

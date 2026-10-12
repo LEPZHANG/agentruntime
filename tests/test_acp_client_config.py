@@ -1,12 +1,12 @@
-"""Tests for agentao.acp_client config models and loader."""
+"""Tests for arbiter.acp_client config models and loader."""
 
 import json
 from pathlib import Path
 
 import pytest
 
-from agentao.acp_client.config import load_acp_client_config
-from agentao.acp_client.models import (
+from arbiter.acp_client.config import load_acp_client_config
+from arbiter.acp_client.models import (
     AcpClientConfig,
     AcpConfigError,
     AcpServerConfig,
@@ -25,7 +25,7 @@ VALID_SERVER: dict = {
 
 
 def _write_acp_config(root: Path, servers: dict) -> Path:
-    cfg_dir = root / ".agentao"
+    cfg_dir = root / ".arbiter"
     cfg_dir.mkdir(parents=True, exist_ok=True)
     path = cfg_dir / "acp.json"
     path.write_text(json.dumps({"servers": servers}), encoding="utf-8")
@@ -33,7 +33,7 @@ def _write_acp_config(root: Path, servers: dict) -> Path:
 
 
 def _write_raw(root: Path, content: str) -> Path:
-    cfg_dir = root / ".agentao"
+    cfg_dir = root / ".arbiter"
     cfg_dir.mkdir(parents=True, exist_ok=True)
     path = cfg_dir / "acp.json"
     path.write_text(content, encoding="utf-8")
@@ -110,7 +110,7 @@ class TestMissingFile:
         cfg = load_acp_client_config(project_root=tmp_path)
         assert cfg.servers == {}
 
-    def test_no_agentao_dir(self, tmp_path: Path) -> None:
+    def test_no_arbiter_dir(self, tmp_path: Path) -> None:
         cfg = load_acp_client_config(project_root=tmp_path)
         assert isinstance(cfg, AcpClientConfig)
         assert cfg.servers == {}

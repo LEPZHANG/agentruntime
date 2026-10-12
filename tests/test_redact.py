@@ -1,4 +1,4 @@
-"""Contract tests for ``agentao.redact.mask_secret``.
+"""Contract tests for ``arbiter.redact.mask_secret``.
 
 The default arguments matter — they're load-bearing for any future audit-log
 display. A regression that, say, lowered ``floor`` to 4 would expose a short
@@ -7,7 +7,7 @@ JWT in full to whoever has read access to the log. Pin the contract here.
 
 import pytest
 
-from agentao.redact import mask_secret
+from arbiter.redact import mask_secret
 
 
 def test_long_value_keeps_head_and_tail():

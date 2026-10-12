@@ -1,6 +1,6 @@
-# Slack · channel-scoped Agentao bot
+# Slack · channel-scoped Arbiter bot
 
-A `slack-bolt` app where each `app_mention` runs one Agentao turn and
+A `slack-bolt` app where each `app_mention` runs one Arbiter turn and
 the reply is posted as a thread reply. The channel id selects a
 permission preset: an explicit allowlist gets workspace-write, every
 other channel falls back to read-only.
@@ -32,12 +32,12 @@ and a fake LLM. The HTTP stack is never started.
 
 ## What this demonstrates
 
-- **Per-mention agent** — fresh `Agentao` per inbound mention; nothing
+- **Per-mention agent** — fresh `Arbiter` per inbound mention; nothing
   shared between channels or threads.
 - **Channel-scoped permissions** — `make_permission_engine_for_channel`
   returns a fresh `PermissionEngine` whose `active_mode` reflects the
   channel allowlist. The engine is injected via
-  `Agentao(permission_engine=...)` so policy is data, not code.
+  `Arbiter(permission_engine=...)` so policy is data, not code.
 - **`llm_client_factory` seam** — production reads from env, smoke
   tests inject a `MagicMock`. No conditional code paths.
 

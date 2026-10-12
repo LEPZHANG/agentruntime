@@ -2,16 +2,16 @@
 
 **Status:** Review record. Drafted 2026-06-23 from a grep-verified read of the
 agent-definition, skill, and plugin discovery paths across all three runtime
-entry points (interactive CLI / `agentao run`, Python embedding via
+entry points (interactive CLI / `arbiter run`, Python embedding via
 `build_from_environment`, ACP `session/new`). **This is a gap analysis +
 prioritized proposal, not an approved plan.** It exists to settle a specific
 question raised about sub-agent registration — and, in doing so, to correct the
 premise that question was built on.
-**Audience:** Agentao maintainers; anyone embedding agentao who expects skill- or
+**Audience:** Arbiter maintainers; anyone embedding arbiter who expects skill- or
 plugin-bundled sub-agents to be visible.
 **Companion:** `subagent-discovery-entrypoint-review.zh.md`.
 **Related:**
-- `embedding-vs-acp.md` — why ACP and `agentao run` are *frontends* over the
+- `embedding-vs-acp.md` — why ACP and `arbiter run` are *frontends* over the
   embedded core, not the core contract. The "should plugin-loading live in the
   core or the frontend?" question in §5 is a direct application of that boundary.
 - `host-tool-injection.md` — the host's explicit tool-injection contract
@@ -49,8 +49,8 @@ of facts — two independent issues plus one absent feature:
    `session/new` load **zero** plugins — not just plugin-agents, but plugin
    *skills, MCP servers, and hooks* too.
 2. **`AgentManager` has no global layer** (real, minor). It scans builtin +
-   project `.agentao/agents/` only; unlike `SkillManager`'s three layers, there
-   is no `~/.agentao/agents/`.
+   project `.arbiter/agents/` only; unlike `SkillManager`'s three layers, there
+   is no `~/.arbiter/agents/`.
 3. **"A skill carries sub-agents" does not exist as wired** (absent feature, not
    a bug). Nothing maps a skill's `agents/` into `AgentManager`.
 
@@ -71,7 +71,7 @@ is demand.
 >    `build_from_environment` already gates even *builtin* agents behind a
 >    default-**off** settings flag (`_builtin_agents_enabled`,
 >    `factory.py:48,238`; `enable_builtin_agents` defaults `False`,
->    `agent.py:102`). Always-on scanning of user-global `~/.agentao/agents/`
+>    `agent.py:102`). Always-on scanning of user-global `~/.arbiter/agents/`
 >    would contradict that conservative posture — yet `SkillManager`'s global
 >    layer *is* always-on. So B carries a real, if smaller, judgment call (*which
 >    precedent to follow*), not "no boundary question."
@@ -109,10 +109,10 @@ to support* — "skill sub-agents are visible in the CLI" — is not (§3).
 | Claim | Verdict | Evidence (`main`@`e477ad3`) |
 |---|---|---|
 | `_load_and_register_plugins` is CLI-only | ✅ true | Defined `cli/subcommands.py:283`; non-test call sites only `cli/app.py:112` and `cli/run.py:543`. |
-| `build_from_environment` loads no plugins | ✅ true | `grep "plugin" agentao/embedding/factory.py` → no match. Constructs `Agentao(**kwargs)` and returns. |
+| `build_from_environment` loads no plugins | ✅ true | `grep "plugin" arbiter/embedding/factory.py` → no match. Constructs `Arbiter(**kwargs)` and returns. |
 | ACP `session/new` loads no plugins | ✅ true | `acp/session_new.py:158` — `default_agent_factory` returns `build_from_environment(working_directory=cwd, **overrides)` directly; no plugin step. |
-| `AgentManager._load_definitions` scans only two dirs | ✅ true | `agents/manager.py:31-37` — builtin `definitions/` (gated on `include_builtin_agents`) + project `.agentao/agents/`. No global layer. |
-| `SkillManager` scans three layers | ✅ true | `skills/manager.py` — global `~/.agentao/skills` (`:14`), project `.agentao/skills` (`:99`/`104`), repo `skills/` (`:100`/`105`), plus bundled `_BUNDLED_SKILLS_DIR` (`:17`). |
+| `AgentManager._load_definitions` scans only two dirs | ✅ true | `agents/manager.py:31-37` — builtin `definitions/` (gated on `include_builtin_agents`) + project `.arbiter/agents/`. No global layer. |
+| `SkillManager` scans three layers | ✅ true | `skills/manager.py` — global `~/.arbiter/skills` (`:14`), project `.arbiter/skills` (`:99`/`104`), repo `skills/` (`:100`/`105`), plus bundled `_BUNDLED_SKILLS_DIR` (`:17`). |
 
 So the report's *directory-comparison* table (AgentManager 2 layers vs
 SkillManager 3) is correct, and the *plugin-load-is-CLI-only* observation is
@@ -132,7 +132,7 @@ embedding/plugins/resolvers/agents.py:85   def _scan_agents_dir(plugin_name, age
 ```
 
 `SkillManager` has **no** `agents/` handling at all — grep of
-`agentao/skills/manager.py` for `agents` returns only the *skill* directory
+`arbiter/skills/manager.py` for `agents` returns only the *skill* directory
 constants, never an `agents/` subscan.
 
 **(b) Plugin discovery never looks inside `skills/`.**
@@ -140,8 +140,8 @@ constants, never an `agents/` subscan.
 exactly three sources:
 
 ```
-:96   global   ~/.agentao/plugins
-:100  project  <cwd>/.agentao/plugins
+:96   global   ~/.arbiter/plugins
+:100  project  <cwd>/.arbiter/plugins
 :104  inline   self._inline_dirs   (populated only by the CLI — entrypoints.py:373)
 ```
 
@@ -149,9 +149,9 @@ The repo's `skills/` tree is not among them.
 
 **(c) `skill-creator` is a bundled *skill*, not a *plugin*.**
 `find skills/skill-creator` shows `SKILL.md` + `agents/{analyzer,comparator,
-grader}.md` and **no plugin manifest** (`agentao-plugin.json` does not exist
+grader}.md` and **no plugin manifest** (`arbiter-plugin.json` does not exist
 anywhere in the tree). It reaches the runtime via `SkillManager`'s bundled-skill
-seeding (`skills/manager.py:17`, `:60`), which copies it to `~/.agentao/skills/`
+seeding (`skills/manager.py:17`, `:60`), which copies it to `~/.arbiter/skills/`
 — a *skills* directory, never a *plugins* directory.
 
 **Conclusion.** For `skills/skill-creator/agents/analyzer.md` to be registered,
@@ -190,9 +190,9 @@ sub-agents specifically.
 
 ### 4.2 Issue B — `AgentManager` lacks a global layer (real, minor)
 
-`AgentManager._load_definitions` scans builtin + project `.agentao/agents/`
+`AgentManager._load_definitions` scans builtin + project `.arbiter/agents/`
 only (`agents/manager.py:31-37`). `SkillManager` scans a global
-`~/.agentao/skills/` layer; the agent manager has no `~/.agentao/agents/`
+`~/.arbiter/skills/` layer; the agent manager has no `~/.arbiter/agents/`
 equivalent. A user who drops a personal agent definition in their home config
 dir — mirroring how user-global skills work — gets nothing. This is independent
 of the plugin question and is the cheapest thing here to *implement* (one
@@ -247,10 +247,10 @@ not folded into an "entry-point parity" fix.
 > plugin manifest declares no `agents` field, and the files sit at
 > `skills/skill-creator/agents/` *inside the skill*, not at the plugin's agent
 > root `<plugin>/agents/` that plugin agent-discovery scans (the same
-> `plugin.root_path / "agents"` rule agentao uses, §3). Confirmed empirically:
+> `plugin.root_path / "agents"` rule arbiter uses, §3). Confirmed empirically:
 > those names are absent from the session's available agent types. So the
 > upstream **deliberately** packages them as skill assets, not plugin-agents —
-> and in *both* Claude Code (where skill-creator is a plugin) and agentao (where
+> and in *both* Claude Code (where skill-creator is a plugin) and arbiter (where
 > it is a bundled skill), they are skill-internal reference docs, never
 > registered sub-agents. The reporter's premise — "a skill's bundled agents get
 > registered" — fails even by the precedent it most likely came from.
@@ -261,11 +261,11 @@ This is the load-bearing judgment, and it is the maintainer's call — not
 self-evidently a defect.
 
 **The argument that CLI-only is deliberate.** Plugins are sourced primarily from
-the user's **global** `~/.agentao/plugins`. Having `build_from_environment`
+the user's **global** `~/.arbiter/plugins`. Having `build_from_environment`
 auto-load them would mean **every embedded host, and every ACP/IDE session,
 silently inherits the end user's global agents, MCP servers, and hooks.** For an
 *embedded harness* that is a trust/isolation footgun: a host application that
-embeds `Agentao(...)` to do one bounded job generally does **not** want its agent
+embeds `Arbiter(...)` to do one bounded job generally does **not** want its agent
 surface, tool set, and outbound MCP connections silently expanded by whatever the
 machine's user happens to have installed globally. Hooks especially — a global
 plugin hook firing inside an embedded host's tool pipeline is an injection
@@ -273,7 +273,7 @@ surface the host never opted into. The CLI is the one context where "load the
 user's plugins" is unambiguously the user's intent, because the user *is* the
 operator. So routing plugin loading through the CLI layer, and leaving the core
 construction path plugin-free, is a defensible **default-deny** posture
-consistent with how agentao treats other ambient inputs.
+consistent with how arbiter treats other ambient inputs.
 
 **The argument that it is a gap.** The asymmetry is **undocumented**. An embedder
 reasonably expects the three entry points to be at parity, and there is no
@@ -284,7 +284,7 @@ leaves the behavior looking accidental rather than chosen.
 **A seam already exists, which tilts this toward "intentional, just
 undocumented."** ACP `session/new` and `session/load` already accept an injected
 `agent_factory` (`acp/session_new.py:304`, `acp/session_load.py:122`), and an
-embedded host constructs `Agentao` itself — so *both* non-CLI paths can already
+embedded host constructs `Arbiter` itself — so *both* non-CLI paths can already
 load plugins by supplying a factory / post-construction step that calls the
 loader. The capability is reachable today; what is missing is a blessed, named,
 documented switch rather than an ad-hoc workaround. That a deliberate injection
@@ -301,8 +301,8 @@ a posture that satisfies both readings.
 first).**
 Add the global layer to `AgentManager._load_definitions`:
 `_scan_directory(user_root() / "agents")` — note `user_root()` is **already**
-`~/.agentao`, so the path is `~/.agentao/agents`, **not** `user_root()/".agentao"
-/"agents"` (that would scan `~/.agentao/.agentao/agents`). Place it to give the
+`~/.arbiter`, so the path is `~/.arbiter/agents`, **not** `user_root()/".arbiter"
+/"agents"` (that would scan `~/.arbiter/.arbiter/agents`). Place it to give the
 right precedence vs project defs (mirror `SkillManager`'s global<project
 ordering, and decide whether project overrides global as skills do), and **add a
 covering test** for the override order. Self-contained; ship independently.
@@ -337,7 +337,7 @@ A without breaking isolation).**
    (`logger` is a plain module logger and moves cleanly — not a real coupling.)
 2. CLI keeps calling the helper by default (unchanged behavior). Have
    `build_from_environment` accept an explicit `load_plugins: bool = False` (or
-   honor a `.agentao/settings.json` flag), default **off**; when set, call
+   honor a `.arbiter/settings.json` flag), default **off**; when set, call
    `load_plugins_for_agent(agent, cwd=wd, ...)` after construction. **This
    default-off-settings-gated pattern already exists in the same function**:
    `enable_builtin_agents` is resolved exactly this way

@@ -9,10 +9,10 @@ Spec: <https://agentclientprotocol.com/>
 Before reading the full protocol breakdown, run a real handshake to feel the shape:
 
 ```bash
-pip install 'agentao[cli]>=0.4.0'
+pip install 'arbiter[cli]>=0.4.0'
 export OPENAI_API_KEY=sk-... OPENAI_BASE_URL=https://api.openai.com/v1 OPENAI_MODEL=gpt-5.4
 
-agentao --acp --stdio
+arbiter --acp --stdio
 ```
 
 The process now reads JSON-RPC requests on stdin and writes responses + notifications on stdout. Paste these three NDJSON lines (one per line) into the same terminal:
@@ -25,7 +25,7 @@ The process now reads JSON-RPC requests on stdin and writes responses + notifica
 
 You'll see, in order:
 
-- `initialize` response — Agentao announces capabilities (`loadSession`, `mcpCapabilities`, …)
+- `initialize` response — Arbiter announces capabilities (`loadSession`, `mcpCapabilities`, …)
 - `session/new` response — a fresh `sessionId`
 - `session/update` notifications — streaming text, tool starts, thinking
 - a final response with `stopReason` when the turn ends
@@ -35,7 +35,7 @@ You'll see, in order:
 ```javascript
 import { spawn } from 'node:child_process';
 
-const proc = spawn('agentao', ['--acp', '--stdio']);
+const proc = spawn('arbiter', ['--acp', '--stdio']);
 let nextId = 1;
 
 function send(method, params) {
@@ -76,17 +76,17 @@ ACP and MCP are **complementary**, not competitors:
 
 | Protocol | Direction | Typical client | Typical server | Role |
 |----------|-----------|----------------|----------------|------|
-| **ACP** | Host ↔ Agent | IDE, web UI, CLI | Agent runtime (e.g. Agentao) | Expose the agent to UI |
+| **ACP** | Host ↔ Agent | IDE, web UI, CLI | Agent runtime (e.g. Arbiter) | Expose the agent to UI |
 | **MCP** | Agent ↔ Tools | Agent runtime | Tools / data sources (filesystem, GitHub, databases…) | Expose tools to the agent |
 
 ```
 ┌────────────┐   ACP    ┌────────────┐   MCP    ┌─────────────┐
 │   Client    │◄────────►│   Agent     │◄────────►│ MCP Tools  │
-│ (your host) │           │  (Agentao)  │           │ (resources)│
+│ (your host) │           │  (Arbiter)  │           │ (resources)│
 └────────────┘           └────────────┘           └─────────────┘
 ```
 
-Agentao is simultaneously an **ACP server** (driven by hosts) and an **MCP client** (drives external tools).
+Arbiter is simultaneously an **ACP server** (driven by hosts) and an **MCP client** (drives external tools).
 
 ## Why ACP
 
@@ -94,7 +94,7 @@ Agentao is simultaneously an **ACP server** (driven by hosts) and an **MCP clien
 |------|----------------------|
 | Non-Python host | stdio + JSON — any language can integrate |
 | Process isolation | Agent runs in a subprocess; a crash does not kill the host |
-| Swappable agent backend | Agentao, Claude Code, Zed's built-in agent all speak the same protocol |
+| Swappable agent backend | Arbiter, Claude Code, Zed's built-in agent all speak the same protocol |
 | Auditable | On-the-wire JSON is naturally dumpable / replayable / diffable |
 
 ## Protocol characteristics
@@ -132,7 +132,7 @@ Client
 sequenceDiagram
     autonumber
     participant C as Client (host)
-    participant S as Server (agentao)
+    participant S as Server (arbiter)
 
     Note over C,S: 1. Handshake
     C->>S: initialize {protocolVersion:1, clientCapabilities}
@@ -166,14 +166,14 @@ sequenceDiagram
 
 ## Extension: `_agentao.cn/ask_user`
 
-The base spec only lets the server **request permission** — it does not let the server ask the user a free-form question. Agentao advertises a private extension method `_agentao.cn/ask_user` under `_meta["_agentao.cn/extensions"]` (ACP's standard extension channel) to do exactly that. Client options:
+The base spec only lets the server **request permission** — it does not let the server ask the user a free-form question. Arbiter advertises a private extension method `_agentao.cn/ask_user` under `_meta["_agentao.cn/extensions"]` (ACP's standard extension channel) to do exactly that. Client options:
 
 - Implement it: prompt the user, return the answer string
 - Don't implement: the agent falls back to `"[ask_user: not available in non-interactive mode]"`
 
 ## ACP v1 boundaries
 
-Explicit v1 limits (Agentao's capability block reflects them faithfully):
+Explicit v1 limits (Arbiter's capability block reflects them faithfully):
 
 - `promptCapabilities.image = true` (0.4.8+, inline `{data, mimeType}` blocks only), `audio = false`, `embeddedContext = false`
 - `mcpCapabilities.http = true`, `sse = true` — MCP transports are stdio, Streamable HTTP, and SSE
@@ -183,9 +183,9 @@ Future versions will expand these. **Clients should inspect the handshake respon
 
 ## What's next
 
-- **3.2** Step-by-step Agentao-as-server with complete wire traces
+- **3.2** Step-by-step Arbiter-as-server with complete wire traces
 - **3.3** Build a host ACP client skeleton
-- **3.4** Reverse: Agentao calling other ACP servers
+- **3.4** Reverse: Arbiter calling other ACP servers
 - **3.5** Zed integration
 
-→ [3.2 Agentao as an ACP Server](./2-agentao-as-server)
+→ [3.2 Arbiter as an ACP Server](./2-arbiter-as-server)

@@ -25,13 +25,13 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from agentao.cancellation import CancellationToken
-from agentao.host.models import ToolLifecycleEvent
-from agentao.runtime import identity as runtime_identity
+from arbiter.cancellation import CancellationToken
+from arbiter.host.models import ToolLifecycleEvent
+from arbiter.runtime import identity as runtime_identity
 
 
 def _make_agent(tmp_path: Path):
-    """Construct an Agentao via the public embedded-host path.
+    """Construct an Arbiter via the public embedded-host path.
 
     Pass ``llm_client=`` explicitly — exercising the very seam the test
     documents — instead of leaning on ``conftest.py``'s env-backfill
@@ -40,12 +40,12 @@ def _make_agent(tmp_path: Path):
     mock_llm = Mock()
     mock_llm.logger = Mock()
     mock_llm.model = "gpt-test"
-    with patch("agentao.tooling.mcp_tools.McpClientManager"), patch(
-        "agentao.tooling.mcp_tools.load_mcp_config", return_value={}
+    with patch("arbiter.tooling.mcp_tools.McpClientManager"), patch(
+        "arbiter.tooling.mcp_tools.load_mcp_config", return_value={}
     ):
-        from agentao.agent import Agentao
+        from arbiter.agent import Arbiter
 
-        return Agentao(working_directory=tmp_path, llm_client=mock_llm)
+        return Arbiter(working_directory=tmp_path, llm_client=mock_llm)
 
 
 def _tool_event(session_id: str, *, tool_call_id: str, phase: str) -> ToolLifecycleEvent:

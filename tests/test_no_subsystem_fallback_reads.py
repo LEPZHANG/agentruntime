@@ -14,7 +14,7 @@ These tests pin the contract that:
   surfaces as a wrong path or a deliberate ``RuntimeError``.
 
 The fixture isolates these subsystems from the rest of the test
-suite — the autouse ``Agentao``-patching conftest fixture is a
+suite — the autouse ``Arbiter``-patching conftest fixture is a
 test-only convenience that the production runtime no longer relies on.
 """
 
@@ -26,10 +26,10 @@ from typing import Iterator
 
 import pytest
 
-from agentao.llm.client import LLMClient
-from agentao.mcp.config import load_mcp_config, save_mcp_config
-from agentao.memory import MemoryManager
-from agentao.permissions import PermissionEngine
+from arbiter.llm.client import LLMClient
+from arbiter.mcp.config import load_mcp_config, save_mcp_config
+from arbiter.memory import MemoryManager
+from arbiter.permissions import PermissionEngine
 
 
 @pytest.fixture
@@ -122,7 +122,7 @@ class TestNoImplicitReads:
         self, tmp_path, _trip_wires
     ):
         """``user_root=None`` must not poke ``Path.home()`` even though
-        legacy code used to read ``Path.home() / ".agentao"`` here."""
+        legacy code used to read ``Path.home() / ".arbiter"`` here."""
         engine = PermissionEngine(project_root=tmp_path)
         assert engine.rules == []  # no project file, no user scope
 
@@ -165,10 +165,10 @@ class TestNoImplicitReads:
         must not be consulted as a default — and after Issue #16 the
         manager itself never imports :mod:`sqlite3` or constructs any
         store, so disk reads happen only at the call site."""
-        from agentao.memory import SQLiteMemoryStore
+        from arbiter.memory import SQLiteMemoryStore
         mgr = MemoryManager(
             project_store=SQLiteMemoryStore.open_or_memory(
-                tmp_path / ".agentao" / "memory.db"
+                tmp_path / ".arbiter" / "memory.db"
             ),
             user_store=None,  # explicit "no user scope"
         )
@@ -189,7 +189,7 @@ def test_factory_still_works_with_env(tmp_path, monkeypatch):
     # to assert that the env-derived path is wired correctly, not that
     # the surrounding repo's ``.env`` happens to win.
     monkeypatch.setattr(
-        "agentao.embedding.factory.safe_load_dotenv", lambda *a, **kw: None
+        "arbiter.embedding.factory.safe_load_dotenv", lambda *a, **kw: None
     )
     # Pin the provider so a leaked ``LLM_PROVIDER`` from a prior test's
     # ``load_dotenv`` (or the developer's real shell env) cannot redirect
@@ -199,7 +199,7 @@ def test_factory_still_works_with_env(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_BASE_URL", "https://factory.local/v1")
     monkeypatch.setenv("OPENAI_MODEL", "factory-model")
 
-    from agentao.embedding import build_from_environment
+    from arbiter.embedding import build_from_environment
 
     agent = build_from_environment(working_directory=tmp_path)
     assert agent.llm.api_key == "factory-key"

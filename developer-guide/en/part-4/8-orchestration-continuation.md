@@ -6,11 +6,11 @@
 > - A **host-owned continuation loop** with a time/turn budget, end to end (~40 lines)
 > - **Why not** `force_continue` (the plugin `Stop` hook), and where the boundary is
 
-Agentao's CLI ships a `/goal` command: state an objective once, and it keeps
+Arbiter's CLI ships a `/goal` command: state an objective once, and it keeps
 driving the agent across many turns until the objective is reported complete or
 blocked, or a budget trips. This chapter is the **pattern behind it**, so you
 can build the same thing in your own host. The CLI implementation
-(`agentao/cli/commands/goal.py` + `agentao/cli/input_loop.py`) is the worked
+(`arbiter/cli/commands/goal.py` + `arbiter/cli/input_loop.py`) is the worked
 reference; the design record is
 [`docs/design/codex-goal-mechanism-review.md`](https://github.com/jin-bo/agentao/blob/main/docs/design/codex-goal-mechanism-review.md) §11.
 
@@ -33,7 +33,7 @@ get when a host composes them in a loop:
 
 Nothing else is needed. Time and turn budgets are pure host bookkeeping
 (wall-clock between `chat()` calls; a counter you increment). Token budgets are
-**not** part of this pattern — Agentao deliberately scopes goal budgets to
+**not** part of this pattern — Arbiter deliberately scopes goal budgets to
 time/turn, so the harness needs no usage-observation primitive.
 
 ## 4.8.2 The continuation loop
@@ -42,7 +42,7 @@ The whole pattern is an outer `while`:
 
 ```python
 import time
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 
 class UpdateGoalTool(Tool):
     """The agent's ONLY write into goal state: mark complete / blocked."""
@@ -130,7 +130,7 @@ tool-call loop *within one* `chat()`; the turn cap bounds the *number of*
 
 ## 4.8.4 Why not the `Stop` hook / `force_continue`?
 
-Agentao plugins have a `Stop` hook that can re-enter the loop
+Arbiter plugins have a `Stop` hook that can re-enter the loop
 (`StopHookResult.force_continue`). It is the **wrong tool** for a goal:
 
 - it is **hard-capped** (`_stop_reentry_cap`, default 3) as a runaway guard —
@@ -144,7 +144,7 @@ different tool.
 
 ## 4.8.5 Persist if you want restart-survival
 
-The CLI writes the goal to `.agentao/goal.json` after every turn so a goal
+The CLI writes the goal to `.arbiter/goal.json` after every turn so a goal
 survives a process restart. Persistence is entirely host-side — the `goal` dict
 above becomes a small JSON file; on launch you reload it and, if it's still
 `active` or `paused`, offer to resume. The harness is not involved.
@@ -159,5 +159,5 @@ above becomes a small JSON file; on launch you reload it and, if it's still
 - [ ] (Optional) persist state for restart-survival.
 - [ ] **Not** built on `force_continue`.
 
-→ Worked reference: `agentao/cli/input_loop.py::run_goal_continuation`. User
+→ Worked reference: `arbiter/cli/input_loop.py::run_goal_continuation`. User
 guide: [Long-Task Goals](https://github.com/jin-bo/agentao/blob/main/docs/guides/goal.md).

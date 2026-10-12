@@ -10,7 +10,7 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
-from agentao.mcp.client import McpClient, ServerStatus
+from arbiter.mcp.client import McpClient, ServerStatus
 
 
 def run_async(coro):

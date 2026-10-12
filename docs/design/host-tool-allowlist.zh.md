@@ -1,16 +1,16 @@
 # Host 工具白名单：`enabled_tools`（设计草案 · 收敛版）
 
 **状态：** **草案，待评审。** 实现未开始。是 `host-tool-injection`（`extra_tools` / `disable_tools`，已落地）的加法对偶。
-**读者：** 要给 host 一个声明式「最小工具集」选择口的 agentao 维护者；以及本设计后续 PR 的评审者。
+**读者：** 要给 host 一个声明式「最小工具集」选择口的 arbiter 维护者；以及本设计后续 PR 的评审者。
 **配套：**
 - `docs/design/host-tool-allowlist.md` — 英文版（本草案确认后再写）
 - `docs/design/host-tool-injection.zh.md` — 减法/加法注入口 `extra_tools` / `disable_tools`（直接前身）
 - `docs/design/runtime-tool-injection.zh.md` — 运行时对偶 `add_tool` / `remove_tool`
 - `docs/design/embedded-host-contract.md` — host 契约稳定边界（本设计的归属处）
-- `agentao/tooling/registry.py` — `register_builtin_tools` / `BUILTIN_TOOL_NAMES`
-- `agentao/agent.py` — 构造器、注册时序、`remove_tool`
+- `arbiter/tooling/registry.py` — `register_builtin_tools` / `BUILTIN_TOOL_NAMES`
+- `arbiter/agent.py` — 构造器、注册时序、`remove_tool`
 
-> **第二稿收敛说明：** 首稿曾把 `enabled_tools` 设计成「跨 built-in + agent + extra + 豁免 MCP/plan 的最终可见集」，并对 `extra_tools` 冲突 raise、配套导出 `CORE_TOOL_NAMES`。评审认定这过度设计。本稿据评审收敛到**最短可行路线**：`enabled_tools` 只筛 agentao-owned 的 built-in + agent-path；extra 恒保留；MCP / profile / `CORE_TOOL_NAMES` / 将 extra 纳入白名单 全部 demand-gated 后延（见 §8）。
+> **第二稿收敛说明：** 首稿曾把 `enabled_tools` 设计成「跨 built-in + agent + extra + 豁免 MCP/plan 的最终可见集」，并对 `extra_tools` 冲突 raise、配套导出 `CORE_TOOL_NAMES`。评审认定这过度设计。本稿据评审收敛到**最短可行路线**：`enabled_tools` 只筛 arbiter-owned 的 built-in + agent-path；extra 恒保留；MCP / profile / `CORE_TOOL_NAMES` / 将 extra 纳入白名单 全部 demand-gated 后延（见 §8）。
 
 ---
 
@@ -33,7 +33,7 @@
 
 ## 2. 范围决策：v1 只加 `enabled_tools` 一个 kwarg
 
-**v1 只交付构造器参数 `enabled_tools`**：一个**只作用于 agentao-owned（built-in + agent-path）工具**的加法白名单。它补齐 §1 的加法缺口，并一次性解决「新增内置静默进入」——白名单里没写的内置/agent 工具，无论何时新增都不会进。
+**v1 只交付构造器参数 `enabled_tools`**：一个**只作用于 arbiter-owned（built-in + agent-path）工具**的加法白名单。它补齐 §1 的加法缺口，并一次性解决「新增内置静默进入」——白名单里没写的内置/agent 工具，无论何时新增都不会进。
 
 | host 需求 | 现有机制 | 本设计 |
 |---|---|---|
@@ -125,17 +125,17 @@ self.tool_runner = ToolRunner(tools=self.tools, ...)
 
 ```python
 # tooling/registry.py
-def apply_enabled_tools(agent: "Agentao") -> None:
+def apply_enabled_tools(agent: "Arbiter") -> None:
     allow = agent._enabled_tools
     if allow is None:                       # 默认：不启用
         return
 
     # (b) typo 守卫：未知名 fail-fast（§5-3）
-    from agentao.tools.base import ToolRegistry
+    from arbiter.tools.base import ToolRegistry
     known = set(agent.tools.tools) | BUILTIN_TOOL_NAMES
     unknown = sorted(allow - known)
     if unknown:
-        raise ValueError(f"Agentao(enabled_tools=): unknown tool name(s) {unknown}")
+        raise ValueError(f"Arbiter(enabled_tools=): unknown tool name(s) {unknown}")
 
     # extra 恒保留（§4）——临时算，不存实例字段
     extra_names = {tool.name for tool in agent._extra_tools}
@@ -156,30 +156,30 @@ def apply_enabled_tools(agent: "Agentao") -> None:
 - `extra_names` 在 `apply_enabled_tools()` 里临时算（`agent._extra_tools` 此刻已存在），**不新增实例字段**。
 - **可观测性**：剔除是显式意图，不 warning；但落 INFO 审计行，便于 host 排查「我的 agent 怎么没了」。
 
-**改动面：** `Agentao.__init__`（收 `enabled_tools` + §5a 校验）、新增 `apply_enabled_tools` 并在 `register_extra_tools` 之后、`ToolRunner` 之前调用。不碰 `disable_tools` / `extra_tools` / MCP / plan 的既有路径，不新增任何常量/profile/实例字段。
+**改动面：** `Arbiter.__init__`（收 `enabled_tools` + §5a 校验）、新增 `apply_enabled_tools` 并在 `register_extra_tools` 之后、`ToolRunner` 之前调用。不碰 `disable_tools` / `extra_tools` / MCP / plan 的既有路径，不新增任何常量/profile/实例字段。
 
 ## 7. 用法
 
 ```python
-from agentao import Agentao
+from arbiter import Arbiter
 
 # 1) 最小核心：手写名字集（v1 不导出 CORE_TOOL_NAMES，见 §8）
 CORE = {"read_file", "write_file", "replace",
         "list_directory", "glob", "search_file_content", "run_shell_command"}
-agent = Agentao(working_directory=wd, enabled_tools=CORE)
+agent = Arbiter(working_directory=wd, enabled_tools=CORE)
 
 # 2) 核心 + 自研检索：extra 恒保留，无需把名字再写进 enabled_tools（§4）
-agent = Agentao(
+agent = Arbiter(
     working_directory=wd,
     extra_tools=[MyRetrievalTool()],
     enabled_tools=CORE,            # MyRetrievalTool 仍在 —— 因为它是 extra
 )
 
 # 3) 极小：移除全部 built-in + agent（extra / MCP / plan 仍在）
-agent = Agentao(working_directory=wd, enabled_tools=set())
+agent = Arbiter(working_directory=wd, enabled_tools=set())
 
 # 4) 非法：互斥
-Agentao(working_directory=wd,
+Arbiter(working_directory=wd,
         enabled_tools={"read_file"}, disable_tools={"web_search"})   # ValueError（§5a-1）
 ```
 
@@ -189,7 +189,7 @@ Agentao(working_directory=wd,
 |---|---|
 | **导出 `CORE_TOOL_NAMES`** | 出现**第二个** host 也要同一核心集时再导出——届时一并解决「core 含不含 `ask_user`/`list_directory`」的边界争议，并配 pin 测试防漂移 |
 | **profile 档位** `tool_profile=` | 多个 host 反复要**同一组**子集时；且做成 host 可扩展 dict，而非固定字符串（否则把 `BUILTIN_TOOL_NAMES` 刻意拒绝的工具分类请回来） |
-| **MCP 纳入白名单** | 出现「要在 agentao 层而非 MCP 层最小化 `mcp_*`」的真实需求时——需另想 `mcp_` 前缀的匹配/通配语义 |
+| **MCP 纳入白名单** | 出现「要在 arbiter 层而非 MCP 层最小化 `mcp_*`」的真实需求时——需另想 `mcp_` 前缀的匹配/通配语义 |
 | **extra 也受白名单约束**（「单一最终集」语义） | 出现「可复用 extra 列表 + 每实例选子集」的真实需求时；届时再定冲突是 raise 还是 drop |
 | **按轴开关** `enable_agent_tools=False` | 「全留 agent、只筛内置」（§4 全有或全无的反面）成为真实痛点时——今天只有管内置 agent 的 `enable_builtin_agents`，够不到 project/plugin agent |
 

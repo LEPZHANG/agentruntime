@@ -1,12 +1,12 @@
 # ACP Client — Project-Local Server Management
 
-Agentao can connect to and manage project-local ACP (Agent Client Protocol) servers. These are external agent processes that communicate over stdio using JSON-RPC 2.0 with NDJSON framing.
+Arbiter can connect to and manage project-local ACP (Agent Client Protocol) servers. These are external agent processes that communicate over stdio using JSON-RPC 2.0 with NDJSON framing.
 
 ## Quick Start
 
 ### 1. Create a config file
 
-Create `.agentao/acp.json` in your project root:
+Create `.arbiter/acp.json` in your project root:
 
 ```json
 {
@@ -66,9 +66,9 @@ Values in `env` support `$VAR` / `${VAR}` expansion from the process environment
 
 ### Key Design Decisions
 
-- **Project-only config.** No global `<home>/.agentao/acp.json` — ACP servers are project-scoped.
+- **Project-only config.** No global `<home>/.arbiter/acp.json` — ACP servers are project-scoped.
 - **No auto-send.** Messages are never automatically routed to ACP servers. Use `/acp send` explicitly.
-- **ACP responses stay separate.** Server output appears in the ACP inbox, not in the main Agentao conversation context.
+- **ACP responses stay separate.** Server output appears in the ACP inbox, not in the main Arbiter conversation context.
 - **Lazy initialization.** The ACP manager is created on first `/acp` command, not at startup.
 - **Inline interaction handling.** Permission and input requests are handled inline during `/acp send` and at safe idle points in the main CLI loop.
 
@@ -114,11 +114,11 @@ Notes:
 
 - Only configured server names match; unknown names fall through to the normal agent path.
 - Empty task text after the server name prints a usage hint.
-- Results stay in the ACP inbox and are **not** injected into the main Agentao conversation context — the explicit-routing semantics are "hand this turn to the sub-agent", not "let the main agent know".
+- Results stay in the ACP inbox and are **not** injected into the main Arbiter conversation context — the explicit-routing semantics are "hand this turn to the sub-agent", not "let the main agent know".
 
 ### Push Delegation (removed)
 
-An earlier design proposed an experimental `pushTaskCompleteToAgent` flag that would bridge private `task_complete` notifications into the main Agentao conversation. It was **dropped** before landing: `task_complete` is not part of the ACP standard enum of `sessionUpdate` kinds, so shipping it would require every compatible server to speak a private extension. The flag, its queue, and the synthetic-message injection path are no longer present in the codebase. See the corresponding design doc for history.
+An earlier design proposed an experimental `pushTaskCompleteToAgent` flag that would bridge private `task_complete` notifications into the main Arbiter conversation. It was **dropped** before landing: `task_complete` is not part of the ACP standard enum of `sessionUpdate` kinds, so shipping it would require every compatible server to speak a private extension. The flag, its queue, and the synthetic-message injection path are no longer present in the codebase. See the corresponding design doc for history.
 
 Design doc:
 
@@ -173,7 +173,7 @@ ACP interactions: 1 pending
 
 ## ACP Extension: `_agentao.cn/ask_user`
 
-Agentao supports a private ACP extension method `_agentao.cn/ask_user` for requesting free-form text input from the user. This is advertised in the `initialize` response under `_meta["_agentao.cn/extensions"]` (ACP's standard channel for extension data).
+Arbiter supports a private ACP extension method `_agentao.cn/ask_user` for requesting free-form text input from the user. This is advertised in the `initialize` response under `_meta["_agentao.cn/extensions"]` (ACP's standard channel for extension data).
 
 ### Request
 

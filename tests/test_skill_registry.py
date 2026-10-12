@@ -1,10 +1,10 @@
-"""Tests for agentao.skills.registry."""
+"""Tests for arbiter.skills.registry."""
 
 import json
 
 import pytest
 
-from agentao.skills.registry import (
+from arbiter.skills.registry import (
     InstalledSkillRecord,
     SkillRegistry,
     _find_project_root,
@@ -120,8 +120,8 @@ class TestResolveDefaultScope:
         (tmp_path / "package.json").touch()
         assert resolve_default_scope(tmp_path) == "project"
 
-    def test_project_with_agentao_dir(self, tmp_path):
-        (tmp_path / ".agentao").mkdir()
+    def test_project_with_arbiter_dir(self, tmp_path):
+        (tmp_path / ".arbiter").mkdir()
         assert resolve_default_scope(tmp_path) == "project"
 
     def test_global_when_empty(self, tmp_path):
@@ -152,12 +152,12 @@ class TestRegistryPathForScope:
     def test_global_path(self):
         from pathlib import Path
         path = registry_path_for_scope("global")
-        assert path == Path.home() / ".agentao" / "skills_registry.json"
+        assert path == Path.home() / ".arbiter" / "skills_registry.json"
 
     def test_project_path_at_root(self, tmp_path):
         (tmp_path / ".git").mkdir()
         path = registry_path_for_scope("project", tmp_path)
-        assert path == tmp_path.resolve() / ".agentao" / "skills_registry.json"
+        assert path == tmp_path.resolve() / ".arbiter" / "skills_registry.json"
 
     def test_project_path_from_subdirectory(self, tmp_path):
         """Running from a subdirectory still resolves to the project root."""
@@ -165,23 +165,23 @@ class TestRegistryPathForScope:
         subdir = tmp_path / "src" / "pkg"
         subdir.mkdir(parents=True)
         path = registry_path_for_scope("project", subdir)
-        assert path == tmp_path.resolve() / ".agentao" / "skills_registry.json"
+        assert path == tmp_path.resolve() / ".arbiter" / "skills_registry.json"
 
 
 class TestInstallDirForScope:
     def test_global_dir(self):
         from pathlib import Path
         d = install_dir_for_scope("global", "my-skill")
-        assert d == Path.home() / ".agentao" / "skills" / "my-skill"
+        assert d == Path.home() / ".arbiter" / "skills" / "my-skill"
 
     def test_project_dir(self, tmp_path):
         (tmp_path / ".git").mkdir()
         d = install_dir_for_scope("project", "my-skill", tmp_path)
-        assert d == tmp_path.resolve() / ".agentao" / "skills" / "my-skill"
+        assert d == tmp_path.resolve() / ".arbiter" / "skills" / "my-skill"
 
     def test_project_dir_from_subdirectory(self, tmp_path):
         (tmp_path / "pyproject.toml").touch()
         subdir = tmp_path / "src"
         subdir.mkdir()
         d = install_dir_for_scope("project", "my-skill", subdir)
-        assert d == tmp_path.resolve() / ".agentao" / "skills" / "my-skill"
+        assert d == tmp_path.resolve() / ".arbiter" / "skills" / "my-skill"

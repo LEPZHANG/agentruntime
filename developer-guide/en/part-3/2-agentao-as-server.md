@@ -1,11 +1,11 @@
-# 3.2 Agentao as an ACP Server
+# 3.2 Arbiter as an ACP Server
 
-Drive Agentao as a black-box ACP server — the integration path for hosts in **any language** (Node, Go, Rust, Kotlin, Swift, C#…).
+Drive Arbiter as a black-box ACP server — the integration path for hosts in **any language** (Node, Go, Rust, Kotlin, Swift, C#…).
 
 ## Launch command
 
 ```bash
-agentao --acp --stdio
+arbiter --acp --stdio
 ```
 
 - `--acp` enables ACP mode
@@ -14,18 +14,18 @@ agentao --acp --stdio
 
 **Environment variables**: same as CLI / SDK (`OPENAI_API_KEY`, etc.). The ACP layer does not transport credentials.
 
-**Logs**: Agentao writes to `<session-cwd>/agentao.log` (the `cwd` from the handshake). Hosts can tail / inspect it for debugging.
+**Logs**: Arbiter writes to `<session-cwd>/arbiter.log` (the `cwd` from the handshake). Hosts can tail / inspect it for debugging.
 
 ## Resume a session on startup
 
 ```bash
-agentao --acp --resume                 # resume the latest saved session
-agentao --acp --resume <SESSION_ID>    # resume a specific session (UUID / prefix / timestamp)
+arbiter --acp --resume                 # resume the latest saved session
+arbiter --acp --resume <SESSION_ID>    # resume a specific session (UUID / prefix / timestamp)
 ```
 
 ACP is client-driven — the server can't open a session on its own — so `--resume` arms a **one-shot directive consumed by the first `session/new`**. That request hydrates the persisted history, replays it as `session/update` notifications (exactly like `session/load`), and returns the **persisted `sessionId`** instead of a fresh one. Every later `session/new` on the connection starts blank.
 
-The store is keyed by the client-supplied `cwd`, so the lookup runs at request time against `<cwd>/.agentao/sessions`. Any recoverable miss — empty store, unknown id, corrupt file, or an id already live in the registry — **degrades to a fresh session** (logged at WARNING) rather than failing the client's first `session/new`.
+The store is keyed by the client-supplied `cwd`, so the lookup runs at request time against `<cwd>/.arbiter/sessions`. Any recoverable miss — empty store, unknown id, corrupt file, or an id already live in the registry — **degrades to a fresh session** (logged at WARNING) rather than failing the client's first `session/new`.
 
 > The resumed `sessionId` is only returned in the `session/new` response, so the replayed `session/update` notifications arrive *before* the client learns that id. Clients that strictly validate `session/update.sessionId` against sessions they opened may drop those early updates; the conversation still continues correctly from the next prompt. See [docs/guides/acp.md](https://github.com/jin-bo/agentao/blob/main/docs/guides/acp.md#resume-a-session-on-startup).
 
@@ -69,7 +69,7 @@ The store is keyed by the client-supplied `cwd`, so the lookup runs at request t
 }
 ```
 
-**Agentao response**:
+**Arbiter response**:
 
 ```json
 {
@@ -91,8 +91,8 @@ The store is keyed by the client-supplied `cwd`, so the lookup runs at request t
     },
     "authMethods": [],
     "agentInfo": {
-      "name": "agentao",
-      "title": "Agentao",
+      "name": "arbiter",
+      "title": "Arbiter",
       "version": "0.2.14"
     },
     "_meta": {
@@ -110,7 +110,7 @@ The store is keyed by the client-supplied `cwd`, so the lookup runs at request t
 ### Rules
 
 - `protocolVersion` must be an **integer** (`"1"` as string or `True` are rejected)
-- Version negotiation: if Agentao supports your version, it echoes it back; otherwise it returns its highest supported version. **Never errors** — the client decides whether to continue
+- Version negotiation: if Arbiter supports your version, it echoes it back; otherwise it returns its highest supported version. **Never errors** — the client decides whether to continue
 - `clientCapabilities` is required as an object (can be `{}`)
 
 ## Session creation `session/new`
@@ -143,7 +143,7 @@ The store is keyed by the client-supplied `cwd`, so the lookup runs at request t
 
 ### Notes
 
-- `cwd` sets this session's **working directory** — file tools, `AGENTAO.md`, `.agentao/` all resolve against it. Keep it unique per concurrent session
+- `cwd` sets this session's **working directory** — file tools, `ARBITER.md`, `.arbiter/` all resolve against it. Keep it unique per concurrent session
 - `mcpServers` accepts `"type":"stdio"`, `"type":"sse"`, or `"type":"http"` (`mcpCapabilities.http=true`); a bare `url` defaults to Streamable HTTP
 - Internally these map to the [`extra_mcp_servers` constructor param](/en/part-2/2-constructor-reference#session-scoped-mcp-servers)
 
@@ -181,7 +181,7 @@ In v1, `prompt` array entries may only be `{"type":"text", "text": ...}`.
 
 ## Streaming updates `session/update` (notification)
 
-Before `session/prompt` returns, Agentao emits **many** notifications like:
+Before `session/prompt` returns, Arbiter emits **many** notifications like:
 
 ```json
 {
@@ -210,7 +210,7 @@ Hosts must **not** respond to notifications (JSON-RPC 2.0: notifications have no
 
 ## Tool confirmation `session/request_permission` (request)
 
-When Agentao attempts a `requires_confirmation=True` tool:
+When Arbiter attempts a `requires_confirmation=True` tool:
 
 ```json
 {
@@ -256,7 +256,7 @@ sequenceDiagram
     autonumber
     participant U as End user
     participant H as Host UI
-    participant S as agentao server
+    participant S as arbiter server
 
     S--)H: session/update {tool_call started, status:pending}
     S->>H: session/request_permission {id:42, toolCall, options}
@@ -287,7 +287,7 @@ Effect: the in-flight `session/prompt` turn finishes with `stopReason:"cancelled
 sequenceDiagram
     autonumber
     participant H as Host
-    participant S as agentao server
+    participant S as arbiter server
 
     H->>S: session/prompt {sessionId, prompt}
     S--)H: session/update {agent_message_chunk} ...
@@ -304,7 +304,7 @@ sequenceDiagram
 
 ## Restoring sessions `session/load`
 
-For **persistent session** scenarios: store `sessionId` + history in your DB, restore after a process restart. Agentao advertises `loadSession:true` in the handshake.
+For **persistent session** scenarios: store `sessionId` + history in your DB, restore after a process restart. Arbiter advertises `loadSession:true` in the handshake.
 
 ```json
 {
@@ -326,7 +326,7 @@ For **persistent session** scenarios: store `sessionId` + history in your DB, re
 
 ::: warning ACP wire-level mistakes that will burn you
 1. **Framing**: NDJSON always — **no raw newlines inside a JSON object**. Use your JSON library's compact mode.
-2. **Stdout pollution**: Agentao routes all logs to `agentao.log` + stderr, never stdout. Your client reads pure JSON from stdout.
+2. **Stdout pollution**: Arbiter routes all logs to `arbiter.log` + stderr, never stdout. Your client reads pure JSON from stdout.
 3. **Stdin backpressure**: if the client ignores stdout after sending a request, the server's stdout buffer will fill. Use async I/O or a dedicated reader thread.
 4. **Version field typing**: `protocolVersion` must be `int`, not a date string.
 5. **Don't reply to `session/update`**: JSON-RPC 2.0 prohibits responses to notifications.
@@ -335,8 +335,8 @@ For **persistent session** scenarios: store `sessionId` + history in your DB, re
 ## End-to-end minimal client (Python, for demo)
 
 ::: tip ⚡ Runnable end-to-end (≈ 5 minutes)
-**Outcome** — drives `agentao --acp --stdio` from a 50-line Python client; you see streaming `session/update` notifications + the final `stopReason`.
-**Stack** — `pip install 'agentao[cli]>=0.4.0'` + 3 env vars; the Python below is the only host code you need.
+**Outcome** — drives `arbiter --acp --stdio` from a 50-line Python client; you see streaming `session/update` notifications + the final `stopReason`.
+**Stack** — `pip install 'arbiter[cli]>=0.4.0'` + 3 env vars; the Python below is the only host code you need.
 **Run** — paste into `acp_demo.py`, then `python acp_demo.py`.
 **Even if your host isn't Python** — read this to understand the wire flow, then translate to your language using [3.3 Host as ACP Client](./3-host-client-architecture).
 :::
@@ -344,13 +344,13 @@ For **persistent session** scenarios: store `sessionId` + history in your DB, re
 Even if your host isn't Python, this snippet clarifies the wire flow:
 
 ```python
-"""Minimal ACP client (Python) driving agentao --acp --stdio."""
+"""Minimal ACP client (Python) driving arbiter --acp --stdio."""
 import json, subprocess, threading, queue, uuid
 
 class AcpClient:
     def __init__(self):
         self.proc = subprocess.Popen(
-            ["agentao", "--acp", "--stdio"],
+            ["arbiter", "--acp", "--stdio"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             bufsize=0, text=True,
         )
@@ -399,11 +399,11 @@ Production-grade patterns (error handling, UI bridging, timeouts) live in [3.3 H
 
 | Topic | File |
 |-------|------|
-| Launch entrypoint | `agentao/cli/entrypoints.py:254-389` |
-| Protocol constants | `agentao/acp/protocol.py:18, 47-58` |
-| Handshake | `agentao/acp/initialize.py` |
-| Capability block | `agentao/acp/initialize.py:53-76` |
-| Session creation | `agentao/acp/session_new.py` |
-| Prompt handling | `agentao/acp/session_prompt.py` |
+| Launch entrypoint | `arbiter/cli/entrypoints.py:254-389` |
+| Protocol constants | `arbiter/acp/protocol.py:18, 47-58` |
+| Handshake | `arbiter/acp/initialize.py` |
+| Capability block | `arbiter/acp/initialize.py:53-76` |
+| Session creation | `arbiter/acp/session_new.py` |
+| Prompt handling | `arbiter/acp/session_prompt.py` |
 
 → [Part 4 · Event Layer & UI Integration](/en/part-4/)

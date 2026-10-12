@@ -53,9 +53,9 @@ def _usage_only_chunk(prompt=10, completion=5):
 
 def _make_client():
     """Construct a real LLMClient with the OpenAI SDK swapped for a Mock."""
-    with patch("agentao.llm.client.OpenAI") as openai_cls:
+    with patch("arbiter.llm.client.OpenAI") as openai_cls:
         openai_cls.return_value = MagicMock()
-        from agentao.llm.client import LLMClient
+        from arbiter.llm.client import LLMClient
         client = LLMClient(
             api_key="test-key",
             base_url="https://example.test/v1",

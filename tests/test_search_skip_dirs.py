@@ -3,7 +3,7 @@
 The Python fallback path in :class:`SearchTextTool` previously walked
 into ``node_modules/``, ``.git/``, language caches, etc. and could lock
 the agent up on large trees. The skip-list defined in
-:mod:`agentao.tools.search` filters those before any stat/open, with an
+:mod:`arbiter.tools.search` filters those before any stat/open, with an
 escape hatch when the caller explicitly references one of the skipped
 names in ``directory`` or ``file_pattern``.
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from agentao.tools.search import (
+from arbiter.tools.search import (
     DEFAULT_SKIP_DIRS,
     SearchTextTool,
     _any_part_in_skip,

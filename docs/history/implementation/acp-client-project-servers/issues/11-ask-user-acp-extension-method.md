@@ -6,7 +6,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Goal
 
-为 Agentao 在 ACP 模式下补齐自由文本用户输入能力，并将其定义为一个明确的 ACP extension method，而不是伪装成标准 ACP method。
+为 Arbiter 在 ACP 模式下补齐自由文本用户输入能力，并将其定义为一个明确的 ACP extension method，而不是伪装成标准 ACP method。
 
 ## Scope
 
@@ -18,8 +18,8 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Deliverables
 
-- `agentao/acp/protocol.py`
-- `agentao/acp/transport.py`
+- `arbiter/acp/protocol.py`
+- `arbiter/acp/transport.py`
 - ACP 文档更新
 - 相关单测
 
@@ -30,11 +30,11 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Design Notes
 
-- `_agentao.cn/ask_user` 是 Agentao 私有 ACP extension method
+- `_agentao.cn/ask_user` 是 Arbiter 私有 ACP extension method
 - 之所以不使用：
   - `session/ask_user`
-  - `agentao/ask_user`
-  - `ext/agentao/ask_user`
+  - `arbiter/ask_user`
+  - `ext/arbiter/ask_user`
   是因为它们都不符合 ACP 扩展方法的命名约定或容易被误解为标准 method
 - 采用 `_agentao.cn/ask_user` 的原因：
   - 以 `_` 开头，符合 ACP 扩展命名约束
@@ -93,7 +93,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 具体字段形态可在实现时根据 ACP ext schema 定稿，但原则是：
 
-- Agentao 必须显式声明支持 `_agentao.cn/ask_user`
+- Arbiter 必须显式声明支持 `_agentao.cn/ask_user`
 - client 只有在明确支持后，才应尝试完整交互
 
 ### Non-goal

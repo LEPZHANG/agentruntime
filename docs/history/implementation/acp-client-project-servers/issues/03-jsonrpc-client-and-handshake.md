@@ -19,7 +19,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Deliverables
 
-- `agentao/acp_client/client.py`
+- `arbiter/acp_client/client.py`
 - 最小握手 API
 - request/response 路由单测
 

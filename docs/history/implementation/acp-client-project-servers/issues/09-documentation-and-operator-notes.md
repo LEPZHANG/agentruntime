@@ -11,7 +11,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 ## Scope
 
 - README 或 docs 中的用户说明
-- `.agentao/acp.json` 示例
+- `.arbiter/acp.json` 示例
 - `/acp` 命令说明
 - 边界与安全说明
 - 故障排查说明
@@ -33,7 +33,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 - 需要明确说明：
   - 仅项目级配置
   - 默认不自动向 ACP server 发消息
-  - ACP 返回默认不进入 Agentao 当前上下文
+  - ACP 返回默认不进入 Arbiter 当前上下文
 - 应提供至少一个最小配置样例
 - 应记录 `/acp logs`、`/acp status` 的调试建议
 

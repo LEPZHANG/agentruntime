@@ -5,8 +5,8 @@ import logging
 
 import pytest
 
-from agentao.runtime.chat_loop import _serialize_tool_call
-from agentao.runtime.sanitize import (
+from arbiter.runtime.chat_loop import _serialize_tool_call
+from arbiter.runtime.sanitize import (
     SURROGATE_RE,
     canonicalize_tool_arguments,
     normalize_tool_calls,
@@ -438,7 +438,7 @@ class TestNormalizeToolCallsMissingId:
         # is already a non-empty string, it must be preserved verbatim —
         # otherwise the assistant-message id and the plan id diverge
         # again. This test pins the contract: id stable end-to-end.
-        from agentao.runtime.tool_planning import _ensure_tool_call_id
+        from arbiter.runtime.tool_planning import _ensure_tool_call_id
 
         tcs = [make_tool_call(None, "name", "{}")]
         cleaned, _ = normalize_tool_calls(tcs)

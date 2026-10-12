@@ -5,12 +5,12 @@
 > - A Flask + long-polling alternative for WSGI deployments
 > - How session pool, cancellation, auth, and structured errors wire together
 
-This section is a **copy-paste-ready** template for exposing Agentao through an HTTP API. Two flavors: **FastAPI + SSE streaming** (modern async, recommended) and **Flask + long-polling** (when you're stuck with WSGI). Both include session pooling, cancellation wiring, authentication, and structured errors.
+This section is a **copy-paste-ready** template for exposing Arbiter through an HTTP API. Two flavors: **FastAPI + SSE streaming** (modern async, recommended) and **Flask + long-polling** (when you're stuck with WSGI). Both include session pooling, cancellation wiring, authentication, and structured errors.
 
 These templates consolidate the patterns from [2.3 lifecycle](./3-lifecycle), [2.4 session state](./4-session-state), and [2.6 cancellation](./6-cancellation-timeouts). If any primitive here is unfamiliar, jump back.
 
 ::: tip Runnable minimum-shape sample
-[`examples/fastapi-background/`](https://github.com/jin-bo/agentao/tree/main/examples/fastapi-background) is the offline-smoke companion: a FastAPI route + asyncio background task with one `Agentao` per request, runnable with `uv sync --extra dev && PYTHONPATH=. uv run pytest tests/`. No `OPENAI_API_KEY` needed — uses a fake LLM. Read this chapter for the production template; clone the sample to see the pieces wired together with passing tests.
+[`examples/fastapi-background/`](https://github.com/jin-bo/agentao/tree/main/examples/fastapi-background) is the offline-smoke companion: a FastAPI route + asyncio background task with one `Arbiter` per request, runnable with `uv sync --extra dev && PYTHONPATH=. uv run pytest tests/`. No `OPENAI_API_KEY` needed — uses a fake LLM. Read this chapter for the production template; clone the sample to see the pieces wired together with passing tests.
 
 For the full production blueprint with SSE streaming + session pool + auth, see [`examples/saas-assistant/`](https://github.com/jin-bo/agentao/tree/main/examples/saas-assistant) (Part 7.1).
 :::
@@ -30,7 +30,7 @@ For the full production blueprint with SSE streaming + session pool + auth, see 
 ### Full code
 
 ```python
-"""app.py — FastAPI + Agentao + SSE streaming."""
+"""app.py — FastAPI + Arbiter + SSE streaming."""
 from __future__ import annotations
 
 import asyncio
@@ -44,10 +44,10 @@ from typing import Dict, Tuple
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from agentao import Agentao
-from agentao.cancellation import CancellationToken
-from agentao.transport import SdkTransport
-from agentao.transport.events import AgentEvent, EventType
+from arbiter import Arbiter
+from arbiter.cancellation import CancellationToken
+from arbiter.transport import SdkTransport
+from arbiter.transport.events import AgentEvent, EventType
 
 
 # --------------------------------------------------------------------------
@@ -57,16 +57,16 @@ from agentao.transport.events import AgentEvent, EventType
 class SessionPool:
     def __init__(self, root: Path):
         self.root = root
-        self._sessions: Dict[str, Tuple[Agentao, Lock]] = {}
+        self._sessions: Dict[str, Tuple[Arbiter, Lock]] = {}
         self._mu = Lock()
 
-    async def get(self, session_id: str, tenant: str) -> Tuple[Agentao, Lock]:
+    async def get(self, session_id: str, tenant: str) -> Tuple[Arbiter, Lock]:
         async with self._mu:
             entry = self._sessions.get(session_id)
             if entry is None:
                 workdir = self.root / tenant
                 workdir.mkdir(parents=True, exist_ok=True)
-                agent = Agentao(working_directory=workdir)
+                agent = Arbiter(working_directory=workdir)
                 entry = (agent, Lock())
                 self._sessions[session_id] = entry
             return entry
@@ -91,7 +91,7 @@ class SessionPool:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.pool = SessionPool(Path(os.environ.get("AGENTAO_ROOT", "/app/tenants")))
+    app.state.pool = SessionPool(Path(os.environ.get("ARBITER_ROOT", "/app/tenants")))
     app.state.active_tokens: Dict[str, CancellationToken] = {}
     yield
     await app.state.pool.close_all()
@@ -236,7 +236,7 @@ If you're on Gunicorn/uWSGI, FastAPI isn't an option. Flask can do streaming too
 ### Key code
 
 ```python
-"""wsgi_app.py — Flask + Agentao."""
+"""wsgi_app.py — Flask + Arbiter."""
 from __future__ import annotations
 
 import json
@@ -246,23 +246,23 @@ from queue import Queue, Empty
 
 from flask import Flask, Response, request, abort, stream_with_context
 
-from agentao import Agentao
-from agentao.cancellation import CancellationToken
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.cancellation import CancellationToken
+from arbiter.transport import SdkTransport
 
 
 # One pool per worker process — each Gunicorn worker has its own.
-_sessions: dict[str, tuple[Agentao, threading.Lock]] = {}
+_sessions: dict[str, tuple[Arbiter, threading.Lock]] = {}
 _active_tokens: dict[str, CancellationToken] = {}
 
 app = Flask(__name__)
 
 
-def _get_agent(session_id: str, tenant: str) -> tuple[Agentao, threading.Lock]:
+def _get_agent(session_id: str, tenant: str) -> tuple[Arbiter, threading.Lock]:
     if session_id not in _sessions:
         workdir = Path(f"/app/tenants/{tenant}")
         workdir.mkdir(parents=True, exist_ok=True)
-        agent = Agentao(working_directory=workdir)
+        agent = Arbiter(working_directory=workdir)
         _sessions[session_id] = (agent, threading.Lock())
     return _sessions[session_id]
 

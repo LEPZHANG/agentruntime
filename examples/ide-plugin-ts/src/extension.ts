@@ -1,9 +1,9 @@
 /**
- * VS Code extension entry point — drives `agentao --acp --stdio` per workspace.
+ * VS Code extension entry point — drives `arbiter --acp --stdio` per workspace.
  *
  * Commands:
- *   agentao.ask     — prompt the agent with a one-line input
- *   agentao.cancel  — cancel the current turn
+ *   arbiter.ask     — prompt the agent with a one-line input
+ *   arbiter.cancel  — cancel the current turn
  *
  * On startup, restores the previous `sessionId` from globalState if available
  * so conversations survive IDE restarts (via `session/load`).
@@ -14,7 +14,7 @@ import { ACPClient } from "./acp-client";
 
 let client: ACPClient | undefined;
 let sessionId: string | undefined;
-const output = vscode.window.createOutputChannel("Agentao");
+const output = vscode.window.createOutputChannel("Arbiter");
 
 export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
   const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -26,7 +26,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
   client = new ACPClient({ cwd: ws });
   await client.start();
 
-  const saved = ctx.globalState.get<string>("agentao.sessionId");
+  const saved = ctx.globalState.get<string>("arbiter.sessionId");
   if (saved) {
     try {
       await client.loadSession(saved, ws, []);
@@ -39,7 +39,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
   } else {
     sessionId = await client.newSession(ws);
   }
-  await ctx.globalState.update("agentao.sessionId", sessionId);
+  await ctx.globalState.update("arbiter.sessionId", sessionId);
   output.appendLine(`session ready: ${sessionId}`);
 
   client.onNotification("session/update", (params) => {
@@ -65,7 +65,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
       const toolCall = (params as { toolCall?: { title?: string } }).toolCall;
       const title = toolCall?.title ?? "unknown tool";
       const pick = await vscode.window.showWarningMessage(
-        `Agentao wants to run: ${title}`,
+        `Arbiter wants to run: ${title}`,
         { modal: true },
         "Allow once",
         "Reject",
@@ -84,9 +84,9 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
   });
 
   ctx.subscriptions.push(
-    vscode.commands.registerCommand("agentao.ask", async () => {
+    vscode.commands.registerCommand("arbiter.ask", async () => {
       if (!client || !sessionId) return;
-      const q = await vscode.window.showInputBox({ prompt: "Ask Agentao" });
+      const q = await vscode.window.showInputBox({ prompt: "Ask Arbiter" });
       if (!q) return;
       output.show(true);
       output.appendLine(`\n> ${q}\n`);
@@ -96,7 +96,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
         output.appendLine(`[error] ${err}`);
       }
     }),
-    vscode.commands.registerCommand("agentao.cancel", async () => {
+    vscode.commands.registerCommand("arbiter.cancel", async () => {
       if (!client || !sessionId) return;
       await client.cancel(sessionId);
       output.appendLine("[cancel sent]");

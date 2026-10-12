@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from agentao.embedding.plugins.diagnostics import PluginDiagnostics, build_diagnostics
-from agentao.embedding.plugins.manager import PluginManager
-from agentao.plugins.models import LoadedPlugin, PluginLoadError, PluginWarning
+from arbiter.embedding.plugins.diagnostics import PluginDiagnostics, build_diagnostics
+from arbiter.embedding.plugins.manager import PluginManager
+from arbiter.plugins.models import LoadedPlugin, PluginLoadError, PluginWarning
 
 
 def _write_plugin(plugin_dir: Path, manifest: dict):
@@ -45,14 +45,14 @@ class TestDiscovery:
         home = tmp_path / "home"
         cwd = tmp_path / "project"
 
-        global_plugins = home / ".agentao" / "plugins"
-        project_plugins = cwd / ".agentao" / "plugins"
+        global_plugins = home / ".arbiter" / "plugins"
+        project_plugins = cwd / ".arbiter" / "plugins"
 
         _write_local_plugin(global_plugins, "plug-a")
         _write_local_plugin(project_plugins, "plug-b")
 
-        from agentao.embedding.plugins.manifest import PluginManifestParser
-        from agentao.plugins.models import PluginCandidate
+        from arbiter.embedding.plugins.manifest import PluginManifestParser
+        from arbiter.plugins.models import PluginCandidate
 
         parser = PluginManifestParser()
         candidates = []
@@ -87,7 +87,7 @@ class TestDiscovery:
 
     def test_missing_dir_no_error(self, tmp_path):
         mgr = PluginManager(cwd=tmp_path)
-        # No .agentao/plugins exists — should be fine.
+        # No .arbiter/plugins exists — should be fine.
         candidates = mgr.discover_candidates()
         # May pick up global plugins if they exist, but no crash.
         assert isinstance(candidates, list)
@@ -100,7 +100,7 @@ class TestDiscovery:
 
 class TestPrecedence:
     def test_project_overrides_global(self, tmp_path):
-        from agentao.plugins.models import PluginCandidate, PluginManifest
+        from arbiter.plugins.models import PluginCandidate, PluginManifest
 
         global_c = PluginCandidate(
             name="shared",
@@ -124,7 +124,7 @@ class TestPrecedence:
         assert resolved[0].source == "project"
 
     def test_inline_overrides_project(self, tmp_path):
-        from agentao.plugins.models import PluginCandidate, PluginManifest
+        from arbiter.plugins.models import PluginCandidate, PluginManifest
 
         project_c = PluginCandidate(
             name="shared",
@@ -147,7 +147,7 @@ class TestPrecedence:
         assert resolved[0].manifest.version == "3.0"
 
     def test_different_names_both_kept(self, tmp_path):
-        from agentao.plugins.models import PluginCandidate, PluginManifest
+        from arbiter.plugins.models import PluginCandidate, PluginManifest
 
         a = PluginCandidate(
             name="plug-a", root_path=tmp_path / "a", source="global",
@@ -170,10 +170,10 @@ class TestPrecedence:
 
 class TestDisableRules:
     def test_disabled_plugin_filtered(self, tmp_path):
-        from agentao.plugins.models import PluginCandidate, PluginManifest
+        from arbiter.plugins.models import PluginCandidate, PluginManifest
 
         cwd = tmp_path / "project"
-        config_dir = cwd / ".agentao"
+        config_dir = cwd / ".arbiter"
         config_dir.mkdir(parents=True)
         (config_dir / "plugins_config.json").write_text(
             json.dumps({"bad-plug": {"disabled": True}}), encoding="utf-8",
@@ -189,7 +189,7 @@ class TestDisableRules:
         assert result == []
 
     def test_not_disabled_passes(self, tmp_path):
-        from agentao.plugins.models import PluginCandidate, PluginManifest
+        from arbiter.plugins.models import PluginCandidate, PluginManifest
 
         c = PluginCandidate(
             name="good", root_path=tmp_path / "x", source="project",
@@ -201,10 +201,10 @@ class TestDisableRules:
         assert len(result) == 1
 
     def test_disable_with_false_value(self, tmp_path):
-        from agentao.plugins.models import PluginCandidate, PluginManifest
+        from arbiter.plugins.models import PluginCandidate, PluginManifest
 
         cwd = tmp_path / "project"
-        config_dir = cwd / ".agentao"
+        config_dir = cwd / ".arbiter"
         config_dir.mkdir(parents=True)
         (config_dir / "plugins_config.json").write_text(
             json.dumps({"off-plug": False}), encoding="utf-8",
@@ -227,7 +227,7 @@ class TestDisableRules:
 
 class TestLoadPlugin:
     def test_loads_minimal_plugin(self, tmp_path):
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_local_plugin(plugins_dir, "demo", {"name": "demo", "version": "0.1.0"})
 
         mgr = PluginManager(cwd=tmp_path / "project")
@@ -242,7 +242,7 @@ class TestLoadPlugin:
         assert loaded.qualified_name == "demo@local"
 
     def test_loads_with_skill_paths(self, tmp_path):
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         plugin_dir = _write_local_plugin(plugins_dir, "demo", {"name": "demo", "skills": ["./skills"]})
         (plugin_dir / "skills").mkdir()
 
@@ -253,7 +253,7 @@ class TestLoadPlugin:
         assert len(loaded.skill_roots) == 1
 
     def test_broken_plugin_does_not_block_others(self, tmp_path):
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_local_plugin(plugins_dir, "good", {"name": "good", "version": "1.0"})
         # Bad plugin: invalid JSON in local/
         bad_dir = plugins_dir / "local" / "bad"
@@ -266,7 +266,7 @@ class TestLoadPlugin:
         assert len(mgr.get_errors()) >= 1
 
     def test_path_safety_rejects_plugin(self, tmp_path):
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_local_plugin(plugins_dir, "unsafe", {"name": "unsafe", "skills": "/etc/passwd"})
 
         mgr = PluginManager(cwd=tmp_path / "project")
@@ -282,7 +282,7 @@ class TestLoadPlugin:
 
 class TestFullPipeline:
     def test_end_to_end(self, tmp_path):
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_local_plugin(plugins_dir, "alpha", {"name": "alpha", "version": "1.0"})
         _write_local_plugin(plugins_dir, "beta", {"name": "beta", "version": "2.0"})
 
@@ -302,7 +302,7 @@ class TestFullPipeline:
 
 class TestDiagnostics:
     def test_build_diagnostics(self, tmp_path):
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_local_plugin(plugins_dir, "ok")
         bad_dir = plugins_dir / "local" / "bad"
         bad_dir.mkdir(parents=True)
@@ -338,7 +338,7 @@ class TestNoManifestLoading:
 
     def test_no_manifest_local_plugin_discovered(self, tmp_path):
         """A local/ directory without plugin.json should still produce a candidate."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         bare = plugins_dir / "local" / "bare-plugin"
         bare.mkdir(parents=True)
 
@@ -348,7 +348,7 @@ class TestNoManifestLoading:
 
     def test_no_manifest_loads_successfully(self, tmp_path):
         """Plugin without plugin.json loads through the full pipeline."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         bare = plugins_dir / "local" / "bare-plugin"
         bare.mkdir(parents=True)
 
@@ -358,7 +358,7 @@ class TestNoManifestLoading:
 
     def test_no_manifest_skills_autodiscovery(self, tmp_path):
         """skills/ directory auto-discovered when no plugin.json."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         bare = plugins_dir / "local" / "bare-plugin"
         skill_dir = bare / "skills" / "greet"
         skill_dir.mkdir(parents=True)
@@ -370,13 +370,13 @@ class TestNoManifestLoading:
         mgr = PluginManager(cwd=tmp_path / "project")
         loaded = mgr.load_plugins()
         plugin = next(p for p in loaded if p.name == "bare-plugin")
-        from agentao.embedding.plugins.resolvers.skills import resolve_plugin_entries
+        from arbiter.embedding.plugins.resolvers.skills import resolve_plugin_entries
         entries, _, _ = resolve_plugin_entries(plugin)
         assert any("greet" in e.runtime_name for e in entries)
 
     def test_no_manifest_hooks_autodiscovery(self, tmp_path):
         """hooks/hooks.json auto-discovered when no plugin.json."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         bare = plugins_dir / "local" / "bare-plugin"
         bare.mkdir(parents=True)
         hooks_dir = bare / "hooks"
@@ -393,7 +393,7 @@ class TestNoManifestLoading:
 
     def test_no_manifest_commands_autodiscovery(self, tmp_path):
         """commands/ auto-discovered via skills.py fallback."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         bare = plugins_dir / "local" / "bare-plugin"
         cmds_dir = bare / "commands"
         cmds_dir.mkdir(parents=True)
@@ -405,7 +405,7 @@ class TestNoManifestLoading:
         mgr = PluginManager(cwd=tmp_path / "project")
         loaded = mgr.load_plugins()
         plugin = next(p for p in loaded if p.name == "bare-plugin")
-        from agentao.embedding.plugins.resolvers.skills import resolve_plugin_entries
+        from arbiter.embedding.plugins.resolvers.skills import resolve_plugin_entries
         entries, _, _ = resolve_plugin_entries(plugin)
         assert any("hello" in e.runtime_name for e in entries)
 
@@ -429,7 +429,7 @@ class TestMarketplaceDiscovery:
 
     def test_discovers_marketplace_plugins(self, tmp_path):
         """Three-level marketplace structure is discovered."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_mp_plugin(plugins_dir, "official", "tool-a", "1.0.0",
                          {"name": "tool-a", "version": "1.0.0"})
 
@@ -442,7 +442,7 @@ class TestMarketplaceDiscovery:
 
     def test_discovers_local_plugins(self, tmp_path):
         """Two-level local/ structure is discovered."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_local_plugin(plugins_dir, "my-tool", {"name": "my-tool", "version": "0.1"})
 
         mgr = PluginManager(cwd=tmp_path / "project")
@@ -453,7 +453,7 @@ class TestMarketplaceDiscovery:
 
     def test_picks_latest_version(self, tmp_path):
         """When multiple version dirs exist, the latest (by semver) is selected."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_mp_plugin(plugins_dir, "mp", "tool", "1.0.0", {"name": "tool", "version": "1.0.0"})
         _write_mp_plugin(plugins_dir, "mp", "tool", "2.0.0", {"name": "tool", "version": "2.0.0"})
         _write_mp_plugin(plugins_dir, "mp", "tool", "1.5.0", {"name": "tool", "version": "1.5.0"})
@@ -465,7 +465,7 @@ class TestMarketplaceDiscovery:
 
     def test_picks_latest_version_double_digits(self, tmp_path):
         """Semantic comparison: 10.0.0 > 2.0.0 (not lexical)."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_mp_plugin(plugins_dir, "mp", "tool", "2.0.0", {"name": "tool", "version": "2.0.0"})
         _write_mp_plugin(plugins_dir, "mp", "tool", "10.0.0", {"name": "tool", "version": "10.0.0"})
 
@@ -481,7 +481,7 @@ class TestMarketplaceDiscovery:
         multiple same-named plugins causes skill/agent collisions.
         The highest-priority candidate wins and a warning is emitted.
         """
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_mp_plugin(plugins_dir, "mp-a", "shared", "1.0",
                          {"name": "shared", "version": "1.0"})
         _write_mp_plugin(plugins_dir, "mp-b", "shared", "2.0",
@@ -498,7 +498,7 @@ class TestMarketplaceDiscovery:
 
     def test_inline_overrides_marketplace_same_name(self, tmp_path):
         """Inline --plugin-dir overrides a marketplace plugin with the same name."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_mp_plugin(plugins_dir, "official", "tool", "1.0",
                          {"name": "tool", "version": "1.0"})
         inline_dir = tmp_path / "dev-tool"
@@ -512,7 +512,7 @@ class TestMarketplaceDiscovery:
 
     def test_qualified_name_format(self, tmp_path):
         """qualified_name follows 'name@marketplace' format."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_mp_plugin(plugins_dir, "openai-codex", "codex", "1.0.2",
                          {"name": "codex", "version": "1.0.2"})
 
@@ -535,10 +535,10 @@ class TestMarketplaceDiscovery:
 
     def test_disable_by_qualified_name(self, tmp_path):
         """plugins_config.json can disable by qualified_name."""
-        from agentao.plugins.models import PluginCandidate, PluginManifest
+        from arbiter.plugins.models import PluginCandidate, PluginManifest
 
         cwd = tmp_path / "project"
-        config_dir = cwd / ".agentao"
+        config_dir = cwd / ".arbiter"
         config_dir.mkdir(parents=True)
         (config_dir / "plugins_config.json").write_text(
             json.dumps({"tool@mp-a": {"disabled": True}}), encoding="utf-8",
@@ -556,7 +556,7 @@ class TestMarketplaceDiscovery:
 
     def test_diagnostics_shows_marketplace(self, tmp_path):
         """format_report() includes marketplace label."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_mp_plugin(plugins_dir, "official", "tool", "1.0",
                          {"name": "tool", "version": "1.0"})
 
@@ -568,7 +568,7 @@ class TestMarketplaceDiscovery:
 
     def test_hidden_dirs_skipped(self, tmp_path):
         """Directories starting with '.' are ignored."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         hidden = plugins_dir / ".hidden-mp" / "tool" / "1.0"
         hidden.mkdir(parents=True)
         (hidden / "plugin.json").write_text(
@@ -581,7 +581,7 @@ class TestMarketplaceDiscovery:
 
     def test_mixed_local_and_marketplace(self, tmp_path):
         """local/ and marketplace plugins load together."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         _write_local_plugin(plugins_dir, "local-tool", {"name": "local-tool"})
         _write_mp_plugin(plugins_dir, "official", "mp-tool", "1.0",
                          {"name": "mp-tool"})
@@ -593,7 +593,7 @@ class TestMarketplaceDiscovery:
 
     def test_no_manifest_marketplace_uses_plugin_folder_name(self, tmp_path):
         """No-manifest marketplace plugin uses the plugin folder name, not version dir."""
-        plugins_dir = tmp_path / "project" / ".agentao" / "plugins"
+        plugins_dir = tmp_path / "project" / ".arbiter" / "plugins"
         version_dir = plugins_dir / "official" / "my-tool" / "1.0.0"
         version_dir.mkdir(parents=True)
         # No plugin.json — auto-discovery should use "my-tool" not "1.0.0"

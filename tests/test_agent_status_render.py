@@ -17,8 +17,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from agentao.agents.bg_store import BackgroundTaskStore
-from agentao.cli.commands_ext.agents import handle_agent_command
+from arbiter.agents.bg_store import BackgroundTaskStore
+from arbiter.cli.commands_ext.agents import handle_agent_command
 
 
 PARTIAL = "# Findings\n\nAudited 41 of 60 modules before stopping."

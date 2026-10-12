@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from agentao.memory.crystallizer import (
+from arbiter.memory.crystallizer import (
     MemoryCrystallizer,
     NOOP_GATE_IDS,
     SkillCrystallizer,
@@ -15,7 +15,7 @@ from agentao.memory.crystallizer import (
     refine_prompt,
     _extract_text,
 )
-from agentao.memory.manager import MemoryManager
+from arbiter.memory.manager import MemoryManager
 
 _SAMPLE_SKILL_MD = """\
 ---
@@ -190,7 +190,7 @@ def test_create_project_skill_path(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     crystallizer = SkillCrystallizer()
     target = crystallizer.create("test-skill", "project", _SAMPLE_SKILL_MD)
-    expected = tmp_path / ".agentao" / "skills" / "test-skill" / "SKILL.md"
+    expected = tmp_path / ".arbiter" / "skills" / "test-skill" / "SKILL.md"
     assert target == expected
 
 
@@ -206,7 +206,7 @@ def test_create_overwrites_existing(tmp_path, monkeypatch):
     crystallizer = SkillCrystallizer()
     crystallizer.create("my-skill", "project", "original")
     crystallizer.create("my-skill", "project", "updated")
-    target = tmp_path / ".agentao" / "skills" / "my-skill" / "SKILL.md"
+    target = tmp_path / ".arbiter" / "skills" / "my-skill" / "SKILL.md"
     assert target.read_text(encoding="utf-8") == "updated"
 
 
@@ -225,11 +225,11 @@ def test_create_uses_project_root_over_cwd(tmp_path, monkeypatch):
     target = crystallizer.create(
         "my-skill", "project", _SAMPLE_SKILL_MD, project_root=repo,
     )
-    expected = repo / ".agentao" / "skills" / "my-skill" / "SKILL.md"
+    expected = repo / ".arbiter" / "skills" / "my-skill" / "SKILL.md"
     assert target == expected
     assert target.exists()
     # And must NOT have leaked into the process cwd.
-    assert not (elsewhere / ".agentao").exists()
+    assert not (elsewhere / ".arbiter").exists()
 
 
 def test_create_project_root_none_falls_back_to_cwd(tmp_path, monkeypatch):
@@ -238,7 +238,7 @@ def test_create_project_root_none_falls_back_to_cwd(tmp_path, monkeypatch):
     target = crystallizer.create(
         "my-skill", "project", _SAMPLE_SKILL_MD, project_root=None,
     )
-    assert target == tmp_path / ".agentao" / "skills" / "my-skill" / "SKILL.md"
+    assert target == tmp_path / ".arbiter" / "skills" / "my-skill" / "SKILL.md"
 
 
 # ---------------------------------------------------------------------------
@@ -277,13 +277,13 @@ def test_refine_prompt_truncates_long_transcript():
 # ---------------------------------------------------------------------------
 
 def test_create_global_skill_path(tmp_path, monkeypatch):
-    """Global scope uses ~/.agentao/skills/; patch home dir to avoid real writes."""
+    """Global scope uses ~/.arbiter/skills/; patch home dir to avoid real writes."""
     monkeypatch.setenv("HOME", str(tmp_path))
     # Patch Path.home() to return tmp_path
-    import agentao.memory.crystallizer as crys_mod
+    import arbiter.memory.crystallizer as crys_mod
     original_home = Path.home
     try:
-        monkeypatch.setattr(crys_mod, "_GLOBAL_SKILLS_DIR", tmp_path / ".agentao" / "skills")
+        monkeypatch.setattr(crys_mod, "_GLOBAL_SKILLS_DIR", tmp_path / ".arbiter" / "skills")
         crystallizer = SkillCrystallizer()
         target = crystallizer.create("global-skill", "global", _SAMPLE_SKILL_MD)
         assert target.exists()
@@ -293,7 +293,7 @@ def test_create_global_skill_path(tmp_path, monkeypatch):
 
 
 def test_create_global_skill_writes_content(tmp_path, monkeypatch):
-    import agentao.memory.crystallizer as crys_mod
+    import arbiter.memory.crystallizer as crys_mod
     monkeypatch.setattr(crys_mod, "_GLOBAL_SKILLS_DIR", tmp_path / "global_skills")
     crystallizer = SkillCrystallizer()
     target = crystallizer.create("my-global", "global", _SAMPLE_SKILL_MD)

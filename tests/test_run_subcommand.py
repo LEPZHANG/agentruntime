@@ -1,4 +1,4 @@
-"""Tests for the non-interactive ``agentao run`` subcommand pipeline.
+"""Tests for the non-interactive ``arbiter run`` subcommand pipeline.
 
 Covers the M0 test matrix from
 ``docs/history/implementation/non-interactive-run-plan.md``: spec loading,
@@ -7,7 +7,7 @@ ordering, observer-only emit gate, replay override, ASK
 ``tool_call_id`` correlation, and read-only enforcement.
 
 These tests exercise the pipeline directly via
-``agentao.cli.run._execute_with_args``; we patch ``agent.chat`` so no
+``arbiter.cli.run._execute_with_args``; we patch ``agent.chat`` so no
 real LLM calls happen.
 """
 
@@ -71,7 +71,7 @@ def stub_pipeline(monkeypatch, tmp_path):
     enough that the pipeline can run without an LLM. Returns a
     ``StubAgent`` factory the test customizes.
     """
-    from agentao.transport import NonInteractiveTransport
+    from arbiter.transport import NonInteractiveTransport
 
     captured: Dict[str, Any] = {}
 
@@ -132,11 +132,11 @@ def stub_pipeline(monkeypatch, tmp_path):
     # ``_run_pipeline`` imports ``build_from_environment`` lazily, so
     # the patch lands on the module the import resolves against.
     monkeypatch.setattr(
-        "agentao.embedding.build_from_environment", _factory,
+        "arbiter.embedding.build_from_environment", _factory,
     )
     # No plugin loading in tests.
     monkeypatch.setattr(
-        "agentao.cli.subcommands._load_and_register_plugins",
+        "arbiter.cli.subcommands._load_and_register_plugins",
         lambda agent: None,
     )
     return captured, StubAgent
@@ -155,7 +155,7 @@ def test_yaml_spec_loads(monkeypatch, tmp_path, stub_pipeline, capsys):
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="text")
     rc = run._execute_with_args(args)
@@ -173,7 +173,7 @@ def test_json_spec_loads(monkeypatch, tmp_path, stub_pipeline, capsys):
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="text")
     rc = run._execute_with_args(args)
@@ -185,7 +185,7 @@ def test_invalid_yaml_exits_2(monkeypatch, tmp_path, stub_pipeline, capsys):
     spec_path = tmp_path / "task.yaml"
     spec_path.write_text("prompt: [unterminated\n", encoding="utf-8")
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="text")
     rc = run._execute_with_args(args)
@@ -199,7 +199,7 @@ def test_unknown_field_exits_2(monkeypatch, tmp_path, stub_pipeline, capsys):
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="text")
     rc = run._execute_with_args(args)
@@ -212,7 +212,7 @@ def test_spec_and_stdin_together_exit_2(
     spec_path = tmp_path / "task.yaml"
     spec_path.write_text("prompt: hi\n", encoding="utf-8")
     monkeypatch.setattr(sys, "stdin", _PipedStdin("prompt: world"))
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="text")
     rc = run._execute_with_args(args)
@@ -229,7 +229,7 @@ def test_cli_flag_overrides_spec_scalar(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), max_iterations=42, output_format="text")
     rc = run._execute_with_args(args)
@@ -239,8 +239,8 @@ def test_cli_flag_overrides_spec_scalar(
 
 def test_repeated_skill_replaces_spec_skills():
     """Repeated ``--skill`` overrides ``skills:`` from the spec wholesale."""
-    from agentao.cli.run import _apply_cli_overrides
-    from agentao.cli.run_models import RunSpec
+    from arbiter.cli.run import _apply_cli_overrides
+    from arbiter.cli.run_models import RunSpec
 
     spec = RunSpec.model_validate({
         "prompt": "hi", "skills": ["alpha", "beta"],
@@ -259,7 +259,7 @@ def test_format_text_emits_only_final_text(
     monkeypatch, tmp_path, stub_pipeline, capsys,
 ):
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(prompt="hi", output_format="text")
     rc = run._execute_with_args(args)
@@ -272,7 +272,7 @@ def test_format_json_emits_structured_envelope(
     monkeypatch, tmp_path, stub_pipeline, capsys,
 ):
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(prompt="hi", output_format="json")
     rc = run._execute_with_args(args)
@@ -293,7 +293,7 @@ def test_format_json_emits_structured_envelope(
 def _emit_incomplete_turn(kind: str, final_text: str):
     """Build a ``chat`` stub that ends the turn the way the runtime does when
     the model returns no usable answer."""
-    from agentao.transport import AgentEvent, EventType
+    from arbiter.transport import AgentEvent, EventType
 
     def chat(self, prompt, max_iterations=100, cancellation_token=None):
         self.transport.emit(AgentEvent(EventType.TURN_END, {
@@ -309,17 +309,17 @@ def _emit_incomplete_turn(kind: str, final_text: str):
 
 
 def _real_turn_end_payload(content, *, reasoning=None) -> Dict[str, Any]:
-    """Drive a real Agentao turn and return the TURN_END payload it emits.
+    """Drive a real Arbiter turn and return the TURN_END payload it emits.
 
     The other tests here hand-write that payload, which leaves the producer
     (``runtime/turn.py``) and this module's reader (``run.py``) agreeing only
     by coincidence of a string literal. This reaches for the real thing so the
     seam is covered.
     """
-    from agentao import Agentao
-    from agentao.transport import EventType
+    from arbiter import Arbiter
+    from arbiter.transport import EventType
 
-    agent = Agentao(
+    agent = Arbiter(
         api_key="test-key", base_url="https://example.test/v1",
         model="test-model", working_directory=Path.cwd(),
     )
@@ -357,7 +357,7 @@ def test_run_consumes_the_real_runtime_turn_end_payload(
     )
 
     captured, StubAgent = stub_pipeline
-    from agentao.transport import AgentEvent, EventType
+    from arbiter.transport import AgentEvent, EventType
 
     def chat(self, prompt, max_iterations=100, cancellation_token=None):
         self.transport.emit(AgentEvent(EventType.TURN_END, payload))
@@ -365,7 +365,7 @@ def test_run_consumes_the_real_runtime_turn_end_payload(
 
     monkeypatch.setattr(StubAgent, "chat", chat)
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     rc = run._execute_with_args(_build_args(prompt="hi", output_format="json"))
 
@@ -383,7 +383,7 @@ def test_empty_turn_exits_non_zero_with_envelope(
         StubAgent, "chat", _emit_incomplete_turn("no_output", "[No response]"),
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(prompt="hi", output_format="json")
     rc = run._execute_with_args(args)
@@ -405,7 +405,7 @@ def test_reasoning_only_turn_reports_distinct_diagnostic(
         _emit_incomplete_turn("reasoning_only", "[No text response]"),
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(prompt="hi", output_format="json")
     rc = run._execute_with_args(args)
@@ -427,7 +427,7 @@ def test_empty_turn_text_mode_writes_stderr_diagnostic(
         StubAgent, "chat", _emit_incomplete_turn("no_output", "[No response]"),
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(prompt="hi", output_format="text")
     rc = run._execute_with_args(args)
@@ -460,7 +460,7 @@ def test_harness_halted_turn_exits_non_zero_with_own_type(
         StubAgent, "chat", _emit_incomplete_turn(reason, "[halted]"),
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     rc = run._execute_with_args(_build_args(prompt="hi", output_format="json"))
 
@@ -486,7 +486,7 @@ def test_llm_error_turn_exits_non_zero_and_surfaces_provider_message(
         _emit_incomplete_turn("llm_error", "[LLM API error: 502 Bad Gateway]"),
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     rc = run._execute_with_args(_build_args(prompt="hi", output_format="json"))
 
@@ -509,8 +509,8 @@ def test_incomplete_outcomes_covers_every_runtime_reason():
     future rename/addition on either side fails loudly rather than silently
     misclassifying.
     """
-    from agentao.cli.run import _INCOMPLETE_OUTCOMES
-    from agentao.runtime.chat_loop import INCOMPLETE_ANSWER_REASONS
+    from arbiter.cli.run import _INCOMPLETE_OUTCOMES
+    from arbiter.runtime.chat_loop import INCOMPLETE_ANSWER_REASONS
 
     assert set(_INCOMPLETE_OUTCOMES) == INCOMPLETE_ANSWER_REASONS
 
@@ -522,7 +522,7 @@ def test_normal_turn_still_exits_ok(monkeypatch, tmp_path, stub_pipeline, capsys
         StubAgent, "chat", _emit_incomplete_turn(None, "the answer is 42"),
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(prompt="hi", output_format="json")
     rc = run._execute_with_args(args)
@@ -539,7 +539,7 @@ def test_cancelled_empty_turn_reports_interrupted_not_empty():
     """A stream cancelled before its first token returns a normally-built empty
     response (``llm/client.py`` breaks out without raising), so both signals are
     live at once — cancellation must win."""
-    from agentao.cli import run
+    from arbiter.cli import run
 
     transport = SimpleNamespace(rejection=None, max_iterations_hit=False)
     token = SimpleNamespace(is_cancelled=True, reason="sigint")
@@ -554,7 +554,7 @@ def test_cancelled_empty_turn_reports_interrupted_not_empty():
 
 
 def test_max_iterations_empty_turn_reports_max_iterations():
-    from agentao.cli import run
+    from arbiter.cli import run
 
     transport = SimpleNamespace(rejection=None, max_iterations_hit=True)
     token = SimpleNamespace(is_cancelled=False, reason=None)
@@ -569,7 +569,7 @@ def test_max_iterations_empty_turn_reports_max_iterations():
 
 
 def test_runtime_error_empty_turn_reports_runtime_error():
-    from agentao.cli import run
+    from arbiter.cli import run
 
     transport = SimpleNamespace(rejection=None, max_iterations_hit=False)
     token = SimpleNamespace(is_cancelled=False, reason=None)
@@ -590,7 +590,7 @@ def test_runtime_error_empty_turn_reports_runtime_error():
 
 def test_add_run_rules_pre_check_tier(tmp_path):
     """Spec deny pre-empts a user ``allow:*`` under workspace-write."""
-    from agentao.permissions import PermissionEngine, PermissionMode
+    from arbiter.permissions import PermissionEngine, PermissionMode
 
     engine = PermissionEngine(
         project_root=tmp_path,
@@ -607,7 +607,7 @@ def test_add_run_rules_pre_check_tier(tmp_path):
 
 def test_add_run_rules_full_access_still_blocks(tmp_path):
     """Spec deny pre-empts the ``full-access`` preset ``allow:*``."""
-    from agentao.permissions import PermissionEngine, PermissionMode
+    from arbiter.permissions import PermissionEngine, PermissionMode
 
     engine = PermissionEngine(project_root=tmp_path, rules=[])
     engine.set_mode(PermissionMode.FULL_ACCESS)
@@ -621,7 +621,7 @@ def test_add_run_rules_full_access_still_blocks(tmp_path):
 
 def test_add_run_rules_allow_does_not_override_user_deny(tmp_path):
     """Spec allow joins user list — a user deny earlier still wins."""
-    from agentao.permissions import PermissionEngine, PermissionMode
+    from arbiter.permissions import PermissionEngine, PermissionMode
 
     engine = PermissionEngine(
         project_root=tmp_path,
@@ -638,7 +638,7 @@ def test_add_run_rules_allow_does_not_override_user_deny(tmp_path):
 
 def test_add_run_rules_allow_grants_unaddressed_tool(tmp_path):
     """Spec allow grants a tool the user policy doesn't address."""
-    from agentao.permissions import PermissionEngine, PermissionMode
+    from arbiter.permissions import PermissionEngine, PermissionMode
 
     engine = PermissionEngine(project_root=tmp_path, rules=[])
     engine.set_mode(PermissionMode.WORKSPACE_WRITE)
@@ -651,7 +651,7 @@ def test_add_run_rules_allow_grants_unaddressed_tool(tmp_path):
 
 
 def test_active_permissions_includes_injected_source(tmp_path):
-    from agentao.permissions import PermissionEngine, PermissionMode
+    from arbiter.permissions import PermissionEngine, PermissionMode
 
     engine = PermissionEngine(project_root=tmp_path, rules=[])
     engine.set_mode(PermissionMode.WORKSPACE_WRITE)
@@ -671,7 +671,7 @@ def test_active_permissions_includes_injected_source(tmp_path):
 
 def test_readonly_short_circuit_uses_mode_preset_prefix():
     """The readonly fallback reason must use the existing ``mode-preset:`` family."""
-    from agentao.runtime.tool_planning import ToolCallPlanner
+    from arbiter.runtime.tool_planning import ToolCallPlanner
 
     class _ReadOnlyTool:
         is_read_only = True
@@ -703,7 +703,7 @@ def test_readonly_short_circuit_uses_mode_preset_prefix():
 
 def test_has_listeners_true_with_observer_only():
     """The new ``_has_listeners`` returns True when only an observer is attached."""
-    from agentao.host.events import EventStream
+    from arbiter.host.events import EventStream
 
     stream = EventStream()
     assert not stream._has_listeners()
@@ -720,8 +720,8 @@ def test_has_listeners_true_with_observer_only():
 
 
 def test_non_interactive_confirm_records_rejection_and_cancels():
-    from agentao.cancellation import CancellationToken
-    from agentao.transport import NonInteractiveTransport
+    from arbiter.cancellation import CancellationToken
+    from arbiter.transport import NonInteractiveTransport
 
     token = CancellationToken()
     transport = NonInteractiveTransport(token=token)
@@ -734,8 +734,8 @@ def test_non_interactive_confirm_records_rejection_and_cancels():
 
 
 def test_non_interactive_ask_user_records_interaction():
-    from agentao.cancellation import CancellationToken
-    from agentao.transport import NonInteractiveTransport
+    from arbiter.cancellation import CancellationToken
+    from arbiter.transport import NonInteractiveTransport
 
     token = CancellationToken()
     transport = NonInteractiveTransport(token=token)
@@ -749,8 +749,8 @@ def test_non_interactive_ask_user_records_interaction():
 
 def test_non_interactive_ask_fifo_dedup_by_name():
     """Two ASK plans for the same tool name → FIFO returns first id, then second."""
-    from agentao.cancellation import CancellationToken
-    from agentao.transport import NonInteractiveTransport
+    from arbiter.cancellation import CancellationToken
+    from arbiter.transport import NonInteractiveTransport
 
     transport = NonInteractiveTransport(token=CancellationToken())
     transport.queue_ask("write_file", "call_1")
@@ -763,7 +763,7 @@ def test_non_interactive_ask_fifo_dedup_by_name():
 
 
 def test_non_interactive_max_iterations_flag():
-    from agentao.transport import NonInteractiveTransport
+    from arbiter.transport import NonInteractiveTransport
 
     transport = NonInteractiveTransport()
     out = transport.on_max_iterations(100, [])
@@ -780,14 +780,14 @@ def test_run_permission_rule_action_is_injected_not_authored():
     """``RunPermissionRule`` rejects ``action:`` written by hand."""
     from pydantic import ValidationError
 
-    from agentao.cli.run_models import RunPermissionRule
+    from arbiter.cli.run_models import RunPermissionRule
 
     with pytest.raises(ValidationError):
         RunPermissionRule.model_validate({"tool": "write_file", "action": "allow"})
 
 
 def test_run_permission_rule_to_engine_dict_shapes():
-    from agentao.cli.run_models import RunPermissionRule
+    from arbiter.cli.run_models import RunPermissionRule
 
     r = RunPermissionRule.model_validate({
         "tool": "write_file",
@@ -817,7 +817,7 @@ def test_max_iterations_exit_4(monkeypatch, tmp_path, stub_pipeline, capsys):
 
     monkeypatch.setattr(StubAgent, "chat", chat)
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(prompt="hi", output_format="json")
     rc = run._execute_with_args(args)
@@ -835,7 +835,7 @@ def test_runtime_error_exit_1(monkeypatch, tmp_path, stub_pipeline, capsys):
 
     monkeypatch.setattr(StubAgent, "chat", chat)
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(prompt="hi", output_format="json")
     rc = run._execute_with_args(args)
@@ -858,7 +858,7 @@ def test_sigint_exit_130(monkeypatch, tmp_path, stub_pipeline, capsys):
 
     monkeypatch.setattr(StubAgent, "chat", chat)
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(prompt="hi", output_format="json")
     rc = run._execute_with_args(args)
@@ -874,7 +874,7 @@ def test_unknown_interaction_policy_exit_2(monkeypatch, tmp_path, stub_pipeline,
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="json")
     rc = run._execute_with_args(args)
@@ -892,7 +892,7 @@ def test_missing_skill_fails_before_chat(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="json")
     rc = run._execute_with_args(args)
@@ -917,7 +917,7 @@ def test_print_mode_shim_returns_4_on_max_iter(
 
     monkeypatch.setattr(StubAgent, "chat", chat)
     _no_stdin(monkeypatch)
-    from agentao.cli.entrypoints import run_print_mode
+    from arbiter.cli.entrypoints import run_print_mode
 
     rc = run_print_mode("hello world")
     assert rc == 4

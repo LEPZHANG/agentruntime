@@ -5,7 +5,7 @@
 | # | 附录 | 作用 |
 |---|------|------|
 | [A](./a-api-reference) | API 参考 | 公开符号、构造器、方法——一页览尽 |
-| [B](./b-config-keys) | 配置键索引 | 环境变量 + `.agentao/*.json` 一表查 |
+| [B](./b-config-keys) | 配置键索引 | 环境变量 + `.arbiter/*.json` 一表查 |
 | [C](./c-acp-messages) | ACP 消息字段 | 每个 ACP 方法与通知的字段级速查 |
 | [D](./d-error-codes) | `AcpErrorCode` 参考 | ACP 客户端的结构化失败分类 |
 | [E](./e-migration) | 框架迁移 | 从 LangChain / AutoGen / CrewAI 过来 |
@@ -22,7 +22,7 @@
 | 你要查什么 | 去哪里 |
 |-----------|--------|
 | 构造器参数、公开方法、稳定导入路径 | [附录 A · API 参考](./a-api-reference) |
-| 环境变量、`.agentao/*.json`、配置默认值 | [附录 B · 配置键索引](./b-config-keys) |
+| 环境变量、`.arbiter/*.json`、配置默认值 | [附录 B · 配置键索引](./b-config-keys) |
 | ACP 请求、响应、通知字段 | [附录 C · ACP 消息字段](./c-acp-messages) |
 | ACP 错误码和客户端处理策略 | [附录 D · 错误码](./d-error-codes) |
 | 从 LangChain / AutoGen / CrewAI 迁移 | [附录 E · 框架迁移](./e-migration) |

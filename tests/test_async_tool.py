@@ -9,7 +9,7 @@ Covers:
   registry / planner / executor / agent-tool surfaces (verified via
   ``typing.get_type_hints``).
 - Public re-exports: ``AsyncToolBase`` and ``RegistrableTool`` from
-  ``agentao.tools``; ``_BaseTool`` is intentionally not re-exported.
+  ``arbiter.tools``; ``_BaseTool`` is intentionally not re-exported.
 - ``CancellationToken.add_done_callback`` semantics (cross-thread fire,
   already-cancelled fast path, idempotent unregister).
 - End-to-end via ``arun()``: the coroutine actually runs on the host
@@ -44,23 +44,23 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from agentao import tools as tools_pkg
-from agentao.cancellation import CancellationToken
-from agentao.runtime import tool_executor as tool_executor_module
-from agentao.runtime.tool_executor import (
+from arbiter import tools as tools_pkg
+from arbiter.cancellation import CancellationToken
+from arbiter.runtime import tool_executor as tool_executor_module
+from arbiter.runtime.tool_executor import (
     ASYNC_CANCEL_REASON,
     ToolExecutionResult,
     ToolExecutor,
     _AsyncToolOutcome,
 )
-from agentao.runtime.tool_planning import (
+from arbiter.runtime.tool_planning import (
     ToolCallDecision,
     ToolCallPlan,
     ToolCallPlanner,
 )
-from agentao.tools import AsyncToolBase, RegistrableTool, Tool, ToolRegistry
-from agentao.tools.base import _BaseTool
-from agentao.transport import AgentEvent, EventType
+from arbiter.tools import AsyncToolBase, RegistrableTool, Tool, ToolRegistry
+from arbiter.tools.base import _BaseTool
+from arbiter.transport import AgentEvent, EventType
 
 from tests.support.host_events import CapturingTransport as _CapturingTransport
 
@@ -246,15 +246,15 @@ def test_registrable_tool_is_published_on_public_surfaces():
     # ``get_type_hints`` can't resolve at runtime. Resolve those types
     # against each module's own globalns + localns supplemented with
     # the missing TYPE_CHECKING names so the check still succeeds.
-    from agentao.agents import bg_store as _bg_store_mod
-    from agentao.agents.manager import AgentManager
-    from agentao.agents.tools import AgentToolWrapper
-    from agentao.agents import manager as manager_mod
+    from arbiter.agents import bg_store as _bg_store_mod
+    from arbiter.agents.manager import AgentManager
+    from arbiter.agents.tools import AgentToolWrapper
+    from arbiter.agents import manager as manager_mod
     # AgentToolWrapper.__init__ lives in ._wrapper after the agents/tools/
     # package split (commit f5a1b44); resolve its string-form annotations
     # against that submodule's globalns rather than the package facade so
     # the package surface stays free of typing/RegistrableTool re-imports.
-    from agentao.agents.tools import _wrapper as wrapper_mod
+    from arbiter.agents.tools import _wrapper as wrapper_mod
 
     extra_locals = {
         "BackgroundTaskStore": _bg_store_mod.BackgroundTaskStore,
@@ -276,9 +276,9 @@ def test_registrable_tool_is_published_on_public_surfaces():
 
 
 def test_registrable_tool_is_the_alias_in_tools_base():
-    """Ensure `RegistrableTool` re-exported from `agentao.tools` is the
-    same object as the one defined in `agentao.tools.base`."""
-    from agentao.tools.base import RegistrableTool as base_alias
+    """Ensure `RegistrableTool` re-exported from `arbiter.tools` is the
+    same object as the one defined in `arbiter.tools.base`."""
+    from arbiter.tools.base import RegistrableTool as base_alias
 
     assert RegistrableTool is base_alias
 
@@ -303,7 +303,7 @@ def test_existing_sync_tool_subclass_unchanged():
     every helper they did before (capability accessors, path helpers,
     metadata properties, OpenAI serializer).
     """
-    from agentao.tools import (
+    from arbiter.tools import (
         EditTool,
         FindFilesTool,
         ReadFileTool,
@@ -339,14 +339,14 @@ def test_compileall_passes_for_edited_modules():
     """
     repo_root = Path(__file__).resolve().parent.parent
     targets = [
-        "agentao/tools/base.py",
-        "agentao/cancellation.py",
-        "agentao/runtime/tool_planning.py",
-        "agentao/runtime/tool_executor.py",
-        "agentao/runtime/tool_runner.py",
-        "agentao/agents/manager.py",
-        "agentao/agents/tools.py",
-        "agentao/agent.py",
+        "arbiter/tools/base.py",
+        "arbiter/cancellation.py",
+        "arbiter/runtime/tool_planning.py",
+        "arbiter/runtime/tool_executor.py",
+        "arbiter/runtime/tool_runner.py",
+        "arbiter/agents/manager.py",
+        "arbiter/agents/tools.py",
+        "arbiter/agent.py",
     ]
     for rel in targets:
         ok = compileall.compile_file(
@@ -465,17 +465,17 @@ def test_sync_dispatcher_does_not_pass_ctx_kwargs_to_sync_tool():
 def test_async_tool_runs_on_host_loop_via_arun(tmp_path):
     """End-to-end: arun() captures the host loop; the coroutine runs on it."""
 
-    with patch("agentao.agent.LLMClient") as mock_llm_cls, \
-         patch("agentao.tooling.mcp_tools.load_mcp_config", return_value={}), \
-         patch("agentao.tooling.mcp_tools.McpClientManager"):
+    with patch("arbiter.agent.LLMClient") as mock_llm_cls, \
+         patch("arbiter.tooling.mcp_tools.load_mcp_config", return_value={}), \
+         patch("arbiter.tooling.mcp_tools.McpClientManager"):
         mock_llm = Mock()
         mock_llm.logger = Mock()
         mock_llm.model = "gpt-test"
         mock_llm_cls.return_value = mock_llm
 
-        from agentao.agent import Agentao
+        from arbiter.agent import Arbiter
 
-        agent = Agentao(working_directory=tmp_path)
+        agent = Arbiter(working_directory=tmp_path)
 
     captured: Dict[str, Any] = {}
 

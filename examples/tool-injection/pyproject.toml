@@ -1,10 +1,10 @@
 [project]
-name = "agentao-example-tool-injection"
+name = "arbiter-example-tool-injection"
 version = "0.1.0"
-description = "Inject Jina-backed web_fetch (construction-time) and web_search (runtime) into an embedded Agentao."
+description = "Inject Jina-backed web_fetch (construction-time) and web_search (runtime) into an embedded Arbiter."
 requires-python = ">=3.10"
 dependencies = [
-    "agentao",
+    "arbiter",
     "httpx>=0.25.0",
 ]
 
@@ -14,7 +14,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-agentao = { path = "../..", editable = true }
+arbiter = { path = "../..", editable = true }
 
 [build-system]
 requires = ["hatchling"]

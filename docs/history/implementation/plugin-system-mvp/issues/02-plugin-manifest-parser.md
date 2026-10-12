@@ -17,7 +17,7 @@ Issue index: [Plugin System MVP Issues](README.md)
 
 ## Deliverables
 
-- `agentao/plugins/manifest.py`
+- `arbiter/plugins/manifest.py`
 - manifest parser 单测
 
 ## Dependencies

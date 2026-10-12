@@ -1,7 +1,7 @@
 # Embedded Harness Contract
 
-**Status:** Design record. Decision captured 2026-04-30. Implementation: 0.3.1 (`agentao.host`).
-**Audience:** Agentao maintainers and host application integrators.
+**Status:** Design record. Decision captured 2026-04-30. Implementation: 0.3.1 (`arbiter.host`).
+**Audience:** Arbiter maintainers and host application integrators.
 **Related docs:** `docs/history/implementation/embedded-harness-implementation-plan.md`,
 `docs/history/implementation/embedded-harness-protocol-plan.md`,
 `docs/history/implementation/embedded-harness-contract-implementation-plan.md`,
@@ -10,23 +10,23 @@
 ## Scope (read this first)
 
 The harness contract is the stability boundary for **in-process**
-embedding of Agentao. Three pillars:
+embedding of Arbiter. Three pillars:
 
 - **Observability events** — tool / subagent / permission-decision
   lifecycle.
 - **Permission state** — `ActivePermissions` snapshot.
 - **ACP schema surface** — versioned Pydantic models for the ACP
   wire payloads. Exported *only* for the long-tail case of an
-  in-process host that also re-exposes Agentao via the ACP wire to
+  in-process host that also re-exposes Arbiter via the ACP wire to
   its own clients; vanilla in-process hosts ignore this surface.
 
 It is **not** a complete chat runtime. To drive an agent turn, hosts
-call `Agentao.arun()`. To render streaming chat UI, hosts consume the
+call `Arbiter.arun()`. To render streaming chat UI, hosts consume the
 internal `Transport` / `AgentEvent` stream — that carries the
 assistant text, reasoning, and raw tool I/O the stable contract
 intentionally omits.
 
-The ACP server (`agentao --acp --stdio`) and the ACP client
+The ACP server (`arbiter --acp --stdio`) and the ACP client
 (`ACPManager`) are **separate deployment models**, not transports
 inside this contract. See
 [`docs/design/embedding-vs-acp.md`](embedding-vs-acp.md)
@@ -34,7 +34,7 @@ for the disambiguation between in-process embedding, ACP server, ACP
 client, and the ACP schema surface.
 
 The harness exists so an embedder can audit, visualise, and gate
-Agentao without coupling to internal event shapes; it does not
+Arbiter without coupling to internal event shapes; it does not
 replace the in-process runtime entry points.
 
 When extending this document, do not refer to `HostEvent` as the
@@ -43,7 +43,7 @@ pillars, not the contract itself.
 
 ## Problem
 
-Agentao's long-term embedding shape is a harness that runs inside another
+Arbiter's long-term embedding shape is a harness that runs inside another
 application, not a Codex-style platform server that owns the whole client state.
 That distinction changes the public API design.
 
@@ -55,17 +55,17 @@ A host application usually already owns:
 - its permission prompts and product policy;
 - its plugin and deployment packaging.
 
-If Agentao exposes many queryable internal stores (`hooks/list`, agent graph
+If Arbiter exposes many queryable internal stores (`hooks/list`, agent graph
 tables, MCP status tables, config write APIs), the host must reconcile two
-sources of truth: the host's state and Agentao's state. That is the wrong default
+sources of truth: the host's state and Arbiter's state. That is the wrong default
 for an embedded harness.
 
-The host-facing contract should be event-first: Agentao emits lifecycle facts;
+The host-facing contract should be event-first: Arbiter emits lifecycle facts;
 the host decides what to store, render, ignore, or correlate.
 
 ## Decision
 
-Agentao separates two surfaces:
+Arbiter separates two surfaces:
 
 1. **Harness API** — stable host-facing data models, simple getters, and event
    streams. This is the compatibility contract for embedded applications.
@@ -74,7 +74,7 @@ Agentao separates two surfaces:
    events, but they are not the harness API.
 
 Store/list/reload features may exist for the CLI, but they must not be promoted
-to host-facing API unless a host truly needs Agentao to own that state.
+to host-facing API unless a host truly needs Arbiter to own that state.
 
 ## Non-Goals
 
@@ -93,8 +93,8 @@ The following are explicitly out of scope for the harness contract MVP:
 
 Before adding anything to the harness API, ask:
 
-> Does a host application need this stable contract to embed Agentao safely,
-> explainably, and without reading Agentao logs or private files?
+> Does a host application need this stable contract to embed Arbiter safely,
+> explainably, and without reading Arbiter logs or private files?
 
 If the answer is "the CLI wants to display or manage it", it belongs first in the
 CLI/local product surface, not in the harness API.
@@ -119,7 +119,7 @@ Expose a small typed getter for the currently active permission policy:
     "rules": [...],
     "loaded_sources": [
         "preset:workspace-write",
-        "user:/Users/me/.agentao/permissions.json",
+        "user:/Users/me/.arbiter/permissions.json",
         "injected:host"
     ]
 }
@@ -148,7 +148,7 @@ These three cover the first questions a host or CLI needs answered:
 
 #### ToolLifecycleEvent
 
-Tool events are public in MVP because the CLI is Agentao's canonical first host.
+Tool events are public in MVP because the CLI is Arbiter's canonical first host.
 External hosts should not have to use a different mechanism to render basic
 "agent is running a tool" state.
 
@@ -206,7 +206,7 @@ alternative and was rejected — it makes the contract assert something
 untrue, which is worse than a phase that needs a second field to
 interpret.
 
-Agentao emits lineage facts. Hosts and the CLI may build graph displays or stores
+Arbiter emits lineage facts. Hosts and the CLI may build graph displays or stores
 from those facts, but a graph store is not a public harness API.
 
 `cancelled` is a distinct subagent phase because lineage tracking benefits from
@@ -255,7 +255,7 @@ MVP contract:
   a replay mechanism.
 - A subscriber that starts mid-turn receives only future events.
 - Backpressure is host-pulled: slow consumers apply pressure by not advancing the
-  iterator. Agentao must not grow an unbounded queue.
+  iterator. Arbiter must not grow an unbounded queue.
 - Cancellation must close the iterator and release session-local resources
   deterministically.
 - When a bounded subscription queue is full, the producer blocks for matching
@@ -277,7 +277,7 @@ Common field rules:
 
 - All timestamp fields use RFC 3339 UTC strings, for example
   `2026-04-30T01:02:03.456Z`.
-  Agentao uses the canonical `Z`-suffix form; offsets such as `+00:00` are
+  Arbiter uses the canonical `Z`-suffix form; offsets such as `+00:00` are
   intentionally rejected for stable snapshots and host parsing.
 - Public summary fields such as `summary`, `task_summary`, and `reason` are
   redacted and truncated host-facing strings. They must not contain raw user
@@ -358,7 +358,7 @@ stores are implementation details.
 
 ## Internal Events
 
-Agentao may have richer internal events for replay, debugging, and CLI rendering.
+Arbiter may have richer internal events for replay, debugging, and CLI rendering.
 Internal events can exist before their public schema is frozen.
 
 Rules:

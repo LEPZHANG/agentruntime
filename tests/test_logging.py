@@ -8,14 +8,14 @@ if not os.getenv("OPENAI_API_KEY"):
     os.environ["OPENAI_API_KEY"] = "test-key-for-demo"
     os.environ["OPENAI_BASE_URL"] = "https://api.example.com/v1"
 
-from agentao.llm import LLMClient
+from arbiter.llm import LLMClient
 
 print("=" * 70)
 print("Testing LLM Logging Functionality")
 print("=" * 70)
 
 # Create test log file
-log_file = "test_agentao.log"
+log_file = "test_arbiter.log"
 if Path(log_file).exists():
     Path(log_file).unlink()
     print(f"✓ Removed existing {log_file}")
@@ -89,13 +89,13 @@ print("=" * 70)
 
 print(f"\nNote: To see full logging in action:")
 print(f"1. Set a valid OPENAI_API_KEY in .env")
-print(f"2. Run: agentao")
+print(f"2. Run: arbiter")
 print(f"3. Have a conversation with the agent")
-print(f"4. Check agentao.log for detailed logs")
+print(f"4. Check arbiter.log for detailed logs")
 
 print(f"\nTo view the log file:")
-print(f"  tail -f agentao.log")
-print(f"  cat agentao.log")
+print(f"  tail -f arbiter.log")
+print(f"  cat arbiter.log")
 
 # Cleanup test log
 if Path(log_file).exists():

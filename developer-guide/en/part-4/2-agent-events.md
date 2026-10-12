@@ -14,8 +14,8 @@ For **production audit / observability / SIEM pipelines**, use the **stable host
 
 | Surface | Where | Stability | When to use |
 |---|---|---|---|
-| `agentao.transport.AgentEvent` (this page) | `Transport.emit()` push callback | Internal — may change per release | CLI / streaming UI that needs rich detail |
-| `agentao.host.HostEvent` ([4.7](./7-host-contract)) | `agent.events()` async pull iterator | **Stable**, schema-snapshotted, CI-enforced | Production audit, billing, multi-tenant compliance |
+| `arbiter.transport.AgentEvent` (this page) | `Transport.emit()` push callback | Internal — may change per release | CLI / streaming UI that needs rich detail |
+| `arbiter.host.HostEvent` ([4.7](./7-host-contract)) | `agent.events()` async pull iterator | **Stable**, schema-snapshotted, CI-enforced | Production audit, billing, multi-tenant compliance |
 
 The two surfaces are **complementary, not alternatives** — most production deployments use both: Transport for UI, `events()` for audit. They share zero code paths.
 :::
@@ -89,7 +89,7 @@ Distinct from `TURN_START` (which fires per LLM iteration). `TURN_BEGIN` carries
 
 This is a **single closed vocabulary**: every turn-ending path commits exactly one of these, or `None` for a real answer — there is no unclassified ending. The first two mean the turn ended normally with no answer; the middle two mean the harness stopped a turn that was not converging; the last means the provider call never yielded a turn. (`max_iterations` is a sixth way a turn ends without a complete answer, but it is a deliberately separate axis — a sticky transport flag with its own exit code 4 and its own `on_max_iterations` interaction, not a value here.)
 
-Prefer it over string-matching `final_text` — the harness substitutes a placeholder or a canned notice there (including the `[LLM API error: …]` notice, now classified `llm_error`), and a Stop hook may decorate it, so the text is not a reliable signal. A cancelled turn is never reported via `incomplete_reason` (it carries `status: "cancelled"`). `agentao run` maps a non-`None` value to a non-zero exit; other hosts are free to retry, prompt, or ignore.
+Prefer it over string-matching `final_text` — the harness substitutes a placeholder or a canned notice there (including the `[LLM API error: …]` notice, now classified `llm_error`), and a Stop hook may decorate it, so the text is not a reliable signal. A cancelled turn is never reported via `incomplete_reason` (it carries `status: "cancelled"`). `arbiter run` maps a non-`None` value to a non-zero exit; other hosts are free to retry, prompt, or ignore.
 
 Replay recorders pair this with `TURN_BEGIN` to delimit a turn. Drives the runtime → replay handoff that used to be a direct call into the replay adapter.
 
@@ -316,7 +316,7 @@ def event_to_json(event: AgentEvent) -> str:
 Reverse (rebuild from JSON, useful for tests):
 
 ```python
-from agentao.transport import AgentEvent, EventType
+from arbiter.transport import AgentEvent, EventType
 
 def event_from_json(j: str) -> AgentEvent:
     obj = json.loads(j)

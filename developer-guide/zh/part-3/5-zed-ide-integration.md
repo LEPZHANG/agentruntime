@@ -1,6 +1,6 @@
 # 3.5 Zed / IDE 集成实操
 
-Zed 的"外部 agent"功能原生讲 ACP——意思是 Agentao 不需要任何胶水就能接入。同样的模式适用于任何支持外部 ACP agent 的 IDE / 编辑器。本节讲端到端接入。
+Zed 的"外部 agent"功能原生讲 ACP——意思是 Arbiter 不需要任何胶水就能接入。同样的模式适用于任何支持外部 ACP agent 的 IDE / 编辑器。本节讲端到端接入。
 
 ## 3.5.1 "ACP 集成"在 IDE 里意味着什么
 
@@ -14,16 +14,16 @@ Zed 的"外部 agent"功能原生讲 ACP——意思是 Agentao 不需要任何�
 
 用户只要在 IDE 设置里加上你的 agent——剩下全是传输。
 
-## 3.5.2 在 Zed 里注册 Agentao
+## 3.5.2 在 Zed 里注册 Arbiter
 
-Zed 从 `~/.config/zed/settings.json`（或 UI 的 **Settings → Agents**）读 agent 配置。加一条指向 `agentao --acp --stdio`：
+Zed 从 `~/.config/zed/settings.json`（或 UI 的 **Settings → Agents**）读 agent 配置。加一条指向 `arbiter --acp --stdio`：
 
 ```json
 {
   "agents": [
     {
-      "name": "agentao",
-      "command": "agentao",
+      "name": "arbiter",
+      "command": "arbiter",
       "args": ["--acp", "--stdio"],
       "env": {
         "OPENAI_API_KEY": "sk-...",
@@ -34,13 +34,13 @@ Zed 从 `~/.config/zed/settings.json`（或 UI 的 **Settings → Agents**）读
 }
 ```
 
-重启 Zed，打开任意项目，Agentao 就出现在 agent 选择器里。
+重启 Zed，打开任意项目，Arbiter 就出现在 agent 选择器里。
 
 ### 注意
 
-- `command` 必须在 `PATH` 上。`uv tool install agentao` 装的已经在了；否则用绝对路径：`/Users/you/.local/bin/agentao`
+- `command` 必须在 `PATH` 上。`uv tool install arbiter` 装的已经在了；否则用绝对路径：`/Users/you/.local/bin/arbiter`
 - `env` 块会和 Zed 自己的环境合并。API key 建议放到 `~/.zshenv` / `~/.bashrc`，别写进 `settings.json`
-- Zed 会把 workspace 根作为 `cwd` 传进 `session/new`——所以 `AGENTAO.md`、`.agentao/mcp.json`、技能、记忆自动按 workspace 作用域生效
+- Zed 会把 workspace 根作为 `cwd` 传进 `session/new`——所以 `ARBITER.md`、`.arbiter/mcp.json`、技能、记忆自动按 workspace 作用域生效
 
 ## 3.5.3 端到端线协议轨迹
 
@@ -49,20 +49,20 @@ Zed 从 `~/.config/zed/settings.json`（或 UI 的 **Settings → Agents**）读
 ```
 USER 在 Zed 里输入 "找 TODO"                                  time
                                                               ────▶
-Zed → agentao:  initialize（进程启动时一次）
-agentao → Zed:  capabilities + extensions
+Zed → arbiter:  initialize（进程启动时一次）
+arbiter → Zed:  capabilities + extensions
 
-Zed → agentao:  session/new  {cwd: "/workspace"}
-agentao → Zed:  {sessionId: "sess-1"}
+Zed → arbiter:  session/new  {cwd: "/workspace"}
+arbiter → Zed:  {sessionId: "sess-1"}
 
-Zed → agentao:  session/prompt  {sessionId, prompt:[{"type":"text",
+Zed → arbiter:  session/prompt  {sessionId, prompt:[{"type":"text",
                                                       "text":"找 TODO"}]}
 
-agentao → Zed:  session/update  agent_message_chunk  "让我搜..."
-agentao → Zed:  session/update  tool_call            {title:"grep -r TODO"}
-agentao → Zed:  session/update  tool_call_update     {output:"src/x.py:42: TODO ..."}
-agentao → Zed:  session/update  agent_message_chunk  "找到 3 处 TODO..."
-agentao → Zed:  response        {stopReason: "end_turn"}
+arbiter → Zed:  session/update  agent_message_chunk  "让我搜..."
+arbiter → Zed:  session/update  tool_call            {title:"grep -r TODO"}
+arbiter → Zed:  session/update  tool_call_update     {output:"src/x.py:42: TODO ..."}
+arbiter → Zed:  session/update  agent_message_chunk  "找到 3 处 TODO..."
+arbiter → Zed:  response        {stopReason: "end_turn"}
 
 （持续）        session/update 通知流推到 Zed UI
 ```
@@ -71,7 +71,7 @@ Zed 把每条 `session/update` 如你所料地渲染：文本 chunk 流进回复
 
 ## 3.5.4 Zed 需要具备的能力
 
-Agentao 在 `initialize` 里声明：
+Arbiter 在 `initialize` 里声明：
 
 ```json
 {
@@ -96,10 +96,10 @@ Zed 对不支持的能力会优雅降级。
 
 ## 3.5.5 多 workspace / 多窗口
 
-Zed **每个 agent 实例起一个 `agentao` 子进程**，每个项目通过 `session/new` 拿独立 session。也就是：
+Zed **每个 agent 实例起一个 `arbiter` 子进程**，每个项目通过 `session/new` 拿独立 session。也就是：
 
-- 多个 Zed 窗口共用一个 `agentao` 进程
-- 每个 workspace 的 `.agentao/memory.db` 按 `cwd` 隔离
+- 多个 Zed 窗口共用一个 `arbiter` 进程
+- 每个 workspace 的 `.arbiter/memory.db` 按 `cwd` 隔离
 - 按 session 传入 `mcpServers` 启动的 MCP 在那个 session 内独立
 
 想每 workspace 一个进程（更严格隔离，但更耗 RAM），在 Zed 那边配置每 workspace 独立 agent——具体开关名看 Zed 最新文档。
@@ -108,7 +108,7 @@ Zed **每个 agent 实例起一个 `agentao` 子进程**，每个项目通过 `s
 
 模式一样：
 
-1. 以子进程启动 `agentao --acp --stdio`
+1. 以子进程启动 `arbiter --acp --stdio`
 2. 在 stdio 上讲 NDJSON JSON-RPC 2.0
 3. `session/update` → UI，`session/request_permission` → 模态
 
@@ -120,26 +120,26 @@ JetBrains 插件能起子进程；用 Kotlin / Java 按同样的"三回路"模�
 
 ### Neovim
 
-用 `vim.fn.jobstart()`（Lua）之类起 `agentao --acp --stdio`。把 `session/update` 转到浮窗。社区已有成熟的 LSP 传输插件，把它们改造成 ACP 很直接。
+用 `vim.fn.jobstart()`（Lua）之类起 `arbiter --acp --stdio`。把 `session/update` 转到浮窗。社区已有成熟的 LSP 传输插件，把它们改造成 ACP 很直接。
 
 ## 3.5.7 环境与密钥
 
 无论哪个 IDE：
 
 - API key **绝不**写进 workspace 设置
-- 优先用 OS keychain（macOS 的 `security`、Windows 的 Credential Manager、Linux 的 `secret-tool`）+ 小 wrapper 脚本：读 key 再 exec agentao
+- 优先用 OS keychain（macOS 的 `security`、Windows 的 Credential Manager、Linux 的 `secret-tool`）+ 小 wrapper 脚本：读 key 再 exec arbiter
 - 或：让用户在 shell profile 里设置 `OPENAI_API_KEY`，IDE 继承环境
 
 macOS wrapper 示例：
 
 ```bash
 #!/usr/bin/env bash
-# /usr/local/bin/agentao-wrapper
+# /usr/local/bin/arbiter-wrapper
 export OPENAI_API_KEY="$(security find-generic-password -ws openai-api-key)"
-exec agentao "$@"
+exec arbiter "$@"
 ```
 
-让 IDE 指向 `agentao-wrapper` 而不是 `agentao`。
+让 IDE 指向 `arbiter-wrapper` 而不是 `arbiter`。
 
 ## 3.5.8 IDE 集成排错
 
@@ -148,7 +148,7 @@ exec agentao "$@"
 | 症状 | 去哪查 |
 |-----|-------|
 | agent 在选择器里看不到 | IDE 自己的日志（Zed 是 `Help → Open Log`） |
-| 首条消息就崩 | `<workspace>/agentao.log` |
+| 首条消息就崩 | `<workspace>/arbiter.log` |
 | 工具调用一直挂起 | IDE 大概没回 `session/request_permission`——查它的权限 UI 代码 |
 | 所有文本一次性砸出来 | IDE 没按流式渲染 `session/update`——查它的 UI 渲染 |
 | MCP server 没出现 | `mcpCapabilities.http=true`——stdio / Streamable HTTP / SSE 都支持；检查条目的 `type`/`url`/`command` |
@@ -158,20 +158,20 @@ exec agentao "$@"
 
 ```bash
 # stdin 里塞手搓 JSON
-agentao --acp --stdio < trace.ndjson > output.ndjson 2> agentao.stderr.log
+arbiter --acp --stdio < trace.ndjson > output.ndjson 2> arbiter.stderr.log
 ```
 
-这样能划清"是你 JSON 的锅、Agentao 处理的锅，还是 IDE 渲染的锅"。
+这样能划清"是你 JSON 的锅、Arbiter 处理的锅，还是 IDE 渲染的锅"。
 
-## 3.5.9 升级 Agentao 的正确姿势
+## 3.5.9 升级 Arbiter 的正确姿势
 
-用户更新 `agentao` 二进制时：
+用户更新 `arbiter` 二进制时：
 
 - Zed / VS Code 下次启动自然起新进程——什么都不用做
-- `protocolVersion` 协商处理版本不匹配：IDE 发 `2`，Agentao 只支持 `1`，Agentao 回 `1`，IDE 决定继续或断开
+- `protocolVersion` 协商处理版本不匹配：IDE 发 `2`，Arbiter 只支持 `1`，Arbiter 回 `1`，IDE 决定继续或断开
 - 技能、MCP、记忆按 **workspace** 作用域，不受二进制升级影响
 
-破坏性协议变更被规避。想锁定版本，请用户 `uv tool install agentao==0.2.14`。
+破坏性协议变更被规避。想锁定版本，请用户 `uv tool install arbiter==0.2.14`。
 
 ## 3.5.10 新 IDE 集成自查
 

@@ -12,7 +12,7 @@ Agent 是"长尾出 bug"的典型——90% 时间好好的，10% 出现让你无
 ```
 ┌─────────────────────────────────────────────┐
 │ 1. 结构化日志：发生了什么？                  │
-│    agentao.log + 你的应用日志                │
+│    arbiter.log + 你的应用日志                │
 ├─────────────────────────────────────────────┤
 │ 2. 指标：多少、多快、多贵？                  │
 │    调用次数 / 延迟 / token / 失败率           │
@@ -27,9 +27,9 @@ Agent 是"长尾出 bug"的典型——90% 时间好好的，10% 出现让你无
 
 ## 维度一：结构化日志
 
-### Agentao 自带的 agentao.log
+### Arbiter 自带的 arbiter.log
 
-默认写到 `<working_directory>/agentao.log`，内容**非常详尽**：
+默认写到 `<working_directory>/arbiter.log`，内容**非常详尽**：
 
 - 每次 LLM 请求/响应（完整 content——不截断，但形似凭据的字符串写入时会脱敏为 `[REDACTED:<kind>]`——以及 tokens、模型）
 - 每次工具调用参数和结果
@@ -44,26 +44,26 @@ Agent 是"长尾出 bug"的典型——90% 时间好好的，10% 出现让你无
 3. 做[脱敏](./5-secrets-injection#四日志脱敏)
 4. 按租户分文件（`working_directory` 天然分）
 
-### 接管 Agentao 的 logger
+### 接管 Arbiter 的 logger
 
-`LLMClient.__init__` 默认会改写 `logging.getLogger("agentao")` ——
-把 level 设成 `DEBUG`、挂一个写到 `<wd>/agentao.log` 的
+`LLMClient.__init__` 默认会改写 `logging.getLogger("arbiter")` ——
+把 level 设成 `DEBUG`、挂一个写到 `<wd>/arbiter.log` 的
 `RotatingFileHandler`、重建时还会驱逐自己 marker 标记的 handler。
 宿主想完全掌控日志栈，应该**显式注入 logger**，让这套改写根本不发生：
 
 ```python
 import logging
-from agentao import Agentao
+from arbiter import Arbiter
 
 # 自己的 logger ——JSON handler 推给 Loki / CloudWatch / ELK
 import pythonjsonlogger.jsonlogger as jl
-my_logger = logging.getLogger("myapp.agentao")
+my_logger = logging.getLogger("myapp.arbiter")
 handler = logging.StreamHandler()
 handler.setFormatter(jl.JsonFormatter())
 my_logger.addHandler(handler)
 my_logger.setLevel(logging.INFO)
 
-agent = Agentao(
+agent = Arbiter(
     api_key=..., base_url=..., model=...,
     working_directory=workdir,
     logger=my_logger,            # ← 跳过对包根 logger 的改写
@@ -71,25 +71,25 @@ agent = Agentao(
 ```
 
 只要传了 `logger=`，`LLMClient` 在建 file handler **之前**就早返回，
-所以默认那条 `<wd>/agentao.log` 也不会被创建。
+所以默认那条 `<wd>/arbiter.log` 也不会被创建。
 完全静默的写法配 `NullHandler`：
 
 ```python
-quiet = logging.getLogger("myapp.agentao")
+quiet = logging.getLogger("myapp.arbiter")
 quiet.addHandler(logging.NullHandler())
 quiet.propagate = False
-agent = Agentao(..., logger=quiet)
+agent = Arbiter(..., logger=quiet)
 ```
 
 ::: warning 踩坑提醒
-在 `getLogger("agentao")` 上 `addHandler(...)` 而**不**传 `logger=`，handler 是会生效，
-但包根 logger 的 level 仍被强行改成 `DEBUG`，rolling 的 `agentao.log` 文件也照样在
+在 `getLogger("arbiter")` 上 `addHandler(...)` 而**不**传 `logger=`，handler 是会生效，
+但包根 logger 的 level 仍被强行改成 `DEBUG`，rolling 的 `arbiter.log` 文件也照样在
 你的 handler 旁边继续写。要彻底关掉那个文件：要么注入自己的 logger（上文），
 要么自己构造 `LLMClient` 时传 `log_file=None`。
 :::
 
 完整说明（开关矩阵、代码锚点、直接走 `LLMClient` 的写法）见
-[`docs/guides/embedding.md` §2 → "Optional: silencing or redirecting agentao.log"](https://github.com/jin-bo/agentao/blob/main/docs/guides/embedding.md#optional-silencing-or-redirecting-agentaolog)。
+[`docs/guides/embedding.md` §2 → "Optional: silencing or redirecting arbiter.log"](https://github.com/jin-bo/agentao/blob/main/docs/guides/embedding.md#optional-silencing-or-redirecting-arbiterlog)。
 
 ### 关键字段
 
@@ -155,13 +155,13 @@ turn_dur.observe((time.time() - start) * 1000)
 
 ## 维度三：Session Replay
 
-Agentao 可以把每个 session 的运行时间线记录成 `.agentao/replays/` 下的 append-only JSONL。按项目开启：
+Arbiter 可以把每个 session 的运行时间线记录成 `.arbiter/replays/` 下的 append-only JSONL。按项目开启：
 
 ```bash
 /replay on
 ```
 
-这会写入 `.agentao/settings.json`：
+这会写入 `.arbiter/settings.json`：
 
 ```json
 {
@@ -184,7 +184,7 @@ Replay 能支持：
 
 ```bash
 /replay list            # 列出 replay instances（裸 /replay 默认也是这个）
-/replay on | /replay off  # 开关录制（写入 .agentao/settings.json）
+/replay on | /replay off  # 开关录制（写入 .arbiter/settings.json）
 /replay show <id>       # 分组渲染
 /replay show <id> --raw
 /replay show <id> --turn <turn_id>
@@ -200,7 +200,7 @@ Replay 文件和保存的 session 是两套东西：`save_session` / `load_sessi
 
 默认 replay 会记录 turn 边界、用户消息、assistant chunk、工具生命周期、权限决策、sub-agent 生命周期、错误、状态变化，以及紧凑的 LLM delta。
 
-Deep capture 开关位于 `.agentao/settings.json` 的 `replay.capture_flags` 下：
+Deep capture 开关位于 `.arbiter/settings.json` 的 `replay.capture_flags` 下：
 
 | 开关 | 默认 | 风险 |
 |------|------|------|
@@ -284,16 +284,16 @@ async def chat(req: ChatRequest):
 
 预算有限时：
 
-1. `agentao.log` → 每租户独立文件、日切、保 14 天
+1. `arbiter.log` → 每租户独立文件、日切、保 14 天
 2. `prometheus_client` → 上面 5 个关键指标、Grafana 面板
-3. 内建 replay JSONL → `.agentao/replays/`，通过 `replay.max_instances` 控制保留量
+3. 内建 replay JSONL → `.arbiter/replays/`，通过 `replay.max_instances` 控制保留量
 4. 无 OpenTelemetry
 
 这套够 99% 的中小 SaaS 用。上规模后再加 APM。
 
 ## TL;DR
 
-- **四个维度**：结构化日志（`agentao.log`）、指标（Prometheus / StatsD）、追踪（OpenTelemetry）、会话 replay。
+- **四个维度**：结构化日志（`arbiter.log`）、指标（Prometheus / StatsD）、追踪（OpenTelemetry）、会话 replay。
 - 最少上报这些指标：按工具名拆的调用率、工具失败率、LLM 5xx 率、confirm 超时率、轮次延迟 p50/p95/p99、最大迭代命中率。
 - **会话 replay 是杀手特性**——出现"Agent 为什么会做 X"时，用 `replay_config=` 确定性回放，逐步排查。
 - 把成本作为一等观测目标：跟踪每轮 token 数和按租户的 token 数；突然 2× 飙升通常是切了模型或换了技能。

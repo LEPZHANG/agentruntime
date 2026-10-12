@@ -5,7 +5,7 @@
 > - 路由模式：便宜-vs-贵、主-备、A/B
 > - 为什么没有 `OpenAIProvider` / `AnthropicProvider` 抽象
 
-一个 `Agentao` 实例构造时绑定一个 LLM。但你常常想**动态决定下一轮用哪个模型**：小问题走便宜模型、规划类问题走贵模型、主 provider 超时就退到备用。本节讲三个公开 API，教你不重建 agent 就做到这件事。
+一个 `Arbiter` 实例构造时绑定一个 LLM。但你常常想**动态决定下一轮用哪个模型**：小问题走便宜模型、规划类问题走贵模型、主 provider 超时就退到备用。本节讲三个公开 API，教你不重建 agent 就做到这件事。
 
 ## 2.5.1 三个方法
 
@@ -36,7 +36,7 @@ models = agent.list_available_models()  # -> ["gpt-5.4", "gpt-5.4", ...]
 | LLM 客户端的 `model` / `api_key` / `base_url` | `agent.messages`（整段历史） |
 | tiktoken 编码（用于 token 估算） | 激活中的技能 |
 | token 计数缓存（`_last_api_prompt_tokens` 置空） | 记忆（两种作用域） |
-| `agentao.log` 里一行 `"Model changed from X to Y"` | 工作目录 / transport / MCP |
+| `arbiter.log` 里一行 `"Model changed from X to Y"` | 工作目录 / transport / MCP |
 
 **重要**：对话历史**不会清空**。新模型会看到旧模型看过的所有历史，包括工具调用轨迹。如果不希望这种上下文渗透，先调用 `clear_history()` 再 swap。
 
@@ -49,7 +49,7 @@ CHEAP_MODEL     = "gpt-5.4"
 SMART_MODEL     = "gpt-5.4"
 SMART_KEYWORDS  = ("规划", "设计", "重构", "架构", "plan", "design")
 
-def route(agent: Agentao, user_message: str) -> str:
+def route(agent: Arbiter, user_message: str) -> str:
     wants_smart = any(kw in user_message.lower() for kw in SMART_KEYWORDS)
     target = SMART_MODEL if wants_smart else CHEAP_MODEL
     if agent.get_current_model() != target:
@@ -66,7 +66,7 @@ PROVIDERS = [
     {"api_key": os.environ["MOONSHOT_API_KEY"], "base_url": "https://api.moonshot.cn/v1","model": "moonshot-v1-8k"},
 ]
 
-def chat_with_fallback(agent: Agentao, msg: str) -> str:
+def chat_with_fallback(agent: Arbiter, msg: str) -> str:
     last_err = None
     for p in PROVIDERS:
         try:
@@ -83,8 +83,8 @@ def chat_with_fallback(agent: Agentao, msg: str) -> str:
 ### 多租户模型选择（SaaS）
 
 ```python
-def build_agent_for(tenant: Tenant) -> Agentao:
-    agent = Agentao(
+def build_agent_for(tenant: Tenant) -> Arbiter:
+    agent = Arbiter(
         working_directory=tenant.workdir,
         model=tenant.plan.default_model,     # "gpt-5.4" 或 "gpt-5.4"
     )
@@ -106,7 +106,7 @@ real_reply = agent.chat(msg)
 log_ab(real=real_reply, shadow=shadow_reply)
 ```
 
-⚠️ 单轮调两次 `chat()` 会把费用翻倍，并且给历史里塞**两条** assistant 回复。认真做 A/B 请用**两个独立的 `Agentao` 实例**，把同一 prompt 分别跑。
+⚠️ 单轮调两次 `chat()` 会把费用翻倍，并且给历史里塞**两条** assistant 回复。认真做 A/B 请用**两个独立的 `Arbiter` 实例**，把同一 prompt 分别跑。
 
 ## 2.5.4 `list_available_models()` — 何时调，何时别调
 
@@ -137,7 +137,7 @@ except RuntimeError:
    `set_provider()` 会按新模型名换 tiktoken 编码；但 tiktoken 本身是 OpenAI 的，对 DeepSeek/Moonshot/Qwen 等非 OpenAI 家只能**近似估算**。预算留点余量
 
 2. **工具调用 schema 依赖 provider**
-   所有 Agentao 支持的 provider 必须讲 **OpenAI 兼容**的 tool-calls schema。换到不兼容的 provider，`chat()` 要么报 "function not supported"，要么悄无声息地丢 tool call。级联链里每个 provider 都要测
+   所有 Arbiter 支持的 provider 必须讲 **OpenAI 兼容**的 tool-calls schema。换到不兼容的 provider，`chat()` 要么报 "function not supported"，要么悄无声息地丢 tool call。级联链里每个 provider 都要测
 
 3. **流式行为可能不同**
    不同 provider 的 chunk 切分、首 token 延迟不同。切换后 UI 感受可能明显变化。`Transport.emit(...)` 仍会照样触发——只是 chunk 边界不一样
@@ -150,9 +150,9 @@ except RuntimeError:
 
 ## 2.5.6 为什么 provider 不是构造参数
 
-你会注意到 `Agentao(...)` 直接收 `api_key / base_url / model`，没有抽象的 `provider=`。这是故意的：
+你会注意到 `Arbiter(...)` 直接收 `api_key / base_url / model`，没有抽象的 `provider=`。这是故意的：
 
-- Agentao 只说 OpenAI 兼容协议
+- Arbiter 只说 OpenAI 兼容协议
 - 任何暴露 OpenAI schema 的 provider（OpenAI、Azure、DeepSeek、Moonshot、Together、本地 Ollama / vLLM……）都能直连
 - "切换 provider" 就等于"切换 key + base_url + model"
 

@@ -4,7 +4,7 @@ Split out from the original monolithic ``test_permissions.py``. The
 hardline floor and sensitive-write preset live in their own modules.
 """
 
-from agentao.permissions import PermissionDecision, PermissionEngine, PermissionMode
+from arbiter.permissions import PermissionDecision, PermissionEngine, PermissionMode
 
 from tests.support.permissions import allow, ask, deny, make_engine as _engine
 
@@ -219,7 +219,7 @@ def test_project_rules_are_ignored_user_wins(tmp_path, monkeypatch, caplog):
     """
     import logging
 
-    with caplog.at_level(logging.WARNING, logger="agentao.permissions"):
+    with caplog.at_level(logging.WARNING, logger="arbiter.permissions"):
         e = _engine(
             tmp_path, monkeypatch,
             project_rules=[allow("web_fetch")],   # would have allowed
@@ -278,7 +278,7 @@ def test_wildcard_tool_rule(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_invalid_json_user_config_graceful_fallback(tmp_path):
-    user_root = tmp_path / "home" / ".agentao"
+    user_root = tmp_path / "home" / ".arbiter"
     user_root.mkdir(parents=True)
     (user_root / "permissions.json").write_text("not valid json", encoding="utf-8")
     e = PermissionEngine(project_root=tmp_path, user_root=user_root)  # should not raise
@@ -287,7 +287,7 @@ def test_invalid_json_user_config_graceful_fallback(tmp_path):
 
 def test_stray_project_config_does_not_raise(tmp_path):
     """A stale project-scope file must not break startup."""
-    cfg = tmp_path / ".agentao"
+    cfg = tmp_path / ".arbiter"
     cfg.mkdir()
     (cfg / "permissions.json").write_text("not valid json", encoding="utf-8")
     e = PermissionEngine(project_root=tmp_path)

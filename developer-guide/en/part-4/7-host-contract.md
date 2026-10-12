@@ -1,10 +1,10 @@
 # 4.7 The Embedded Harness Contract — Your Stable Host API
 
 > **What you'll learn**
-> - **Why** there's a separate `agentao.host` package alongside Transport / AgentEvent
+> - **Why** there's a separate `arbiter.host` package alongside Transport / AgentEvent
 > - The **three surfaces** it exposes (events, policy snapshot, capability protocols) and which problem each solves
 > - **`agent.events()` vs. `Transport(on_event=…)`** — when to use which (or both)
-> - **End-to-end**: a tenant-scoped audit pipeline in ~30 lines that won't break on the next Agentao release
+> - **End-to-end**: a tenant-scoped audit pipeline in ~30 lines that won't break on the next Arbiter release
 
 If you've read [4.2 AgentEvent](./2-agent-events) and the `:::warning` told you "use `HostEvent` instead for production", this chapter is the **how** behind that advice.
 
@@ -12,37 +12,37 @@ If you've read [4.2 AgentEvent](./2-agent-events) and the `:::warning` told you 
 
 You're shipping a multi-tenant SaaS. Every action the agent takes has to produce an audit row: tenant, user, tool name, args, was it approved, did it succeed.
 
-You build it on top of `AgentEvent` (Part 4.2), it works, you ship. Three months later Agentao 0.5.0 lands. `EventType.MEMORY_WRITE` got renamed. Two `data` fields moved. Your audit pipeline silently misses rows for a week before someone notices the ETL count diverging.
+You build it on top of `AgentEvent` (Part 4.2), it works, you ship. Three months later Arbiter 0.5.0 lands. `EventType.MEMORY_WRITE` got renamed. Two `data` fields moved. Your audit pipeline silently misses rows for a week before someone notices the ETL count diverging.
 
 This is the **churn problem**. `AgentEvent` is the runtime's internal event bus — it powers the CLI, debug UI, and replay machinery, all of which need rich detail and can absorb churn release-by-release. **A production host can't.**
 
-The **embedded harness contract** is the answer: a deliberately small surface at `agentao.host` that's:
+The **embedded harness contract** is the answer: a deliberately small surface at `arbiter.host` that's:
 
 - **Frozen as Pydantic models** — fields and types are part of the public contract
 - **Schema-snapshotted** in `docs/schema/host.events.v1.json` — byte-equality enforced in CI
 - **A redacted projection** of internal events — e.g. user prompt text isn't in the audit body
 - **Versioned** — adding optional fields is backwards-compatible; removing or renaming requires a schema bump
 
-If your code only touches `agentao.host` (plus the documented `Agentao(...)` constructor and `chat()` / `events()` / `active_permissions()` methods), you stay forward-compatible.
+If your code only touches `arbiter.host` (plus the documented `Arbiter(...)` constructor and `chat()` / `events()` / `active_permissions()` methods), you stay forward-compatible.
 
 ::: tip Harness wraps the runtime — it doesn't replace it.
-The harness contract types the **observability**, **policy**, and **wire-schema** surfaces *around* an Agentao session. It is **not** a turnkey chat runtime: you still call `agent.arun()` (or `agent.chat()`) to drive a turn, and you still pick a streaming surface (`Transport` or ACP) for assistant text / reasoning / raw tool I/O. Think of harness as the OEM connector around the engine, not the engine itself.
+The harness contract types the **observability**, **policy**, and **wire-schema** surfaces *around* an Arbiter session. It is **not** a turnkey chat runtime: you still call `agent.arun()` (or `agent.chat()`) to drive a turn, and you still pick a streaming surface (`Transport` or ACP) for assistant text / reasoning / raw tool I/O. Think of harness as the OEM connector around the engine, not the engine itself.
 :::
 
 ## 4.7.2 The three surfaces
 
-`agentao.host` exposes three distinct surfaces. They live in one package because they share the "stable host contract" promise, but they solve different problems:
+`arbiter.host` exposes three distinct surfaces. They live in one package because they share the "stable host contract" promise, but they solve different problems:
 
 | Surface | What you call | What it gives you | Used in |
 |---------|---------------|-------------------|---------|
 | **Events** | `agent.events()` async iterator | A stream of `HostEvent` (tool / sub-agent / permission lifecycle) | Audit pipelines, observability, real-time UI |
 | **Policy snapshot** | `agent.active_permissions()` | A JSON-safe `ActivePermissions` (mode + rules + sources) | Settings UI, audit-log enrichment, compliance reports |
-| **Capability protocols** | `from agentao.host.protocols import FileSystem, ShellExecutor, MCPRegistry, MemoryStore` | Runtime-checkable Protocols you implement to inject Docker / virtual FS / audit proxies / programmatic MCP / remote memory backends | See [2.2 Tier 3 · capability protocols](/en/part-2/2-constructor-reference#tier-3-advanced-injections) and [6.4](/en/part-6/4-multi-tenant-fs); end-to-end demo [`examples/protocol-injection/`](https://github.com/jin-bo/agentao/tree/main/examples/protocol-injection) |
+| **Capability protocols** | `from arbiter.host.protocols import FileSystem, ShellExecutor, MCPRegistry, MemoryStore` | Runtime-checkable Protocols you implement to inject Docker / virtual FS / audit proxies / programmatic MCP / remote memory backends | See [2.2 Tier 3 · capability protocols](/en/part-2/2-constructor-reference#tier-3-advanced-injections) and [6.4](/en/part-6/4-multi-tenant-fs); end-to-end demo [`examples/protocol-injection/`](https://github.com/jin-bo/agentao/tree/main/examples/protocol-injection) |
 
 This chapter focuses on **events** and **policy snapshot** — the parts most readers reach for first. Capability protocols are already covered in their construction-time context; for a runnable end-to-end shape that replaces all four slots at once, see [`examples/protocol-injection/`](https://github.com/jin-bo/agentao/tree/main/examples/protocol-injection).
 
 ::: info There's also a fourth artifact in the package: the ACP schema surface.
-`export_host_acp_json_schema()` exposes the Pydantic-typed wire schema for hosts that drive Agentao **out-of-process** (IDE plugin, Node/Go/Rust frontend, microservice) over the [ACP stdio protocol](/en/part-3/1-acp-tour). It isn't a consumption API like the three above — it's a contract artifact for protocol implementers. **In-process embedders can ignore it; out-of-process embedders should reference the snapshot rather than reverse-engineering payloads from runtime traces.**
+`export_host_acp_json_schema()` exposes the Pydantic-typed wire schema for hosts that drive Arbiter **out-of-process** (IDE plugin, Node/Go/Rust frontend, microservice) over the [ACP stdio protocol](/en/part-3/1-acp-tour). It isn't a consumption API like the three above — it's a contract artifact for protocol implementers. **In-process embedders can ignore it; out-of-process embedders should reference the snapshot rather than reverse-engineering payloads from runtime traces.**
 :::
 
 ## 4.7.3 The three event types
@@ -69,7 +69,7 @@ Cancellation is unaffected: it still arrives as `phase="cancelled"`.
 `HostEvent` is the discriminated union of these three. Use `isinstance` to branch:
 
 ```python
-from agentao.host import (
+from arbiter.host import (
     HostEvent,
     ToolLifecycleEvent,
     SubagentLifecycleEvent,
@@ -98,7 +98,7 @@ Both deliver events, but they're for different jobs. Don't pick one *instead of*
 | Building an **audit pipeline** / SIEM feed / billing meter? | ✅ | ❌ |
 | Building **CLI / debug tooling** that wants every internal detail? | ❌ — too redacted | ✅ |
 | Need **async pull** semantics with backpressure? | ✅ — `async for` with bounded queue | ❌ — push callback |
-| Need **multiple concurrent consumers**? | ⚠️ MVP: one stream per `Agentao` | ✅ — fan out via your own dispatcher |
+| Need **multiple concurrent consumers**? | ⚠️ MVP: one stream per `Arbiter` | ✅ — fan out via your own dispatcher |
 
 Most production deployments use **both**: Transport drives the streaming UI; `events()` drives the audit / observability pipeline. They share zero code paths so they don't fight each other.
 
@@ -111,20 +111,20 @@ Most production deployments use **both**: Transport drives the streaming UI; `ev
 Read on for the schema-stable pattern; clone either example to get hands-on output in 60 seconds.
 :::
 
-Here's a complete pattern. Every tool call, permission decision, and sub-agent action gets one row in your audit table — schema-stable across Agentao releases. Field names below are the actual ones in [`agentao/host/models.py`](https://github.com/jin-bo/agentao/blob/main/agentao/host/models.py); compare with [Appendix A.10](/en/appendix/a-api-reference#a-10-embedded-host-contract) for the full type signatures.
+Here's a complete pattern. Every tool call, permission decision, and sub-agent action gets one row in your audit table — schema-stable across Arbiter releases. Field names below are the actual ones in [`arbiter/host/models.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/host/models.py); compare with [Appendix A.10](/en/appendix/a-api-reference#a-10-embedded-host-contract) for the full type signatures.
 
 ```python
 """Tenant audit pipeline. Run alongside agent.arun()."""
 import asyncio
 import json
-from agentao import Agentao
-from agentao.host import (
+from arbiter import Arbiter
+from arbiter.host import (
     ToolLifecycleEvent,
     PermissionDecisionEvent,
     SubagentLifecycleEvent,
 )
 
-async def audit_loop(agent: Agentao, tenant_id: str, db):
+async def audit_loop(agent: Arbiter, tenant_id: str, db):
     """Drain harness events and write one audit row per fact."""
     async for ev in agent.events():
         row = {
@@ -193,7 +193,7 @@ async def handle_request(tenant_id: str, message: str, db):
 - Same-session ordering is guaranteed by the contract — your audit row order matches event order.
 - `PermissionDecisionEvent` precedes the matching `ToolLifecycleEvent(phase="started")` (same `tool_call_id`) so downstream views can stitch them.
 - Dropping a slow consumer doesn't drop events: backpressure is host-pulled via a bounded queue. Events block the producer rather than silently get dropped.
-- When Agentao 0.5 ships and adds a new internal event variant, your audit pipeline doesn't notice — that event isn't projected to harness, and any new `HostEvent` variant the projection *does* gain only adds optional fields.
+- When Arbiter 0.5 ships and adds a new internal event variant, your audit pipeline doesn't notice — that event isn't projected to harness, and any new `HostEvent` variant the projection *does* gain only adds optional fields.
 
 ## 4.7.6 `agent.active_permissions()` — policy snapshots
 
@@ -210,24 +210,24 @@ snap.loaded_sources   # list[str] — provenance labels
 `loaded_sources` carries stable string labels:
 
 - `preset:<mode>` — built-in preset (e.g. `preset:workspace-write`)
-- `user:<path>` — user-scoped JSON from `~/.agentao/permissions.json`
+- `user:<path>` — user-scoped JSON from `~/.arbiter/permissions.json`
 - `injected:<name>` — host-supplied policy via `add_loaded_source()`
 - `default:no-engine` — fallback when no engine is configured
 
-> **No `project:<path>` label.** Project-scope `<wd>/.agentao/permissions.json` is intentionally **not** loaded — see [5.4](/en/part-5/4-permissions). Hosts that need project-aware policy should inject it via `add_loaded_source("injected:<name>")` plus their own rule layer.
+> **No `project:<path>` label.** Project-scope `<wd>/.arbiter/permissions.json` is intentionally **not** loaded — see [5.4](/en/part-5/4-permissions). Hosts that need project-aware policy should inject it via `add_loaded_source("injected:<name>")` plus their own rule layer.
 
 Pin this snapshot into your audit log on session start so you can later answer "what policy was active when this happened?" without replaying the whole engine.
 
 ## 4.7.7 Forward-compatibility guarantees
 
-What `agentao.host` promises:
+What `arbiter.host` promises:
 
 - **Adding a field** to any model = backwards-compatible. Your code keeps working.
 - **Removing or renaming a field** requires a schema version bump (`host.events.v1.json` → `v2`) and a clear migration in the changelog.
-- **Internal types** (`agentao.transport.AgentEvent`, `agentao.tools.ToolExecutionResult`, `agentao.permissions.PermissionEngine`) may change in any release. **Don't import them directly into production code paths.**
+- **Internal types** (`arbiter.transport.AgentEvent`, `arbiter.tools.ToolExecutionResult`, `arbiter.permissions.PermissionEngine`) may change in any release. **Don't import them directly into production code paths.**
 - **Schema snapshots are CI-enforced** via `tests/test_host_schema.py` — a model change that shifts the wire form fails the build until both the model and the snapshot are updated together.
 
-What this gives you operationally: **you can pin `agentao>=0.4.0,<1.0` in production** with confidence that the harness contract is the contract you'll have at 0.9.x.
+What this gives you operationally: **you can pin `arbiter>=0.4.0,<1.0` in production** with confidence that the harness contract is the contract you'll have at 0.9.x.
 
 ## 4.7.8 What's *not* in the contract
 
@@ -242,7 +242,7 @@ The harness deliberately doesn't expose:
 
 The CLI may build on the same events for its own UI, but its stores and commands are **not promoted** to the harness API.
 
-If you find yourself wanting to reach past `agentao.host` for something missing, file an issue rather than relying on internal types.
+If you find yourself wanting to reach past `arbiter.host` for something missing, file an issue rather than relying on internal types.
 
 ## 4.7.9 Quick decision flow
 
@@ -262,10 +262,10 @@ Q: I need to react to agent events. Which surface?
 │      → agent.active_permissions()    (§ 4.7.6)
 │
 ├─ Routing IO through Docker / virtual FS / audit proxy?
-│      → from agentao.host.protocols import FileSystem, ShellExecutor
+│      → from arbiter.host.protocols import FileSystem, ShellExecutor
 │        (Part 2.2 / Part 6.4)
 │
-├─ Driving Agentao from a non-Python host (IDE, Node, Go, Rust)?
+├─ Driving Arbiter from a non-Python host (IDE, Node, Go, Rust)?
 │      → ACP stdio protocol            (Part 3.1)
 │        (use export_host_acp_json_schema() for the wire types)
 │
@@ -274,7 +274,7 @@ Q: I need to react to agent events. Which surface?
 
 ## TL;DR
 
-- **`agentao.host` is the stable, schema-snapshotted, forward-compatible host surface.** Pin to it for production code.
+- **`arbiter.host` is the stable, schema-snapshotted, forward-compatible host surface.** Pin to it for production code.
 - **Three surfaces**: `events()` for streams, `active_permissions()` for policy snapshots, `harness.protocols` for capability injection.
 - **`events()` is not a replacement for Transport** — they're complementary. Use Transport for UI streaming, `events()` for audit / observability.
 - **`isinstance`-dispatch on `HostEvent`** to route to the right handler. The three event types are orthogonal lifecycle facts, not a hierarchy.

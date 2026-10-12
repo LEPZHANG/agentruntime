@@ -1,10 +1,10 @@
-# Agentao — 重构审计与反向评审（2026-07）
+# Arbiter — 重构审计与反向评审（2026-07）
 
 **状态:** 评审记录。2026-07-24/25 对全树（58.8k 行 / 268 个模块）做重构审计，随后
 对**审计自身的结论**做了一轮对抗性反向评审。三项落地；五项在反向评审推翻或降级其
 前提**之后**被否决。**被否决的那半才是本文的实质内容**——它存在的目的是：没有新证据
 时不要重提这些提案。
-**读者:** Agentao 维护者。
+**读者:** Arbiter 维护者。
 **配套:** `refactor-audit-2026-07.md`（权威英文版）。
 **相关:**
 - `optimization-opportunities-review.md` —— 2026-06-19 那轮审计。其 Tier 1–2 已随
@@ -85,12 +85,12 @@ import 只在**函数体内部**（这是刻意的——插件子系统是可选
 名字，因此没有任何静态检查器能解析这些注解。
 
 修法是把它们声明进 `TYPE_CHECKING` 块。已验证**不引入运行时 import**
-（`agentao.plugins.models` 不进 `sys.modules`）。
+（`arbiter.plugins.models` 不进 `sys.modules`）。
 
 > **价值修正。** 审计曾暗示这能恢复运行时内省。**并不能**——已实测：
 > `typing.get_type_hints()` 仍抛 `NameError`，因为它按运行时 `__globals__` 解析，而
 > `TYPE_CHECKING` 块运行时不存在。全树没有任何代码对这两个方法做内省；schema 生成器
-> 作用于 `agentao.host` 的 Pydantic 模型，唯一做内省的测试
+> 作用于 `arbiter.host` 的 Pydantic 模型，唯一做内省的测试
 > （`test_async_tool.py`）针对的是**另一个方法**且早已用 `localns` 绕过。
 > **这是为将来扩大 mypy 门禁做的防护，不是活动缺陷。**
 
@@ -113,28 +113,28 @@ import 只在**函数体内部**（这是刻意的——插件子系统是可选
 没人改的 249 行函数不产生成本。**长度本身不是重构触发条件**——同一把尺子也把
 `agent.py` 那个 231 行的 `__init__` 排除在外（cx **3**，纯顺序装配）。
 
-**T3.2 还栽在第二个独立理由上。** 该提案要把 `Agentao.get_conversation_summary`
+**T3.2 还栽在第二个独立理由上。** 该提案要把 `Arbiter.get_conversation_summary`
 当作展示逻辑移出 core。它**有真实调用者**（`cli/ui.py:75`），并且在测试 stub 中作为
 宿主提供的方法出现（`test_cli_host_events.py:133`）——它是既有接口的一部分。移走
 等于对嵌入宿主的破坏性变更，换来零功能收益。只有当某个宿主真的被它卡住时才重开。
 
 ### 6 — mypy 逐包棘轮
 
-审计建议逐包扩大 CI 类型门禁，并称 `agentao.replay`（16 条）是天然切入点。核查后
+审计建议逐包扩大 CI 类型门禁，并称 `arbiter.replay`（16 条）是天然切入点。核查后
 否决：
 
-- `agentao.replay` —— 16 条里 15 条是 `type-arg` / `no-any-return` 装饰性问题。仅
+- `arbiter.replay` —— 16 条里 15 条是 `type-arg` / `no-any-return` 装饰性问题。仅
   1 条真实注解缺陷（`recorder.py:113`，漏了 `Optional[TextIO]`）。
-- `agentao.runtime` —— **89 条里 27 条是 mixin 假阳性**（`_CompactionMixin` 访问
+- `arbiter.runtime` —— **89 条里 27 条是 mixin 假阳性**（`_CompactionMixin` 访问
   `self._agent`，由具体类提供）。消掉它们意味着写 Protocol 脚手架去哄检查器，而不是
   修任何东西。其余：26 条 `type-arg`、24 条缺注解。
 
-投入产出比差。`mypy --strict` 继续只覆盖 `agentao.host`——那是稳定性边界，也是它真正
+投入产出比差。`mypy --strict` 继续只覆盖 `arbiter.host`——那是稳定性边界，也是它真正
 产生价值的地方。`recorder.py:113` 那一条可在下次改动该文件时顺手修掉。
 
 ### 7 — 全面引入 linter
 
-`uvx ruff check agentao` 报约 2800 条，但这个数字有误导性：926 条是 `List` → `list`
+`uvx ruff check arbiter` 报约 2800 条，但这个数字有误导性：926 条是 `List` → `list`
 现代化，833 条是 `Optional[X]` → `X | None`，224 条是刻意的 `except Exception` 设计
 取舍。高信号子集（`--select F`）是 92 条，其中只有 4 条 F821 有论据支撑——而且见上文
 的价值修正。
@@ -145,7 +145,7 @@ import 只在**函数体内部**（这是刻意的——插件子系统是可选
 ### 8 — hardline 正则表惰性编译
 
 `permissions_hardline/_patterns.py` 在导入期编译 23 条正则：占 88ms
-`import agentao.agent` 中的 17ms，约为 130ms CLI 冷启动的 13%。它是整个导入图里最贵
+`import arbiter.agent` 中的 17ms，约为 130ms CLI 冷启动的 13%。它是整个导入图里最贵
 的单个模块，这正是它看起来像个发现的原因。但它仍然只是 17ms、一次性；对嵌入宿主而言
 只在模块导入时付一次。按需再议。
 
@@ -170,7 +170,7 @@ import 只在**函数体内部**（这是刻意的——插件子系统是可选
   每次都掉出所有 turn。**该 PR 自己的测试之所以通过，是因为我手工给全部六个事件写死
   了 `turn_id: "t1"`——这是 recorder 产生不出来的形状。** 已修：给 `HostReplaySink`
   加 `turn_id_provider`，信封走 replay 的 id 空间，payload 保留 host 的。
-- **一个测试软删了开发者真实的 `~/.agentao/memory.db`。** 让 `_clear_reset` 走真实
+- **一个测试软删了开发者真实的 `~/.arbiter/memory.db`。** 让 `_clear_reset` 走真实
   handler 是对的，但 `MemoryManager.clear()` 在 `scope=None` 下会清**用户**存储，
   而该存储解析到 `user_root()`，与 fixture 的 `working_directory` 无关。每次
   `pytest tests/` 都在销毁跨项目用户记忆——静默、全绿。已修：fixture 重定向 `HOME`，

@@ -5,11 +5,11 @@ from unittest.mock import Mock, patch
 
 
 def _make_agent(thinking_callback=None):
-    with patch('agentao.agent.LLMClient') as mock_llm_client:
+    with patch('arbiter.agent.LLMClient') as mock_llm_client:
         mock_llm_client.return_value.logger = Mock()
         mock_llm_client.return_value.model = "gpt-4"
-        from agentao.agent import Agentao
-        agent = Agentao(
+        from arbiter.agent import Arbiter
+        agent = Arbiter(
             thinking_callback=thinking_callback,
             working_directory=Path.cwd(),
         )

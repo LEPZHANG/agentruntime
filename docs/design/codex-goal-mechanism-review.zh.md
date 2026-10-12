@@ -1,19 +1,19 @@
-# Codex `/goal` — 拆解 + Agentao 候选设计
+# Codex `/goal` — 拆解 + Arbiter 候选设计
 
 **状态:** 两部分。**§§1–9 —— 机制拆解**:对**外部项目**(Codex)的拆解,2026-06-23 起草,
 基于对 goal 斜杠命令、`ext/goal` 扩展 crate、协议/状态模型、引导(steering)模板的逐行核对
-阅读(纯描述,不含建议)。**§§10–11 —— Agentao 候选设计**:探索性的关联说明(§10)+ 带
+阅读(纯描述,不含建议)。**§§10–11 —— Arbiter 候选设计**:探索性的关联说明(§10)+ 带
 `/goal` 接口草拟的候选设计拆分(§11),两者均**明确标注为非已批准计划 / 未实现**。拆解部分
-独立成立;候选设计中,**§11 的具体论断已对 `agentao/` 做 grep 核实**,而 **§10 保持探索性、
+独立成立;候选设计中,**§11 的具体论断已对 `arbiter/` 做 grep 核实**,而 **§10 保持探索性、
 未经验证**;整个候选成为提案前仍需维护者签字。(若 §11 日后
 升级为已批准计划,再拆成独立的实现计划文档 —— 在它仍是候选阶段时留在此处,以免割裂
 EN/ZH 配对。)
-**读者:** 研究长任务/自主续航设计的 Agentao 维护者;任何对 Codex 做反向审阅的人。
+**读者:** 研究长任务/自主续航设计的 Arbiter 维护者;任何对 Codex 做反向审阅的人。
 **配套:** `codex-goal-mechanism-review.md`(英文版)。
 **相关:**
-- `codex-reverse-review.md` —— 此前对 Codex 的反向审阅,同样秉持"看 Agentao 真正需要
+- `codex-reverse-review.md` —— 此前对 Codex 的反向审阅,同样秉持"看 Arbiter 真正需要
   什么,而非照搬 Codex 的产品形态"的立场。
-- `metacognitive-boundary.md` —— Agentao 自己的"可注入的每轮协议"构想;是与 Codex
+- `metacognitive-boundary.md` —— Arbiter 自己的"可注入的每轮协议"构想;是与 Codex
   "steering 注入"概念上最接近的近邻。
 
 **来源:** Codex 本地检出 `../codex`,`main`@`97dce078c5`(2026-06-23)。下文所有文件引用
@@ -241,22 +241,22 @@ Read the Codex goal objective file at <path> before continuing.
 
 ---
 
-## 10. 对 Agentao 的探索性关联(未经验证 —— 由维护者裁定)
+## 10. 对 Arbiter 的探索性关联(未经验证 —— 由维护者裁定)
 
 本节保持探索性 —— 其自身**不是**提案;在它之上的候选设计是 §11(已明确标注非批准)。仅
 记录供 grep-first 评估的引子:
 
-- Agentao 现有最接近的概念是**可注入的每轮元认知边界**
+- Arbiter 现有最接近的概念是**可注入的每轮元认知边界**
   (`metacognitive-boundary.md`)—— Codex 的 "steering" 正是"每轮注入一段由 host 控制的
-  协议片段"的一个已落地的具体实例。Agentao 的边界是否该长出一个*目标形状*的默认值,是
+  协议片段"的一个已落地的具体实例。Arbiter 的边界是否该长出一个*目标形状*的默认值,是
   开放设计问题,而非已坐实的缺口。
-- Codex 的自动续航活在 **host/app-server + TUI**,不在模型循环里。按 Agentao 的嵌入式
+- Codex 的自动续航活在 **host/app-server + TUI**,不在模型循环里。按 Arbiter 的嵌入式
   harness 边界,等价的"持续朝目标推进 turn"的循环最自然应是 **host 的职责**,由 harness
   暴露"每轮注入 + 工具注入"原语(时间/轮次预算属 host 侧;token 记账则是未来的 harness
   原语,见 §11)—— 与反复出现的"有价值的内核往往已作为 host-contract 原语
-  存在"这一结论一致。任何"存在真实缺口"的论断之前,都需照例在 `agentao/` 里 grep 验证。
+  存在"这一结论一致。任何"存在真实缺口"的论断之前,都需照例在 `arbiter/` 里 grep 验证。
 
-在上述任何一条变成提案之前:用具体的 `file:line` 证据(或"无匹配")在 `agentao/` 里
+在上述任何一条变成提案之前:用具体的 `file:line` 证据(或"无匹配")在 `arbiter/` 里
 证明缺口,并把痛点/优先级的裁定留给维护者。
 
 ---
@@ -281,15 +281,15 @@ harness 只欠**通用、与 goal 无关的原语**;"goal" 永不进核心。对
 
 | host 需要的原语 | 今天有没有? | 锚点 |
 |---|---|---|
-| 驱动多轮 turn | ✅ `Agentao.chat()` / `arun()`,可在 host 循环里反复调 | `agentao/agent.py` |
-| 每轮注入续航上下文 | ✅ host 拼进下一条消息 | `agentao/cli/input_loop.py:545`(CLI 已这么做) |
-| 注入 goal 工具(`get_goal`/…) | ✅ host `extra_tools` 构造 kwarg | `agentao/agent.py:84` |
+| 驱动多轮 turn | ✅ `Arbiter.chat()` / `arun()`,可在 host 循环里反复调 | `arbiter/agent.py` |
+| 每轮注入续航上下文 | ✅ host 拼进下一条消息 | `arbiter/cli/input_loop.py:545`(CLI 已这么做) |
+| 注入 goal 工具(`get_goal`/…) | ✅ host `extra_tools` 构造 kwarg | `arbiter/agent.py:84` |
 | 持久化 goal 状态 | ✅ host 侧(不属 harness) | —— |
 
 也就是说,**时间/轮次** goal 循环所需的原语 host 全已具备;唯一缺的那项只对 *token* 预算才有意义:
 
 **唯一的 harness 缺口 —— 以及决策为何绕开它:** token 用量没暴露在 `agent.events()` /
-`agentao/host/models.py` 上,所以 codex 式的 **token 预算**需要补一个(goal-agnostic 的)
+`arbiter/host/models.py` 上,所以 codex 式的 **token 预算**需要补一个(goal-agnostic 的)
 每轮用量信号。**按上述决策,token 预算不在范围内。** 时间/轮次预算**纯属 host 侧**
 (`chat()` 调用之间量墙钟;host 自己数循环轮次),**零** harness 改动 —— 所以第 1 层不只
 goal-agnostic,而是*完全不动*。(若日后想要 token 预算,这个用量信号就是唯一要加的原语,
@@ -297,8 +297,8 @@ goal-agnostic,而是*完全不动*。(若日后想要 token 预算,这个用量�
 
 ### 第 2 层 —— CLI(参考 host):实现 `/goal` + 续航循环
 
-Agentao 有三个 host / 前端面(in-process embedding、CLI(含 `agentao run`)、ACP;
-`docs/design/embedding-vs-acp.md`);其中 **CLI** 是本设计天然的**参考** host。它把 Agentao
+Arbiter 有三个 host / 前端面(in-process embedding、CLI(含 `arbiter run`)、ACP;
+`docs/design/embedding-vs-acp.md`);其中 **CLI** 是本设计天然的**参考** host。它把 Arbiter
 自己的 goal 编排实现为 **host 持有的外层循环**:
 
 ```text
@@ -310,7 +310,7 @@ while goal.active:
 
 这是把 `cli/input_loop.py:545` 已有的一次性先例(plan 模式后的自动续航)泛化。**明确不**
 建在插件 `Stop`/`force_continue` 路径上 —— 那被硬上限 `_stop_reentry_cap`(默认 3,
-`agentao/runtime/chat_loop/_runner.py:587`)卡住作为防失控护栏,且注入的是**可见** user
+`arbiter/runtime/chat_loop/_runner.py:587`)卡住作为防失控护栏,且注入的是**可见** user
 消息,两点都不适合持续追目标。host 持有的循环按设计**不设上限**(终止条件由 host 掌握)。
 
 ### 第 3 层 —— developer-guide:把 host 编排范式文档化
@@ -348,7 +348,7 @@ part-4(`developer-guide/en/part-4/7-host-contract.md`、`2-agent-events.md`)。�
 续航循环集成。无 token 预算(按上述决策)。`/goal` 是 CLI 斜杠命令,**不是 LLM 工具**;其它
 host 照 developer-guide 自行实现命令面。
 
-**A. 命令面**(对齐 `agentao/cli/help_text.py` 的 `/cmd [subcommand]` 风格):
+**A. 命令面**(对齐 `arbiter/cli/help_text.py` 的 `/cmd [subcommand]` 风格):
 
 ```
 /goal [subcommand|<objective>]            管理长任务目标(时间/轮次预算)
@@ -379,7 +379,7 @@ host 照 developer-guide 自行实现命令面。
 —— 取值/是否默认开由维护者定:
 
 ```jsonc
-// .agentao/settings.json
+// .arbiter/settings.json
 "goal": {
   "default_max_turns": 25,         // 未给 --turns 时套用
   "default_time_budget": "120m",   // 未给 --for 时套用
@@ -399,7 +399,7 @@ host 照 developer-guide 自行实现命令面。
 
 `/goal <obj> --unbounded` 显式退出默认上限。
 
-**D. 状态模型**(持久化到 `.agentao/goal.json`,或挂当前 session —— 开放):
+**D. 状态模型**(持久化到 `.arbiter/goal.json`,或挂当前 session —— 开放):
 
 ```python
 @dataclass
@@ -484,7 +484,7 @@ while goal.status == active:
 host **停止驱动**;状态停在 `limit_reached`,直到用户 `clear` / `edit` / `/goal budget` 重设。
 
 **G. 需新增小工具:** duration 解析器(`90s|30m|2h|1h30m → 秒`)—— 树里**无**(grep 无
-`parse_duration`);拒绝无单位数字;放 `agentao/cli/`。
+`parse_duration`);拒绝无单位数字;放 `arbiter/cli/`。
 
 **H. 边界防撞:**
 
@@ -494,7 +494,7 @@ host **停止驱动**;状态停在 `limit_reached`,直到用户 `clear` / `edit`
 | `force_continue`(`_runner.py:587`,上限 3) | host 外层 `while` | **不复用**:goal 走 host 循环,不走插件 Stop 路径 |
 
 **待维护者拍板:**(1)默认值 —— **已定(§C):`25` 轮 / `120m`,默认开上限**;尚开放的是
-上限"静默套用"还是"首次设目标时给一次性提示";(2)状态持久化落点(`.agentao/goal.json`
+上限"静默套用"还是"首次设目标时给一次性提示";(2)状态持久化落点(`.arbiter/goal.json`
 vs session);(3)旗标命名(`--for` / `--turns`)。
 
 ### 11.2 提交清单(有条件 —— 仅当 §11 获批后)
@@ -506,12 +506,12 @@ vs session);(3)旗标命名(`--for` / `--turns`)。
 
 | # | 提交 | 落点(锚) | 测试 | 依赖 |
 |---|---|---|---|---|
-| 1 | **duration 解析器**(§G) | 新增 `agentao/cli/duration.py` :: `parse_duration("90s\|30m\|2h\|1h30m") → int`;拒绝无单位 / 非正数 | 新增 `tests/cli/test_duration.py` —— 单位、复合、拒 `"30"` / `"-5m"` / `""` | — |
-| 2 | **GoalState + 持久化**(§D、§E) | 新增 `agentao/cli/goal_state.py` :: `GoalState` dataclass + `GoalStatus` 枚举;`load()`/`save()` → `.agentao/goal.json`(或 session —— 待定);转移方法落实 §E **状态机**(只管合法转移;*由谁触发*的写权限切分由调用方落实 —— 行 3/4/5) | round-trip 序列化;非法转移拒绝;paused 时间不计的计量 | — |
-| 3 | **`update_goal` 注入工具**(§E.1) | 新增 `agentao/tools/goal.py` :: 带守卫的 `update_goal(status)`(仅 active → 终态后 no-op + 错误结果);**不**在 `agent.py::_register_tools()` 注册 —— 经 `extra_tools` 注入(`agent.py:84`);可选只读 `get_goal` | `status != active` 时守卫返回错误;成功路径置状态;终态不可变 | 2 |
-| 4 | **`/goal` 命令**(§A、§C) | 新增 `agentao/cli/commands/goal.py`(argparse 子命令 + `--for` / `--turns` / `--unbounded` / `--clear`;替换非终态目标时确认);改 `agentao/cli/help_text.py`(`/goal` 条目);从 settings 读 `goal.{default_max_turns,default_time_budget,enabled}` | 新增 `tests/cli/test_goal_command.py` —— 旗标解析、默认套用、替换确认、`--unbounded` 退出 | 1、2 |
-| 5 | **续航循环**(§F)—— *关键件* | 改 `agentao/cli/input_loop.py` —— 把 `:545` 的一次性先例泛化为 host 自有 `while goal.status == active`:预算前置检查、经 `extra_tools` 注入 `update_goal`、`CONTINUATION_PROMPT` / `WRAP_UP_PROMPT`、触限时**恰好一次**收尾轮、每轮 `persist()`;明确**不**走 `force_continue`(§H) | 循环在 complete/blocked/轮次上限/时间上限退出;收尾恰好一次;首轮用原始消息,之后用续航消息;`--turns` 与 `max_iterations` 独立 | 2、3、4 |
-| 6 | **配置参考**(§C) | 改 `docs/reference/configuration.md` —— `goal` settings 块 + `.agentao/goal.json` 路径 / schema / 优先级 | 纯文档 | 4 |
+| 1 | **duration 解析器**(§G) | 新增 `arbiter/cli/duration.py` :: `parse_duration("90s\|30m\|2h\|1h30m") → int`;拒绝无单位 / 非正数 | 新增 `tests/cli/test_duration.py` —— 单位、复合、拒 `"30"` / `"-5m"` / `""` | — |
+| 2 | **GoalState + 持久化**(§D、§E) | 新增 `arbiter/cli/goal_state.py` :: `GoalState` dataclass + `GoalStatus` 枚举;`load()`/`save()` → `.arbiter/goal.json`(或 session —— 待定);转移方法落实 §E **状态机**(只管合法转移;*由谁触发*的写权限切分由调用方落实 —— 行 3/4/5) | round-trip 序列化;非法转移拒绝;paused 时间不计的计量 | — |
+| 3 | **`update_goal` 注入工具**(§E.1) | 新增 `arbiter/tools/goal.py` :: 带守卫的 `update_goal(status)`(仅 active → 终态后 no-op + 错误结果);**不**在 `agent.py::_register_tools()` 注册 —— 经 `extra_tools` 注入(`agent.py:84`);可选只读 `get_goal` | `status != active` 时守卫返回错误;成功路径置状态;终态不可变 | 2 |
+| 4 | **`/goal` 命令**(§A、§C) | 新增 `arbiter/cli/commands/goal.py`(argparse 子命令 + `--for` / `--turns` / `--unbounded` / `--clear`;替换非终态目标时确认);改 `arbiter/cli/help_text.py`(`/goal` 条目);从 settings 读 `goal.{default_max_turns,default_time_budget,enabled}` | 新增 `tests/cli/test_goal_command.py` —— 旗标解析、默认套用、替换确认、`--unbounded` 退出 | 1、2 |
+| 5 | **续航循环**(§F)—— *关键件* | 改 `arbiter/cli/input_loop.py` —— 把 `:545` 的一次性先例泛化为 host 自有 `while goal.status == active`:预算前置检查、经 `extra_tools` 注入 `update_goal`、`CONTINUATION_PROMPT` / `WRAP_UP_PROMPT`、触限时**恰好一次**收尾轮、每轮 `persist()`;明确**不**走 `force_continue`(§H) | 循环在 complete/blocked/轮次上限/时间上限退出;收尾恰好一次;首轮用原始消息,之后用续航消息;`--turns` 与 `max_iterations` 独立 | 2、3、4 |
+| 6 | **配置参考**(§C) | 改 `docs/reference/configuration.md` —— `goal` settings 块 + `.arbiter/goal.json` 路径 / schema / 优先级 | 纯文档 | 4 |
 | 7 | **文档**(三类读者) | **(a) 终端用户** —— 新增 `docs/guides/goal.md`:如何用 CLI `/goal`(子命令、预算、示例),与 `session-replay.md`(`/replay`)/ `memory-management.md`(`/memory`)平行;**(b) host 集成方·完整** —— 新增 `developer-guide/{en,zh}/part-4/8-orchestration-continuation.md`:编排续航模式(外层循环 + 注入上下文 + 注入工具 + host 侧时间/轮次计量),CLI 作范例,交叉链 §5.8 —— **唯一真源**;**(c) 嵌入型 coding agent·精简** —— 扩充 `docs/guides/embed-for-agents.md`,加一段"长任务 goal/续航是 *host* 的活"的骨架,**指向 (b)**(不重复),强调当下即真的通用结论:harness 只给三个原语(drive-turn / 注入上下文 / 注入工具 —— 均已存在,Layer 1 不变),**不**给 goal 功能;**(d)** 改 `CLAUDE.md` 斜杠命令列表 + 一条 `--turns` ≠ `max_iterations` 的 gotcha | 纯文档;developer-guide EN+ZH 配对,`docs/guides/*` 按仓库惯例单文件 | 5 |
 
 **分阶段上线护栏。** 在提交 5 落地前把 `goal.enabled` 保持 **`false`**,以免提交 3–4
@@ -519,5 +519,5 @@ vs session);(3)旗标命名(`--for` / `--turns`)。
 
 **完成判定。** `uv run python -m pytest tests/` 含新文件全绿;`/help` 渲染出 `/goal`;
 EN+ZH 文档对同步;一条回归测试断言 goal 循环**不**经 `force_continue`、且 `--turns`
-与 `max_iterations` 独立(§H 两条边界护栏);非 goal 路径上 `agentao/cli/` 的 import
+与 `max_iterations` 独立(§H 两条边界护栏);非 goal 路径上 `arbiter/cli/` 的 import
 面不变。

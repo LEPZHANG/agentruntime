@@ -5,13 +5,13 @@ canonical "drain ``agent.events()`` into a database" pattern:
 
 - Pin ``agent.active_permissions()`` once per session (audit-log
   enrichment).
-- Stream :class:`agentao.host.HostEvent` into a local SQLite
+- Stream :class:`arbiter.host.HostEvent` into a local SQLite
   ``agent_audit`` table while ``agent.arun(...)`` is running.
 - Print the table after the turn so you can see the schema-stable shape
-  that survives Agentao release upgrades.
+  that survives Arbiter release upgrades.
 
 The schema only references fields documented in
-``agentao/host/models.py``. New optional fields landing in future
+``arbiter/host/models.py``. New optional fields landing in future
 minor releases are *additive* — this script (and your real audit
 pipeline) keep working without changes.
 
@@ -39,8 +39,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
-from agentao.embedding import build_from_environment
-from agentao.host import (
+from arbiter.embedding import build_from_environment
+from arbiter.host import (
     HostEvent,
     PermissionDecisionEvent,
     SubagentLifecycleEvent,
@@ -276,7 +276,7 @@ def main() -> int:
         )
         return 2
 
-    workdir = Path(tempfile.mkdtemp(prefix="agentao-audit-"))
+    workdir = Path(tempfile.mkdtemp(prefix="arbiter-audit-"))
     db_path = workdir / "audit.sqlite"
     return asyncio.run(amain(workdir, db_path))
 

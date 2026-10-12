@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from agentao.cli.commands import handle_image_command
+from arbiter.cli.commands import handle_image_command
 
 
 # A 1x1 transparent PNG.
@@ -117,7 +117,7 @@ def test_trailing_apostrophe_filename_not_stripped(tmp_path):
 
 
 def test_too_large_image_rejected(tmp_path, monkeypatch):
-    from agentao.cli.commands import image as image_mod
+    from arbiter.cli.commands import image as image_mod
 
     # Shrink the cap so we can test rejection without writing a 20MB file —
     # and prove the size check happens before the file is read into memory.
@@ -145,7 +145,7 @@ def test_toctou_truncated_after_stat_is_rejected(tmp_path, monkeypatch):
 def test_toctou_grown_after_stat_is_rejected(tmp_path, monkeypatch):
     """A file that passes the stat() size check but reads back oversized (grew
     between stat and read) must be rejected by the post-read size guard."""
-    from agentao.cli.commands import image as image_mod
+    from arbiter.cli.commands import image as image_mod
 
     img = tmp_path / "race.png"
     img.write_bytes(_PNG_BYTES)
@@ -158,7 +158,7 @@ def test_toctou_grown_after_stat_is_rejected(tmp_path, monkeypatch):
 
 
 def test_staged_image_cap_enforced(tmp_path):
-    from agentao.cli.commands import image as image_mod
+    from arbiter.cli.commands import image as image_mod
 
     img = tmp_path / "x.png"
     img.write_bytes(_PNG_BYTES)
@@ -175,7 +175,7 @@ def _run_loop_once(commands):
     Returns the mocked cli so callers can assert post-run state. The final
     command must be /exit so the loop terminates.
     """
-    from agentao.cli.input_loop import run_loop
+    from arbiter.cli.input_loop import run_loop
 
     cli = Mock()
     cli._staged_images = [{"data": "QUJD", "mimeType": "image/png"}]

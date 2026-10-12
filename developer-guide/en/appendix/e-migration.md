@@ -1,14 +1,14 @@
 # Appendix E · Migrating from LangChain / AutoGen / CrewAI
 
-If you've already built agents with another framework, the mental model of Agentao will feel familiar in most places and different in a few load-bearing ones. This appendix is the concordance.
+If you've already built agents with another framework, the mental model of Arbiter will feel familiar in most places and different in a few load-bearing ones. This appendix is the concordance.
 
 ## E.1 One-page mental-model map
 
-| Concept | LangChain | AutoGen | CrewAI | Agentao |
+| Concept | LangChain | AutoGen | CrewAI | Arbiter |
 |---------|-----------|---------|--------|---------|
-| Agent unit | `AgentExecutor` (+ chain / graph) | `ConversableAgent` | `Agent` role | `Agentao` instance |
+| Agent unit | `AgentExecutor` (+ chain / graph) | `ConversableAgent` | `Agent` role | `Arbiter` instance |
 | Tool | `BaseTool` | function with docstring | `tool` decorator | `Tool` ABC |
-| Multi-agent | LangGraph | `GroupChat` | `Crew` | spawn another `Agentao` or use ACP reverse call |
+| Multi-agent | LangGraph | `GroupChat` | `Crew` | spawn another `Arbiter` or use ACP reverse call |
 | Memory | `ConversationBufferMemory` / vector stores | `memory` on agent | `memory` on agent | `MemoryManager` (SQLite, project+user) |
 | Streaming | callbacks / LCEL `astream` | `register_hook` | event hooks | `Transport` + `AgentEvent` |
 | Tool approval | HITL via `interrupt` | `a_human_input_mode` | `human_input=True` | `Transport.confirm_tool` |
@@ -19,22 +19,22 @@ If you've already built agents with another framework, the mental model of Agent
 
 ### What's the same
 
-- **Tools** — the boilerplate is almost identical. LangChain's `BaseTool.name/description/args_schema/_run` maps 1-to-1 to Agentao's `Tool.name/description/parameters/execute`.
-- **Streaming via callbacks** — LangChain's callback handlers and Agentao's `Transport.emit(AgentEvent)` serve the same purpose.
-- **Prompt composition** — system-prompt blocks in LangChain become Agentao's `AGENTAO.md` + skills.
+- **Tools** — the boilerplate is almost identical. LangChain's `BaseTool.name/description/args_schema/_run` maps 1-to-1 to Arbiter's `Tool.name/description/parameters/execute`.
+- **Streaming via callbacks** — LangChain's callback handlers and Arbiter's `Transport.emit(AgentEvent)` serve the same purpose.
+- **Prompt composition** — system-prompt blocks in LangChain become Arbiter's `ARBITER.md` + skills.
 
 ### What's different
 
-- **No LCEL / graph** — Agentao is a single execution loop, not a composable pipeline. If you were building a DAG of chains, collapse it into one system prompt + tools. Branching logic belongs in the LLM, not the framework.
+- **No LCEL / graph** — Arbiter is a single execution loop, not a composable pipeline. If you were building a DAG of chains, collapse it into one system prompt + tools. Branching logic belongs in the LLM, not the framework.
 - **No retrievers-as-tools glue** — write a thin custom tool that wraps your existing retriever's `.get_relevant_documents()` call.
-- **Memory is not a vector store** — Agentao memory is structured key/value SQLite. If you relied on vector recall, keep your vector DB; expose it as an MCP server or custom tool and let the LLM call it.
-- **Agents run forever by default** — LangChain has `max_iterations`; Agentao has it too (`max_iterations=` on `chat()`) but defaults to 100. Turn it down for cost control.
+- **Memory is not a vector store** — Arbiter memory is structured key/value SQLite. If you relied on vector recall, keep your vector DB; expose it as an MCP server or custom tool and let the LLM call it.
+- **Agents run forever by default** — LangChain has `max_iterations`; Arbiter has it too (`max_iterations=` on `chat()`) but defaults to 100. Turn it down for cost control.
 
 ### Migration recipe
 
 1. Port tools first. `_run(self, **kw)` → `execute(self, **kw)`; `args_schema` Pydantic → `parameters` JSON Schema (or generate it with `pydantic.TypeAdapter`).
-2. Move prompt text to `AGENTAO.md` + skill files. Any per-request dynamic context stays in the user message.
-3. Replace `AgentExecutor(..., memory=ConversationBufferMemory())` with `Agentao(...)`; history lives in `agent.messages` automatically.
+2. Move prompt text to `ARBITER.md` + skill files. Any per-request dynamic context stays in the user message.
+3. Replace `AgentExecutor(..., memory=ConversationBufferMemory())` with `Arbiter(...)`; history lives in `agent.messages` automatically.
 4. Wire streaming: replace callback handlers with a `SdkTransport(on_event=…)`.
 5. For RAG, expose your vector store as an MCP server or a `Tool` subclass.
 
@@ -42,19 +42,19 @@ If you've already built agents with another framework, the mental model of Agent
 
 ### What's the same
 
-- **Conversational loop** — AutoGen's "agent talks, tool is called, result returns" matches Agentao's inner loop.
+- **Conversational loop** — AutoGen's "agent talks, tool is called, result returns" matches Arbiter's inner loop.
 - **Async-friendly** — both are OK under `asyncio.to_thread` / event-loop integration.
 
 ### What's different
 
-- **No `GroupChat`** — AutoGen's strength is multi-agent orchestration. Agentao supports sub-agents (one `Agentao` spawning another, or ACP reverse-calling a different server), but there's no built-in "group chat manager". For multi-role conversations, model them as skills + one agent, or wire your own coordinator.
-- **Tool calling is OpenAI-style only** — AutoGen supports multiple LLM providers with varying tool-call formats; Agentao standardizes on the OpenAI-compatible tool-call schema. Non-OpenAI providers must speak the OpenAI format.
+- **No `GroupChat`** — AutoGen's strength is multi-agent orchestration. Arbiter supports sub-agents (one `Arbiter` spawning another, or ACP reverse-calling a different server), but there's no built-in "group chat manager". For multi-role conversations, model them as skills + one agent, or wire your own coordinator.
+- **Tool calling is OpenAI-style only** — AutoGen supports multiple LLM providers with varying tool-call formats; Arbiter standardizes on the OpenAI-compatible tool-call schema. Non-OpenAI providers must speak the OpenAI format.
 - **Human-in-the-loop** — AutoGen's `human_input_mode` parameter ≈ `Transport.confirm_tool` + `Transport.ask_user`.
 - **No `UserProxyAgent`** — the user sits outside the loop, communicating through `chat()` calls. Host code is the "user proxy".
 
 ### Migration recipe
 
-1. Identify the single "most autonomous" AutoGen agent — that's your `Agentao`.
+1. Identify the single "most autonomous" AutoGen agent — that's your `Arbiter`.
 2. Collapse other `ConversableAgent`s into either tools (if stateless) or skills (if they shape behavior).
 3. `GroupChat` managers become your host-side code (FastAPI endpoint, scheduler loop) that decides when to call `agent.chat()`.
 4. Port `register_function` calls to `Tool` subclasses.
@@ -63,12 +63,12 @@ If you've already built agents with another framework, the mental model of Agent
 
 ### What's the same
 
-- **Role / goal / backstory framing** — CrewAI's per-agent `role` + `goal` + `backstory` → Agentao's `AGENTAO.md` + activated skills.
-- **Tools as discrete units** — CrewAI `@tool` ≈ Agentao `Tool` subclass.
+- **Role / goal / backstory framing** — CrewAI's per-agent `role` + `goal` + `backstory` → Arbiter's `ARBITER.md` + activated skills.
+- **Tools as discrete units** — CrewAI `@tool` ≈ Arbiter `Tool` subclass.
 
 ### What's different
 
-- **No `Crew` orchestrator** — CrewAI's explicit `tasks` / `process` pipeline is the opposite of Agentao's style. In Agentao, the LLM decides what to do next based on tools + skills + user message. Multi-step workflows live in the prompt or in a host-side loop, not in framework config.
+- **No `Crew` orchestrator** — CrewAI's explicit `tasks` / `process` pipeline is the opposite of Arbiter's style. In Arbiter, the LLM decides what to do next based on tools + skills + user message. Multi-step workflows live in the prompt or in a host-side loop, not in framework config.
 - **Hierarchical vs flat** — CrewAI `Process.hierarchical` / `sequential` become either one super-agent + skills or host-side orchestration.
 - **No manager agent abstraction** — if you had one, reshape it into host code that calls `agent.chat()` multiple times with different prompts.
 
@@ -76,7 +76,7 @@ If you've already built agents with another framework, the mental model of Agent
 
 1. Pick the most useful CrewAI agent — port it first with its tools.
 2. For `Process.sequential`: write a host-side function that calls `agent.chat("step 1 …")`, inspects output, then `agent.chat("step 2 …")`.
-3. For `Process.hierarchical`: the manager becomes host code; worker agents become either additional `Agentao` instances (isolated) or skills (if they just change tone/approach).
+3. For `Process.hierarchical`: the manager becomes host code; worker agents become either additional `Arbiter` instances (isolated) or skills (if they just change tone/approach).
 4. Port tools.
 5. Migrate `memory=True` to the `MemoryManager` (see [5.5](/en/part-5/5-memory)).
 
@@ -97,10 +97,10 @@ You probably **want** to migrate if:
 
 ## E.6 Patterns that translate cleanly
 
-| Pattern | LC / AG / CrewAI | Agentao |
+| Pattern | LC / AG / CrewAI | Arbiter |
 |---------|------------------|---------|
 | "Tool that calls our API" | BaseTool | `Tool` subclass |
-| "Inject company policy into prompt" | system message | `AGENTAO.md` |
+| "Inject company policy into prompt" | system message | `ARBITER.md` |
 | "Task-specific behavior profile" | system prompt branch | Skill (activate on demand) |
 | "Human must approve writes" | HITL callback | `Transport.confirm_tool` |
 | "Per-user conversation memory" | `ConversationBufferMemory` keyed by user | Per-user `working_directory` → project-scope memory |
@@ -152,9 +152,9 @@ Notes:
 ## E.8 Common pitfalls when migrating
 
 1. **Over-abstracting** — you don't need a DAG. Trust the LLM + tools.
-2. **Under-trusting tool descriptions** — Agentao has no chain-of-thought scaffold; the tool description and AGENTAO.md *are* the behavior plan. Make them rich.
+2. **Under-trusting tool descriptions** — Arbiter has no chain-of-thought scaffold; the tool description and ARBITER.md *are* the behavior plan. Make them rich.
 3. **Mixing user + project memory** — keep tenant isolation as the default (see [6.4](/en/part-6/4-multi-tenant-fs)); user-scope is for single-user setups only.
-4. **Leaving confirmations off** — other frameworks often default to "ask everything". Agentao lets you allow-list; use it, but only after you've audited the tool's blast radius.
+4. **Leaving confirmations off** — other frameworks often default to "ask everything". Arbiter lets you allow-list; use it, but only after you've audited the tool's blast radius.
 
 ## E.9 Migrating from 0.2.x to 0.3.0
 
@@ -164,9 +164,9 @@ Notes:
 
 ```python
 from pathlib import Path
-from agentao import Agentao
+from arbiter import Arbiter
 
-agent = Agentao(working_directory=Path("/srv/agent-workdir"), ...)
+agent = Arbiter(working_directory=Path("/srv/agent-workdir"), ...)
 ```
 
 This is the right fix for the vast majority of call sites. Resolve the path before passing it so the frozen value is always absolute.
@@ -175,23 +175,23 @@ This is the right fix for the vast majority of call sites. Resolve the path befo
 
 ```python
 from pathlib import Path
-from agentao.embedding import build_from_environment
+from arbiter.embedding import build_from_environment
 
 agent = build_from_environment(working_directory=Path("/srv/agent-workdir"))
 ```
 
-`build_from_environment` reads `.env`, discovers `.agentao/` config files, and wires the full CLI-equivalent defaults (user-scope memory, MCP file config, sandbox, replay). Pass `working_directory=` explicitly; if omitted, the factory falls back to `Path.cwd()` — acceptable for CLI entry points, not for embedded hosts.
+`build_from_environment` reads `.env`, discovers `.arbiter/` config files, and wires the full CLI-equivalent defaults (user-scope memory, MCP file config, sandbox, replay). Pass `working_directory=` explicitly; if omitted, the factory falls back to `Path.cwd()` — acceptable for CLI entry points, not for embedded hosts.
 
 ### Recipe 3 — Tests that exercised the legacy lazy-cwd default
 
-In 0.2.x, tests that intentionally called `Agentao()` without `working_directory=` suppressed the warning with:
+In 0.2.x, tests that intentionally called `Arbiter()` without `working_directory=` suppressed the warning with:
 
 ```python
 import warnings
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", DeprecationWarning)
-    agent = Agentao(...)   # legacy lazy-cwd
+    agent = Arbiter(...)   # legacy lazy-cwd
 ```
 
 In 0.3.0, the same call raises `TypeError`. Update those tests to either:

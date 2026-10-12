@@ -1,6 +1,6 @@
 # 把需求拆成原子卡 · Survey → Classify → Prescribe → Verify
 
-> 本 playbook 是 SKILL.md Step 1 的展开，对应 `AGENTAO.md` 的 Code Review 思路（Survey → Classify → Prescribe → Verify）。
+> 本 playbook 是 SKILL.md Step 1 的展开，对应 `ARBITER.md` 的 Code Review 思路（Survey → Classify → Prescribe → Verify）。
 
 ## 工作面规则
 

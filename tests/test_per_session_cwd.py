@@ -3,17 +3,17 @@
 Since 0.3.0 ``working_directory`` is a required keyword argument: omitting
 it raises ``TypeError`` at construction (no ``Path.cwd()`` lazy fallback).
 The CLI-style auto-detection lives in
-``agentao.embedding.build_from_environment``, not in the constructor.
+``arbiter.embedding.build_from_environment``, not in the constructor.
 
 Covers:
 
-- ``Agentao()`` without ``working_directory=`` raises ``TypeError``;
+- ``Arbiter()`` without ``working_directory=`` raises ``TypeError``;
   when passed, the value is frozen as a resolved absolute ``Path``
 - The ``_resolve_path`` helper: absolute pass-through, tilde expansion,
   relative-against-wd, and relative-without-wd (returns the path unchanged)
 - Memory manager bound to session cwd (so two sessions don't share a
   SQLite database)
-- ``_load_project_instructions`` reads AGENTAO.md from session cwd
+- ``_load_project_instructions`` reads ARBITER.md from session cwd
 - System prompt renders the session cwd
 - ``PermissionEngine(project_root=...)`` isolation
 - ``load_mcp_config(project_root=...)`` isolation
@@ -23,7 +23,7 @@ Covers:
   tool's session cwd
 - ACP ``session/new`` factory wires ``working_directory=cwd`` through to
   the constructed runtime
-- ``agentao.log`` lands in the session cwd, not the process cwd
+- ``arbiter.log`` lands in the session cwd, not the process cwd
 """
 
 from __future__ import annotations
@@ -36,24 +36,24 @@ from pathlib import Path
 
 import pytest
 
-from agentao.acp import initialize as acp_initialize
-from agentao.acp import session_new as acp_session_new
-from agentao.acp.protocol import ACP_PROTOCOL_VERSION
-from agentao.acp.server import AcpServer
-from agentao.mcp.config import load_mcp_config
-from agentao.permissions import PermissionEngine
-from agentao.tools.file_ops import (
+from arbiter.acp import initialize as acp_initialize
+from arbiter.acp import session_new as acp_session_new
+from arbiter.acp.protocol import ACP_PROTOCOL_VERSION
+from arbiter.acp.server import AcpServer
+from arbiter.mcp.config import load_mcp_config
+from arbiter.permissions import PermissionEngine
+from arbiter.tools.file_ops import (
     EditTool,
     ReadFileTool,
     ReadFolderTool,
     WriteFileTool,
 )
-from agentao.tools.search import FindFilesTool, SearchTextTool
-from agentao.tools.shell import ShellTool
+from arbiter.tools.search import FindFilesTool, SearchTextTool
+from arbiter.tools.shell import ShellTool
 
 
 # ---------------------------------------------------------------------------
-# Agentao construction is expensive (LLMClient + memory manager + tool
+# Arbiter construction is expensive (LLMClient + memory manager + tool
 # registry + MCP autoload). Gate it behind a fixture that sets a dummy key.
 # ---------------------------------------------------------------------------
 
@@ -67,16 +67,16 @@ def stub_llm_env(monkeypatch):
 
 
 def _make_agent(working_directory: Path, stub_llm_env=None):
-    """Construct a real Agentao instance without invoking the API.
+    """Construct a real Arbiter instance without invoking the API.
 
     Since 0.3.0 ``working_directory`` is a required keyword argument
     (Issue #14 hard break). Tests that previously exercised the
     legacy ``working_directory=None`` lazy-cwd default were either
     deleted or rewritten to pin the new ``TypeError`` semantic.
     """
-    from agentao.agent import Agentao
+    from arbiter.agent import Arbiter
 
-    return Agentao(working_directory=working_directory)
+    return Arbiter(working_directory=working_directory)
 
 
 # ---------------------------------------------------------------------------
@@ -230,15 +230,15 @@ def test_shell_tool_default_wd_resolves_to_session_cwd(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_permission_engine_ignores_project_scope_rules(tmp_path):
-    """Project-scope ``.agentao/permissions.json`` is no longer honored.
+    """Project-scope ``.arbiter/permissions.json`` is no longer honored.
 
     A checked-in allow-rule must not slip into the rule set; the file
     is dropped and a warning is logged. This is the load-bearing
     config-trust-boundary invariant.
     """
-    (tmp_path / ".agentao").mkdir()
+    (tmp_path / ".arbiter").mkdir()
     rules = {"rules": [{"tool": "custom_tool_a", "action": "allow"}]}
-    (tmp_path / ".agentao" / "permissions.json").write_text(json.dumps(rules), encoding="utf-8")
+    (tmp_path / ".arbiter" / "permissions.json").write_text(json.dumps(rules), encoding="utf-8")
 
     engine = PermissionEngine(project_root=tmp_path)
 
@@ -282,9 +282,9 @@ def test_permission_engine_requires_project_root():
 # ---------------------------------------------------------------------------
 
 def test_load_mcp_config_reads_project_root(tmp_path):
-    (tmp_path / ".agentao").mkdir()
+    (tmp_path / ".arbiter").mkdir()
     cfg = {"mcpServers": {"local": {"command": "/bin/true", "args": []}}}
-    (tmp_path / ".agentao" / "mcp.json").write_text(json.dumps(cfg), encoding="utf-8")
+    (tmp_path / ".arbiter" / "mcp.json").write_text(json.dumps(cfg), encoding="utf-8")
 
     loaded = load_mcp_config(project_root=tmp_path)
 
@@ -295,12 +295,12 @@ def test_load_mcp_config_reads_project_root(tmp_path):
 def test_load_mcp_config_independent_per_project(tmp_path):
     dir_a = tmp_path / "a"
     dir_b = tmp_path / "b"
-    (dir_a / ".agentao").mkdir(parents=True)
-    (dir_b / ".agentao").mkdir(parents=True)
-    (dir_a / ".agentao" / "mcp.json").write_text(
+    (dir_a / ".arbiter").mkdir(parents=True)
+    (dir_b / ".arbiter").mkdir(parents=True)
+    (dir_a / ".arbiter" / "mcp.json").write_text(
         json.dumps({"mcpServers": {"server_a": {"command": "/a", "args": []}}}), encoding="utf-8"
     )
-    (dir_b / ".agentao" / "mcp.json").write_text(
+    (dir_b / ".arbiter" / "mcp.json").write_text(
         json.dumps({"mcpServers": {"server_b": {"command": "/b", "args": []}}}), encoding="utf-8"
     )
 
@@ -312,24 +312,24 @@ def test_load_mcp_config_independent_per_project(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Agentao.working_directory property
+# Arbiter.working_directory property
 # ---------------------------------------------------------------------------
 
-def test_agentao_without_working_directory_raises(stub_llm_env):
+def test_arbiter_without_working_directory_raises(stub_llm_env):
     """Since 0.3.0 ``working_directory`` is required keyword-only.
 
-    Calling ``Agentao()`` without it must raise ``TypeError`` from
+    Calling ``Arbiter()`` without it must raise ``TypeError`` from
     Python's signature dispatch — there is no longer a ``Path.cwd()``
     lazy fallback. Embedded hosts that want the legacy CLI behavior
-    should route through ``agentao.embedding.build_from_environment``.
+    should route through ``arbiter.embedding.build_from_environment``.
     """
-    from agentao.agent import Agentao
+    from arbiter.agent import Arbiter
 
     with pytest.raises(TypeError):
-        Agentao()  # type: ignore[call-arg]
+        Arbiter()  # type: ignore[call-arg]
 
 
-def test_agentao_working_directory_is_frozen_when_explicit(stub_llm_env, tmp_path, monkeypatch):
+def test_arbiter_working_directory_is_frozen_when_explicit(stub_llm_env, tmp_path, monkeypatch):
     agent = _make_agent(working_directory=tmp_path)
     try:
         expected = tmp_path.resolve()
@@ -342,20 +342,20 @@ def test_agentao_working_directory_is_frozen_when_explicit(stub_llm_env, tmp_pat
         agent.close()
 
 
-def test_agentao_memory_manager_bound_to_session_cwd(stub_llm_env, tmp_path):
+def test_arbiter_memory_manager_bound_to_session_cwd(stub_llm_env, tmp_path):
     agent = _make_agent(working_directory=tmp_path)
     try:
         # After Issue #16, MemoryManager has no notion of a root path —
         # the SQLite store's ``db_path`` is the load-bearing artifact.
         # Verify the project store is rooted under the session cwd.
         db_path = Path(agent._memory_manager.project_store.db_path)
-        assert db_path == tmp_path.resolve() / ".agentao" / "memory.db"
+        assert db_path == tmp_path.resolve() / ".arbiter" / "memory.db"
     finally:
         agent.close()
 
 
-def test_agentao_loads_project_instructions_from_session_cwd(stub_llm_env, tmp_path):
-    (tmp_path / "AGENTAO.md").write_text("## Session-specific instructions\nhello\n", encoding="utf-8")
+def test_arbiter_loads_project_instructions_from_session_cwd(stub_llm_env, tmp_path):
+    (tmp_path / "ARBITER.md").write_text("## Session-specific instructions\nhello\n", encoding="utf-8")
 
     agent = _make_agent(working_directory=tmp_path)
     try:
@@ -365,7 +365,7 @@ def test_agentao_loads_project_instructions_from_session_cwd(stub_llm_env, tmp_p
         agent.close()
 
 
-def test_agentao_system_prompt_includes_session_cwd(stub_llm_env, tmp_path):
+def test_arbiter_system_prompt_includes_session_cwd(stub_llm_env, tmp_path):
     agent = _make_agent(working_directory=tmp_path)
     try:
         prompt = agent._build_system_prompt()
@@ -374,7 +374,7 @@ def test_agentao_system_prompt_includes_session_cwd(stub_llm_env, tmp_path):
         agent.close()
 
 
-def test_agentao_registers_tools_with_session_cwd(stub_llm_env, tmp_path):
+def test_arbiter_registers_tools_with_session_cwd(stub_llm_env, tmp_path):
     """Every file/shell/search tool registered on the agent must see the session cwd."""
     agent = _make_agent(working_directory=tmp_path)
     try:
@@ -401,7 +401,7 @@ def test_agentao_registers_tools_with_session_cwd(stub_llm_env, tmp_path):
 # Multi-session isolation (the acceptance criterion for Issue 05)
 # ---------------------------------------------------------------------------
 
-def test_two_agentao_instances_do_not_share_memory_db(stub_llm_env, tmp_path):
+def test_two_arbiter_instances_do_not_share_memory_db(stub_llm_env, tmp_path):
     dir_a = tmp_path / "session_a"
     dir_b = tmp_path / "session_b"
     dir_a.mkdir()
@@ -413,14 +413,14 @@ def test_two_agentao_instances_do_not_share_memory_db(stub_llm_env, tmp_path):
         db_a = Path(agent_a._memory_manager.project_store.db_path)
         db_b = Path(agent_b._memory_manager.project_store.db_path)
         assert db_a != db_b
-        assert db_a == dir_a.resolve() / ".agentao" / "memory.db"
-        assert db_b == dir_b.resolve() / ".agentao" / "memory.db"
+        assert db_a == dir_a.resolve() / ".arbiter" / "memory.db"
+        assert db_b == dir_b.resolve() / ".arbiter" / "memory.db"
     finally:
         agent_a.close()
         agent_b.close()
 
 
-def test_two_agentao_instances_report_different_cwd_in_system_prompt(stub_llm_env, tmp_path):
+def test_two_arbiter_instances_report_different_cwd_in_system_prompt(stub_llm_env, tmp_path):
     dir_a = tmp_path / "session_a"
     dir_b = tmp_path / "session_b"
     dir_a.mkdir()
@@ -440,7 +440,7 @@ def test_two_agentao_instances_report_different_cwd_in_system_prompt(stub_llm_en
         agent_b.close()
 
 
-def test_two_agentao_instances_have_isolated_file_tool_reads(stub_llm_env, tmp_path):
+def test_two_arbiter_instances_have_isolated_file_tool_reads(stub_llm_env, tmp_path):
     dir_a = tmp_path / "session_a"
     dir_b = tmp_path / "session_b"
     dir_a.mkdir()
@@ -496,7 +496,7 @@ def test_acp_session_new_factory_binds_working_directory(stub_llm_env, tmp_path)
     state_b = server.sessions.require(result_b["sessionId"])
 
     try:
-        # The real Agentao runtime must see the session cwd, not process cwd.
+        # The real Arbiter runtime must see the session cwd, not process cwd.
         assert state_a.agent.working_directory == dir_a.resolve()
         assert state_b.agent.working_directory == dir_b.resolve()
         # And file tools on each agent must be bound accordingly.
@@ -512,16 +512,16 @@ def test_acp_session_new_factory_binds_working_directory(stub_llm_env, tmp_path)
 # LLM debug log path is anchored to the session working directory
 #
 # Regression for the ACP launch failure: when an external client (e.g. Zed)
-# spawned the agentao subprocess with cwd="/" on macOS, ``LLMClient`` opened
-# ``"agentao.log"`` as a relative path, Python resolved it against the
+# spawned the arbiter subprocess with cwd="/" on macOS, ``LLMClient`` opened
+# ``"arbiter.log"`` as a relative path, Python resolved it against the
 # subprocess cwd, and ``FileHandler`` raised
-# ``OSError: [Errno 30] Read-only file system: '/agentao.log'`` from inside
-# ``Agentao.__init__``, killing the ACP server before any session could
+# ``OSError: [Errno 30] Read-only file system: '/arbiter.log'`` from inside
+# ``Arbiter.__init__``, killing the ACP server before any session could
 # start. The fix routes the agent's effective working directory into
 # ``LLMClient`` so the log always lands in a writable, session-scoped path.
 # ---------------------------------------------------------------------------
 
-def test_agentao_log_lands_in_session_cwd_not_process_cwd(
+def test_arbiter_log_lands_in_session_cwd_not_process_cwd(
     stub_llm_env, tmp_path, monkeypatch
 ):
     """ACP regression: log file follows ``working_directory``, not process cwd."""
@@ -533,10 +533,10 @@ def test_agentao_log_lands_in_session_cwd_not_process_cwd(
 
     agent = _make_agent(working_directory=session_cwd)
     try:
-        assert (session_cwd / "agentao.log").exists(), (
+        assert (session_cwd / "arbiter.log").exists(), (
             "log file must be created under the session working directory"
         )
-        assert not (process_cwd / "agentao.log").exists(), (
+        assert not (process_cwd / "arbiter.log").exists(), (
             "log file must NOT be created under the process cwd"
         )
     finally:
@@ -551,21 +551,21 @@ def test_llm_client_falls_back_when_primary_log_path_unwritable(
     Simulates the ACP failure mode (``OSError`` from FileHandler) by pointing
     the primary log at a path whose parent is a *file*, which makes
     ``mkdir(parents=True, exist_ok=True)`` raise ``NotADirectoryError`` (an
-    ``OSError`` subclass). The fallback should redirect to ``~/.agentao``,
+    ``OSError`` subclass). The fallback should redirect to ``~/.arbiter``,
     which we relocate to ``tmp_path`` via HOME so the test stays hermetic.
     """
     monkeypatch.setenv("HOME", str(tmp_path))
 
     blocker = tmp_path / "not-a-dir"
     blocker.write_text("regular file, not a directory", encoding="utf-8")
-    primary = blocker / "agentao.log"  # mkdir on the parent will fail
+    primary = blocker / "arbiter.log"  # mkdir on the parent will fail
 
-    from agentao.llm.client import LLMClient
+    from arbiter.llm.client import LLMClient
 
     handler = LLMClient._build_file_handler(str(primary))
     try:
         assert handler is not None, "fallback handler must be returned"
-        fallback_path = Path(tmp_path) / ".agentao" / "agentao.log"
+        fallback_path = Path(tmp_path) / ".arbiter" / "arbiter.log"
         assert Path(handler.baseFilename) == fallback_path.resolve()
         assert fallback_path.exists()
     finally:
@@ -579,33 +579,33 @@ def test_llm_client_anchors_relative_log_to_cwd_at_construction(
     """A relative ``log_file`` is anchored to ``Path.cwd()`` at __init__ time."""
     monkeypatch.chdir(tmp_path)
 
-    from agentao.llm.client import LLMClient
+    from arbiter.llm.client import LLMClient
 
-    handler = LLMClient._build_file_handler("agentao.log")
+    handler = LLMClient._build_file_handler("arbiter.log")
     try:
         assert handler is not None
-        assert Path(handler.baseFilename) == (tmp_path / "agentao.log").resolve()
+        assert Path(handler.baseFilename) == (tmp_path / "arbiter.log").resolve()
     finally:
         if handler is not None:
             handler.close()
 
 
 # ---------------------------------------------------------------------------
-# Memory-store fault tolerance during Agentao() construction
+# Memory-store fault tolerance during Arbiter() construction
 #
 # Regression for the ACP launch failure: when an external client spawned
-# the agentao subprocess in a restricted environment, ``MemoryManager``
+# the arbiter subprocess in a restricted environment, ``MemoryManager``
 # raised ``sqlite3.OperationalError: unable to open database file`` on the
-# user-scope DB (``~/.agentao/memory.db``). The manager's try/except only
-# caught ``OSError``, so the exception escaped and killed ``Agentao()``
+# user-scope DB (``~/.arbiter/memory.db``). The manager's try/except only
+# caught ``OSError``, so the exception escaped and killed ``Arbiter()``
 # before any session could be created — breaking plain CLI boot and every
 # ACP ``session/new`` spawn.
 # ---------------------------------------------------------------------------
 
-def test_agentao_survives_user_memory_db_sqlite_error(
+def test_arbiter_survives_user_memory_db_sqlite_error(
     stub_llm_env, tmp_path, monkeypatch
 ):
-    """``Agentao()`` must boot when the user memory DB cannot be opened.
+    """``Arbiter()`` must boot when the user memory DB cannot be opened.
 
     After Issue #16, the user-store fault is injected by patching
     :class:`SQLiteMemoryStore.__init__` directly; the factory's
@@ -613,7 +613,7 @@ def test_agentao_survives_user_memory_db_sqlite_error(
     """
     import sqlite3
 
-    from agentao.memory import SQLiteMemoryStore
+    from arbiter.memory import SQLiteMemoryStore
 
     # Point HOME at a writable tmp dir so the test is hermetic, but still
     # fault-inject a sqlite3.OperationalError on the user-scope path so the
@@ -621,7 +621,7 @@ def test_agentao_survives_user_memory_db_sqlite_error(
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    user_db = str(home / ".agentao" / "memory.db")
+    user_db = str(home / ".arbiter" / "memory.db")
 
     real_init = SQLiteMemoryStore.__init__
 
@@ -632,7 +632,7 @@ def test_agentao_survives_user_memory_db_sqlite_error(
 
     monkeypatch.setattr(SQLiteMemoryStore, "__init__", fake_init)
 
-    from agentao.embedding import build_from_environment
+    from arbiter.embedding import build_from_environment
 
     # Construction must succeed; user store is disabled, project store is live.
     agent = build_from_environment(working_directory=tmp_path)
@@ -659,12 +659,12 @@ def test_acp_session_new_survives_user_memory_db_sqlite_error(
     """End-to-end ACP ``session/new`` must not crash on a dead user memory DB."""
     import sqlite3
 
-    from agentao.memory import SQLiteMemoryStore
+    from arbiter.memory import SQLiteMemoryStore
 
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    user_db = str(home / ".agentao" / "memory.db")
+    user_db = str(home / ".arbiter" / "memory.db")
 
     real_init = SQLiteMemoryStore.__init__
 

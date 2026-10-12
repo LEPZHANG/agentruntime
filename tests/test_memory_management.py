@@ -1,6 +1,6 @@
 """Test memory management features via MemoryManager + SaveMemoryTool."""
 
-from agentao.tools.memory import SaveMemoryTool
+from arbiter.tools.memory import SaveMemoryTool
 
 from tests.support.memory import make_memory_manager
 
@@ -11,7 +11,7 @@ def test_memory_management(tmp_path):
     tool = SaveMemoryTool(memory_manager=mgr)
 
     # Save memories
-    result = tool.execute(key="project_name", value="Agentao", tags=["project", "important"])
+    result = tool.execute(key="project_name", value="Arbiter", tags=["project", "important"])
     assert "memory" in result.lower()
 
     result = tool.execute(key="user_preference", value="Use Python 3.11+", tags=["preference", "python"])

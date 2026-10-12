@@ -1,19 +1,19 @@
 # 运行时工具注入：`add_tool` / `remove_tool`（推迟设计）
 
-**状态：** **v1 已落地** —— 按 §6 实现了 `Agentao.add_tool` / `remove_tool` + `ToolRegistry.unregister`。跟踪于 [issue #65](https://github.com/jin-bo/agentao/issues/65)。本文档保留为设计记录;§8 的 demand-gate 说明它在此前为何推迟。
-**读者：** 在构造期工具注入(PR #64)之上,考虑给 host 一个运行时(构造后)增/删工具入口的 agentao 维护者。
+**状态：** **v1 已落地** —— 按 §6 实现了 `Arbiter.add_tool` / `remove_tool` + `ToolRegistry.unregister`。跟踪于 [issue #65](https://github.com/jin-bo/agentao/issues/65)。本文档保留为设计记录;§8 的 demand-gate 说明它在此前为何推迟。
+**读者：** 在构造期工具注入(PR #64)之上,考虑给 host 一个运行时(构造后)增/删工具入口的 arbiter 维护者。
 **配套:**
 - `docs/design/runtime-tool-injection.md` — 英文版
 - `docs/design/host-tool-injection.zh.md` — 构造期注入(`extra_tools` / `disable_tools`),本设计的前置
 - `docs/design/embedded-host-contract.md` — host 契约稳定边界(本设计的归属处)
-- `agentao/tools/base.py` — `ToolRegistry`(改造主战场:新增 `unregister`)
-- `agentao/tooling/registry.py` — `_bind_and_register`(运行时注入复用它)
+- `arbiter/tools/base.py` — `ToolRegistry`(改造主战场:新增 `unregister`)
+- `arbiter/tooling/registry.py` — `_bind_and_register`(运行时注入复用它)
 
 ---
 
 ## 1. 问题:构造期注入有了,运行时没有
 
-PR #64 落地了**构造期**工具注入——`Agentao(extra_tools=..., disable_tools=...)`(见 `host-tool-injection.zh.md`)。这两个 kwarg 在 `_wire_tooling` 里被消费一次,之后**不再读**。
+PR #64 落地了**构造期**工具注入——`Arbiter(extra_tools=..., disable_tools=...)`(见 `host-tool-injection.zh.md`)。这两个 kwarg 在 `_wire_tooling` 里被消费一次,之后**不再读**。
 
 本设计跟踪它的**运行时**对偶:host 想在构造**之后**、两次 `chat()` 调用**之间**增/替/删一个工具。真实场景:
 
@@ -26,7 +26,7 @@ PR #64 落地了**构造期**工具注入——`Agentao(extra_tools=..., disable
 | 事实 | 锚点 | 含义 |
 |---|---|---|
 | **schema 每次 `chat()` / `arun()` 调用重建一次** | `runtime/chat_loop/_runner.py:201`(`to_openai_format()` 在进入内部 LLM 迭代循环**之前**取一次快照) | 两次 `chat()`/`arun()` 调用**之间**改注册表,下一次调用即生效;一次调用**之内**(含后续 LLM iteration、stop-hook re-entry)工具列表冻结 |
-| **动态增/替技术上能跑** | `tools/base.py:209` `ToolRegistry.register(tool, replace=)` | 但这是捅运行时内部,不在 `agentao.host` 契约面 |
+| **动态增/替技术上能跑** | `tools/base.py:209` `ToolRegistry.register(tool, replace=)` | 但这是捅运行时内部,不在 `arbiter.host` 契约面 |
 | **但它绕过两道保障** | `tooling/registry.py:67` `_bind_and_register` | (a) capability 绑定(`working_directory`/`filesystem`/`shell`)丢失 → 工具变"裸"(ACP cwd 隔离 + host FS/shell 重定向失效);(b) 构造期校验(`mcp_` 前缀禁令、空名/类型 guard、override 审计日志)全不生效 |
 | **动态移除完全没 API** | `tools/base.py:198-263`(只有 `register`/`get`/`list_tools`/`to_openai_format`) | 无 `unregister`/`remove`;`disable_tools` 只在构造期过滤 |
 
@@ -34,14 +34,14 @@ PR #64 落地了**构造期**工具注入——`Agentao(extra_tools=..., disable
 
 ## 3. 范围:`add_tool` + `remove_tool`,且 demand-gated
 
-**仅当 §8 触发后**,给 `agentao.host` 契约加两个方法,**复用现有基础设施而非特判**:
+**仅当 §8 触发后**,给 `arbiter.host` 契约加两个方法,**复用现有基础设施而非特判**:
 
 ```python
 agent.add_tool(tool, *, replace=False)   # 复用 _bind_and_register + extra_tools 的校验
 agent.remove_tool(name) -> bool          # 复用新增的 ToolRegistry.unregister(name)
 ```
 
-放在 `Agentao` 公共方法簇里,与 `events()`(`agent.py:681`)、`active_permissions()`(`agent.py:699`)、`add_host_event_observer()`(`agent.py:658`)并列——它们已是契约面方法。
+放在 `Arbiter` 公共方法簇里,与 `events()`(`agent.py:681`)、`active_permissions()`(`agent.py:699`)、`add_host_event_observer()`(`agent.py:658`)并列——它们已是契约面方法。
 
 **明确不做:**
 - 不做 mid-turn(单次 `chat()` 内)变更可见——snapshot 已天然约束,见 §5。
@@ -52,7 +52,7 @@ agent.remove_tool(name) -> bool          # 复用新增的 ToolRegistry.unregist
 
 ## 4. 接口
 
-### 4.1 `Agentao.add_tool`
+### 4.1 `Arbiter.add_tool`
 
 ```python
 def add_tool(self, tool: "RegistrableTool", *, replace: bool = False) -> None:
@@ -68,7 +68,7 @@ def add_tool(self, tool: "RegistrableTool", *, replace: bool = False) -> None:
     """
 ```
 
-### 4.2 `Agentao.remove_tool`
+### 4.2 `Arbiter.remove_tool`
 
 ```python
 def remove_tool(self, name: str) -> bool:
@@ -103,9 +103,9 @@ def unregister(self, name: str) -> bool:
 |---|---|
 | `ToolRegistry.unregister(name) -> bool` | `tools/base.py`,紧挨 `register`(:209) |
 | 抽出单工具校验 `_validate_one_extra_tool(tool)` | `agent.py`,从现有 `_validate_tool_injection` 提取;构造期循环与 `add_tool` 共用。**保留名集 = `mcp_` 前缀 ∪ `_PLAN_ONLY_TOOLS`**,加空/非字符串名 guard |
-| `Agentao.add_tool` / `remove_tool` | `agent.py`,与 `events()`/`active_permissions()` 同簇(:681/:699 附近)。两者都先按保留名集校验(`add_tool` 走 `_validate_one_extra_tool`;`remove_tool` 同样拒 `mcp_` + `_PLAN_ONLY_TOOLS`),再绑定/`unregister` |
+| `Arbiter.add_tool` / `remove_tool` | `agent.py`,与 `events()`/`active_permissions()` 同簇(:681/:699 附近)。两者都先按保留名集校验(`add_tool` 走 `_validate_one_extra_tool`;`remove_tool` 同样拒 `mcp_` + `_PLAN_ONLY_TOOLS`),再绑定/`unregister` |
 | `add_tool` 复用 `_bind_and_register` | 已在 `tooling/registry.py:67`,无需改 |
-| 文档 + 契约面 | `docs/reference/host-api.md` 公共方法表加两行;`host/__init__.py` 无需动(是 `Agentao` 方法,非包级符号) |
+| 文档 + 契约面 | `docs/reference/host-api.md` 公共方法表加两行;`host/__init__.py` 无需动(是 `Arbiter` 方法,非包级符号) |
 
 路线简明,与 PR #64 同形:**grep 验证 → 设计(本文档)→ patch + 测试**。
 
@@ -121,7 +121,7 @@ v1 **只支持在两次 `chat()` / `arun()` 调用之间**调用 `add_tool` / `r
 
 满足**其一**才启动实现(gap≠need):
 
-1. 真实嵌入场景需要会话**中途**增/删工具,且构造期 `extra_tools`/`disable_tools` + 重建 `Agentao` 无法满足(如长 ACP 会话不能重建)。
+1. 真实嵌入场景需要会话**中途**增/删工具,且构造期 `extra_tools`/`disable_tools` + 重建 `Arbiter` 无法满足(如长 ACP 会话不能重建)。
 2. ACP `session/update` 类需求出现,要求会话级动态工具面。
 3. 有 host 反馈"只能捅 `agent.tools.register(...)`,且踩了裸工具(FS/shell 未绑定)的坑"。
 
@@ -129,7 +129,7 @@ v1 **只支持在两次 `chat()` / `arun()` 调用之间**调用 `add_tool` / `r
 
 ## 9. 待定问题(v1 范围外,记录备查)
 
-**v1 收敛为三步,不扩张:** `ToolRegistry.unregister()` + `Agentao.add_tool()`(复用 `_bind_and_register`)+ `Agentao.remove_tool()`(名字校验后 `unregister`)。下列均**先不做**:
+**v1 收敛为三步,不扩张:** `ToolRegistry.unregister()` + `Arbiter.add_tool()`(复用 `_bind_and_register`)+ `Arbiter.remove_tool()`(名字校验后 `unregister`)。下列均**先不做**:
 
 - **`add_tool(replace=False)` 重名该 raise 还是 warn?**(实现时定;倾向 raise,显式 host 调用严于 `register` 的 warn——届时在文档里与 `register` 语义区分清楚。)
 - **并发加锁 / 快照版本号**——见 §7,等真实信号。
@@ -146,12 +146,12 @@ v1 **只支持在两次 `chat()` / `arun()` 调用之间**调用 `add_tool` / `r
 ## 11. 引用
 
 - **前置设计:** `host-tool-injection.zh.md`(构造期注入,PR #64)、其 §9(落地前置)。
-- **Agentao 触及面(2026-06-01 验证):**
-  - `agentao/tools/base.py:198-263` — `ToolRegistry`(无 `unregister`)。
-  - `agentao/runtime/chat_loop/_runner.py:201` — `chat()`/`arun()` 进入 LLM 迭代循环前的 `to_openai_format` 快照(唯一的运行时工具面构建点;`agent.py` 里 `get_conversation_summary()` 那处 `to_openai_format` 是 token 估算,不是运行时工具面)。
-  - `agentao/tooling/registry.py:67` — `_bind_and_register`(capability 绑定,运行时复用)。
-  - `agentao/tooling/registry.py:138` — `register_extra_tools`(构造期最后 pass,同形参照)。
-  - `agentao/mcp/tool.py:19-21` — `make_mcp_tool_name`(`mcp_` 前缀来源)。
-  - `agentao/cli/app.py:91-92` — plan 工具构造后注册(正交路径)。
-  - `agentao/agent.py:658/681/699` — `add_host_event_observer` / `events` / `active_permissions`(公共方法簇,新方法的放置处)。
+- **Arbiter 触及面(2026-06-01 验证):**
+  - `arbiter/tools/base.py:198-263` — `ToolRegistry`(无 `unregister`)。
+  - `arbiter/runtime/chat_loop/_runner.py:201` — `chat()`/`arun()` 进入 LLM 迭代循环前的 `to_openai_format` 快照(唯一的运行时工具面构建点;`agent.py` 里 `get_conversation_summary()` 那处 `to_openai_format` 是 token 估算,不是运行时工具面)。
+  - `arbiter/tooling/registry.py:67` — `_bind_and_register`(capability 绑定,运行时复用)。
+  - `arbiter/tooling/registry.py:138` — `register_extra_tools`(构造期最后 pass,同形参照)。
+  - `arbiter/mcp/tool.py:19-21` — `make_mcp_tool_name`(`mcp_` 前缀来源)。
+  - `arbiter/cli/app.py:91-92` — plan 工具构造后注册(正交路径)。
+  - `arbiter/agent.py:658/681/699` — `add_host_event_observer` / `events` / `active_permissions`(公共方法簇,新方法的放置处)。
 - **跟踪:** [issue #65](https://github.com/jin-bo/agentao/issues/65)。

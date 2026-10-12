@@ -2,15 +2,15 @@
 
 The lazy-import contract is that ``rich`` / ``prompt_toolkit`` / ``readchar``
 / ``filelock`` only load when CLI / persistence paths actually run.
-``agentao/cli/*`` is allowed to import them eagerly (it is the CLI by
-definition); every other module under ``agentao/`` must defer or stay
+``arbiter/cli/*`` is allowed to import them eagerly (it is the CLI by
+definition); every other module under ``arbiter/`` must defer or stay
 pure-stdlib.
 
 This test walks the package source with ``ast`` and fails on any
 top-level import of those names from a non-CLI file. It does not run the
 modules — it is a static check, intentionally cheap. ``filelock`` is
 slightly more permissive: tests/registry/recovery code paths may need it,
-but ``agentao/skills/registry.py`` defers it inside ``save()`` rather than
+but ``arbiter/skills/registry.py`` defers it inside ``save()`` rather than
 at module top.
 """
 
@@ -19,7 +19,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "agentao"
+PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "arbiter"
 CLI_DIR = PACKAGE_ROOT / "cli"
 
 # Names whose top-level import in a non-CLI file would defeat the P0.5 budget.
@@ -94,5 +94,5 @@ def test_no_cli_deps_in_core_modules() -> None:
     assert not offenders, (
         "P0.5 lazy-import contract broken — these non-CLI modules import a "
         "CLI-only dep at top level. Defer to a function body, or move the "
-        "module under agentao/cli/.\n  " + "\n  ".join(offenders)
+        "module under arbiter/cli/.\n  " + "\n  ".join(offenders)
     )

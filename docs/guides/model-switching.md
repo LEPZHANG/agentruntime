@@ -2,7 +2,7 @@
 
 ## Overview
 
-Agentao supports switching between different LLM models during a conversation using the `/model` command.
+Arbiter supports switching between different LLM models during a conversation using the `/model` command.
 
 ## Usage
 
@@ -146,9 +146,9 @@ The model setting persists throughout your session:
 
 ### Logging
 
-All model switches are logged to `agentao.log`:
+All model switches are logged to `arbiter.log`:
 ```
-2026-02-09 14:30:45 - agentao.llm - INFO - Model changed from claude-sonnet-4-6 to gpt-5.4
+2026-02-09 14:30:45 - arbiter.llm - INFO - Model changed from claude-sonnet-4-6 to gpt-5.4
 ```
 
 ### Context Preservation
@@ -162,7 +162,7 @@ Switching models does NOT clear conversation history:
 
 If the host configured `extra_body` (see [the embedding guide](embedding.md#optional-provider-specific-request-params-extra_body)), switching models **preserves it** — it is instance-level host config, not a model-detected quirk.
 
-⚠️ **No auto-recovery.** Unlike `temperature` (which the client auto-drops when a model rejects it), a stale `extra_body` key has **no latch**. If you set `extra_body={"reasoning_effort": "high"}` and then `set_model(...)` to a model that does not support it, **every** subsequent call fails with a provider `400` until the key is cleared. Dropping model-specific `extra_body` keys when you switch is the host's responsibility — Agentao will not silently strip them. (Capability latches that *are* reset on switch: `omit_temperature`, `max_completion_tokens`.)
+⚠️ **No auto-recovery.** Unlike `temperature` (which the client auto-drops when a model rejects it), a stale `extra_body` key has **no latch**. If you set `extra_body={"reasoning_effort": "high"}` and then `set_model(...)` to a model that does not support it, **every** subsequent call fails with a provider `400` until the key is cleared. Dropping model-specific `extra_body` keys when you switch is the host's responsibility — Arbiter will not silently strip them. (Capability latches that *are* reset on switch: `omit_temperature`, `max_completion_tokens`.)
 
 ## Configuration
 
@@ -179,7 +179,7 @@ Or when initializing:
 
 ```python
 from pathlib import Path
-from agentao.embedding import build_from_environment
+from arbiter.embedding import build_from_environment
 
 # Factory reads .env / LLM_PROVIDER + the matching *_API_KEY / *_BASE_URL,
 # then `model=` overrides whatever *_MODEL the env resolves to.
@@ -322,7 +322,7 @@ This is useful for:
 
 ```python
 from pathlib import Path
-from agentao.embedding import build_from_environment
+from arbiter.embedding import build_from_environment
 
 agent = build_from_environment(working_directory=Path.cwd())
 

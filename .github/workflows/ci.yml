@@ -26,14 +26,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --python 3.12
 
-      - name: Verify replay schemas match agentao/replay/events.py
+      - name: Verify replay schemas match arbiter/replay/events.py
         run: uv run --python 3.12 python scripts/write_replay_schema.py --check
 
-      - name: Verify host schemas match agentao/host/models.py + agentao/acp/schema.py
+      - name: Verify host schemas match arbiter/host/models.py + arbiter/acp/schema.py
         run: uv run --python 3.12 python scripts/write_host_schema.py --check
 
   # ─────────────────────────────────────────────────────────────
-  # Job 0b · P0.4 typing gate — mypy --strict on agentao.host
+  # Job 0b · P0.4 typing gate — mypy --strict on arbiter.host
   # ─────────────────────────────────────────────────────────────
   typing-gate:
     name: Typing gate (mypy --strict on host)
@@ -51,8 +51,8 @@ jobs:
       - name: Install dependencies (incl. dev group for mypy)
         run: uv sync --python 3.12 --group dev
 
-      - name: mypy --strict --package agentao.host
-        run: uv run --python 3.12 mypy --strict --package agentao.host
+      - name: mypy --strict --package arbiter.host
+        run: uv run --python 3.12 mypy --strict --package arbiter.host
 
   # ─────────────────────────────────────────────────────────────
   # Job 1 · Unit tests across Python 3.10 / 3.11 / 3.12
@@ -75,7 +75,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies (with cli/web/i18n extras for CLI-dependent unit tests)
-        # Default unit tests import agentao.cli.AgentaoCLI / web fetch tool /
+        # Default unit tests import arbiter.cli.ArbiterCLI / web fetch tool /
         # jieba memory paths, which after the P0.9 dependency split live
         # in optional extras. Install all three so the existing test
         # surface still resolves; the core-only contract is separately
@@ -144,10 +144,10 @@ jobs:
           python -c "
           import tempfile
           from pathlib import Path
-          from agentao import Agentao
-          from agentao.llm import LLMClient
-          from agentao.transport import NullTransport
-          agent = Agentao(
+          from arbiter import Arbiter
+          from arbiter.llm import LLMClient
+          from arbiter.transport import NullTransport
+          agent = Arbiter(
               working_directory=Path(tempfile.mkdtemp()),
               llm_client=LLMClient(api_key='dummy', base_url='http://localhost:1', model='dummy'),
               transport=NullTransport(),
@@ -163,30 +163,30 @@ jobs:
         run: |
           # Glob expansion happens in the shell, not in pip — so resolve
           # the concrete wheel path first and then append the extra.
-          WHEEL=$(ls dist/agentao-*.whl)
+          WHEEL=$(ls dist/arbiter-*.whl)
           pip install "${WHEEL}[cli]"
 
       - name: Import check — package and public API
         run: |
           python -c "
-          import agentao
-          print('version:', agentao.__version__)
-          from agentao import Agentao, SkillManager
+          import arbiter
+          print('version:', arbiter.__version__)
+          from arbiter import Arbiter, SkillManager
           print('Public API OK')
           "
 
       - name: PEP 561 — py.typed marker present in installed package
-        run: python -c "from importlib.resources import files; assert files('agentao').joinpath('py.typed').is_file(), 'py.typed missing'; print('py.typed OK')"
+        run: python -c "from importlib.resources import files; assert files('arbiter').joinpath('py.typed').is_file(), 'py.typed missing'; print('py.typed OK')"
 
       - name: Embedded-construct smoke (matches README "Embed in 30 lines")
         run: |
           python -c "
           import tempfile
           from pathlib import Path
-          from agentao import Agentao
-          from agentao.llm import LLMClient
-          from agentao.transport import NullTransport
-          agent = Agentao(
+          from arbiter import Arbiter
+          from arbiter.llm import LLMClient
+          from arbiter.transport import NullTransport
+          agent = Arbiter(
               working_directory=Path(tempfile.mkdtemp()),
               llm_client=LLMClient(api_key='dummy', base_url='http://localhost:1', model='dummy'),
               transport=NullTransport(),
@@ -198,16 +198,16 @@ jobs:
           "
 
       - name: Import check — CLI entry point importable
-        run: python -c "from agentao.cli import entrypoint; print('CLI entrypoint OK')"
+        run: python -c "from arbiter.cli import entrypoint; print('CLI entrypoint OK')"
 
-      - name: Verify agentao command is on PATH
-        run: python -c "import shutil; assert shutil.which('agentao'), 'agentao not found on PATH'; print('agentao on PATH OK')"
+      - name: Verify arbiter command is on PATH
+        run: python -c "import shutil; assert shutil.which('arbiter'), 'arbiter not found on PATH'; print('arbiter on PATH OK')"
 
       - name: Verify bundled skills are discoverable after install
         run: |
           python -c "
           from pathlib import Path
-          import agentao.skills.manager as m
+          import arbiter.skills.manager as m
           bundled = m._BUNDLED_SKILLS_DIR
           assert bundled.exists(), f'Bundled skills dir missing: {bundled}'
           skills = [d.name for d in bundled.iterdir() if d.is_dir()]

@@ -1,4 +1,4 @@
-# Agentao
+# Arbiter
 
 > **A Governed Agent Runtime** — 受治理的 Agent 运行时，面向**本地优先、隐私优先、可嵌入**的场景。
 >
@@ -8,8 +8,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-agentao.cn-blue)](https://agentao.cn)
 
-> **仓库名 vs 包名**：仓库叫 `agentruntime`，**Python 包名是 `agentao`**。
-> 安装与导入都用 `agentao`。
+> **仓库名 vs 包名**：仓库叫 `agentruntime`，**Python 包名是 `arbiter`**。
+> 安装与导入都用 `arbiter`。
 
 ---
 
@@ -23,7 +23,7 @@
 它的设计前提是**对抗性**的 —— 假设模型会出错、工具会失败、输入不可信，
 然后把每一个边界情况写进**类型化、有测试、fail-closed** 的控制流。
 
-同一套内核驱动三个入口：**交互式 CLI**、**`agentao run` 自动化**、**ACP server（JSON-RPC）**。
+同一套内核驱动三个入口：**交互式 CLI**、**`arbiter run` 自动化**、**ACP server（JSON-RPC）**。
 
 ---
 
@@ -74,29 +74,29 @@ Plan → Confirm → Execute → Format
 - **MCP**（stdio / Streamable HTTP / SSE）与 **ACP**（JSON-RPC）双入口
 - **JSONL 事件回放**：每个回合可完整重放
 - **脱敏日志**：记录每次 LLM 请求 / 响应、工具调用与结果、token 用量，落盘前统一脱敏
-- **宿主契约**：稳定的事件类型与 Pydantic schema，宿主可直接嵌入 `Agentao(...)`
+- **宿主契约**：稳定的事件类型与 Pydantic schema，宿主可直接嵌入 `Arbiter(...)`
 
 ---
 
 ## 快速开始
 
 ```bash
-pip install 'agentao[cli]'      # 交互式 CLI 所需的最小安装
+pip install 'arbiter[cli]'      # 交互式 CLI 所需的最小安装
 cp .env.example .env            # 填入 OPENAI_API_KEY / OPENAI_BASE_URL / OPENAI_MODEL
-agentao                         # 交互式
-agentao run --prompt "..."      # 非交互式
-agentao --acp --stdio           # ACP server
+arbiter                         # 交互式
+arbiter run --prompt "..."      # 非交互式
+arbiter --acp --stdio           # ACP server
 ```
 
 **嵌入到你的应用**（不依赖环境变量发现）：
 
 ```python
 from pathlib import Path
-from agentao import Agentao
-from agentao.llm import LLMClient
-from agentao.transport import NullTransport
+from arbiter import Arbiter
+from arbiter.llm import LLMClient
+from arbiter.transport import NullTransport
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path("/tmp/agent-run-1"),
     llm_client=LLMClient(api_key="sk-...", base_url="...", model="..."),
     transport=NullTransport(),
@@ -119,7 +119,7 @@ agent.close()
 ## 架构
 
 ```
-agentao/
+arbiter/
 ├─ agent.py              门面：sync chat() / async arun()
 ├─ runtime/              回合机制：ChatLoopRunner / ToolRunner / 参数修复 /
 │                        截断安全 / doom-loop / 模型分层

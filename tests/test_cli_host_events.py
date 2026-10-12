@@ -1,9 +1,9 @@
 """CLI host-adapter smoke tests (PR 8).
 
 The CLI is the canonical first host of the host contract. PR 8 wires
-the status/mode display through ``Agentao.active_permissions()`` and
+the status/mode display through ``Arbiter.active_permissions()`` and
 demonstrates that a CLI-side consumer can render tool lifecycle state
-from ``Agentao.events()`` without reaching into private runtime state.
+from ``Arbiter.events()`` without reaching into private runtime state.
 
 These tests intentionally drive the public surface only: no internal
 ``AgentEvent`` paths are touched, no private permission-engine
@@ -20,11 +20,11 @@ from typing import Any, Dict, List
 
 import pytest
 
-from agentao.host.events import EventStream
-from agentao.host.models import ToolLifecycleEvent
-from agentao.host.projection import HostToolEmitter
-from agentao.runtime.tool_executor import ToolExecutor
-from agentao.tools import Tool
+from arbiter.host.events import EventStream
+from arbiter.host.models import ToolLifecycleEvent
+from arbiter.host.projection import HostToolEmitter
+from arbiter.runtime.tool_executor import ToolExecutor
+from arbiter.tools import Tool
 
 from tests.support.host_events import NullTransport, make_plan
 
@@ -106,16 +106,16 @@ def test_cli_show_status_reads_from_active_permissions(tmp_path, monkeypatch, ca
     """``show_status`` must derive the mode label from the public
     ``active_permissions()`` snapshot, not from private engine
     attributes."""
-    from agentao.cli import ui as cli_ui
-    from agentao.host.models import ActivePermissions
-    from agentao.permissions import PermissionMode
+    from arbiter.cli import ui as cli_ui
+    from arbiter.host.models import ActivePermissions
+    from arbiter.permissions import PermissionMode
 
     snapshot = ActivePermissions(
         mode="full-access",
         rules=[{"tool": "*", "action": "allow"}],
         loaded_sources=[
             "preset:full-access",
-            "project:.agentao/permissions.json",
+            "project:.arbiter/permissions.json",
             "injected:host",
         ],
     )

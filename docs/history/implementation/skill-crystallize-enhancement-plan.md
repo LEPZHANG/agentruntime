@@ -33,10 +33,10 @@
 
 当前相关代码位置：
 
-- `agentao/cli/commands_ext.py`
-- `agentao/skills/drafts.py`
-- `agentao/memory/crystallizer.py`
-- `agentao/cli/_utils.py`
+- `arbiter/cli/commands_ext.py`
+- `arbiter/skills/drafts.py`
+- `arbiter/memory/crystallizer.py`
+- `arbiter/cli/_utils.py`
 
 ## Design Principles
 
@@ -453,7 +453,7 @@ Recommended flow:
 
 还需要同步更新：
 
-- `agentao/cli/_utils.py`
+- `arbiter/cli/_utils.py`
   - `_SLASH_COMMANDS`
   - `_SLASH_COMMAND_HINTS`
 - `README.md`
@@ -462,7 +462,7 @@ Recommended flow:
 
 ## File-Level Change List
 
-### `agentao/cli/commands_ext.py`
+### `arbiter/cli/commands_ext.py`
 
 - 保留 `_collect_session_content()` 用于兼容旧逻辑
 - 新增 `collect_crystallize_evidence()`
@@ -470,7 +470,7 @@ Recommended flow:
 - 扩展 `status` 输出
 - 调整 `suggest` / `refine` 使用 evidence
 
-### `agentao/skills/drafts.py`
+### `arbiter/skills/drafts.py`
 
 - 扩展 `SkillDraft`
 - 新增 `SkillEvidence` / `SkillFeedbackEntry`
@@ -478,7 +478,7 @@ Recommended flow:
 - 提供 feedback append helper
 - 保证向后兼容
 
-### `agentao/memory/crystallizer.py`
+### `arbiter/memory/crystallizer.py`
 
 - 保持 `MemoryCrystallizer` 职责不变
 - 增加新的 prompt builder：
@@ -486,7 +486,7 @@ Recommended flow:
   - 更新后的 `suggest_prompt`
   - 更新后的 `refine_prompt`
 
-### `agentao/cli/_utils.py`
+### `arbiter/cli/_utils.py`
 
 - 增加：
   - `/crystallize feedback`

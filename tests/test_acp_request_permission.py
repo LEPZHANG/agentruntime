@@ -5,7 +5,7 @@ Covers three layers:
 1. **AcpServer plumbing**: ``call()`` writes a JSON-RPC request, the
    returned :class:`_PendingRequest` wakes when ``_route_response`` fires,
    errors and cancellations raise the expected exception types.
-2. **ACPTransport.confirm_tool**: the full mapping from Agentao's
+2. **ACPTransport.confirm_tool**: the full mapping from Arbiter's
    ``(tool_name, description, args)`` call signature to an ACP
    ``session/request_permission`` request, outcome → bool translation,
    session-level overrides, and deterministic failure on disconnect /
@@ -30,11 +30,11 @@ from typing import Any, Callable, Dict, List, Optional
 
 import pytest
 
-from agentao.acp import initialize as acp_initialize
-from agentao.acp import session_new as acp_session_new
-from agentao.acp import session_prompt as acp_session_prompt
-from agentao.acp.models import AcpSessionState
-from agentao.acp.protocol import (
+from arbiter.acp import initialize as acp_initialize
+from arbiter.acp import session_new as acp_session_new
+from arbiter.acp import session_prompt as acp_session_prompt
+from arbiter.acp.models import AcpSessionState
+from arbiter.acp.protocol import (
     ACP_PROTOCOL_VERSION,
     INTERNAL_ERROR,
     INVALID_REQUEST,
@@ -42,13 +42,13 @@ from agentao.acp.protocol import (
     METHOD_SESSION_NEW,
     METHOD_SESSION_PROMPT,
 )
-from agentao.acp.server import (
+from arbiter.acp.server import (
     AcpServer,
     JsonRpcHandlerError,
     PendingRequestCancelled,
     _PendingRequest,
 )
-from agentao.acp.transport import (
+from arbiter.acp.transport import (
     ACPTransport,
     PERMISSION_ALLOW_ALWAYS,
     PERMISSION_ALLOW_ONCE,
@@ -56,7 +56,7 @@ from agentao.acp.transport import (
     PERMISSION_REJECT_ONCE,
     _build_permission_options,
 )
-from agentao.cancellation import CancellationToken
+from arbiter.cancellation import CancellationToken
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ class RecordingServer:
         self.cancelled = cancelled
         self.calls: List[tuple] = []  # list of (method, params)
         # Session registry: the transport looks this up to read/write overrides.
-        from agentao.acp.session_manager import AcpSessionManager
+        from arbiter.acp.session_manager import AcpSessionManager
         self.sessions = AcpSessionManager()
 
     def call(self, method: str, params: dict) -> _PendingRequest:
@@ -244,7 +244,7 @@ class TestAcpServerCall:
         server = AcpServer(stdin=io.StringIO(""), stdout=io.StringIO())
         # No pending call — a response for an unknown id should log and drop.
         import logging as _logging
-        with caplog.at_level(_logging.WARNING, logger="agentao.acp.server"):
+        with caplog.at_level(_logging.WARNING, logger="arbiter.acp.server"):
             server._handle_line(
                 json.dumps(
                     {"jsonrpc": "2.0", "id": "srv_bogus", "result": {"x": 1}}
@@ -518,14 +518,14 @@ class TestConfirmToolUnit:
 
         class ErrorServer:
             def __init__(self) -> None:
-                from agentao.acp.session_manager import AcpSessionManager
+                from arbiter.acp.session_manager import AcpSessionManager
                 self.sessions = AcpSessionManager()
                 self.calls: List[tuple] = []
 
             def call(self, method: str, params: dict) -> _PendingRequest:
                 self.calls.append((method, params))
                 pending = _PendingRequest("srv_err")
-                from agentao.acp.models import JsonRpcError
+                from arbiter.acp.models import JsonRpcError
                 pending.error = JsonRpcError(code=-32001, message="client borked")
                 pending.event.set()
                 return pending
@@ -543,11 +543,11 @@ class TestConfirmToolUnit:
 
 class TestPermissionPromptSerialization:
     def test_sequential_calls_are_naturally_serial(self):
-        """confirm_tool in Agentao's tool_runner is called in Phase 2 one
+        """confirm_tool in Arbiter's tool_runner is called in Phase 2 one
         tool at a time. Verify that each call's override persists and
         correctly short-circuits the next one — which is the serialization
         contract that matters."""
-        from agentao.acp.transport import PERMISSION_ALLOW_ALWAYS
+        from arbiter.acp.transport import PERMISSION_ALLOW_ALWAYS
 
         server = RecordingServer(
             outcome={"outcome": {"outcome": "selected", "optionId": PERMISSION_ALLOW_ALWAYS}}
@@ -565,7 +565,7 @@ class TestPermissionPromptSerialization:
 
     def test_interleaved_different_tools_each_get_their_own_override(self):
         """allow_always on two tools in sequence leaves both recorded."""
-        from agentao.acp.transport import PERMISSION_ALLOW_ALWAYS
+        from arbiter.acp.transport import PERMISSION_ALLOW_ALWAYS
 
         server = RecordingServer(
             outcome={"outcome": {"outcome": "selected", "optionId": PERMISSION_ALLOW_ALWAYS}}

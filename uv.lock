@@ -15,7 +15,7 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "agentao"
+name = "arbiter"
 source = { editable = "." }
 dependencies = [
     { name = "filelock" },

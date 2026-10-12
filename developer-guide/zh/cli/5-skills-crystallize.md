@@ -114,10 +114,10 @@ Available skills (12):
 
 ## 从 GitHub 安装 Skill
 
-在 slash 命令之上，Agentao 还有一个顶层 shell 子命令用来管理来自公开 repo 的 skills。这个命令跑在 **REPL 之外** — 在你的 shell 提示符下用，不是 `>` 后面。
+在 slash 命令之上，Arbiter 还有一个顶层 shell 子命令用来管理来自公开 repo 的 skills。这个命令跑在 **REPL 之外** — 在你的 shell 提示符下用，不是 `>` 后面。
 
 ```bash
-agentao skill install owner/repo[:path][@ref]
+arbiter skill install owner/repo[:path][@ref]
 ```
 
 ref 格式：
@@ -132,13 +132,13 @@ ref 格式：
 作用域（scope）：
 
 ```bash
-agentao skill install anthropics/skills:document-skills/pdf --scope global
-agentao skill install myorg/internal-skills:billing      --scope project
+arbiter skill install anthropics/skills:document-skills/pdf --scope global
+arbiter skill install myorg/internal-skills:billing      --scope project
 ```
 
 | Scope | 装到哪 | 什么时候用 |
 |---|---|---|
-| `global` | `~/.agentao/skills/` | 个人、跨项目 |
+| `global` | `~/.arbiter/skills/` | 个人、跨项目 |
 | `project` | `<cwd>/skills/` | 团队共享、签入 repo |
 
 省略 `--scope` 时 CLI 自动判断（cwd 下存在 `skills/` 就是 project，否则 global）。
@@ -148,15 +148,15 @@ agentao skill install myorg/internal-skills:billing      --scope project
 ### 其他三个子命令
 
 ```bash
-agentao skill list                  # Agentao 已知的全部
-agentao skill list --installed      # 仅 'skill install' 管理的那些
-agentao skill list --json           # 机器可读
+arbiter skill list                  # Arbiter 已知的全部
+arbiter skill list --installed      # 仅 'skill install' 管理的那些
+arbiter skill list --json           # 机器可读
 
-agentao skill remove pdf            # 按名卸载
-agentao skill remove pdf --scope global
+arbiter skill remove pdf            # 按名卸载
+arbiter skill remove pdf --scope global
 
-agentao skill update pdf            # 检查更新并拉取
-agentao skill update --all          # 跨作用域检查所有受管 skill
+arbiter skill update pdf            # 检查更新并拉取
+arbiter skill update --all          # 跨作用域检查所有受管 skill
 ```
 
 `update` 只对 `source_type` ≠ `manual` 的 skill 起作用 — 也就是 `skill install` 装进来的那些。手写 skill 不会被动到。
@@ -166,7 +166,7 @@ agentao skill update --all          # 跨作用域检查所有受管 skill
 `skill install` 把 SKILL.md 落到磁盘上；正在运行的 CLI 会话默认看不到，得告诉它一声。两个办法：
 
 - **会话内**：`/skills reload` — 重扫 skills 目录
-- **否则**：重启 `agentao` — 下次启动自然加载
+- **否则**：重启 `arbiter` — 下次启动自然加载
 
 可见后，这个 skill 的行为跟手写的完全一样：`/skills activate <name>` 把它拉进 prompt，或让 agent 在描述匹配时自激活。
 
@@ -175,7 +175,7 @@ agentao skill update --all          # 跨作用域检查所有受管 skill
 - **未认证请求很快命中 GitHub 限流** — 一次装多个时设个 `GITHUB_TOKEN` 到 env
 - **`@ref` 钉版本是你的朋友** — 不写的话每次 `update` 都重解析默认分支最新 commit，可能把意料之外的改动拉进环境
 - **`skill install` 不激活** — 只把文件落盘，`/skills activate`（或自激活）仍是独立一步
-- **两个作用域可能互相遮蔽** — 同名的 `pdf`，global 和 project 都装了 — 项目级胜出。用 `agentao skill list` 看哪个生效
+- **两个作用域可能互相遮蔽** — 同名的 `pdf`，global 和 project 都装了 — 项目级胜出。用 `arbiter skill list` 看哪个生效
 
 ## 本仓自带的 Skill Gallery
 
@@ -190,12 +190,12 @@ agentao skill update --all          # 跨作用域检查所有受管 skill
 **安装**用 cp 或 symlink（这些不通过 `skill install` 从 GitHub 拉，它们就在本仓里）：
 
 ```bash
-# 全局装（你从任何项目启动 agentao 都能看到）
-cp -R examples/skills/ocr ~/.agentao/skills/
+# 全局装（你从任何项目启动 arbiter 都能看到）
+cp -R examples/skills/ocr ~/.arbiter/skills/
 
 # 或者只装到一个项目
-cp -R examples/skills/zootopia-ppt /path/to/your/project/.agentao/skills/
-cp -R examples/skills/pro-ppt      /path/to/your/project/.agentao/skills/
+cp -R examples/skills/zootopia-ppt /path/to/your/project/.arbiter/skills/
+cp -R examples/skills/pro-ppt      /path/to/your/project/.arbiter/skills/
 
 # 两个 PPT skill 带 requirements.txt — Python 依赖装一次
 # （ocr 不需要：脚本内置 PEP 723 行内元数据，`uv run` 自动解析）
@@ -216,9 +216,9 @@ pip install -r examples/skills/zootopia-ppt/requirements.txt
 |---|---|
 | `skills/<name>/SKILL.md` | skill 本体（frontmatter + body） |
 | `skills/<name>/references/*.md` | body 引用的按需加载文档 |
-| `~/.agentao/skills/<name>/` | 同样的目录结构，global 作用域（受管安装） |
-| `~/.agentao/skills/registry.json` · `<cwd>/skills/registry.json` | 跟踪受管安装（source ref、版本、scope） |
-| `.agentao/skills_config.json`（项目） | 持久化的 enable/disable 状态 — 见 [10. 配置文件参考](./10-config-reference) |
+| `~/.arbiter/skills/<name>/` | 同样的目录结构，global 作用域（受管安装） |
+| `~/.arbiter/skills/registry.json` · `<cwd>/skills/registry.json` | 跟踪受管安装（source ref、版本、scope） |
+| `.arbiter/skills_config.json`（项目） | 持久化的 enable/disable 状态 — 见 [10. 配置文件参考](./10-config-reference) |
 | [`examples/skills/`](https://github.com/jin-bo/agentao/tree/main/examples/skills) | 仓库自带 gallery（拷进上面任一位置使用） |
 
 ## 接下来读什么
@@ -232,9 +232,9 @@ pip install -r examples/skills/zootopia-ppt/requirements.txt
 ---
 
 ::: info 这一章在体系里的位置
-Skill manager 是 `agentao.skills.manager.SkillManager`，挂在 agent 上是 `agent.skill_manager`。嵌入式宿主可以直接 `activate_skill()` / `deactivate_skill()` / 读 `available_skills`。SKILL.md 格式 CLI 和嵌入两条路径完全一致。
+Skill manager 是 `arbiter.skills.manager.SkillManager`，挂在 agent 上是 `agent.skill_manager`。嵌入式宿主可以直接 `activate_skill()` / `deactivate_skill()` / 读 `available_skills`。SKILL.md 格式 CLI 和嵌入两条路径完全一致。
 :::
 
 ::: tip 真相源头
-命令语法：`/help`。Skill 列表：[`agentao/cli/ui.py:list_skills`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/ui.py)。Crystallize 逻辑：[`agentao/cli/commands_ext/crystallize.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands_ext/crystallize.py)。Skill manager：[`agentao/skills/manager.py`](https://github.com/jin-bo/agentao/blob/main/agentao/skills/manager.py)。
+命令语法：`/help`。Skill 列表：[`arbiter/cli/ui.py:list_skills`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/ui.py)。Crystallize 逻辑：[`arbiter/cli/commands_ext/crystallize.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands_ext/crystallize.py)。Skill manager：[`arbiter/skills/manager.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/skills/manager.py)。
 :::

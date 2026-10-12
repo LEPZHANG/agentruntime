@@ -1,37 +1,37 @@
 # 嵌入式 Harness API
 
-**包名:** `agentao.host`
+**包名:** `arbiter.host`
 **状态:** Stable，自 0.3.1 起。
 **设计文档:** [`docs/design/embedded-host-contract.md`](../design/embedded-host-contract.md)
 **实施计划（历史档）:** [`docs/history/implementation/embedded-harness-contract-implementation-plan.md`](../history/implementation/embedded-harness-contract-implementation-plan.md)
 
-Harness API 是宿主应用嵌入 Agentao 时面向外部的兼容性边界。运行时内部
+Harness API 是宿主应用嵌入 Arbiter 时面向外部的兼容性边界。运行时内部
 类型（`AgentEvent`、`ToolExecutionResult`、`PermissionEngine`）有意不
 对外暴露。
 
-> **覆盖范围。** 本包是宿主**进程内**嵌入 Agentao 的稳定合约边界，
+> **覆盖范围。** 本包是宿主**进程内**嵌入 Arbiter 的稳定合约边界，
 > 三个支柱：
 >
 > - **观测事件**——`ToolLifecycleEvent`、`SubagentLifecycleEvent`、
 >   `PermissionDecisionEvent`。
 > - **权限状态**——`ActivePermissions` 快照。
 > - **ACP schema surface**——ACP wire payload 的版本化 Pydantic 模型，
->   **只**为这种长尾场景导出：in-process 宿主**同时**还要把 Agentao
+>   **只**为这种长尾场景导出：in-process 宿主**同时**还要把 Arbiter
 >   通过 ACP 再暴露给自己的客户端。普通 in-process 宿主用不到这层，
 >   完全可以忽略所有 ACP 相关导出。
 >
-> 本包**不是**完整的聊天 runtime。驱动一轮执行用 `Agentao.arun()`；
+> 本包**不是**完整的聊天 runtime。驱动一轮执行用 `Arbiter.arun()`；
 > 做流式聊天 UI 从内部的 `Transport` / `AgentEvent` 流取——那里有
 > assistant 文本、reasoning、原始工具 I/O，稳定 host contract 有意
 > 不包含这些。
 >
-> > 不确定要用这一层，还是 ACP server（`agentao --acp --stdio`），
+> > 不确定要用这一层，还是 ACP server（`arbiter --acp --stdio`），
 > > 还是 ACP client（`ACPManager`）？见
 > > [Embedding vs. ACP](../design/embedding-vs-acp.zh.md)。
 
-> **导入纪律。** 所有公共类型只活在 `agentao.host` 模块下，**没有**
-> 从顶层 `agentao` 包再 re-export。请始终
-> `from agentao.host import ...`；不要假定 `agentao.ToolLifecycleEvent`
+> **导入纪律。** 所有公共类型只活在 `arbiter.host` 模块下，**没有**
+> 从顶层 `arbiter` 包再 re-export。请始终
+> `from arbiter.host import ...`；不要假定 `arbiter.ToolLifecycleEvent`
 > 之类的快捷路径存在。
 
 ## 公共导出
@@ -46,7 +46,7 @@ Harness API 是宿主应用嵌入 Agentao 时面向外部的兼容性边界。�
 | `RFC3339UTCString` | 所有公共事件使用的受限时间戳类型。 |
 | `export_host_event_json_schema()` | 事件 + 权限的规范 JSON schema。 |
 | `export_host_acp_json_schema()` | 对外的 ACP 负载规范 JSON schema。 |
-| `agentao.host.replay_projection` | 把 `EventStream` 桥接到 replay JSONL 的子模块——见下文 [Replay 投影](#replay-投影agentaohostreplay_projection)。 |
+| `arbiter.host.replay_projection` | 把 `EventStream` 桥接到 replay JSONL 的子模块——见下文 [Replay 投影](#replay-投影arbiterhostreplay_projection)。 |
 
 ### 子 Agent 的 `failed` 有两种形态
 
@@ -89,15 +89,15 @@ if isinstance(ev, SubagentLifecycleEvent) and ev.phase == "failed":
 同步变化，所以 `check_background_agent` 对"没答出来"同样报 `failed`
 ——并且会把这次跑出来的部分结果一并带上。
 
-## 能力协议（`agentao.host.protocols`）
+## 能力协议（`arbiter.host.protocols`）
 
-嵌入宿主通过向 `Agentao(filesystem=..., shell=..., mcp_registry=..., memory_manager=...)`
+嵌入宿主通过向 `Arbiter(filesystem=..., shell=..., mcp_registry=..., memory_manager=...)`
 注入这些 `Protocol` 类型来重定向 IO。该子模块是协议及其值类型的稳定
-re-export；**请始终从 `agentao.host.protocols` 导入，不要伸手到内部
-的 `agentao.capabilities.*`**（后者是内部实现，可能会移动）。
+re-export；**请始终从 `arbiter.host.protocols` 导入，不要伸手到内部
+的 `arbiter.capabilities.*`**（后者是内部实现，可能会移动）。
 
 ```python
-from agentao.host.protocols import (
+from arbiter.host.protocols import (
     FileSystem, ShellExecutor, MCPRegistry, MemoryStore,
     FileEntry, FileStat, ShellRequest, ShellResult, BackgroundHandle,
 )
@@ -113,12 +113,12 @@ from agentao.host.protocols import (
 | `ShellRequest`、`ShellResult`、`BackgroundHandle` | `ShellExecutor` 实现的值类型。 |
 
 `Local*` 默认实现（如 `LocalFileSystem`、`LocalShellExecutor`）保留在
-`agentao.capabilities` 中，因为它们是参考实现而非对外注入面的一部分。
+`arbiter.capabilities` 中，因为它们是参考实现而非对外注入面的一部分。
 
 ### `FileSystem.write_text` 必须原子地替换
 
 **替换已有内容**的实现必须给调用方一次原子替换：读者要么看到旧内容、
-要么看到新内容，绝不能看到被截断或写了一半的文件。Agentao 跑在一个它
+要么看到新内容，绝不能看到被截断或写了一半的文件。Arbiter 跑在一个它
 控制不了的宿主进程里，所以"先截断再写"会留出一个窗口——一次 Ctrl+C、
 一次 OOM kill 或一个 `kill` 就会毁掉用户的文件。这是对**你自己的**实现
 提出的要求，不只是对默认实现。
@@ -139,13 +139,13 @@ from agentao.host.protocols import (
 范围说明：这关掉的是*进程死亡*窗口。它没有 fsync，所以掉电级别的持久性
 仍归宿主负责。
 
-## Replay 投影（`agentao.host.replay_projection`）
+## Replay 投影（`arbiter.host.replay_projection`）
 
 Harness 事件流和 replay JSONL 是同一组事实的两种视图。本子模块把它们
 桥接起来，让嵌入宿主只用维护一份审计产物，而不是两条平行流。
 
 ```python
-from agentao.host.replay_projection import (
+from arbiter.host.replay_projection import (
     HostReplaySink,
     replay_payload_to_host_event,
     host_event_to_replay_kind,
@@ -155,11 +155,11 @@ from agentao.host.replay_projection import (
 
 | 符号 | 用途 |
 |---|---|
-| `HostReplaySink(recorder, *, stream=None)` | 正向投影。`Agentao.start_replay()` 会自动接线；手动驱动 replay 的宿主也可以显式传入 stream。之后每个发布的 `ToolLifecycleEvent` / `SubagentLifecycleEvent` / `PermissionDecisionEvent` 会被写入 `recorder` 作为一条 v1.2 replay 事件。写入失败仅记 WARNING 后吞掉——审计存储坏了不能拖垮运行时。 |
+| `HostReplaySink(recorder, *, stream=None)` | 正向投影。`Arbiter.start_replay()` 会自动接线；手动驱动 replay 的宿主也可以显式传入 stream。之后每个发布的 `ToolLifecycleEvent` / `SubagentLifecycleEvent` / `PermissionDecisionEvent` 会被写入 `recorder` 作为一条 v1.2 replay 事件。写入失败仅记 WARNING 后吞掉——审计存储坏了不能拖垮运行时。 |
 | `replay_payload_to_host_event(kind, payload)` | 反向投影。把一行 replay JSONL 还原回 `HostEvent` Pydantic 模型。会先剥掉 sanitizer 注入的可选元字段（`redaction_hits`、`redacted`、`redacted_fields`），让被脱敏过的事件仍能通过公共模型的 `extra="forbid"` 校验。 |
 | `host_event_to_replay_kind(event)` / `host_event_to_replay_payload(event)` | 较底层的两个辅助函数，给 sink 与测试使用。分别返回 `None` / `model_dump(mode="json")`。 |
 
-`Agentao.start_replay()` 会自动以 agent 的 `EventStream` 实例化
+`Arbiter.start_replay()` 会自动以 agent 的 `EventStream` 实例化
 `HostReplaySink`；`end_replay()` 负责 detach 并清空。手动驱动 replay
 子系统的宿主可以照样自己接线。
 
@@ -169,10 +169,10 @@ replay schema `oneOf` 判别器匹配的字节完全一致。版本兼容契约�
 
 ## 类型门槛
 
-`agentao.host` 在 `mypy --strict` 下保持干净：
+`arbiter.host` 在 `mypy --strict` 下保持干净：
 
 ```
-uv run mypy --strict --package agentao.host
+uv run mypy --strict --package arbiter.host
 ```
 
 CI 的 `Typing gate` Job 在每个 PR 上强制执行。下游项目对自己代码运行
@@ -197,7 +197,7 @@ CI 的 `Typing gate` Job 在每个 PR 上强制执行。下游项目对自己代
 - 删除字段、重命名字段、变更枚举值或字段语义：必须升 schema 版本并
   写发布说明。
 - 公共事件**不得**直接复用内部 `AgentEvent.data` 负载；脱敏/裁剪在
-  `agentao/host/projection.py` 内统一进行。
+  `arbiter/host/projection.py` 内统一进行。
 - 公共摘要字段（`summary`、`task_summary`、`reason`）必须经过脱敏与
   截断，永远不得携带原始用户输入、工具参数、工具输出或策略内部细节。
 - 所有时间戳采用规范化的 `Z` 后缀，例如 `2026-04-30T01:02:03.456Z`，
@@ -206,13 +206,13 @@ CI 的 `Typing gate` Job 在每个 PR 上强制执行。下游项目对自己代
 ## 运行时身份契约
 
 公共事件依赖一组稳定的 id 字段。生成与归一化辅助函数位于
-`agentao/runtime/identity.py`，并已在计划、执行、权限决策与子 Agent
+`arbiter/runtime/identity.py`，并已在计划、执行、权限决策与子 Agent
 派生的运行时边界完成接入。
 
 | 字段 | 来源 |
 |---|---|
 | `session_id` | 优先使用持久化会话 id；构造时分配 UUID4 兜底。 |
-| `turn_id` | 在 `agentao/runtime/turn.py` 入口生成 UUID4，对应一次用户提交的 Agent 循环。 |
+| `turn_id` | 在 `arbiter/runtime/turn.py` 入口生成 UUID4，对应一次用户提交的 Agent 循环。 |
 | `tool_call_id` | 优先使用 LLM 提供的 id；缺失时生成 UUID4，并在计划阶段一次性归一化复用。 |
 | `decision_id` | 每次权限决策生成一个 UUID4。 |
 | `child_task_id` / `child_session_id` | 在子 Agent 派生时捕获，不在结束时回溯推断。 |
@@ -222,8 +222,8 @@ CI 的 `Typing gate` Job 在每个 PR 上强制执行。下游项目对自己代
 
 ## 事件订阅语义
 
-`Agentao.events(session_id: str | None = None)` 返回 `HostEvent`
-的异步迭代器。传 `session_id=` 进行过滤；传 `None` 订阅本 `Agentao`
+`Arbiter.events(session_id: str | None = None)` 返回 `HostEvent`
+的异步迭代器。传 `session_id=` 进行过滤；传 `None` 订阅本 `Arbiter`
 实例下所有会话。
 
 - 同会话顺序保证保留。
@@ -236,7 +236,7 @@ CI 的 `Typing gate` Job 在每个 PR 上强制执行。下游项目对自己代
   匹配的事件阻塞。
 - 取消迭代器必须释放队列/订阅资源。
 - MVP 每个 filter 仅允许 **一个 async 迭代器** 消费者
-  （`Agentao.events(session_id=…)`）；同 filter 的第二个迭代器会
+  （`Arbiter.events(session_id=…)`）；同 filter 的第二个迭代器会
   抛出 `StreamSubscribeError`。多 sink 扇出（审计 / 指标 / replay）
   请使用同步 observer，见下文
   [同步 observer 扇出](#同步-observer-扇出)。
@@ -280,7 +280,7 @@ agent.add_host_event_observer(metrics)
 - `agent.remove_host_event_observer(callback)` 用于解除注册；幂等，重复调用安全。
 
 `HostReplaySink` 就是这套机制的典型用户——见上文
-[Replay 投影](#replay-投影-agentaohostreplay_projection)。
+[Replay 投影](#replay-投影-arbiterhostreplay_projection)。
 
 ## 想要更细粒度的事件？内部 `Transport` 通道
 
@@ -291,12 +291,12 @@ agent.add_host_event_observer(metrics)
 构造时挂回调：
 
 ```python
-from agentao import Agentao
-from agentao.transport import SdkTransport
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
 
 events = []
 transport = SdkTransport(on_event=events.append)
-agent = Agentao(transport=transport, ...)
+agent = Arbiter(transport=transport, ...)
 
 # 一轮结束后：
 for ev in events:
@@ -306,7 +306,7 @@ for ev in events:
 
 ### 当前 `Transport` 都流些什么
 
-权威清单见 `agentao/transport/events.py::EventType`。截至目前：
+权威清单见 `arbiter/transport/events.py::EventType`。截至目前：
 
 | 家族 | 成员 |
 |---|---|
@@ -333,7 +333,7 @@ for ev in events:
 |---|---|---|
 | `docs/schema/` 下有 schema 快照？ | ✅ `host.events.v1.json` | ❌ |
 | 字段重命名/删除会触发版本 bump？ | ✅ 由 `tests/test_host_schema.py` 强制 | ⚠️ best-effort `schema_version` bump —— 全局的，一动就动所有事件类型 |
-| 有脱敏/投影层？ | ✅ `agentao/host/projection.py` 剥掉原始 input/output | ❌ 原始载荷（LLM_CALL_IO 可含完整 prompt 与工具 I/O） |
+| 有脱敏/投影层？ | ✅ `arbiter/host/projection.py` 剥掉原始 input/output | ❌ 原始载荷（LLM_CALL_IO 可含完整 prompt 与工具 I/O） |
 | 发布前跨版本兼容性审计？ | ✅ 是发布检查表项 | ❌ |
 | 适合走长期稳定的 wire 协议？ | ✅ | ⚠️ 仅当你 pin 住 `schema_version` 并自负升级路径 |
 
@@ -362,7 +362,7 @@ for ev in events:
   `length_truncated`、`doom_loop`、`llm_error`，或 `None`；`tool_count`；
   `error`），`.is_answer` 把它折成一个判断。这是一个 **pull** 面：它回答
   "我刚 await 完的这个 turn 是怎么结束的"，覆盖 `chat()` / `arun()` 调用方、
-  `agentao run` 和任何嵌入方。**尚未**进稳定契约的是 **push** 形态——一个
+  `arbiter run` 和任何嵌入方。**尚未**进稳定契约的是 **push** 形态——一个
   不驱动 turn 的异步观察者可以订阅的 `HostEvent`。这个缺口现在**只剩主循环**：
   **子 agent** 的 turn 结果*已经*在公共面上了——没答出来的子 agent 会发
   `SubagentLifecycleEvent(phase="failed", error_type="incomplete:<reason>")`，

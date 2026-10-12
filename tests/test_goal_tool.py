@@ -1,7 +1,7 @@
-"""Tests for the update_goal injected tool (agentao/tools/goal.py)."""
+"""Tests for the update_goal injected tool (arbiter/tools/goal.py)."""
 
-from agentao.cli.goal_state import GoalState, GoalStatus
-from agentao.tools.goal import UpdateGoalTool
+from arbiter.cli.goal_state import GoalState, GoalStatus
+from arbiter.tools.goal import UpdateGoalTool
 
 
 def _tool(goal):

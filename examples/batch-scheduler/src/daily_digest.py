@@ -18,9 +18,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from agentao.embedding import build_from_environment
-from agentao.transport import SdkTransport
-from agentao.transport.events import EventType
+from arbiter.embedding import build_from_environment
+from arbiter.transport import SdkTransport
+from arbiter.transport.events import EventType
 
 
 def run() -> None:
@@ -31,8 +31,8 @@ def run() -> None:
     workdir.mkdir(parents=True, exist_ok=True)
 
     # Copy the skill into the run's workdir so SkillManager picks it up.
-    src_skill = Path(__file__).resolve().parent.parent / ".agentao" / "skills" / "daily-digest"
-    dst_skill = workdir / ".agentao" / "skills" / "daily-digest"
+    src_skill = Path(__file__).resolve().parent.parent / ".arbiter" / "skills" / "daily-digest"
+    dst_skill = workdir / ".arbiter" / "skills" / "daily-digest"
     if not dst_skill.exists():
         dst_skill.parent.mkdir(parents=True, exist_ok=True)
         dst_skill.symlink_to(src_skill)

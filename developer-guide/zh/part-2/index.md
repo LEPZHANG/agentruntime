@@ -1,11 +1,11 @@
 # 第二部分 · Python 进程内嵌入
 
-Python 宿主的**最短集成路径**：直接 `from agentao import Agentao` 拿到运行时，用方法调用驱动，没有任何协议层开销。
+Python 宿主的**最短集成路径**：直接 `from arbiter import Arbiter` 拿到运行时，用方法调用驱动，没有任何协议层开销。
 
 ::: info 本部分关键词
 五个反复出现的核心词汇 —— 完整词汇表见 [附录 G](/zh/appendix/g-glossary)。
-- **Agentao 实例** — 一次构造 = 一段会话；`close()` 是义务 · [§2.3](/zh/part-2/3-lifecycle)、[G.1](/zh/appendix/g-glossary#g-1-核心概念)
-- **Working directory（cwd）** — 文件工具根目录、MCP cwd、`AGENTAO.md` 查找路径；构造时冻结 · [§2.2](/zh/part-2/2-constructor-reference)、[G.1](/zh/appendix/g-glossary#g-1-核心概念)
+- **Arbiter 实例** — 一次构造 = 一段会话；`close()` 是义务 · [§2.3](/zh/part-2/3-lifecycle)、[G.1](/zh/appendix/g-glossary#g-1-核心概念)
+- **Working directory（cwd）** — 文件工具根目录、MCP cwd、`ARBITER.md` 查找路径；构造时冻结 · [§2.2](/zh/part-2/2-constructor-reference)、[G.1](/zh/appendix/g-glossary#g-1-核心概念)
 - **Transport** — 推送式回调（`emit(event)`），驱动流式 UI · [§2.7](/zh/part-2/7-fastapi-flask-embed)、[G.2](/zh/appendix/g-glossary#g-2-扩展点)
 - **CancellationToken** — 宿主侧的取消句柄，用于中断进行中的 `chat()` · [§2.6](/zh/part-2/6-cancellation-timeouts)、[G.1](/zh/appendix/g-glossary#g-1-核心概念)
 - **extra_mcp_servers** — 会话级 MCP 注入（不同租户 → 不同 token） · [§2.2](/zh/part-2/2-constructor-reference#第-2-档-生产常用-再加-8-个)
@@ -36,12 +36,12 @@ Python 宿主的**最短集成路径**：直接 `from agentao import Agentao` �
 
 - [1.2 核心概念](/zh/part-1/2-core-concepts) — Agent / Tool / Transport / Working Directory 等名词
 - [1.3 两种集成模式](/zh/part-1/3-integration-modes) — 确认 Python SDK 是你的选择
-- [1.4 Hello Agentao](/zh/part-1/4-hello-agentao#示例-a-python-sdk-约-20-行) — 20 行可跑样板
+- [1.4 Hello Arbiter](/zh/part-1/4-hello-arbiter#示例-a-python-sdk-约-20-行) — 20 行可跑样板
 
 ## 预备心智模型
 
 > Agent 不是一个"函数调用"，而是一个**有状态的进程组件**。
-> 一次 `Agentao(...)` 对应一段会话；
+> 一次 `Arbiter(...)` 对应一段会话；
 > 多会话 = 多实例；
 > `close()` 是义务，不是建议。
 

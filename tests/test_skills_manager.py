@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-import agentao.skills.manager as _mod
-from agentao.skills.manager import SkillManager
+import arbiter.skills.manager as _mod
+from arbiter.skills.manager import SkillManager
 
 
 # ---------------------------------------------------------------------------
@@ -40,7 +40,7 @@ def _make_manager(tmp_path, global_dir=None, project_dir=None, bundled_dir=None,
     with patch.multiple(_mod, **patches):
         if repo_skills is not None:
             # Patch Path.cwd() to return a dir that contains repo_skills
-            with patch("agentao.skills.manager.Path") as MockPath:
+            with patch("arbiter.skills.manager.Path") as MockPath:
                 # This is complex — easier to just monkeypatch the load method
                 pass
         return SkillManager()

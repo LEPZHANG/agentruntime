@@ -16,10 +16,10 @@ from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 
-from agentao import Agentao  # type alias for return annotation
-from agentao.embedding import build_from_environment
-from agentao.permissions import PermissionDecision, PermissionEngine, PermissionMode
-from agentao.tools.base import Tool
+from arbiter import Arbiter  # type alias for return annotation
+from arbiter.embedding import build_from_environment
+from arbiter.permissions import PermissionDecision, PermissionEngine, PermissionMode
+from arbiter.tools.base import Tool
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -179,14 +179,14 @@ class ConfidenceGatedEngine(PermissionEngine):
 # Agent builder
 # ──────────────────────────────────────────────────────────────────────────
 
-def build_agent(ticket_id: str) -> Agentao:
+def build_agent(ticket_id: str) -> Arbiter:
     root = Path(__file__).resolve().parent.parent
     workdir = root / "runs" / ticket_id
     workdir.mkdir(parents=True, exist_ok=True)
 
     # Make the skill visible inside this per-ticket workdir.
-    src_skill = root / ".agentao" / "skills" / "support-triage"
-    dst_skill = workdir / ".agentao" / "skills" / "support-triage"
+    src_skill = root / ".arbiter" / "skills" / "support-triage"
+    dst_skill = workdir / ".arbiter" / "skills" / "support-triage"
     if not dst_skill.exists():
         dst_skill.parent.mkdir(parents=True, exist_ok=True)
         dst_skill.symlink_to(src_skill)

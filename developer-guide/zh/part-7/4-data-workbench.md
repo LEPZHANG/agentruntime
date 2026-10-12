@@ -7,7 +7,7 @@
 **运行** —— `uv run python -m src.workbench "你的问题"`
 :::
 
-**场景**：内部分析师有一个类 Jupyter 的工作台。你希望加上"用中/英文提问，返回图表和 SQL"——Agentao 跑 `duckdb`、写一次性 Python 脚本、把 PNG 存到会话的草稿目录。因为涉及 shell，沙箱是硬性要求。
+**场景**：内部分析师有一个类 Jupyter 的工作台。你希望加上"用中/英文提问，返回图表和 SQL"——Arbiter 跑 `duckdb`、写一次性 Python 脚本、把 PNG 存到会话的草稿目录。因为涉及 shell，沙箱是硬性要求。
 
 ## 谁 & 为什么
 
@@ -24,7 +24,7 @@ Web UI (图表查看器 + 对话记录)
 后端 (FastAPI) ──┐
       │          │
       ▼          │
-Agentao 实例     │
+Arbiter 实例     │
   ├─ working_directory = /workspaces/alice/
   ├─ 工具:
   │    - run_shell_command  (沙箱: workspace-write-no-network)
@@ -39,7 +39,7 @@ Agentao 实例     │
 ### 1 · 沙箱配置
 
 ```json
-// .agentao/sandbox.json
+// .arbiter/sandbox.json
 {
   "shell": {
     "enabled": true,
@@ -111,9 +111,9 @@ UI 会解析这个 marker 来渲染图片。
 
 ```python
 # app.py (精简)
-from agentao import Agentao
-from agentao.transport import SdkTransport
-from agentao.transport.events import EventType
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport
+from arbiter.transport.events import EventType
 from pathlib import Path
 import re, asyncio
 
@@ -132,7 +132,7 @@ async def ask(req: dict, user=Depends(current_user)):
                 charts.append(m.group(1))
 
     transport = SdkTransport(on_event=on_event)
-    agent = Agentao(working_directory=workdir, transport=transport)
+    agent = Arbiter(working_directory=workdir, transport=transport)
     agent.skill_manager.activate_skill(
         "duckdb-analyst",
         task_description=f"回答：{req['question']}",

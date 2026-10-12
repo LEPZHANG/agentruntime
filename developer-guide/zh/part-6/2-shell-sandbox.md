@@ -5,7 +5,7 @@
 > - macOS 三个 sandbox profile（`readonly` / `workspace-write` / `workspace-write-no-network`）
 > - Linux 等价方案：容器、namespace、seccomp
 
-`run_shell_command` 是 Agent 能力最强、也最危险的工具。Agentao 提供**三层递进**防护，按"越下层越贵、越严"排：
+`run_shell_command` 是 Agent 能力最强、也最危险的工具。Arbiter 提供**三层递进**防护，按"越下层越贵、越严"排：
 
 ```
 层 A · PermissionEngine   (每一层都应该开)
@@ -20,7 +20,7 @@ A、B 在 [Part 4.5](/zh/part-4/5-tool-confirmation-ui) 与 [Part 5.4](/zh/part-
 
 ## macOS sandbox-exec
 
-macOS 自带 `sandbox-exec` 工具，内核级隔离文件写入和网络访问。Agentao 的 SandboxPolicy 在命令执行前**用它包一层**。
+macOS 自带 `sandbox-exec` 工具，内核级隔离文件写入和网络访问。Arbiter 的 SandboxPolicy 在命令执行前**用它包一层**。
 
 ### 3 个内置 profile
 
@@ -30,13 +30,13 @@ macOS 自带 `sandbox-exec` 工具，内核级隔离文件写入和网络访问�
 | `workspace-write-no-network` | 仅 `_RW1` 下 | ❌ | 代码编辑（无网） |
 | `workspace-write` | 仅 `_RW1` 下 | ✅ | 默认开发用 |
 
-`_RW1` 是 sandbox profile 里声明的可写路径变量，Agentao 会传入 `workspace_root`（默认 = 项目根）。
+`_RW1` 是 sandbox profile 里声明的可写路径变量，Arbiter 会传入 `workspace_root`（默认 = 项目根）。
 
 ## 启用方式
 
 ### 最小配置
 
-在 `~/.agentao/sandbox.json` 或 `<project>/.agentao/sandbox.json`：
+在 `~/.arbiter/sandbox.json` 或 `<project>/.arbiter/sandbox.json`：
 
 ```json
 {
@@ -64,7 +64,7 @@ macOS 自带 `sandbox-exec` 工具，内核级隔离文件写入和网络访问�
 ### 运行时开关
 
 ```python
-from agentao.sandbox import SandboxPolicy
+from arbiter.sandbox import SandboxPolicy
 
 policy = SandboxPolicy(project_root=Path("/data/tenant-a"))
 policy.set_enabled(True)
@@ -110,7 +110,7 @@ policy.set_default_profile("workspace-write-no-network")
 
 ## Fail-closed 语义
 
-Agentao 的沙箱策略**严格 fail-closed**——配置有问题就拒绝执行，不会静默降级：
+Arbiter 的沙箱策略**严格 fail-closed**——配置有问题就拒绝执行，不会静默降级：
 
 | 错误情形 | 行为 |
 |---------|------|
@@ -147,10 +147,10 @@ docker run --rm \
 
 **方案 2 · firejail / bwrap**
 
-用轻量级沙箱工具包住 `run_shell_command`。目前 Agentao 没有内置，需要你自定义 `ShellTool`：
+用轻量级沙箱工具包住 `run_shell_command`。目前 Arbiter 没有内置，需要你自定义 `ShellTool`：
 
 ```python
-from agentao.tools.shell import ShellTool
+from arbiter.tools.shell import ShellTool
 import shlex
 
 class FirejailShellTool(ShellTool):
@@ -167,7 +167,7 @@ class FirejailShellTool(ShellTool):
 
 | 场景 | 开还是不开 |
 |------|---------|
-| 开发者本地跑 Agentao CLI | 可开可不开（开了更稳） |
+| 开发者本地跑 Arbiter CLI | 可开可不开（开了更稳） |
 | 嵌入个人 SaaS 后端（单租户） | **开** |
 | 多租户 SaaS（高风险） | **开 + 容器隔离双保险** |
 | 可信内部工具 | 可不开 |

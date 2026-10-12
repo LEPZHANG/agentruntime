@@ -12,7 +12,7 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "agentao"
+name = "arbiter"
 source = { editable = "../../" }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -72,11 +72,11 @@ dev = [
 ]
 
 [[package]]
-name = "agentao-example-data-workbench"
+name = "arbiter-example-data-workbench"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "agentao" },
+    { name = "arbiter" },
     { name = "duckdb" },
     { name = "matplotlib" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -86,7 +86,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentao", editable = "../../" },
+    { name = "arbiter", editable = "../../" },
     { name = "duckdb", specifier = ">=0.10" },
     { name = "matplotlib", specifier = ">=3.8" },
     { name = "pandas", specifier = ">=2.0" },

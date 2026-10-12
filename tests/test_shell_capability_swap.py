@@ -10,12 +10,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 
-from agentao.capabilities import (
+from arbiter.capabilities import (
     BackgroundHandle,
     ShellRequest,
     ShellResult,
 )
-from agentao.tools.shell import ShellTool
+from arbiter.tools.shell import ShellTool
 
 
 class FakeExecutor:

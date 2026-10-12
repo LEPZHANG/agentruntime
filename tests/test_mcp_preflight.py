@@ -16,7 +16,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-from agentao.mcp.client import (
+from arbiter.mcp.client import (
     McpClient,
     NonMcpEndpointError,
     ServerStatus,

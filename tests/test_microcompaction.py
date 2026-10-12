@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from agentao.context_manager import ContextManager
+from arbiter.context_manager import ContextManager
 
 _LIMIT = ContextManager.MICROCOMPACT_TOOL_LIMIT  # 3_000
 _PRESERVE = ContextManager.MICROCOMPACT_PRESERVE_RECENT  # 5

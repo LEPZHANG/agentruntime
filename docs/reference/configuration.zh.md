@@ -1,12 +1,12 @@
 # 配置参考（Configuration Reference）
 
-> **本文档定位。** 这是 Agentao 在启动或运行期读取的**全部配置面**的参考手册：文件路径、schema、默认值、优先级。它**只**记录"事实"，不解释"为什么这样设计"或"怎么用"——后者请跳到对应的 feature 文档。
+> **本文档定位。** 这是 Arbiter 在启动或运行期读取的**全部配置面**的参考手册：文件路径、schema、默认值、优先级。它**只**记录"事实"，不解释"为什么这样设计"或"怎么用"——后者请跳到对应的 feature 文档。
 >
 > 如果你发现自己开始在这份文档里写动机段落，把它挪到 feature 文档里，这里只留一行链接。
 
 英文原版：[CONFIGURATION.md](configuration.md)。两份文档结构、段号、字段表完全一致；如果某次改动只更新了其中一份，请同步另一份。
 
-> **快速校验。** 想不启动 agent 直接检查下面任意文件，跑 `agentao config validate`（或 `agentao doctor`，同时还覆盖插件 / ACP / 可选依赖）。两者都支持 `--json`：error 退出 1，warning 退出 0。详见 [developer-guide CLI 第 12 章](https://github.com/jin-bo/agentao/blob/main/developer-guide/zh/cli/12-non-interactive.md#agentao-doctor-健康快照)。
+> **快速校验。** 想不启动 agent 直接检查下面任意文件，跑 `arbiter config validate`（或 `arbiter doctor`，同时还覆盖插件 / ACP / 可选依赖）。两者都支持 `--json`：error 退出 1，warning 退出 0。详见 [developer-guide CLI 第 12 章](https://github.com/jin-bo/agentao/blob/main/developer-guide/zh/cli/12-non-interactive.md#arbiter-doctor-健康快照)。
 
 ---
 
@@ -17,31 +17,31 @@
 | # | 配置面 | 项目路径 | 用户（全局）路径 | Loader | Feature 文档 |
 |---|---|---|---|---|---|
 | 1 | LLM 环境变量 | `.env`（cwd） | shell env | `dotenv.load_dotenv` → `discover_llm_kwargs` | —（参见 `.env.example`） |
-| 2 | 运行模式 + 内置子代理 | `.agentao/settings.json` | — | `embedding/factory.py::_load_settings`、`plan/controller.py::_load_settings` | [TOOL_CONFIRMATION_FEATURE.md](../guides/tool-confirmation.md) |
-| 3 | 工具权限规则 | — *（仅用户级；项目级文件被忽略）* | `~/.agentao/permissions.json` | `permissions.py::PermissionEngine` | [TOOL_CONFIRMATION_FEATURE.md](../guides/tool-confirmation.md) |
-| 4 | MCP 服务器 | `.agentao/mcp.json` *（仅可新增名字，不能覆盖用户级同名服务器）* | `~/.agentao/mcp.json` | `mcp/FileBackedMCPRegistry`（见 `mcp/config.py`） | `CLAUDE.md` § MCP |
-| 5 | ACP 子代理 | `.agentao/acp.json` | — *（仅项目级）* | `acp_client/config.py` | [acp-client.md](../guides/acp-client.md) / [acp-embedding.md](../guides/acp-embedding.md) |
-| 6 | 禁用 skill 列表 | `.agentao/skills_config.json` | — | `skills/manager.py` | [SKILLS_GUIDE.md](../guides/skills.md) |
-| 7 | 项目说明 | `AGENTAO.md`（cwd） | — | `agent.py::_build_system_prompt` | [CHATAGENT_MD_FEATURE.md](../guides/chatagent-md.md) |
-| 8 | 记忆库 | `.agentao/memory.db` | `~/.agentao/memory.db` | `memory/manager.py::MemoryManager` | [memory-management.md](../guides/memory-management.md) |
-| 9 | Run spec（`agentao run`） | `--spec` 传入的任意路径（或 stdin） | — | `cli/run_models.py::RunSpec`、`cli/run_template.py::render_spec` | [run-spec-parameters.zh.md](../design/run-spec-parameters.zh.md) |
+| 2 | 运行模式 + 内置子代理 | `.arbiter/settings.json` | — | `embedding/factory.py::_load_settings`、`plan/controller.py::_load_settings` | [TOOL_CONFIRMATION_FEATURE.md](../guides/tool-confirmation.md) |
+| 3 | 工具权限规则 | — *（仅用户级；项目级文件被忽略）* | `~/.arbiter/permissions.json` | `permissions.py::PermissionEngine` | [TOOL_CONFIRMATION_FEATURE.md](../guides/tool-confirmation.md) |
+| 4 | MCP 服务器 | `.arbiter/mcp.json` *（仅可新增名字，不能覆盖用户级同名服务器）* | `~/.arbiter/mcp.json` | `mcp/FileBackedMCPRegistry`（见 `mcp/config.py`） | `CLAUDE.md` § MCP |
+| 5 | ACP 子代理 | `.arbiter/acp.json` | — *（仅项目级）* | `acp_client/config.py` | [acp-client.md](../guides/acp-client.md) / [acp-embedding.md](../guides/acp-embedding.md) |
+| 6 | 禁用 skill 列表 | `.arbiter/skills_config.json` | — | `skills/manager.py` | [SKILLS_GUIDE.md](../guides/skills.md) |
+| 7 | 项目说明 | `ARBITER.md`（cwd） | — | `agent.py::_build_system_prompt` | [CHATAGENT_MD_FEATURE.md](../guides/chatagent-md.md) |
+| 8 | 记忆库 | `.arbiter/memory.db` | `~/.arbiter/memory.db` | `memory/manager.py::MemoryManager` | [memory-management.md](../guides/memory-management.md) |
+| 9 | Run spec（`arbiter run`） | `--spec` 传入的任意路径（或 stdin） | — | `cli/run_models.py::RunSpec`、`cli/run_template.py::render_spec` | [run-spec-parameters.zh.md](../design/run-spec-parameters.zh.md) |
 
 **内部状态文件**（自动管理；列出仅为告知，请勿手动编辑）：
 
 | 配置面 | 路径 | 维护者 | 备注 |
 |---|---|---|---|
-| 后台子代理任务状态 | `.agentao/background_tasks.json` | `agents/bg_store.py::BackgroundTaskStore` | 锚定到 `working_directory`；未传 `persistence_dir` 时只在内存中。手改会与运行中的线程脱钩。`status: "failed"` 的记录在"跑完未抛异常但没答出来"时会带 `incomplete_reason`——它的有无用来区分"崩溃"（无 `result`）与"没跑完"（`result` 仍在且值得读）。0.4.15 之前写入的记录没有该字段。**不做密钥扫描**——见下方注记。 |
-| 回放事件 | `.agentao/replay/*.jsonl` | `replay/` | 见 [session-replay.md](../guides/session-replay.md)。 |
-| 会话 / 计划 | `.agentao/sessions/`、`.agentao/plan-history/` | 多模块 | 单次会话产物。**不做密钥扫描**——见下方注记。 |
-| 工具产物 | `.agentao/tool-outputs/` | `runtime/tool_result_formatter.py::_save_and_truncate` | 超长工具输出溢写到磁盘，由上下文中的摘录引用其路径。**落盘前会做密钥扫描。** |
+| 后台子代理任务状态 | `.arbiter/background_tasks.json` | `agents/bg_store.py::BackgroundTaskStore` | 锚定到 `working_directory`；未传 `persistence_dir` 时只在内存中。手改会与运行中的线程脱钩。`status: "failed"` 的记录在"跑完未抛异常但没答出来"时会带 `incomplete_reason`——它的有无用来区分"崩溃"（无 `result`）与"没跑完"（`result` 仍在且值得读）。0.4.15 之前写入的记录没有该字段。**不做密钥扫描**——见下方注记。 |
+| 回放事件 | `.arbiter/replay/*.jsonl` | `replay/` | 见 [session-replay.md](../guides/session-replay.md)。 |
+| 会话 / 计划 | `.arbiter/sessions/`、`.arbiter/plan-history/` | 多模块 | 单次会话产物。**不做密钥扫描**——见下方注记。 |
+| 工具产物 | `.arbiter/tool-outputs/` | `runtime/tool_result_formatter.py::_save_and_truncate` | 超长工具输出溢写到磁盘，由上下文中的摘录引用其路径。**落盘前会做密钥扫描。** |
 
-> **密钥扫描是有意不对称的。** `.agentao/tool-outputs/` 在落盘前会过一遍 `security/secret_scan.py::scan_and_redact`——形似凭据的字符串被替换成 `[REDACTED:<kind>]`。而 `.agentao/sessions/*.json`（`embedding/sessions.py::save_session`）与 `.agentao/background_tasks.json` **不扫描**，这是权衡而非疏漏：两者在恢复会话时都会原样回灌进 `agent.messages`，对它们做脱敏会静默污染一次被恢复的对话，正如对实时工具结果做脱敏会污染当前对话一样。**产物是终点就脱敏，产物会被回读就不脱敏。**
+> **密钥扫描是有意不对称的。** `.arbiter/tool-outputs/` 在落盘前会过一遍 `security/secret_scan.py::scan_and_redact`——形似凭据的字符串被替换成 `[REDACTED:<kind>]`。而 `.arbiter/sessions/*.json`（`embedding/sessions.py::save_session`）与 `.arbiter/background_tasks.json` **不扫描**，这是权衡而非疏漏：两者在恢复会话时都会原样回灌进 `agent.messages`，对它们做脱敏会静默污染一次被恢复的对话，正如对实时工具结果做脱敏会污染当前对话一样。**产物是终点就脱敏，产物会被回读就不脱敏。**
 >
 > 交给模型的工具结果同样从不脱敏——正则无法区分真实凭据和测试用的假 key。当某次工具产物落盘**确实**发生了脱敏，交给模型的那段摘录会附上一句提示，避免模型把被改写过的文本抄回真实文件：`(credential-shaped strings in the saved copy are replaced with [REDACTED:<kind>]; the excerpt below is verbatim)`。
 
 **优先级规则**（仅适用于同时存在项目与用户两份的配置面）：
 
-- **Permissions** —— user 文件是**唯一**的规则来源。项目级 `.agentao/permissions.json` 会被**忽略**并打 warning（一条 checked-in `{"tool": "*", "action": "allow"}` 会因首个命中规则胜出而当场作废用户策略）。custom 规则之后，当前 mode 的 **preset** 规则放在最后求值（例外：`full-access` / `plan` 模式下，preset 规则放在**最前**且无法被覆盖）。
+- **Permissions** —— user 文件是**唯一**的规则来源。项目级 `.arbiter/permissions.json` 会被**忽略**并打 warning（一条 checked-in `{"tool": "*", "action": "allow"}` 会因首个命中规则胜出而当场作废用户策略）。custom 规则之后，当前 mode 的 **preset** 规则放在最后求值（例外：`full-access` / `plan` 模式下，preset 规则放在**最前**且无法被覆盖）。
 - **MCP** —— 两份文件都会读。**项目级仅可新增**：项目级条目可以声明*新的* server name，但不能覆盖用户级同名条目（冲突时打 warning + 跳过项目项）。这防止了 checked-in `mcp.json` 静默把已知 server name（如 `github`）重定向到不同 transport。
 - **Memory** —— project DB 与 user DB **独立读取**；prompt 里两者都可见，project 不会覆盖 user。
 - 其他用户级配置面均为项目级独占——不存在合并。
@@ -65,18 +65,18 @@
 | `LLM_TEMPERATURE` | 否 | `0.2` | 范围 `0.0`–`2.0`。 |
 | `LLM_MAX_TOKENS` | 否 | — | 不设则使用 provider 缺省。 |
 | `BOCHA_API_KEY` | 否 | — | `web_search` 走一条有序回退链，某个后端**出错**（而非返回空结果）时退到下一个：`jina`（设了 `JINA_API_KEY`）→ `bocha`（设了 `BOCHA_API_KEY`）→ `duckduckgo`（无需 key，永远是兜底）。每次回退都会在结果里标注并记日志。用 `WebSearchTool(backend="bocha"\|"jina"\|"duckduckgo")` 显式钉死某个后端时，**只**用那一个，不做自动回退。 |
-| `AGENTAO_WEB_FETCH_FALLBACK` | 否 | `none` | `web_fetch` 的 JS 渲染回退。可选值：`none` / `jina` / `crawl4ai`。默认 `none` —— 工具不会把用户给定的 URL 静默代理到第三方。`jina` 把 URL 发到 `https://r.jina.ai`（工具描述和结果首部的 `Fallback:` 行会显式说明）。`crawl4ai` 需要 `pip install 'agentao[crawl4ai]'` + `playwright install chromium`。仅在 `WebFetchTool` 构造时读一次；无效值会 warn 并降级到 `none`。 |
-| `AGENTAO_WEB_FETCH_ALLOW_CIDRS` | 否 | — | `web_fetch` 的 opt-in SSRF 白名单：逗号/空格分隔的 CIDR（或裸 IP），即便它们**不是公网可路由地址**也放行。给跑在 fake-IP 代理后面的 host 用的逃生口（Clash/V2Ray 把所有域名映射到保留段，通常是 `198.18.0.0/15`，否则会被 SSRF 防护拦掉），或放行可信的内网服务。对初始 URL **以及每一个重定向跳转**都生效；白名单是**有作用域的**——列了 `198.18.0.0/15` **不会**顺带放行 `169.254.169.254`。**这是放松一项安全控制** —— 启动时记一条日志、并在工具描述里透出；范围要尽量窄，绝不要写 `0.0.0.0/0`。默认空 = 完全严格。（更干净的做法：把代理 DNS 从 `fake-ip` 改成 `redir-host`/真实 IP。）见 `agentao/security/url_policy.py`。 |
-| `JINA_API_KEY` | 否 | — | 可选的 Jina key，作为 `Authorization: Bearer <key>` 发出以获取更高速率上限。被 **`web_search`**（`jina` 后端，走 `s.jina.ai` —— 无 key 也能用，key 只是抬高速率上限；设了 key 还会把 `jina` 加进自动回退链）**和** `web_fetch`（`AGENTAO_WEB_FETCH_FALLBACK=jina` 时走 `r.jina.ai`）共用。 |
-| `AGENTAO_SCRUB_CHILD_ENV` | 否 | 开启 | shell 与 MCP 子进程是否继承 agentao **自己的** provider 凭据。默认（除 `0`/`false`/`no`/`off` 之外的任何值）会把 `HARNESS_ENV_KEYS` —— `OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`LLM_EXTRA_BODY`…… —— 从子进程环境里剔除，这样被 prompt 注入的 `run_shell_command("env")` 捞不到任何值钱的东西。agent 与运行它的人是**两个不同的主体**，LLM 决定要跑的东西没有一个需要那把给 LLM 付费的 key。**设为 `0` 可恢复完整继承** —— 如果你要在 agent 自己的 shell 里跑 `agentao run`、或任何会调用 provider 的脚本，就需要这么做。只有 agentao 自己的 key 会被剔除；用户的其他密钥（AWS、GitHub、`DATABASE_URL`）原样保留 —— 要不要连它们一起扫是 host 的决定，想要更严格环境的 host 可以通过 `ShellRequest` 显式传 `env`。这是纵深防御，不是密封：`cat .env` 依然有效。见 `agentao/capabilities/process.py::build_child_env`。 |
+| `ARBITER_WEB_FETCH_FALLBACK` | 否 | `none` | `web_fetch` 的 JS 渲染回退。可选值：`none` / `jina` / `crawl4ai`。默认 `none` —— 工具不会把用户给定的 URL 静默代理到第三方。`jina` 把 URL 发到 `https://r.jina.ai`（工具描述和结果首部的 `Fallback:` 行会显式说明）。`crawl4ai` 需要 `pip install 'arbiter[crawl4ai]'` + `playwright install chromium`。仅在 `WebFetchTool` 构造时读一次；无效值会 warn 并降级到 `none`。 |
+| `ARBITER_WEB_FETCH_ALLOW_CIDRS` | 否 | — | `web_fetch` 的 opt-in SSRF 白名单：逗号/空格分隔的 CIDR（或裸 IP），即便它们**不是公网可路由地址**也放行。给跑在 fake-IP 代理后面的 host 用的逃生口（Clash/V2Ray 把所有域名映射到保留段，通常是 `198.18.0.0/15`，否则会被 SSRF 防护拦掉），或放行可信的内网服务。对初始 URL **以及每一个重定向跳转**都生效；白名单是**有作用域的**——列了 `198.18.0.0/15` **不会**顺带放行 `169.254.169.254`。**这是放松一项安全控制** —— 启动时记一条日志、并在工具描述里透出；范围要尽量窄，绝不要写 `0.0.0.0/0`。默认空 = 完全严格。（更干净的做法：把代理 DNS 从 `fake-ip` 改成 `redir-host`/真实 IP。）见 `arbiter/security/url_policy.py`。 |
+| `JINA_API_KEY` | 否 | — | 可选的 Jina key，作为 `Authorization: Bearer <key>` 发出以获取更高速率上限。被 **`web_search`**（`jina` 后端，走 `s.jina.ai` —— 无 key 也能用，key 只是抬高速率上限；设了 key 还会把 `jina` 加进自动回退链）**和** `web_fetch`（`ARBITER_WEB_FETCH_FALLBACK=jina` 时走 `r.jina.ai`）共用。 |
+| `ARBITER_SCRUB_CHILD_ENV` | 否 | 开启 | shell 与 MCP 子进程是否继承 arbiter **自己的** provider 凭据。默认（除 `0`/`false`/`no`/`off` 之外的任何值）会把 `HARNESS_ENV_KEYS` —— `OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`LLM_EXTRA_BODY`…… —— 从子进程环境里剔除，这样被 prompt 注入的 `run_shell_command("env")` 捞不到任何值钱的东西。agent 与运行它的人是**两个不同的主体**，LLM 决定要跑的东西没有一个需要那把给 LLM 付费的 key。**设为 `0` 可恢复完整继承** —— 如果你要在 agent 自己的 shell 里跑 `arbiter run`、或任何会调用 provider 的脚本，就需要这么做。只有 arbiter 自己的 key 会被剔除；用户的其他密钥（AWS、GitHub、`DATABASE_URL`）原样保留 —— 要不要连它们一起扫是 host 的决定，想要更严格环境的 host 可以通过 `ShellRequest` 显式传 `env`。这是纵深防御，不是密封：`cat .env` 依然有效。见 `arbiter/capabilities/process.py::build_child_env`。 |
 
 > 标准范例：仓库根目录的 `.env.example`。
 
 ---
 
-## 3. `.agentao/settings.json` — 运行模式 + 内置子代理
+## 3. `.arbiter/settings.json` — 运行模式 + 内置子代理
 
-- **路径。** `<cwd>/.agentao/settings.json`（仅项目级，无用户变体）。
+- **路径。** `<cwd>/.arbiter/settings.json`（仅项目级，无用户变体）。
 - **Loaders。**
   - `embedding/factory.py::_load_settings` — 读取 `agents.enable_builtin` / `enable_builtin_agents` 用作构造器的 `enable_builtin_agents` 默认值。
   - `plan/controller.py::_load_settings` — 在 plan-mode 会话结束后**恢复**权限模式时读取 `mode`。
@@ -106,9 +106,9 @@
 ## 4. `permissions.json` — 按工具的权限规则
 
 - **路径。**
-  1. `~/.agentao/permissions.json`（用户级）—— 唯一基于文件的规则来源。
-  2. `<cwd>/.agentao/permissions.json`（项目级）—— **被忽略**并打 warning。原因见下方"为何不再支持项目级？"。
-- **Loader。** `permissions.py::PermissionEngine._load_file`。文件缺失或 JSON 损坏 → 空规则列表（不报错）。成功加载的文件会贡献 `loaded_sources` 标签（`user:<path>`），由 `PermissionEngine.active_permissions()` 与 `Agentao.active_permissions()` 暴露 —— 详见 [`docs/reference/host-api.md`](host-api.md)。
+  1. `~/.arbiter/permissions.json`（用户级）—— 唯一基于文件的规则来源。
+  2. `<cwd>/.arbiter/permissions.json`（项目级）—— **被忽略**并打 warning。原因见下方"为何不再支持项目级？"。
+- **Loader。** `permissions.py::PermissionEngine._load_file`。文件缺失或 JSON 损坏 → 空规则列表（不报错）。成功加载的文件会贡献 `loaded_sources` 标签（`user:<path>`），由 `PermissionEngine.active_permissions()` 与 `Arbiter.active_permissions()` 暴露 —— 详见 [`docs/reference/host-api.md`](host-api.md)。
 - **公共 getter。** `PermissionEngine.active_permissions()` 返回一个缓存的、JSON 安全的 `ActivePermissions` 快照（`mode`、`rules`、`loaded_sources`）。叠加策略的宿主可调用 `add_loaded_source("injected:<name>")` 让快照反映其 provenance。`set_mode()` 与 `add_loaded_source()` 会使缓存失效。
 - **求值顺序。**
   - `read-only` / `workspace-write` 模式：`[用户规则] → [当前 mode 的 preset 规则]`，首个命中胜出。
@@ -155,8 +155,8 @@
 ## 5. `mcp.json` — MCP 服务器注册表
 
 - **路径。**
-  1. `~/.agentao/mcp.json`（用户级）—— 任何在该文件声明的 server name 都以此为准。
-  2. `<cwd>/.agentao/mcp.json`（项目级）—— **仅可新增**：可以声明*新*的 server name，但不能覆盖用户级同名条目。冲突时打 warning + 跳过项目项。
+  1. `~/.arbiter/mcp.json`（用户级）—— 任何在该文件声明的 server name 都以此为准。
+  2. `<cwd>/.arbiter/mcp.json`（项目级）—— **仅可新增**：可以声明*新*的 server name，但不能覆盖用户级同名条目。冲突时打 warning + 跳过项目项。
 - **Loader。** `mcp/config.py`。值里的环境变量会被展开（`$VAR` 形式）。
 
 ### Schema
@@ -185,7 +185,7 @@
 | Streamable HTTP | `"http"`（或从 `url` 推断） | `url` | `headers`、`timeout`、`trust` |
 | SSE（legacy） | `"sse"` | `url` | `headers`、`timeout`、`trust` |
 
-> **`env` 与基础环境。** stdio server 的 `env` 条目是叠加在一份**已被清洗**的 agentao 环境之上的：`mcp/client.py` 通过 `build_child_env()` 构造子进程环境，会剔除 agentao 自己的 provider 凭据（`HARNESS_ENV_KEYS`）。原本靠*继承* `GEMINI_API_KEY`、`OPENAI_API_KEY` 等变量工作的 MCP server 现在会拿到 401 —— 请在 `env` 里显式传（`{"GEMINI_API_KEY": "$GEMINI_API_KEY"}`，它在清洗之后才应用），或设 `AGENTAO_SCRUB_CHILD_ENV=0`（§2）恢复完整继承。环境里的其他变量照常继承，不受影响。
+> **`env` 与基础环境。** stdio server 的 `env` 条目是叠加在一份**已被清洗**的 arbiter 环境之上的：`mcp/client.py` 通过 `build_child_env()` 构造子进程环境，会剔除 arbiter 自己的 provider 凭据（`HARNESS_ENV_KEYS`）。原本靠*继承* `GEMINI_API_KEY`、`OPENAI_API_KEY` 等变量工作的 MCP server 现在会拿到 401 —— 请在 `env` 里显式传（`{"GEMINI_API_KEY": "$GEMINI_API_KEY"}`，它在清洗之后才应用），或设 `ARBITER_SCRUB_CHILD_ENV=0`（§2）恢复完整继承。环境里的其他变量照常继承，不受影响。
 
 **传输选择（`mcp/config.py :: resolve_transport`）。** 可选的 `type` 字段选择传输：`"stdio"` / `"sse"` / `"http"`（别名 `"streamable-http"` / `"streamable_http"` 归一到 `"http"`）。省略 `type` 时按以下规则推断：`command` → stdio，`url` → **Streamable HTTP**。因此裸 `{"url": ...}` 表示 Streamable HTTP——旧版 SSE 传输需显式写 `"type": "sse"`。未知的 `type`、或缺少所需键的传输，会**快速失败**（`McpTransportConfigError`），而不是静默连到错误的协议。
 
@@ -206,13 +206,13 @@
 
 ---
 
-## 6. `.agentao/acp.json` — ACP 子代理注册表
+## 6. `.arbiter/acp.json` — ACP 子代理注册表
 
-- **路径。** 仅 `<cwd>/.agentao/acp.json`。**没有用户级变体**——ACP 服务器明确按项目隔离。
+- **路径。** 仅 `<cwd>/.arbiter/acp.json`。**没有用户级变体**——ACP 服务器明确按项目隔离。
 - **Loader。** `acp_client/config.py::load_acp_config`（解析后通过 `acp_client/models.py::AcpServerConfig.from_dict` 转为 `AcpServerConfig`）。
 - **失败行为。** `command` / `args` / `env` / `cwd` 缺失会在配置加载时抛 `AcpConfigError`——直接启动失败。
 - **热加载。** CLI 监听文件 mtime；编辑会在下一次 inbox 轮询时被发现（`cli/acp_inbox.py`）。
-- **子进程环境。** ACP 服务器是从配置里拉起的第三方二进制——和 MCP 服务器处在同一信任位置——所以它的基础环境来自 `capabilities/process.py::build_child_env()`，**不会**继承 agentao 自己的 provider 凭据。原本靠继承 `OPENAI_API_KEY` 跑通的 server 现在会拿到 401；请在它的 `env` 块里显式声明，或设 `AGENTAO_SCRUB_CHILD_ENV=0` 在整个进程范围恢复完整继承。
+- **子进程环境。** ACP 服务器是从配置里拉起的第三方二进制——和 MCP 服务器处在同一信任位置——所以它的基础环境来自 `capabilities/process.py::build_child_env()`，**不会**继承 arbiter 自己的 provider 凭据。原本靠继承 `OPENAI_API_KEY` 跑通的 server 现在会拿到 401；请在它的 `env` 块里显式声明，或设 `ARBITER_SCRUB_CHILD_ENV=0` 在整个进程范围恢复完整继承。
 
 ### Schema
 
@@ -254,9 +254,9 @@
 
 ---
 
-## 7. `.agentao/skills_config.json` — 禁用 skill 列表
+## 7. `.arbiter/skills_config.json` — 禁用 skill 列表
 
-- **路径。** `<cwd>/.agentao/skills_config.json`（仅项目级）。
+- **路径。** `<cwd>/.arbiter/skills_config.json`（仅项目级）。
 - **Loader。** `skills/manager.py`。
 
 ### Schema
@@ -275,9 +275,9 @@ skill 的发现与激活规则见 [SKILLS_GUIDE.md](../guides/skills.md)。
 
 ---
 
-## 8. `AGENTAO.md` — 项目说明
+## 8. `ARBITER.md` — 项目说明
 
-- **路径。** `<cwd>/AGENTAO.md`。可选。
+- **路径。** `<cwd>/ARBITER.md`。可选。
 - **Loader。** `agent.py::_build_system_prompt` —— 文件存在时其内容会被前置到 system prompt。
 - **Schema。** 自由 Markdown，无强制结构。
 
@@ -288,8 +288,8 @@ prompt 组成规则与约定见 [CHATAGENT_MD_FEATURE.md](../guides/chatagent-md
 ## 9. 记忆库（`memory.db`）
 
 - **路径。**
-  - 项目：`<cwd>/.agentao/memory.db`
-  - 用户：`~/.agentao/memory.db`
+  - 项目：`<cwd>/.arbiter/memory.db`
+  - 用户：`~/.arbiter/memory.db`
 - **格式。** SQLite；schema 由 `memory/manager.py::MemoryManager` 拥有。**不要手编辑**。
 - **优先级。** 两个 DB 独立读取；prompt 渲染器都会看到。Project 不会覆盖 user。
 
@@ -297,10 +297,10 @@ prompt 组成规则与约定见 [CHATAGENT_MD_FEATURE.md](../guides/chatagent-md
 
 ---
 
-## 10. Run spec —— `agentao run` 调用规约
+## 10. Run spec —— `arbiter run` 调用规约
 
-- **路径。** 无固定位置 —— `agentao run --spec PATH`（YAML 或 JSON），或从 stdin 管道传入。
-- **加载器。** `agentao/cli/run.py::_load_spec` + `_parse_spec_text` → `RunSpec.model_validate`。模板渲染：`cli/run_template.py::render_spec`。
+- **路径。** 无固定位置 —— `arbiter run --spec PATH`（YAML 或 JSON），或从 stdin 管道传入。
+- **加载器。** `arbiter/cli/run.py::_load_spec` + `_parse_spec_text` → `RunSpec.model_validate`。模板渲染：`cli/run_template.py::render_spec`。
 - **作用域。** 每次调用一份；不与任何全局文件合并。
 
 ### Schema（顶层）
@@ -308,7 +308,7 @@ prompt 组成规则与约定见 [CHATAGENT_MD_FEATURE.md](../guides/chatagent-md
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `prompt` | `str` | CLI 合并 + 渲染后必填。可模板化。 |
-| `instructions` | `str?` | 可模板化。`.strip()` 后非空时通过 `Agentao(project_instructions=…)` 注入，并跳过 `AGENTAO.md`。 |
+| `instructions` | `str?` | 可模板化。`.strip()` 后非空时通过 `Arbiter(project_instructions=…)` 注入，并跳过 `ARBITER.md`。 |
 | `parameters` | `list[RunParameter]?` | 子 schema 见下；重名直接拒绝。 |
 | `cwd` | `str?` | 工作目录；默认 `os.getcwd()`。 |
 | `model` / `base_url` | `str?` | LLM 覆盖项。 |
@@ -357,7 +357,7 @@ prompt 组成规则与约定见 [CHATAGENT_MD_FEATURE.md](../guides/chatagent-md
   - `UndefinedError`（StrictUndefined） → "template uses undefined variable 'X' (declare it in spec.parameters)"。
   - `template.render()` 抛出的其他任意异常（`ZeroDivisionError`、`TypeError`、`TemplateNotFound` 等）→ "template error in spec.\<field\>: …"。
 
-### 退出码（`agentao run`）
+### 退出码（`arbiter run`）
 
 | Code | 含义 |
 |---|---|

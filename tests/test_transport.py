@@ -1,6 +1,6 @@
 """Tests for the Transport abstraction layer."""
 
-from agentao.transport import (
+from arbiter.transport import (
     AgentEvent,
     EventType,
     NullTransport,

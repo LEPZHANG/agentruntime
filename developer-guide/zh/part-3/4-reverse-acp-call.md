@@ -1,6 +1,6 @@
 # 3.4 反向：调用外部 ACP Agent
 
-[3.2](./2-agentao-as-server) 和 [3.3](./3-host-client-architecture) 把 Agentao 定位成**服务端**、你是客户端。本节把角色反过来：**Agentao 当客户端**，以子进程形式驱动一个外部 ACP agent。适用场景：你有一个讲 ACP 的专业 agent（搜索机器人、文档爬虫、代码审阅者），想让主 Agentao 把某些轮次委派给它。
+[3.2](./2-arbiter-as-server) 和 [3.3](./3-host-client-architecture) 把 Arbiter 定位成**服务端**、你是客户端。本节把角色反过来：**Arbiter 当客户端**，以子进程形式驱动一个外部 ACP agent。适用场景：你有一个讲 ACP 的专业 agent（搜索机器人、文档爬虫、代码审阅者），想让主 Arbiter 把某些轮次委派给它。
 
 ## 3.4.1 什么时候用
 
@@ -14,21 +14,21 @@
 什么时候**别**用：
 
 - 想要一个本地工具——写 `Tool` 子类更简单
-- 子 agent 也是 Python 并与你同进程——就在进程内再起一个 `Agentao`
+- 子 agent 也是 Python 并与你同进程——就在进程内再起一个 `Arbiter`
 
 ## 3.4.2 `ACPManager` — 公开 API
 
-`ACPManager` 是 Agentao 的 ACP 客户端侧。从 `agentao.acp_client` 导入：
+`ACPManager` 是 Arbiter 的 ACP 客户端侧。从 `arbiter.acp_client` 导入：
 
 ```python
-from agentao.acp_client import ACPManager, load_acp_client_config, PromptResult
-from agentao.acp_client import AcpClientError, AcpErrorCode, ServerState
+from arbiter.acp_client import ACPManager, load_acp_client_config, PromptResult
+from arbiter.acp_client import AcpClientError, AcpErrorCode, ServerState
 ```
 
 两种构造方式：
 
 ```python
-# 1. 从 .agentao/acp.json（自动探测项目根）
+# 1. 从 .arbiter/acp.json（自动探测项目根）
 mgr = ACPManager.from_project()
 
 # 2. 显式传 config
@@ -64,7 +64,7 @@ mgr = ACPManager(config)
 
 `send_prompt_nonblocking` / `finish_prompt_nonblocking` /
 `cancel_prompt_nonblocking` 也挂在 `ACPManager` 上，但属于
-**internal / unstable**：仅供 Agentao 自己的交互式 CLI inline-confirm
+**internal / unstable**：仅供 Arbiter 自己的交互式 CLI inline-confirm
 管线使用，签名可能随时变更，headless embedder **不应**依赖。Headless
 场景请使用 `send_prompt` 或 `prompt_once`。支持级别以
 [`docs/guides/headless-runtime.md`](../../../docs/guides/headless-runtime.md)
@@ -104,7 +104,7 @@ def prompt_once(
 ### 示例：主 agent 把工作委派给 "searcher"
 
 ```python
-from agentao.acp_client import ACPManager, AcpClientError, AcpErrorCode
+from arbiter.acp_client import ACPManager, AcpClientError, AcpErrorCode
 
 mgr = ACPManager.from_project()
 
@@ -126,10 +126,10 @@ def search_via_subagent(query: str) -> str:
         raise
 ```
 
-把它包成 Agentao `Tool`，主 agent 就能像调其它工具一样调它：
+把它包成 Arbiter `Tool`，主 agent 就能像调其它工具一样调它：
 
 ```python
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 
 class SearcherTool(Tool):
     name = "delegate_search"
@@ -151,12 +151,12 @@ class SearcherTool(Tool):
 在主 agent 里注册：
 
 ```python
-from agentao import Agentao
+from arbiter import Arbiter
 
 mgr = ACPManager.from_project()
 mgr.start_server("searcher")        # 预热；可选，但能降首次延迟
 
-main = Agentao(tools=[SearcherTool(mgr)])
+main = Arbiter(tools=[SearcherTool(mgr)])
 main.chat("调研 agent-client protocol 并总结。")
 ```
 
@@ -177,9 +177,9 @@ mgr = ACPManager(config, notification_callback=on_notification)
 
 回调跑在**读线程**上——要么做得快，要么塞到队列里再交棒。
 
-## 3.4.5 配置格式 — `.agentao/acp.json`
+## 3.4.5 配置格式 — `.arbiter/acp.json`
 
-和 Agentao 自己识别的配置 schema 一致：
+和 Arbiter 自己识别的配置 schema 一致：
 
 ```json
 {
@@ -201,7 +201,7 @@ mgr = ACPManager(config, notification_callback=on_notification)
 
 必填：`command`、`args`、`env`、`cwd`。可选：`autoStart`、`startupTimeoutMs`、`requestTimeoutMs`、`capabilities`、`description`、`nonInteractivePolicy`。
 
-- `cwd` 相对路径相对于项目根（含 `.agentao/` 的目录）解析
+- `cwd` 相对路径相对于项目根（含 `.arbiter/` 的目录）解析
 - `env` 值里的 `$VAR` / `${VAR}` 会展开成宿主进程的环境变量
 - `nonInteractivePolicy` 是结构化对象 `{"mode": "reject_all" | "accept_all"}`。缺省等价于 `{"mode": "reject_all"}`。旧版裸字符串形式（`"reject_all"` / `"accept_all"`）现在在配置加载阶段**直接报错**，迁移见 [附录 E](/zh/appendix/e-migration)
 - 生产用 `reject_all`。在 `send_prompt` / `prompt_once` 上传 `interaction_policy=` 可对单次 turn 覆盖 server 默认
@@ -211,7 +211,7 @@ mgr = ACPManager(config, notification_callback=on_notification)
 ### 单次调用策略覆盖
 
 ```python
-from agentao.acp_client import ACPManager, InteractionPolicy
+from arbiter.acp_client import ACPManager, InteractionPolicy
 
 mgr = ACPManager.from_project()
 
@@ -269,7 +269,7 @@ mgr.prompt_once(
 **致命进程死亡 → sticky，必须运维介入**。OOM / SIGKILL / `exit 137`、信号结束、连续 handshake 失败、或 idle 非零退出超过上限，都会把 server 标记为 sticky-fatal。`mgr.is_fatal(name)` 返回 `True`，所有调用都抛 `AcpClientError(code=TRANSPORT_DISCONNECT, details={"recovery": "fatal"})`，直到调 `mgr.restart_server(name)` 或 `mgr.start_server(name)` 清除标记。
 
 ```python
-from agentao.acp_client import ACPManager, AcpClientError, AcpErrorCode
+from arbiter.acp_client import ACPManager, AcpClientError, AcpErrorCode
 
 mgr = ACPManager.from_project()
 
@@ -282,7 +282,7 @@ except AcpClientError as e:
         # 之后: mgr.restart_server("searcher")
 ```
 
-classifier 是纯函数——`classify_process_death`——从 `agentao.acp_client` 导出，可以独立测试。完整决策矩阵见 [`docs/guides/headless-runtime.md` §7.2](../../../docs/guides/headless-runtime.md)。
+classifier 是纯函数——`classify_process_death`——从 `arbiter.acp_client` 导出，可以独立测试。完整决策矩阵见 [`docs/guides/headless-runtime.md` §7.2](../../../docs/guides/headless-runtime.md)。
 
 ## 3.4.8 取消与错误
 
@@ -316,7 +316,7 @@ except AcpClientError as e:
 `ACPManager.get_status()` 返回类型化的 `list[ServerStatus]`：
 
 ```python
-from agentao.acp_client import ServerStatus
+from arbiter.acp_client import ServerStatus
 
 for s in mgr.get_status():             # 每个 s 都是 ServerStatus
     print(s.server, s.state, s.pid, s.has_active_turn)
@@ -327,7 +327,7 @@ for s in mgr.get_status():             # 每个 s 都是 ServerStatus
 
 核心字段：
 
-- `server: str` — `.agentao/acp.json` 里的 server 名
+- `server: str` — `.arbiter/acp.json` 里的 server 名
 - `state: str` — `ServerState` 枚举的字符串值
 - `pid: int | None`
 - `has_active_turn: bool` — 由 manager 的活跃 turn 槽派生；turn
@@ -341,11 +341,11 @@ for s in mgr.get_status():             # 每个 s 都是 ServerStatus
 从旧 dict 形态迁移的映射表见
 [`docs/guides/headless-runtime.md`](../../../docs/guides/headless-runtime.md)。
 
-子 agent（如果也是 Agentao 类型）的日志在 `<server cwd>/agentao.log`，其它 agent 可能输出到其它位置。`.agentao/acp.json` 里的 `cwd` 一定要指向可写目录，不然日志会丢。
+子 agent（如果也是 Arbiter 类型）的日志在 `<server cwd>/arbiter.log`，其它 agent 可能输出到其它位置。`.arbiter/acp.json` 里的 `cwd` 一定要指向可写目录，不然日志会丢。
 
 ## 3.4.10 生命周期自查
 
-主 Agentao 进程启动时：
+主 Arbiter 进程启动时：
 
 ```python
 mgr = ACPManager.from_project()

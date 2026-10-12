@@ -34,14 +34,14 @@ app-server surface in this plan.
 
 Already shipped or available:
 
-- `Agentao.arun()` async public surface.
+- `Arbiter.arun()` async public surface.
 - `working_directory` is explicit.
 - `build_from_environment()` owns CLI-style env/cwd/home loading.
 - `AgentEvent` has `schema_version`.
 - `AsyncToolBase` exists and dispatch is host-loop aware.
 - Capabilities such as filesystem, shell, memory, MCP registry, replay, sandbox,
   and background task store are injectable.
-- Internal structured events already exist in `agentao/transport/events.py`.
+- Internal structured events already exist in `arbiter/transport/events.py`.
 
 Gaps this plan closes:
 
@@ -82,14 +82,14 @@ These are intentionally outside this implementation plan:
 Add a small public harness package:
 
 ```text
-agentao/harness/
+arbiter/harness/
   __init__.py
   models.py          # Pydantic public payload models
   events.py          # event stream primitives
   projection.py      # redaction/sanitization from runtime state to public models
   schema.py          # schema export helpers
 
-agentao/runtime/
+arbiter/runtime/
   identity.py        # internal id generation and normalization helpers
 ```
 
@@ -104,13 +104,13 @@ Exports:
 - `export_harness_event_json_schema()`
 - `export_harness_acp_json_schema()`
 
-`agentao/harness/__init__.py` is updated cumulatively across PRs. The export
+`arbiter/harness/__init__.py` is updated cumulatively across PRs. The export
 list above is the final state. PR 1 exports the models and
 `export_harness_event_json_schema()` only; PR 2 adds
 `export_harness_acp_json_schema()`; PR 4 adds `EventStream`.
 
-Do not export runtime id generation helpers from `agentao.harness`. Runtime ids
-are generated and normalized internally in `agentao/runtime/identity.py`; the
+Do not export runtime id generation helpers from `arbiter.harness`. Runtime ids
+are generated and normalized internally in `arbiter/runtime/identity.py`; the
 harness surface only exposes the resulting id fields on public models.
 
 Dependency rule: add `pydantic>=2` as a direct project dependency in PR 1. The
@@ -137,9 +137,9 @@ contract must be implemented before PR 5-7 event emission work starts.
 
 ### `session_id`
 
-- Source: the `Agentao` instance/session id already used for persisted sessions
+- Source: the `Arbiter` instance/session id already used for persisted sessions
   when available.
-- If no persisted session id exists yet, allocate a UUID at `Agentao`
+- If no persisted session id exists yet, allocate a UUID at `Arbiter`
   construction and treat it as the in-memory harness session id.
 - Public events always use a string `session_id`; they do not use `None` or an
   empty string.
@@ -148,9 +148,9 @@ contract must be implemented before PR 5-7 event emission work starts.
 
 ### `turn_id`
 
-- Boundary: one user-submitted agentic loop, i.e. one `Agentao.chat()` or
-  `Agentao.arun()` call.
-- Generation: create a UUID4 `turn_id` at turn entry in `agentao/runtime/turn.py`
+- Boundary: one user-submitted agentic loop, i.e. one `Arbiter.chat()` or
+  `Arbiter.arun()` call.
+- Generation: create a UUID4 `turn_id` at turn entry in `arbiter/runtime/turn.py`
   and store it on turn-local runtime state until the turn exits.
 - Public tool and permission events emitted inside that loop carry this `turn_id`.
 - Events outside a turn may use `turn_id=None` only if their model explicitly
@@ -344,7 +344,7 @@ Contract:
   not a payload value. Emitted events always carry a non-empty string
   `session_id`.
 - Events are scoped by `session_id`. `agent.events(session_id=None)` subscribes
-  to future events from all sessions owned by that `Agentao` instance.
+  to future events from all sessions owned by that `Arbiter` instance.
 - Same-session ordering is guaranteed.
 - Within one `tool_call_id`, `PermissionDecisionEvent` must be emitted before
   `ToolLifecycleEvent` with `phase="started"`.
@@ -360,10 +360,10 @@ Contract:
 - If a subscriber is scoped to one session, only matching session producers can
   be blocked by that subscriber. If a subscriber listens to all sessions, any
   matching public event can apply backpressure.
-- MVP supports one public event stream consumer per `Agentao` instance unless the
+- MVP supports one public event stream consumer per `Arbiter` instance unless the
   implementation PR explicitly adds tested fan-out. This avoids introducing a
   pub/sub subsystem before there is a real need.
-- `Agentao.events()` returns an async iterator bound to the runtime event loop.
+- `Arbiter.events()` returns an async iterator bound to the runtime event loop.
   Hosts iterating from a different event loop or a synchronous thread must adapt
   via standard asyncio interop, such as `asyncio.run_coroutine_threadsafe`. MVP
   does not provide a synchronous iterator wrapper.
@@ -382,7 +382,7 @@ Implementation hint:
 
 - Keep internal `Transport.emit()` working.
 - Add a separate harness event publisher that receives sanitized public models.
-- Put runtime-to-public projection and redaction in `agentao/harness/projection.py`.
+- Put runtime-to-public projection and redaction in `arbiter/harness/projection.py`.
 - Do not expose raw `AgentEvent.data` as public harness payload.
 
 ---
@@ -394,11 +394,11 @@ Implementation hint:
 Files:
 
 - `pyproject.toml`
-- `agentao/harness/__init__.py`
-- `agentao/harness/models.py`
-- `agentao/harness/projection.py`
-- `agentao/harness/schema.py`
-- `agentao/runtime/identity.py`
+- `arbiter/harness/__init__.py`
+- `arbiter/harness/models.py`
+- `arbiter/harness/projection.py`
+- `arbiter/harness/schema.py`
+- `arbiter/runtime/identity.py`
 - `tests/test_host_schema.py`
 - `docs/schema/harness.events.v1.json`
 - `docs/reference/host-api.md`
@@ -411,13 +411,13 @@ Work:
    `HarnessEvent`.
 3. Define the constrained `RFC3339UTCString` timestamp type used by all public
    timestamp fields.
-4. Add runtime id helper functions or types in `agentao/runtime/identity.py` for:
+4. Add runtime id helper functions or types in `arbiter/runtime/identity.py` for:
    - `session_id`
    - `turn_id`
    - `tool_call_id`
    - `decision_id`
    - child task/session ids
-   These helpers are not exported from `agentao.harness`.
+   These helpers are not exported from `arbiter.harness`.
 5. Add `export_harness_event_json_schema()`.
 6. Add checked-in event schema snapshot:
    `docs/schema/harness.events.v1.json`.
@@ -430,7 +430,7 @@ Acceptance:
 
 - `uv run pytest tests/test_host_schema.py` passes.
 - `pyproject.toml` directly declares `pydantic>=2`.
-- `agentao/runtime/identity.py` owns id generation/normalization helpers; the
+- `arbiter/runtime/identity.py` owns id generation/normalization helpers; the
   public harness package does not export them.
 - `docs/schema/harness.events.v1.json` contains only event/permission harness
   models; ACP has its own snapshot in PR 2.
@@ -445,11 +445,11 @@ Acceptance:
 
 Files:
 
-- `agentao/acp/models.py`
-- `agentao/acp/protocol.py`
-- `agentao/harness/__init__.py`
-- `agentao/harness/models.py` or `agentao/acp/schema.py`
-- `agentao/harness/schema.py`
+- `arbiter/acp/models.py`
+- `arbiter/acp/protocol.py`
+- `arbiter/harness/__init__.py`
+- `arbiter/harness/models.py` or `arbiter/acp/schema.py`
+- `arbiter/harness/schema.py`
 - `tests/test_acp_schema.py`
 - `docs/schema/harness.acp.v1.json`
 
@@ -481,9 +481,9 @@ Acceptance:
 
 Files:
 
-- `agentao/permissions.py`
-- `agentao/agent.py`
-- `agentao/harness/models.py`
+- `arbiter/permissions.py`
+- `arbiter/agent.py`
+- `arbiter/harness/models.py`
 - `tests/test_active_permissions.py`
 - `docs/reference/configuration.md`
 - `docs/reference/configuration.zh.md`
@@ -492,7 +492,7 @@ Work:
 
 1. Track loaded permission sources in `PermissionEngine`.
 2. Add `PermissionEngine.active_permissions() -> ActivePermissions`.
-3. Add `Agentao.active_permissions()` as the host-facing convenience wrapper.
+3. Add `Arbiter.active_permissions()` as the host-facing convenience wrapper.
 4. Include preset source for the current mode.
 5. Include project/user file sources only when the file was loaded or attempted
    according to the current loader semantics. Be explicit in tests.
@@ -512,23 +512,23 @@ Acceptance:
 
 Files:
 
-- `agentao/harness/__init__.py`
-- `agentao/harness/events.py`
-- `agentao/agent.py`
-- `agentao/runtime/turn.py`
+- `arbiter/harness/__init__.py`
+- `arbiter/harness/events.py`
+- `arbiter/agent.py`
+- `arbiter/runtime/turn.py`
 - `tests/test_host_event_stream.py`
 
 Work:
 
 1. Add `EventStream` with async iterator semantics.
-2. Add `Agentao.events(session_id: str | None = None)`.
+2. Add `Arbiter.events(session_id: str | None = None)`.
 3. Implement the subscriber lifecycle matrix from this plan:
    - no subscriber drops events;
    - mid-turn subscription sees only future events;
    - bounded queues apply backpressure for matching events;
    - cancellation releases subscription resources.
-4. Generate and thread `turn_id` at `agentao/runtime/turn.py` entry.
-5. Implement the `Agentao`-construction-time UUID fallback for `session_id` when
+4. Generate and thread `turn_id` at `arbiter/runtime/turn.py` entry.
+5. Implement the `Arbiter`-construction-time UUID fallback for `session_id` when
    no persisted session id exists, per the Runtime Identity Contract.
 6. Keep the stream usable without starting a real LLM call in tests.
 
@@ -538,7 +538,7 @@ Acceptance tests:
 - cross-session tests do not assert global order;
 - events emitted within one turn share the same `turn_id`;
 - events emitted from different turns use different `turn_id` values;
-- identity tests cover `Agentao`-construction-time session id fallback
+- identity tests cover `Arbiter`-construction-time session id fallback
   allocation;
 - no-subscriber events do not block and are not replayed;
 - mid-turn subscribers receive only future events;
@@ -552,10 +552,10 @@ Acceptance tests:
 
 Files:
 
-- `agentao/runtime/tool_executor.py`
-- `agentao/runtime/tool_runner.py`
-- `agentao/harness/projection.py`
-- `agentao/harness/models.py`
+- `arbiter/runtime/tool_executor.py`
+- `arbiter/runtime/tool_runner.py`
+- `arbiter/harness/projection.py`
+- `arbiter/harness/models.py`
 - `tests/test_host_tool_events.py`
 
 Work:
@@ -563,7 +563,7 @@ Work:
 1. Emit `ToolLifecycleEvent(started)` before tool execution.
 2. Emit `ToolLifecycleEvent(completed)` after success.
 3. Emit `ToolLifecycleEvent(failed)` after exceptions or cancelled execution.
-4. Use `agentao/harness/projection.py` for redacted/summarized result text.
+4. Use `arbiter/harness/projection.py` for redacted/summarized result text.
 5. Do not expose raw args or raw outputs in public event payloads.
 6. Ensure AsyncTool cancellation emits the terminal public event only after the
    async cleanup acknowledgement has settled.
@@ -585,12 +585,12 @@ Acceptance:
 
 Files:
 
-- `agentao/permissions.py`
-- `agentao/runtime/tool_planning.py`
-- `agentao/runtime/tool_executor.py`
-- `agentao/runtime/tool_runner.py`
-- `agentao/harness/projection.py`
-- `agentao/harness/models.py`
+- `arbiter/permissions.py`
+- `arbiter/runtime/tool_planning.py`
+- `arbiter/runtime/tool_executor.py`
+- `arbiter/runtime/tool_runner.py`
+- `arbiter/harness/projection.py`
+- `arbiter/harness/models.py`
 - `tests/test_host_permission_events.py`
 
 Work:
@@ -619,18 +619,18 @@ Acceptance:
 
 Files:
 
-- `agentao/agents/bg_store.py`
-- `agentao/tools/agents.py`
-- `agentao/agents/tools.py`
-- `agentao/harness/projection.py`
-- `agentao/harness/models.py`
+- `arbiter/agents/bg_store.py`
+- `arbiter/tools/agents.py`
+- `arbiter/agents/tools.py`
+- `arbiter/harness/projection.py`
+- `arbiter/harness/models.py`
 - `tests/test_host_subagent_events.py`
 
 Work:
 
 1. Confirm the actual spawn and terminal update points before editing:
-   `agentao/agents/bg_store.py` is the persistence/state owner, while
-   `agentao/tools/agents.py` and `agentao/agents/tools.py` are candidate call
+   `arbiter/agents/bg_store.py` is the persistence/state owner, while
+   `arbiter/tools/agents.py` and `arbiter/agents/tools.py` are candidate call
    sites/consumers.
 2. Emit `SubagentLifecycleEvent(spawned)` when a child task/session is created.
 3. Emit terminal events for `completed`, `failed`, and `cancelled`.
@@ -648,16 +648,16 @@ Acceptance:
 
 Files:
 
-- `agentao/cli/*`
-- `agentao/display.py`
+- `arbiter/cli/*`
+- `arbiter/display.py`
 - `tests/test_cli_host_events.py` or focused existing CLI tests
 
 Work:
 
 1. Route the CLI tool-running spinner/status through `ToolLifecycleEvent`.
-2. Read the mode/status line from `Agentao.active_permissions()` where that line
+2. Read the mode/status line from `Arbiter.active_permissions()` where that line
    reflects permission mode.
-3. Keep CLI-only stores and commands out of `agentao.harness`.
+3. Keep CLI-only stores and commands out of `arbiter.harness`.
 4. Preserve existing user-visible CLI behavior unless a PR explicitly improves it.
 
 Acceptance:
@@ -715,7 +715,7 @@ Candidate public event family after plugin hooks are host-relevant:
 
 ### Per-session stream dispatch and multi-subscriber fan-out
 
-MVP allows one public stream consumer per `Agentao` instance. Hosts that want one
+MVP allows one public stream consumer per `Arbiter` instance. Hosts that want one
 independent iterator per UI tab/session should filter the all-session stream in
 MVP. Separate per-session iterators and multi-subscriber fan-out are deferred
 together because both require a tested pub/sub layer rather than a single
@@ -772,7 +772,7 @@ Required tests across the plan:
   - one-subscriber or fan-out semantics.
 - `tests/test_harness_identity.py` or focused identity assertions in the event
   tests:
-  - `Agentao`-construction-time session id fallback allocation;
+  - `Arbiter`-construction-time session id fallback allocation;
   - turn id propagation within one turn and separation across turns;
   - tool call id prefers the LLM id and falls back to UUID;
   - decision id uniqueness per permission decision;
@@ -816,16 +816,16 @@ uv run pytest
 
 The MVP is complete when:
 
-- `agentao.harness` exports public Pydantic models.
+- `arbiter.harness` exports public Pydantic models.
 - `docs/schema/harness.events.v1.json` is generated from public event models and
   protected by tests.
 - `docs/schema/harness.acp.v1.json` is generated from public ACP models and
   protected by tests.
 - ACP host-facing payloads participate in the same schema discipline through
   their own checked-in snapshot.
-- `Agentao.active_permissions()` returns `mode`, JSON-safe `rules`, and
+- `Arbiter.active_permissions()` returns `mode`, JSON-safe `rules`, and
   `loaded_sources`.
-- `Agentao.events()` exposes an async iterator.
+- `Arbiter.events()` exposes an async iterator.
 - Public events use stable `session_id`, `turn_id`, `tool_call_id`, and
   `decision_id` semantics as defined in this plan.
 - The public stream emits tool lifecycle, permission decision, and subagent

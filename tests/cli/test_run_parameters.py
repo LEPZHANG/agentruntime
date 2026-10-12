@@ -1,4 +1,4 @@
-"""Tests for ``agentao run`` spec parameters & instructions templating.
+"""Tests for ``arbiter run`` spec parameters & instructions templating.
 
 Covers the 15-case test plan from
 ``docs/design/run-spec-parameters.md``. Hooks into the same stub
@@ -114,10 +114,10 @@ def stub_pipeline(monkeypatch, tmp_path):
         return StubAgent(**kwargs)
 
     monkeypatch.setattr(
-        "agentao.embedding.build_from_environment", _factory,
+        "arbiter.embedding.build_from_environment", _factory,
     )
     monkeypatch.setattr(
-        "agentao.cli.subcommands._load_and_register_plugins",
+        "arbiter.cli.subcommands._load_and_register_plugins",
         lambda agent: None,
     )
     return captured, StubAgent
@@ -139,7 +139,7 @@ def test_valid_render_uses_param_in_prompt(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         spec_path=str(spec_path),
@@ -166,7 +166,7 @@ def test_required_param_missing_exits_2(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="json")
     rc = run._execute_with_args(args)
@@ -193,7 +193,7 @@ def test_default_applied_when_param_missing(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="text")
     rc = run._execute_with_args(args)
@@ -217,7 +217,7 @@ def test_choices_violation_exits_2(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         spec_path=str(spec_path),
@@ -247,7 +247,7 @@ def test_unknown_param_with_declared_params(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         spec_path=str(spec_path),
@@ -271,7 +271,7 @@ def test_unknown_param_when_no_parameters_block(
     spec_path = tmp_path / "task.yaml"
     spec_path.write_text("prompt: hello\n", encoding="utf-8")
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         spec_path=str(spec_path),
@@ -299,7 +299,7 @@ def test_no_params_passthrough_literal_braces(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="text")
     rc = run._execute_with_args(args)
@@ -323,7 +323,7 @@ def test_strict_undefined_in_template(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         spec_path=str(spec_path),
@@ -351,7 +351,7 @@ def test_duplicate_parameter_names_in_spec(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="json")
     rc = run._execute_with_args(args)
@@ -369,7 +369,7 @@ def test_param_malformed_no_equals(
     monkeypatch, tmp_path, stub_pipeline, capsys,
 ):
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         prompt="hi",
@@ -396,7 +396,7 @@ def test_param_duplicate_key(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         spec_path=str(spec_path),
@@ -426,7 +426,7 @@ def test_instructions_flows_to_project_instructions(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         spec_path=str(spec_path),
@@ -455,7 +455,7 @@ def test_required_and_default_mutually_exclusive(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="json")
     rc = run._execute_with_args(args)
@@ -480,7 +480,7 @@ def test_default_not_in_choices(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="json")
     rc = run._execute_with_args(args)
@@ -515,7 +515,7 @@ def test_non_identifier_parameter_name_spec_side(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="json")
     rc = run._execute_with_args(args)
@@ -526,7 +526,7 @@ def test_non_identifier_param_key_cli_side(
     monkeypatch, tmp_path, stub_pipeline, capsys,
 ):
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         prompt="hi",
@@ -546,12 +546,12 @@ def test_non_identifier_param_key_cli_side(
 # ---------------------------------------------------------------------------
 
 
-def test_empty_rendered_instructions_does_not_override_agentao_md(
+def test_empty_rendered_instructions_does_not_override_arbiter_md(
     monkeypatch, tmp_path, stub_pipeline,
 ):
     """An ``instructions`` template that resolves to ``""`` must NOT be
     plumbed into the factory — the agent treats any non-None value as
-    authoritative and would silently suppress AGENTAO.md.
+    authoritative and would silently suppress ARBITER.md.
     """
     captured, _ = stub_pipeline
     spec_path = tmp_path / "task.yaml"
@@ -562,7 +562,7 @@ def test_empty_rendered_instructions_does_not_override_agentao_md(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="text")
     rc = run._execute_with_args(args)
@@ -570,12 +570,12 @@ def test_empty_rendered_instructions_does_not_override_agentao_md(
     assert "project_instructions" not in captured["factory_kwargs"]
 
 
-def test_whitespace_only_rendered_instructions_does_not_override_agentao_md(
+def test_whitespace_only_rendered_instructions_does_not_override_arbiter_md(
     monkeypatch, tmp_path, stub_pipeline,
 ):
     """YAML block-scalar instructions that render to whitespace-only
     output (e.g. ``"\\n"`` from ``keep_trailing_newline=True``) must
-    also fall back to AGENTAO.md — the empty-string guard alone misses
+    also fall back to ARBITER.md — the empty-string guard alone misses
     this case.
     """
     captured, _ = stub_pipeline
@@ -587,7 +587,7 @@ def test_whitespace_only_rendered_instructions_does_not_override_agentao_md(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="text")
     rc = run._execute_with_args(args)
@@ -607,7 +607,7 @@ def test_prompt_rendered_to_empty_emits_distinct_diagnostic(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         spec_path=str(spec_path),
@@ -638,7 +638,7 @@ def test_sandbox_blocks_attribute_escape(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="json")
     rc = run._execute_with_args(args)
@@ -668,7 +668,7 @@ def test_runtime_template_errors_map_to_invalid_spec(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="json")
     rc = run._execute_with_args(args)
@@ -699,7 +699,7 @@ def test_jinja_reserved_parameter_name_rejected(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(spec_path=str(spec_path), output_format="json")
     rc = run._execute_with_args(args)
@@ -720,7 +720,7 @@ def test_multiple_unknown_params_aggregated_into_one_error(
         encoding="utf-8",
     )
     _no_stdin(monkeypatch)
-    from agentao.cli import run
+    from arbiter.cli import run
 
     args = _build_args(
         spec_path=str(spec_path),

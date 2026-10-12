@@ -2,11 +2,11 @@
 
 ## Goal
 
-把插件中的 `skills` 和 `commands` 接入 Agentao 的 skill/prompt 运行时，使 Claude-compatible prompt assets 能在 Agentao 中被发现、列出并激活。
+把插件中的 `skills` 和 `commands` 接入 Arbiter 的 skill/prompt 运行时，使 Claude-compatible prompt assets 能在 Arbiter 中被发现、列出并激活。
 
 ## Why This Phase Exists
 
-`skills` 和 `commands` 是 Claude-style plugins 中最直接、最常用、风险也最低的一类能力。先把它们接入，可以尽快验证 plugin packaging 层是否真的能映射到 Agentao runtime。
+`skills` 和 `commands` 是 Claude-style plugins 中最直接、最常用、风险也最低的一类能力。先把它们接入，可以尽快验证 plugin packaging 层是否真的能映射到 Arbiter runtime。
 
 ## Scope
 
@@ -16,7 +16,7 @@
 - manifest `skills` 路径加载
 - plugin `commands/` markdown 发现
 - manifest `commands` 路径和 object mapping 解析结果接入
-- plugin prompt assets 映射为 Agentao skill-like entries
+- plugin prompt assets 映射为 Arbiter skill-like entries
 - namespacing
 - collision diagnostics
 
@@ -39,7 +39,7 @@
 
 ## Runtime Contract
 
-- plugin `skills/` 按 Agentao skill source 接入
+- plugin `skills/` 按 Arbiter skill source 接入
 - plugin `commands/` 统一映射为 skill-like prompt entries
 - plugin 内部产出的 runtime name 必须稳定
 - plugin 内部 collision 为 fatal

@@ -1,6 +1,6 @@
 """Snapshot + validation tests for the public ACP payload schema (PR 2).
 
-Hosts integrating Agentao over ACP rely on these payloads as the wire
+Hosts integrating Arbiter over ACP rely on these payloads as the wire
 contract. Schema changes must update both the Pydantic model and the
 checked-in snapshot in ``docs/schema/host.acp.v1.json``.
 """
@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agentao.acp.schema import (
+from arbiter.acp.schema import (
     AcpAskUserResponse,
     AcpInitializeRequest,
     AcpInitializeResponse,
@@ -34,7 +34,7 @@ from agentao.acp.schema import (
     AcpSessionSetModelResponse,
     AcpSessionUpdateParams,
 )
-from agentao.host.schema import (
+from arbiter.host.schema import (
     export_host_acp_json_schema,
     normalized_schema_json,
 )
@@ -58,7 +58,7 @@ def test_acp_schema_matches_snapshot():
     assert generated == snapshot_norm, (
         "Generated harness ACP schema diverged from "
         f"{SNAPSHOT_PATH}. Regenerate via "
-        "agentao.host.schema.export_host_acp_json_schema() and re-run."
+        "arbiter.host.schema.export_host_acp_json_schema() and re-run."
     )
 
 
@@ -113,7 +113,7 @@ def test_initialize_response_round_trip():
             "mcpCapabilities": {"http": True, "sse": True},
         },
         "authMethods": [],
-        "agentInfo": {"name": "agentao", "version": "0.3.1.dev0"},
+        "agentInfo": {"name": "arbiter", "version": "0.3.1.dev0"},
         "_meta": {
             "_agentao.cn/extensions": [
                 {
@@ -123,10 +123,10 @@ def test_initialize_response_round_trip():
             ],
         },
     })
-    assert resp.agentInfo.name == "agentao"
+    assert resp.agentInfo.name == "arbiter"
     assert resp.meta is not None
-    assert len(resp.meta.agentao_extensions) == 1
-    assert resp.meta.agentao_extensions[0].method == "_agentao.cn/ask_user"
+    assert len(resp.meta.arbiter_extensions) == 1
+    assert resp.meta.arbiter_extensions[0].method == "_agentao.cn/ask_user"
 
 
 def test_initialize_response_rejects_top_level_extensions():
@@ -145,7 +145,7 @@ def test_initialize_response_rejects_top_level_extensions():
                 "mcpCapabilities": {"http": True, "sse": True},
             },
             "authMethods": [],
-            "agentInfo": {"name": "agentao", "version": "0.3.1.dev0"},
+            "agentInfo": {"name": "arbiter", "version": "0.3.1.dev0"},
             "extensions": [
                 {"method": "_agentao.cn/ask_user"},
             ],
@@ -168,7 +168,7 @@ def test_initialize_response_meta_is_alias_only():
             "mcpCapabilities": {"http": True, "sse": True},
         },
         "authMethods": [],
-        "agentInfo": {"name": "agentao", "version": "0.3.1.dev0"},
+        "agentInfo": {"name": "arbiter", "version": "0.3.1.dev0"},
     }
     # The wire alias is accepted.
     ok = AcpInitializeResponse.model_validate(
@@ -209,7 +209,7 @@ def test_mcp_server_type_defaults_to_stdio():
     """Runtime ``_parse_mcp_servers`` treats a missing ``type`` field
     as ``stdio`` so existing ``{name, command}`` payloads continue to
     work. The schema must accept the same shape."""
-    from agentao.acp.schema import AcpMcpServer
+    from arbiter.acp.schema import AcpMcpServer
     server = AcpMcpServer.model_validate({
         "name": "fs", "command": "/usr/local/bin/mcp-fs",
     })
@@ -409,7 +409,7 @@ def test_session_set_mode_round_trip():
 
 def test_session_set_mode_accepts_open_mode_ids():
     """``modeId`` is the ACP-standard field and an OPEN string — a UI mode
-    that has no Agentao permission meaning (DeepChat's ``code`` / ``ask``)
+    that has no Arbiter permission meaning (DeepChat's ``code`` / ``ask``)
     must validate, not be rejected. Permission presets are still valid
     values; the handler applies a preset only on an exact match."""
     for value in (

@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import json
 
-from agentao.plugins.hooks import (
+from arbiter.plugins.hooks import (
     ClaudeHookPayloadAdapter,
     PluginHookDispatcher,
 )
-from agentao.plugins.models import ParsedHookRule
+from arbiter.plugins.models import ParsedHookRule
 
 from tests.support.stop_precompact import write_capture_script
 

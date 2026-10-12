@@ -7,14 +7,14 @@ Covers the contract in ``docs/design/cli-host-agent-factory.md``:
 * §3.2 — pre-bound CLI-owned kwargs and unreachable transports are rejected
 
 These tests inject a factory rather than patching module globals. Note that
-``patch('agentao.cli.app.Agentao')`` — used by several older CLI tests —
+``patch('arbiter.cli.app.Arbiter')`` — used by several older CLI tests —
 intercepts nothing, because construction goes through
-``build_from_environment``, which imports ``Agentao`` locally.
+``build_from_environment``, which imports ``Arbiter`` locally.
 
 Every test that reaches the real factory pins ``working_directory`` to a
 ``tmp_path``: ``build_from_environment`` otherwise resolves ``Path.cwd()``,
 which under pytest is the repo root, and would create/mutate the developer's
-real ``.agentao/memory.db``, background-task store, and ``agentao.log``.
+real ``.arbiter/memory.db``, background-task store, and ``arbiter.log``.
 """
 
 from functools import partial
@@ -22,15 +22,15 @@ from unittest.mock import patch
 
 import pytest
 
-from agentao.embedding import build_from_environment
+from arbiter.embedding import build_from_environment
 
 
 def _make_cli(**kwargs):
-    """Build an AgentaoCLI with plugin loading and dotenv reads suppressed."""
-    with patch('agentao.cli.app.safe_load_dotenv'), \
-            patch('agentao.cli.subcommands._load_and_register_plugins'):
-        from agentao.cli import AgentaoCLI
-        return AgentaoCLI(**kwargs)
+    """Build an ArbiterCLI with plugin loading and dotenv reads suppressed."""
+    with patch('arbiter.cli.app.safe_load_dotenv'), \
+            patch('arbiter.cli.subcommands._load_and_register_plugins'):
+        from arbiter.cli import ArbiterCLI
+        return ArbiterCLI(**kwargs)
 
 
 def _isolated(tmp_path, **extra):
@@ -52,7 +52,7 @@ class _RecordingFactory:
 
 def _host_tool(tool_name):
     """A minimal host-supplied Tool instance."""
-    from agentao.tools.base import Tool
+    from arbiter.tools.base import Tool
 
     return type(
         "_HostTool", (Tool,),
@@ -82,8 +82,8 @@ def test_factory_receives_cli_owned_kwargs(tmp_path):
 
 
 def test_context_limit_comes_from_environment(tmp_path, monkeypatch):
-    """The forwarded limit tracks AGENTAO_CONTEXT_TOKENS."""
-    monkeypatch.setenv("AGENTAO_CONTEXT_TOKENS", "12345")
+    """The forwarded limit tracks ARBITER_CONTEXT_TOKENS."""
+    monkeypatch.setenv("ARBITER_CONTEXT_TOKENS", "12345")
     factory = _RecordingFactory(tmp_path)
     _make_cli(agent_factory=factory)
     assert factory.calls[0]["max_context_tokens"] == 12345
@@ -212,7 +212,7 @@ def test_rejects_substituted_transport(tmp_path):
 
 
 def test_accepts_wrapped_transport_reaching_the_cli(tmp_path):
-    """Reachability, not identity — agentao's own ReplayAdapter wraps this way."""
+    """Reachability, not identity — arbiter's own ReplayAdapter wraps this way."""
     class _TeeAdapter:
         def __init__(self, inner):
             self.inner = inner
@@ -282,18 +282,18 @@ def test_saved_mode_is_read_from_the_factory_working_directory(tmp_path, monkeyp
     import json
 
     project = tmp_path / "project"
-    (project / ".agentao").mkdir(parents=True)
-    (project / ".agentao" / "settings.json").write_text(
+    (project / ".arbiter").mkdir(parents=True)
+    (project / ".arbiter" / "settings.json").write_text(
         json.dumps({"mode": "read-only"}), encoding="utf-8")
 
     # Process cwd holds a *different*, more permissive posture.
     cwd = tmp_path / "cwd"
-    (cwd / ".agentao").mkdir(parents=True)
-    (cwd / ".agentao" / "settings.json").write_text(
+    (cwd / ".arbiter").mkdir(parents=True)
+    (cwd / ".arbiter" / "settings.json").write_text(
         json.dumps({"mode": "full-access"}), encoding="utf-8")
     monkeypatch.chdir(cwd)
 
-    from agentao.permissions import PermissionMode
+    from arbiter.permissions import PermissionMode
 
     cli = _make_cli(agent_factory=_isolated(project))
 
@@ -311,7 +311,7 @@ def _run_main(**kwargs):
     handler; neither is cleaned up on the success path, so an unguarded call
     from a test leaks an fd and leaves a handler that fires at pytest exit.
     """
-    from agentao.cli import entrypoints
+    from arbiter.cli import entrypoints
 
     seen = {}
 
@@ -322,8 +322,8 @@ def _run_main(**kwargs):
         def run(self):
             seen["ran"] = True
 
-    with patch('agentao.cli.app.AgentaoCLI', _FakeCLI), \
-            patch('agentao.cli.entrypoints.atexit.register'), \
+    with patch('arbiter.cli.app.ArbiterCLI', _FakeCLI), \
+            patch('arbiter.cli.entrypoints.atexit.register'), \
             patch.dict('sys.modules', {'termios': None}):
         entrypoints.main(**kwargs)
 
@@ -331,7 +331,7 @@ def _run_main(**kwargs):
 
 
 def test_main_forwards_factory_identity(tmp_path):
-    """main() hands the identical callable to AgentaoCLI."""
+    """main() hands the identical callable to ArbiterCLI."""
     sentinel = _RecordingFactory(tmp_path)
     seen = _run_main(agent_factory=sentinel)
 
@@ -340,7 +340,7 @@ def test_main_forwards_factory_identity(tmp_path):
 
 
 def test_main_defaults_to_none_factory():
-    """Console startup is unchanged: no factory reaches AgentaoCLI."""
+    """Console startup is unchanged: no factory reaches ArbiterCLI."""
     seen = _run_main()
 
     assert seen["factory"] is None

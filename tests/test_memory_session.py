@@ -49,7 +49,7 @@ def test_save_is_noop_on_exception(tmp_path):
     the test still demonstrates that an unwritable path doesn't crash
     the ``MemoryManager`` construction or subsequent writes.
     """
-    from agentao.memory import MemoryManager, SQLiteMemoryStore
+    from arbiter.memory import MemoryManager, SQLiteMemoryStore
     mgr = MemoryManager(
         project_store=SQLiteMemoryStore.open_or_memory(
             Path("/nonexistent/readonly/path/memory.db")
@@ -202,7 +202,7 @@ def test_clear_all_session_summaries_returns_zero_on_error(tmp_path, monkeypatch
 def test_clear_all_session_summaries_wipes_explicit_session_ids(tmp_path):
     """The store has summaries from N independent session_ids (not just chained
     archive_session() calls). clear_all must remove them all in one shot."""
-    from agentao.memory.models import SessionSummaryRecord
+    from arbiter.memory.models import SessionSummaryRecord
 
     mgr = _make_manager(tmp_path)
 
@@ -256,8 +256,8 @@ def test_clear_all_session_summaries_unblocks_review_queue_starvation(tmp_path):
 
 def test_context_manager_writes_session_summary(tmp_path, monkeypatch):
     """compress_messages() writes to SQLite when memory_manager is present."""
-    from agentao.context_manager import ContextManager
-    from agentao.memory.manager import MemoryManager
+    from arbiter.context_manager import ContextManager
+    from arbiter.memory.manager import MemoryManager
 
     mock_llm = Mock()
     mock_llm.logger = Mock()
@@ -300,7 +300,7 @@ def test_context_manager_crystallizes_from_raw_user_messages(tmp_path):
     """compress_messages() must crystallize from to_summarize (raw user
     messages), not from the LLM-generated summary text. Assistant prose
     that happens to contain pattern words must be ignored."""
-    from agentao.context_manager import ContextManager
+    from arbiter.context_manager import ContextManager
 
     from tests.support.memory import make_memory_manager
 
@@ -384,7 +384,7 @@ class TestGetCrossSessionTail:
         assert count <= 3
 
     def test_truncated_to_session_tail_chars(self, tmp_path):
-        from agentao.memory.models import SESSION_TAIL_CHARS
+        from arbiter.memory.models import SESSION_TAIL_CHARS
         mgr = _make_manager(tmp_path)
         mgr.save_session_summary("X" * 1000, tokens_before=100, messages_summarized=1)
         mgr.archive_session()

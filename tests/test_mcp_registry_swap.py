@@ -2,7 +2,7 @@
 
 A swappable MCPRegistry means embedded hosts can register MCP servers
 programmatically (plugin systems, dynamic discovery, remote
-registries) without writing to ``.agentao/mcp.json``. The tests below
+registries) without writing to ``.arbiter/mcp.json``. The tests below
 confirm wire-up: a custom registry's ``list_servers()`` is the single
 source the agent consults, and a registry that returns an empty dict
 (or is explicitly ``None``) skips file discovery entirely.
@@ -16,12 +16,12 @@ from unittest.mock import patch
 
 import pytest
 
-from agentao.capabilities import (
+from arbiter.capabilities import (
     FileBackedMCPRegistry,
     InMemoryMCPRegistry,
     MCPRegistry,
 )
-from agentao.mcp.config import McpServerConfig
+from arbiter.mcp.config import McpServerConfig
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ class TestFileBackedMCPRegistry:
         assert reg.list_servers() == {}
 
     def test_reads_project_file(self, tmp_path):
-        cfg_dir = tmp_path / ".agentao"
+        cfg_dir = tmp_path / ".arbiter"
         cfg_dir.mkdir()
         (cfg_dir / "mcp.json").write_text(
             '{"mcpServers": {"alpha": {"command": "echo", "args": []}}}'
@@ -58,7 +58,7 @@ class TestFileBackedMCPRegistry:
         """User-scope wins on collision; the project entry is ignored.
 
         Locks in the security invariant: a checked-in
-        ``.agentao/mcp.json`` cannot silently redirect a known server
+        ``.arbiter/mcp.json`` cannot silently redirect a known server
         name (e.g. ``github``) to a different transport or endpoint.
         """
         user_dir = tmp_path / "user"
@@ -66,7 +66,7 @@ class TestFileBackedMCPRegistry:
         (user_dir / "mcp.json").write_text(
             '{"mcpServers": {"shared": {"command": "user-bin"}}}'
         )
-        proj_dir = tmp_path / "proj" / ".agentao"
+        proj_dir = tmp_path / "proj" / ".arbiter"
         proj_dir.mkdir(parents=True)
         (proj_dir / "mcp.json").write_text(
             '{"mcpServers": {"shared": {"command": "proj-bin"}}}'
@@ -78,7 +78,7 @@ class TestFileBackedMCPRegistry:
         assert reg.list_servers()["shared"]["command"] == "user-bin"
 
     def test_re_reads_disk_on_each_call(self, tmp_path):
-        cfg_dir = tmp_path / ".agentao"
+        cfg_dir = tmp_path / ".arbiter"
         cfg_dir.mkdir()
         cfg_path = cfg_dir / "mcp.json"
         cfg_path.write_text('{"mcpServers": {"v1": {"command": "x"}}}')
@@ -152,10 +152,10 @@ def test_init_mcp_calls_injected_registry(stub_llm_env, tmp_path):
     falling back to the file source."""
     fake = _RecordingRegistry({})
 
-    from agentao.agent import Agentao
+    from arbiter.agent import Arbiter
 
-    with patch("agentao.tooling.mcp_tools.load_mcp_config") as file_loader:
-        agent = Agentao(working_directory=tmp_path, mcp_registry=fake)
+    with patch("arbiter.tooling.mcp_tools.load_mcp_config") as file_loader:
+        agent = Arbiter(working_directory=tmp_path, mcp_registry=fake)
         try:
             assert fake.calls == ["list_servers"]
             file_loader.assert_not_called()
@@ -166,15 +166,15 @@ def test_init_mcp_calls_injected_registry(stub_llm_env, tmp_path):
 def test_init_mcp_falls_back_to_file_when_no_registry(stub_llm_env, tmp_path):
     """The bare-construction path (no factory, no registry) still
     consults the on-disk MCP config — the M5 cut keeps that fallback so
-    ``Agentao(working_directory=...)`` outside the factory continues to
-    work for repos that already set up ``.agentao/mcp.json``."""
-    from agentao.agent import Agentao
+    ``Arbiter(working_directory=...)`` outside the factory continues to
+    work for repos that already set up ``.arbiter/mcp.json``."""
+    from arbiter.agent import Arbiter
 
     with patch(
-        "agentao.tooling.mcp_tools.load_mcp_config",
+        "arbiter.tooling.mcp_tools.load_mcp_config",
         return_value={},
     ) as file_loader:
-        agent = Agentao(working_directory=tmp_path)
+        agent = Arbiter(working_directory=tmp_path)
         try:
             file_loader.assert_called_once()
         finally:
@@ -184,7 +184,7 @@ def test_init_mcp_falls_back_to_file_when_no_registry(stub_llm_env, tmp_path):
 def test_factory_default_uses_file_backed_registry(stub_llm_env, tmp_path):
     """``build_from_environment`` injects ``FileBackedMCPRegistry`` so
     the CLI/ACP path keeps the legacy file-load behavior."""
-    from agentao.embedding import build_from_environment
+    from arbiter.embedding import build_from_environment
 
     agent = build_from_environment(working_directory=tmp_path)
     try:
@@ -199,11 +199,11 @@ def test_factory_accepts_custom_registry(stub_llm_env, tmp_path):
     init, never touching disk."""
     fake = _RecordingRegistry({"custom": {"command": "echo", "args": ["hi"]}})
 
-    from agentao.embedding import build_from_environment
+    from arbiter.embedding import build_from_environment
 
     # Patch the file loader so an accidental disk read trips an assert.
     with patch(
-        "agentao.tooling.mcp_tools.load_mcp_config",
+        "arbiter.tooling.mcp_tools.load_mcp_config",
         side_effect=AssertionError("file source should be skipped"),
     ):
         agent = build_from_environment(
@@ -221,11 +221,11 @@ def test_mcp_registry_and_mcp_manager_mutually_exclusive(stub_llm_env, tmp_path)
     """Passing both a pre-built ``mcp_manager`` and a ``mcp_registry``
     is a programmer error — ``mcp_registry`` is the config source for
     construction, ``mcp_manager`` is the construction outcome itself."""
-    from agentao.agent import Agentao
-    from agentao.mcp import McpClientManager
+    from arbiter.agent import Arbiter
+    from arbiter.mcp import McpClientManager
 
     with pytest.raises(ValueError, match="mcp_manager.*mcp_registry"):
-        Agentao(
+        Arbiter(
             working_directory=tmp_path,
             mcp_manager=McpClientManager({}),
             mcp_registry=InMemoryMCPRegistry(),

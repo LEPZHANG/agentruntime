@@ -1,9 +1,9 @@
 # pi-mono OpenAI-compatible stream fix (v0.73.1 / Unreleased)
 
-**Status:** Reference + agentao-side gap analysis. Drafted 2026-05-08 after reviewing four upstream commits in `../pi-mono` between v0.73.0 and v0.74.0.
-**Audience:** Agentao maintainers responsible for `agentao/llm/client.py` and anyone considering OpenAI-compatible providers (DeepSeek, Kimi, MiniMax, LM Studio, Xiaomi MiMo, Together, chutes.ai, …).
+**Status:** Reference + arbiter-side gap analysis. Drafted 2026-05-08 after reviewing four upstream commits in `../pi-mono` between v0.73.0 and v0.74.0.
+**Audience:** Arbiter maintainers responsible for `arbiter/llm/client.py` and anyone considering OpenAI-compatible providers (DeepSeek, Kimi, MiniMax, LM Studio, Xiaomi MiMo, Together, chutes.ai, …).
 **Companion:** `pi-mono-openai-stream-fix.zh.md`.
-**Method:** Read each upstream commit in full, cross-reference agentao's current streaming path (`agentao/llm/client.py:730-814`), report the gaps as concrete file:line risks rather than generic recommendations.
+**Method:** Read each upstream commit in full, cross-reference arbiter's current streaming path (`arbiter/llm/client.py:730-814`), report the gaps as concrete file:line risks rather than generic recommendations.
 
 ## TL;DR
 
@@ -14,9 +14,9 @@ pi-mono shipped four related changes that together harden its OpenAI-compatible 
 3. **`783e96a1` — `fix(ai): disable OpenAI reasoning where supported`.** Tags GPT-5.x family models with `thinkingLevelMap.off = "none"` so a `reasoning.effort: "none"` value is sent when thinking is disabled, instead of relying on default behavior.
 4. **`9eb126e7` — `docs(ai): document interleaved stream events`.** Promotes the contract: stream events for different content blocks are not guaranteed contiguous; consumers must use `contentIndex` as the anchor.
 
-For agentao the most important takeaway is **#1**. Agentao's streaming consumer (`agentao/llm/client.py:774-790`) keys tool calls by `tc_delta.index` only and does not match by `id`; a provider that emits `id` without `index`, that changes `id` across chunks for the same `index`, or that omits `index` entirely for a parallel call will cause silent argument loss or tool-call merging.
+For arbiter the most important takeaway is **#1**. Arbiter's streaming consumer (`arbiter/llm/client.py:774-790`) keys tool calls by `tc_delta.index` only and does not match by `id`; a provider that emits `id` without `index`, that changes `id` across chunks for the same `index`, or that omits `index` entirely for a parallel call will cause silent argument loss or tool-call merging.
 
-Agentao does not currently use the OpenAI Responses API (no `responses.create` in the codebase) so #2 and #3 are advisory. #4 is conceptual — agentao does not surface block-level start/delta/end events to its consumers, so the contract change does not affect its public surface.
+Arbiter does not currently use the OpenAI Responses API (no `responses.create` in the codebase) so #2 and #3 are advisory. #4 is conceptual — arbiter does not surface block-level start/delta/end events to its consumers, so the contract change does not affect its public surface.
 
 ## 1. Mixed chat-completion deltas (`6b271842`)
 
@@ -63,9 +63,9 @@ for (const block of blocks) finishBlock(block);
 - Final `arguments` parsed correctly per tool (`{path: "README.md"}`, `{pattern: "TODO", path: "src"}`, …)
 - `partialArgs` / `streamIndex` scratch fields stripped from the final block
 
-### Agentao current state
+### Arbiter current state
 
-`agentao/llm/client.py:774-790`:
+`arbiter/llm/client.py:774-790`:
 
 ```python
 if delta and delta.tool_calls:
@@ -84,17 +84,17 @@ if delta and delta.tool_calls:
 
 This is correct for OpenAI's first-party Chat Completions API and most well-behaved compatibles, because:
 
-- Text and reasoning are singletons keyed only by type (`content_parts`, `reasoning_parts` lists, `agentao/llm/client.py:734-735`) — pi-mono's text/thinking fragmentation bug never applies.
+- Text and reasoning are singletons keyed only by type (`content_parts`, `reasoning_parts` lists, `arbiter/llm/client.py:734-735`) — pi-mono's text/thinking fragmentation bug never applies.
 - Tool calls are keyed by integer `idx` from `tc_delta.index`. OpenAI guarantees `index` on every tool-call delta.
 
-Two latent risks if agentao starts targeting non-first-party servers:
+Two latent risks if arbiter starts targeting non-first-party servers:
 
 1. **Provider emits `tc_delta.id` without `index`.** `idx = tc_delta.index` becomes `None`; `tool_calls_data[None]` collects all such deltas into one synthetic call. The pi-mono `toolCallBlocksById` map is the canonical fix.
 2. **Provider re-uses the same `index` for what is logically a new tool call (or changes `id` mid-stream for the same `index`).** Current code `+=` the `name` and `arguments` strings — a name change becomes string concatenation, an arguments restart becomes invalid JSON. This is the case pi-mono's "ignore later id changes once first id is established" rule defends against.
 
-### Verdict for agentao
+### Verdict for arbiter
 
-**Backlog** until agentao actually ships an OpenAI-compatible provider config that exhibits one of the failure shapes. None of the providers users currently configure (OpenAI proper, generic OpenAI-compatible per `OPENAI_BASE_URL`) is known to send `tool_calls` without `index`. When the provider list grows (DeepSeek thinking models, Kimi K2 P6, MiniMax M2.7, LM Studio), revisit. The fix is ~30 lines: add a parallel `by_id` dict, look up by `index` first then by `id`, back-fill both on partial-key deltas.
+**Backlog** until arbiter actually ships an OpenAI-compatible provider config that exhibits one of the failure shapes. None of the providers users currently configure (OpenAI proper, generic OpenAI-compatible per `OPENAI_BASE_URL`) is known to send `tool_calls` without `index`. When the provider list grows (DeepSeek thinking models, Kimi K2 P6, MiniMax M2.7, LM Studio), revisit. The fix is ~30 lines: add a parallel `by_id` dict, look up by `index` first then by `id`, back-fill both on partial-key deltas.
 
 ## 2. Responses API reasoning text deltas (`31f5c232`)
 
@@ -121,13 +121,13 @@ currentBlock.thinking = summaryText || contentText || currentBlock.thinking;
 
 Previously the line was `currentBlock.thinking = item.summary?.map(...) || ""` which **wiped** any streamed thinking when the item ended without a summary.
 
-### Agentao current state
+### Arbiter current state
 
-`agentao/llm/client.py` uses `client.chat.completions.create` only. There is no Responses API consumer in the codebase. Agentao's `reasoning_content` accumulator (`agentao/llm/client.py:771-772`) is the Chat Completions equivalent (DeepSeek / Kimi / MiniMax field).
+`arbiter/llm/client.py` uses `client.chat.completions.create` only. There is no Responses API consumer in the codebase. Arbiter's `reasoning_content` accumulator (`arbiter/llm/client.py:771-772`) is the Chat Completions equivalent (DeepSeek / Kimi / MiniMax field).
 
-### Verdict for agentao
+### Verdict for arbiter
 
-**Not applicable today.** If agentao ever adds a Responses API path (e.g., to consume GPT-5.x with native reasoning surfaces), this fix is a known-good reference: handle both `response.reasoning_summary_text.delta` and `response.reasoning_text.delta`, and prefer streamed content over post-hoc summary on item-end.
+**Not applicable today.** If arbiter ever adds a Responses API path (e.g., to consume GPT-5.x with native reasoning surfaces), this fix is a known-good reference: handle both `response.reasoning_summary_text.delta` and `response.reasoning_text.delta`, and prefer streamed content over post-hoc summary on item-end.
 
 ## 3. Disable reasoning explicitly (`783e96a1`)
 
@@ -150,13 +150,13 @@ if (model.api === "openai-responses" &&
 
 Combined with the existing thinking-level dispatch, requests with thinking off now send `reasoning.effort: "none"` for these models. Without this, GPT-5.x defaults to an internal reasoning level even when the user has thinking disabled — wasted reasoning tokens billed silently.
 
-### Agentao current state
+### Arbiter current state
 
-Agentao does not expose a thinking-on/off toggle and does not send `reasoning.effort`. It also does not call the Responses API. The cost concern only materializes if both are added.
+Arbiter does not expose a thinking-on/off toggle and does not send `reasoning.effort`. It also does not call the Responses API. The cost concern only materializes if both are added.
 
-### Verdict for agentao
+### Verdict for arbiter
 
-**Not applicable today.** When (if) agentao adds thinking control, the lookup table above is reusable verbatim for GPT-5.x.
+**Not applicable today.** When (if) arbiter adds thinking control, the lookup table above is reusable verbatim for GPT-5.x.
 
 ## 4. Interleaved-events contract (`9eb126e7`)
 
@@ -168,23 +168,23 @@ Two lines of README:
 
 This formalizes the design choice in `6b271842`: instead of buffering and re-ordering, pi forwards the upstream interleaving as-is, and `contentIndex` is the disambiguator.
 
-### Agentao current state
+### Arbiter current state
 
-Agentao does not emit block-level start/delta/end events. Its host-facing streaming surface is `on_text_chunk(delta_text: str)` — text-only, called per chunk during the loop in `agentao/llm/client.py:764-766`. Reasoning, tool calls, and finish reasons are returned all-at-once at the end of the streaming loop via `_StreamResponse`. There is no public per-block sequencing contract to break.
+Arbiter does not emit block-level start/delta/end events. Its host-facing streaming surface is `on_text_chunk(delta_text: str)` — text-only, called per chunk during the loop in `arbiter/llm/client.py:764-766`. Reasoning, tool calls, and finish reasons are returned all-at-once at the end of the streaming loop via `_StreamResponse`. There is no public per-block sequencing contract to break.
 
-### Verdict for agentao
+### Verdict for arbiter
 
-**Not applicable today.** If agentao later adds a richer streaming event surface (per-block start/delta/end on `EventStream`), adopt the same interleaving contract from day one — buffering-and-reordering is a trap, not a feature.
+**Not applicable today.** If arbiter later adds a richer streaming event surface (per-block start/delta/end on `EventStream`), adopt the same interleaving contract from day one — buffering-and-reordering is a trap, not a feature.
 
 ## Cross-reference table
 
-| pi-mono commit | agentao file:line | Risk today | Action |
+| pi-mono commit | arbiter file:line | Risk today | Action |
 |---|---|---|---|
-| `6b271842` mixed deltas | `agentao/llm/client.py:774-790` | Low — only triggers on non-first-party servers that emit `tool_calls` without `index` or change `id` mid-stream | Backlog. Revisit when adding a provider known to misbehave. |
+| `6b271842` mixed deltas | `arbiter/llm/client.py:774-790` | Low — only triggers on non-first-party servers that emit `tool_calls` without `index` or change `id` mid-stream | Backlog. Revisit when adding a provider known to misbehave. |
 | `31f5c232` Responses reasoning_text | (no consumer) | None | Reference for future Responses API support. |
 | `783e96a1` disable reasoning | (no consumer) | None | Reference for future thinking-toggle support. |
 | `9eb126e7` interleaved contract | (no public block events) | None | Reference for future event-stream redesign. |
 
 ## Honest meta-note
 
-The pi-mono `separate-accumulators` rewrite is technically clean and the test it ships is the kind of test agentao should write *before* it adopts the change, not after. The current single-`index`-keyed accumulator in agentao is **not buggy** — it is **narrower in compatibility surface**. Borrowing the rewrite preemptively would be over-engineering; keep it on the backlog and let the trigger be a real provider that breaks.
+The pi-mono `separate-accumulators` rewrite is technically clean and the test it ships is the kind of test arbiter should write *before* it adopts the change, not after. The current single-`index`-keyed accumulator in arbiter is **not buggy** — it is **narrower in compatibility surface**. Borrowing the rewrite preemptively would be over-engineering; keep it on the backlog and let the trigger be a real provider that breaks.

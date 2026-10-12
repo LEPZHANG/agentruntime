@@ -14,8 +14,8 @@ Ported from the pi-mono #6285 lesson (strict-parse alone is insufficient; the
 from pathlib import Path
 from types import SimpleNamespace
 
-from agentao import Agentao
-from agentao.runtime.chat_loop._runner import (
+from arbiter import Arbiter
+from arbiter.runtime.chat_loop._runner import (
     LENGTH_TRUNCATED_TOOL_CALL_MESSAGE,
     LENGTH_TRUNCATION_ABORT_THRESHOLD,
 )
@@ -47,8 +47,8 @@ def _scripted_llm_call(responses):
     return _call
 
 
-def _make_agent() -> Agentao:
-    return Agentao(
+def _make_agent() -> Arbiter:
+    return Arbiter(
         api_key="test-key",
         base_url="https://example.test/v1",
         model="test-model",
@@ -115,7 +115,7 @@ def test_stop_finish_with_tool_calls_executes_normally():
             "reading",
             tool_calls=[_fake_tool_call(
                 "call_ok", "read_file",
-                '{"file_path": "/tmp/agentao-nonexistent-xyz-1234"}',
+                '{"file_path": "/tmp/arbiter-nonexistent-xyz-1234"}',
             )],
             finish_reason="stop",
         ),

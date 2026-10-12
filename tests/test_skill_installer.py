@@ -1,4 +1,4 @@
-"""Tests for agentao.skills.installer."""
+"""Tests for arbiter.skills.installer."""
 
 import json
 import shutil
@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from agentao.skills.installer import (
+from arbiter.skills.installer import (
     SkillConflictError,
     SkillInstaller,
     SkillValidationError,
     normalize_skill_name,
 )
-from agentao.skills.registry import InstalledSkillRecord, SkillRegistry
-from agentao.skills.sources import FetchResult, SkillSource, SourceSpec, UpdateInfo
-from agentao.skills.sources import GitHubSkillSource
+from arbiter.skills.registry import InstalledSkillRecord, SkillRegistry
+from arbiter.skills.sources import FetchResult, SkillSource, SourceSpec, UpdateInfo
+from arbiter.skills.sources import GitHubSkillSource
 
 
 # ------------------------------------------------------------------
@@ -280,7 +280,7 @@ class TestInstall:
         _create_valid_skill(pkg, "my-skill")
 
         # Pre-create the target dir
-        target = tmp_path / ".agentao" / "skills" / "my-skill"
+        target = tmp_path / ".arbiter" / "skills" / "my-skill"
         target.mkdir(parents=True)
         (target / "SKILL.md").write_text("existing", encoding="utf-8")
 
@@ -296,7 +296,7 @@ class TestInstall:
         _create_valid_skill(pkg, "my-skill")
 
         # Pre-create the target
-        target = tmp_path / ".agentao" / "skills" / "my-skill"
+        target = tmp_path / ".arbiter" / "skills" / "my-skill"
         target.mkdir(parents=True)
         (target / "SKILL.md").write_text("old content", encoding="utf-8")
 
@@ -413,7 +413,7 @@ class TestUpdate:
         reg = SkillRegistry(tmp_path / "reg.json")
         installer = SkillInstaller(reg, FakeSource(pkg), "project", tmp_path)
 
-        from agentao.skills.installer import SkillInstallError
+        from arbiter.skills.installer import SkillInstallError
         with pytest.raises(SkillInstallError, match="not found"):
             installer.update("nonexistent")
 

@@ -1,14 +1,14 @@
 # 子 Agent 发现 —— 入口不对称 与 Skill/Plugin 混淆
 
 **状态：** 评审记录。2026-06-23 起草，基于对 agent 定义、skill、plugin 三套发现路径
-在三个运行入口（交互式 CLI / `agentao run`、Python 嵌入 `build_from_environment`、
+在三个运行入口（交互式 CLI / `arbiter run`、Python 嵌入 `build_from_environment`、
 ACP `session/new`）上的 grep 验证式通读。**这是缺口分析 + 优先级建议，不是已批准的
 方案。** 它用来回答一个关于子 agent 注册的具体疑问 —— 并在回答过程中，纠正那个疑问
 所依据的前提。
-**读者：** Agentao 维护者；任何期望 skill 或 plugin 携带的子 agent 可见的嵌入方。
+**读者：** Arbiter 维护者；任何期望 skill 或 plugin 携带的子 agent 可见的嵌入方。
 **配套：** `subagent-discovery-entrypoint-review.md`（英文）。
 **相关：**
-- `embedding-vs-acp.md` —— 为什么 ACP 与 `agentao run` 是嵌入核心之上的*前端*，而非
+- `embedding-vs-acp.md` —— 为什么 ACP 与 `arbiter run` 是嵌入核心之上的*前端*，而非
   核心契约本身。§5 里"plugin 加载该放核心还是前端？"正是这条边界的直接应用。
 - `host-tool-injection.md` —— 宿主显式工具注入契约
   （`extra_tools` / `disable_tools` / `enabled_tools`）。§6 的 opt-in plugin 加载
@@ -42,7 +42,7 @@ CLI 没有、嵌入没有、ACP 也没有。`agents/` 自动发现是 **plugin**
    加载的 plugin 数量为 **零** —— 不只是 plugin-agent，连 plugin 的 *skill、MCP
    server、hook* 一并不加载。
 2. **`AgentManager` 没有全局层**（真实，但小）。它只扫 builtin + 项目
-   `.agentao/agents/`；不像 `SkillManager` 有三层，它没有 `~/.agentao/agents/`。
+   `.arbiter/agents/`；不像 `SkillManager` 有三层，它没有 `~/.arbiter/agents/`。
 3. **"skill 携带子 agent" 这个特性尚未接线**（缺失特性，不是 bug）。没有任何代码把
    skill 的 `agents/` 映射进 `AgentManager`。
 
@@ -58,7 +58,7 @@ CLI 没有、嵌入没有、ACP 也没有。`agents/` 自动发现是 **plugin**
 > 1. **问题 B *并非*无边界**（纠正 §4.2 / §6-P1）。`build_from_environment` 已经把
 >    连*builtin* agent 都门控在一个默认**关**的 settings 开关后
 >    （`_builtin_agents_enabled`，`factory.py:48,238`；`enable_builtin_agents` 默认
->    `False`，`agent.py:102`）。常开扫描用户全局 `~/.agentao/agents/` 会与这个保守
+>    `False`，`agent.py:102`）。常开扫描用户全局 `~/.arbiter/agents/` 会与这个保守
 >    姿态冲突 —— 然而 `SkillManager` 的全局层*却是*常开。所以 B 带着一个真实（虽更小）
 >    的判断 ——*跟哪个先例*—— 而非"无边界争议"。
 > 2. **ACP 已有 plugin 加载逃生口**（纠正 §5 / §6-P2）。`session/new` 和
@@ -90,10 +90,10 @@ plugin 加载；ACP 委托给它；`_load_and_register_plugins` 仅 CLI 触发�
 | 声明 | 结论 | 证据（`main`@`e477ad3`） |
 |---|---|---|
 | `_load_and_register_plugins` 仅 CLI | ✅ 真 | 定义于 `cli/subcommands.py:283`；非测试调用点只有 `cli/app.py:112` 与 `cli/run.py:543`。 |
-| `build_from_environment` 不加载 plugin | ✅ 真 | `grep "plugin" agentao/embedding/factory.py` → 无匹配。构造 `Agentao(**kwargs)` 后直接返回。 |
+| `build_from_environment` 不加载 plugin | ✅ 真 | `grep "plugin" arbiter/embedding/factory.py` → 无匹配。构造 `Arbiter(**kwargs)` 后直接返回。 |
 | ACP `session/new` 不加载 plugin | ✅ 真 | `acp/session_new.py:158` —— `default_agent_factory` 直接返回 `build_from_environment(working_directory=cwd, **overrides)`，无 plugin 步骤。 |
-| `AgentManager._load_definitions` 只扫两个目录 | ✅ 真 | `agents/manager.py:31-37` —— builtin `definitions/`（受 `include_builtin_agents` 控制）+ 项目 `.agentao/agents/`。无全局层。 |
-| `SkillManager` 扫三层 | ✅ 真 | `skills/manager.py` —— 全局 `~/.agentao/skills`（`:14`）、项目 `.agentao/skills`（`:99`/`104`）、仓库 `skills/`（`:100`/`105`），外加 bundled `_BUNDLED_SKILLS_DIR`（`:17`）。 |
+| `AgentManager._load_definitions` 只扫两个目录 | ✅ 真 | `agents/manager.py:31-37` —— builtin `definitions/`（受 `include_builtin_agents` 控制）+ 项目 `.arbiter/agents/`。无全局层。 |
+| `SkillManager` 扫三层 | ✅ 真 | `skills/manager.py` —— 全局 `~/.arbiter/skills`（`:14`）、项目 `.arbiter/skills`（`:99`/`104`）、仓库 `skills/`（`:100`/`105`），外加 bundled `_BUNDLED_SKILLS_DIR`（`:17`）。 |
 
 所以报告的*目录对比*表（AgentManager 2 层 vs SkillManager 3 层）正确，
 *plugin 加载仅 CLI* 的观察也正确。
@@ -111,7 +111,7 @@ embedding/plugins/resolvers/agents.py:41   default_dir = plugin.root_path / "age
 embedding/plugins/resolvers/agents.py:85   def _scan_agents_dir(plugin_name, agents_dir): ...
 ```
 
-`SkillManager` **完全没有** `agents/` 处理 —— 对 `agentao/skills/manager.py` grep
+`SkillManager` **完全没有** `agents/` 处理 —— 对 `arbiter/skills/manager.py` grep
 `agents` 只命中 *skill* 目录常量，从无 `agents/` 子扫描。
 
 **(b) plugin 发现从不进入 `skills/`。**
@@ -119,8 +119,8 @@ embedding/plugins/resolvers/agents.py:85   def _scan_agents_dir(plugin_name, age
 三处来源：
 
 ```
-:96   全局   ~/.agentao/plugins
-:100  项目   <cwd>/.agentao/plugins
+:96   全局   ~/.arbiter/plugins
+:100  项目   <cwd>/.arbiter/plugins
 :104  inline self._inline_dirs   （仅由 CLI 填充 —— entrypoints.py:373）
 ```
 
@@ -128,9 +128,9 @@ embedding/plugins/resolvers/agents.py:85   def _scan_agents_dir(plugin_name, age
 
 **(c) `skill-creator` 是 bundled *skill*，不是 *plugin*。**
 `find skills/skill-creator` 显示 `SKILL.md` + `agents/{analyzer,comparator,
-grader}.md`，且**没有任何 plugin manifest**（整棵树都不存在 `agentao-plugin.json`）。
+grader}.md`，且**没有任何 plugin manifest**（整棵树都不存在 `arbiter-plugin.json`）。
 它经由 `SkillManager` 的 bundled-skill 落盘（`skills/manager.py:17`、`:60`）到达
-运行时，被复制进 `~/.agentao/skills/` —— 一个 *skills* 目录，绝非 *plugins* 目录。
+运行时，被复制进 `~/.arbiter/skills/` —— 一个 *skills* 目录，绝非 *plugins* 目录。
 
 **结论。** 要让 `skills/skill-creator/agents/analyzer.md` 被注册，`skill-creator`
 必须作为 **plugin** 被加载（一个其 `agents/` 会被自动扫描的 plugin 根）。它不是，而且
@@ -161,9 +161,9 @@ CLI** —— 与"CLI 可见、别处缺失"恰好相反。
 
 ### 4.2 问题 B —— `AgentManager` 缺全局层（真实，但小）
 
-`AgentManager._load_definitions` 只扫 builtin + 项目 `.agentao/agents/`
-（`agents/manager.py:31-37`）。`SkillManager` 有全局 `~/.agentao/skills/` 层；
-agent manager 没有对应的 `~/.agentao/agents/`。用户在 home 配置目录放一个个人 agent
+`AgentManager._load_definitions` 只扫 builtin + 项目 `.arbiter/agents/`
+（`agents/manager.py:31-37`）。`SkillManager` 有全局 `~/.arbiter/skills/` 层；
+agent manager 没有对应的 `~/.arbiter/agents/`。用户在 home 配置目录放一个个人 agent
 定义 —— 类比用户全局 skill 的用法 —— 什么都不会发生。这与 plugin 问题无关，也是这里
 最便宜*实现*的（一句 `_scan_directory(user_root() / "agents")`，按正确
 优先级排序）。
@@ -204,10 +204,10 @@ agent manager 没有对应的 `~/.agentao/agents/`。用户在 home 配置目录
 > `agents/{analyzer,comparator,grader}` 在那边**同样不被注册为子 agent**。两个原因，都是
 > 结构性的：plugin manifest 没声明 `agents` 字段；而这些文件位于
 > `skills/skill-creator/agents/`——*在 skill 内部*，不在 plugin 的 agent 根
-> `<plugin>/agents/`（plugin agent 发现扫描的正是后者，与 agentao 同一条
+> `<plugin>/agents/`（plugin agent 发现扫描的正是后者，与 arbiter 同一条
 > `plugin.root_path / "agents"` 规则，§3）。实证确认：这些名字不在本会话的可用 agent
 > 类型里。所以上游是**刻意**把它们打包成 skill 资产、而非 plugin-agent —— 在 Claude
-> Code（skill-creator 是 plugin）和 agentao（它是 bundled skill）*两边*，它们都是 skill
+> Code（skill-creator 是 plugin）和 arbiter（它是 bundled skill）*两边*，它们都是 skill
 > 内部、运行时读取的参考文档，从不是注册子 agent。报告者的前提——"skill 捆绑的 agent 会
 > 被注册"——连它最可能的来源（Claude Code）都不成立。
 
@@ -216,14 +216,14 @@ agent manager 没有对应的 `~/.agentao/agents/`。用户在 home 配置目录
 这是承重判断，且是维护者的决定 —— 并非不言自明的缺陷。
 
 **支持 "CLI-only 是刻意的" 的论据。** plugin 主要来源是用户的**全局**
-`~/.agentao/plugins`。让 `build_from_environment` 自动加载它们，意味着**每一个嵌入
+`~/.arbiter/plugins`。让 `build_from_environment` 自动加载它们，意味着**每一个嵌入
 宿主、每一个 ACP/IDE 会话，都会静默继承终端用户全局的 agent、MCP server 和 hook。**
-对一个*嵌入式 harness* 而言这是信任/隔离上的脚枪：一个嵌入 `Agentao(...)` 去做一件
+对一个*嵌入式 harness* 而言这是信任/隔离上的脚枪：一个嵌入 `Arbiter(...)` 去做一件
 有界工作的宿主应用，通常*不希望*自己的 agent 面、工具集、外联 MCP 连接，被这台机器的
 用户碰巧全局装了什么而悄悄扩张。尤其是 hook —— 一个全局 plugin hook 在嵌入宿主的工具
 管线里触发，是宿主从未 opt-in 的注入面。CLI 是唯一一个"加载用户的 plugin"毫无歧义
 即用户意图的场景，因为用户*就是*操作者。所以把 plugin 加载走 CLI 层、让核心构造路径
-保持无 plugin，是一种站得住脚的 **默认拒绝** 姿态，与 agentao 对待其他环境输入的方式
+保持无 plugin，是一种站得住脚的 **默认拒绝** 姿态，与 arbiter 对待其他环境输入的方式
 一致。
 
 **支持 "这是缺口" 的论据。** 这种不对称**没有文档**。嵌入方合理地期望三个入口对等，
@@ -232,7 +232,7 @@ agent manager 没有对应的 `~/.agentao/agents/`。用户在 home 配置目录
 
 **一个接缝已经存在，这把天平推向"刻意，只是没写文档"。** ACP `session/new` 与
 `session/load` 已接受注入的 `agent_factory`（`acp/session_new.py:304`、
-`acp/session_load.py:122`），而嵌入宿主自己构造 `Agentao` —— 所以*两条*非 CLI 路径
+`acp/session_load.py:122`），而嵌入宿主自己构造 `Arbiter` —— 所以*两条*非 CLI 路径
 今天就能通过提供一个调用加载器的 factory / 构造后步骤来加载 plugin。能力当下可达；缺的
 是一个受祝福、有名字、有文档的开关，而非临时变通。在构造接缝处恰好存在一个刻意的注入
 点，本身就是"无 plugin 默认是选择而非疏漏"的弱证据。
@@ -245,8 +245,8 @@ agent manager 没有对应的 `~/.agentao/agents/`。用户在 home 配置目录
 **P1 —— 修问题 B（实现便宜；但要先定一个小的边界判断）。**
 给 `AgentManager._load_definitions` 加全局层：
 `_scan_directory(user_root() / "agents")` —— 注意 `user_root()` **本身就是**
-`~/.agentao`，所以路径是 `~/.agentao/agents`，**不是** `user_root()/".agentao"
-/"agents"`（那会扫到 `~/.agentao/.agentao/agents`）。放在能给出正确优先级的位置
+`~/.arbiter`，所以路径是 `~/.arbiter/agents`，**不是** `user_root()/".arbiter"
+/"agents"`（那会扫到 `~/.arbiter/.arbiter/agents`）。放在能给出正确优先级的位置
 （对照 `SkillManager` 的 全局<项目 顺序，并决定是否像 skill 那样项目覆盖全局），并
 **加一个覆盖测试**验证覆盖顺序。自包含；可独立发版。**合并前先定那个判断**（见 §4.2
 的反向复核纠正）：用户全局 agent
@@ -273,7 +273,7 @@ LLM 调用时运行），不像 plugin 那样带有副作用的 MCP/hook —— 
 
    （`logger` 只是普通模块 logger，干净迁移 —— 不算真耦合。）
 2. CLI 默认继续调用该 helper（行为不变）。让 `build_from_environment` 接受显式
-   `load_plugins: bool = False`（或读取 `.agentao/settings.json` 的 flag），默认
+   `load_plugins: bool = False`（或读取 `.arbiter/settings.json` 的 flag），默认
    **关**；置位时在构造后调用 `load_plugins_for_agent(agent, cwd=wd, ...)`。
    **这个默认关 + settings 门控模式在同一函数里已经存在**：`enable_builtin_agents`
    正是这样解析的（`_builtin_agents_enabled(settings)` → 默认 `False` 的 override，

@@ -18,12 +18,12 @@ from __future__ import annotations
 import pytest
 from rich.console import Console
 
-from agentao.cli.replay_render import _summarize_replay_event
-from agentao.cli.replay_render._views import (
+from arbiter.cli.replay_render import _summarize_replay_event
+from arbiter.cli.replay_render._views import (
     _render_replay_grouped,
     _render_replay_raw,
 )
-from agentao.replay.events import EventKind
+from arbiter.replay.events import EventKind
 
 # A payload key no renderer knows about. If the summarizer falls through
 # to its "preview the payload keys" branch, this leaks into the output —
@@ -65,7 +65,7 @@ def _emission_sites(kind: str) -> int:
     const = kind.upper()
     out = subprocess.run(
         ["git", "grep", "-l", "-e", f"EventKind.{const}", "-e", f'"{kind}"',
-         "--", "agentao"],
+         "--", "arbiter"],
         capture_output=True, text=True,
     ).stdout
     hits = {
@@ -338,15 +338,15 @@ def test_audit_events_land_in_their_turn_through_the_real_wiring(tmp_path):
     """
     import json
 
-    from agentao.host.models import (
+    from arbiter.host.models import (
         PermissionDecisionEvent,
         SubagentLifecycleEvent,
         ToolLifecycleEvent,
     )
-    from agentao.host.replay_projection import HostReplaySink
-    from agentao.replay.adapter import ReplayAdapter
-    from agentao.replay.recorder import ReplayRecorder
-    from agentao.transport.null import NullTransport
+    from arbiter.host.replay_projection import HostReplaySink
+    from arbiter.replay.adapter import ReplayAdapter
+    from arbiter.replay.recorder import ReplayRecorder
+    from arbiter.transport.null import NullTransport
 
     recorder = ReplayRecorder.create("sess", tmp_path)
     adapter = ReplayAdapter(NullTransport(), recorder)

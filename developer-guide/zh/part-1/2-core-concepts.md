@@ -5,7 +5,7 @@
 > - 一张图看清它们如何协作
 > - 每个名词在代码里的锚点，方便你深挖
 
-在开始写任何集成代码之前，先熟悉 Agentao 的 6 个核心名词。后面所有章节都会反复用到它们。
+在开始写任何集成代码之前，先熟悉 Arbiter 的 6 个核心名词。后面所有章节都会反复用到它们。
 
 ## 概念地图
 
@@ -19,7 +19,7 @@
 │        │ drive                 │                            │
 │        ▼                       │                            │
 │   ┌──────────────────────────────────────────────────┐      │
-│   │                   Agent (Agentao)                │      │
+│   │                   Agent (Arbiter)                │      │
 │   │                                                  │      │
 │   │   Session ──► Working Directory                  │      │
 │   │      │                                           │      │
@@ -32,9 +32,9 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 1. Agent（Agentao 实例）
+## 1. Agent（Arbiter 实例）
 
-Python 类 `agentao.Agentao`，一个**有状态、单会话**的对象。它维护：
+Python 类 `arbiter.Arbiter`，一个**有状态、单会话**的对象。它维护：
 
 - 对话历史 `self.messages`
 - 工具注册表 `self.tools`
@@ -54,7 +54,7 @@ Agent 能调用的"动作"。每个工具有：
 - `execute(**kwargs) -> str` 真实执行逻辑
 - `requires_confirmation` 是否需要用户批准
 
-Agentao 自带几十个工具（`read_file`, `write_file`, `run_shell_command`, `web_fetch`, `grep`, `glob` ...）。**你的业务 API 需要暴露给 Agent 时，就以工具形式包装**（见第 5.1 节）。
+Arbiter 自带几十个工具（`read_file`, `write_file`, `run_shell_command`, `web_fetch`, `grep`, `glob` ...）。**你的业务 API 需要暴露给 Agent 时，就以工具形式包装**（见第 5.1 节）。
 
 ## 3. Skill（技能）
 
@@ -83,16 +83,16 @@ Agent 与宿主之间的**双向通道**。一个 Transport 实现 4 个方法�
 - `ask_user(question) -> str` — Agent 向用户反问
 - `on_max_iterations(count, messages) -> dict` — 达到最大轮次时的兜底策略
 
-Agentao 内置 3 个 Transport：
+Arbiter 内置 3 个 Transport：
 - `NullTransport` — 静默，自动批准一切（测试用）
 - `SdkTransport` — 可配置回调，**库/服务嵌入的首选**
 - CLI 的 Rich Transport — 终端用户交互
 
 ## 5. Session / Working Directory
 
-**Session** = 一次从 `Agentao()` 构造到 `close()` 之间的完整生命周期，对应一段对话历史。
+**Session** = 一次从 `Arbiter()` 构造到 `close()` 之间的完整生命周期，对应一段对话历史。
 
-**Working Directory** = 这个会话"看到的项目根"。文件工具、Shell、技能、`AGENTAO.md` 加载都相对它。
+**Working Directory** = 这个会话"看到的项目根"。文件工具、Shell、技能、`ARBITER.md` 加载都相对它。
 
 ⚠️ **多实例嵌入时必须显式传入 `working_directory=Path(...)`**。默认会用 `Path.cwd()`，在服务器进程里这是全局共享的，会造成会话串扰。
 
@@ -100,25 +100,25 @@ Agentao 内置 3 个 Transport：
 
 不是静态字符串，而是**每次 `chat()` 重新拼装**的：
 
-1. `AGENTAO.md`（项目说明，从 working_directory 读）
+1. `ARBITER.md`（项目说明，从 working_directory 读）
 2. Agent 基础能力描述
 3. 当前日期、可用技能清单
 4. 激活的技能全文
 5. 记忆召回块 `<memory-context>`
 6. 任务列表（todos）
 
-宿主可以通过写 `AGENTAO.md` 或自定义技能在这里注入业务知识（第 5.6 节）。
+宿主可以通过写 `ARBITER.md` 或自定义技能在这里注入业务知识（第 5.6 节）。
 
 ## 快速对照表
 
 | 概念 | 对应源码位置 | 第三方开发者的主要接触点 |
 |------|------------|----------------------|
-| Agent | `agentao/agent.py` | `Agentao(...)` 构造器 |
-| Tool | `agentao/tools/base.py` | 继承 `Tool` 写业务工具 |
-| Skill | `agentao/skills/manager.py` | 写 `SKILL.md` 文件 |
-| Transport | `agentao/transport/` | 实例化 `SdkTransport` |
+| Agent | `arbiter/agent.py` | `Arbiter(...)` 构造器 |
+| Tool | `arbiter/tools/base.py` | 继承 `Tool` 写业务工具 |
+| Skill | `arbiter/skills/manager.py` | 写 `SKILL.md` 文件 |
+| Transport | `arbiter/transport/` | 实例化 `SdkTransport` |
 | Session | `agent.messages` | 管理生命周期、并发 |
-| System Prompt | `agent._build_system_prompt()` | 写 `AGENTAO.md` |
+| System Prompt | `agent._build_system_prompt()` | 写 `ARBITER.md` |
 
 ## TL;DR
 
@@ -127,6 +127,6 @@ Agentao 内置 3 个 Transport：
 - **Skill = 按需的提示知识**。Markdown 包，需要显式激活；它不是代码。
 - **Transport = UI 桥**。4 个回调：emit / confirm / ask_user / on_max_iterations。
 - **Working directory = 进程内会话根目录**。**永远显式传 `Path`**。
-- **System prompt = 每轮重新组装**：AGENTAO.md + 日期 + 技能 + 记忆。
+- **System prompt = 每轮重新组装**：ARBITER.md + 日期 + 技能 + 记忆。
 
 下一节：[1.3 两种集成模式 →](./3-integration-modes)

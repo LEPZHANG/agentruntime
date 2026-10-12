@@ -14,8 +14,8 @@ Stop helper:
 
 from __future__ import annotations
 
-from agentao.cancellation import CancellationToken
-from agentao.plugins.models import StopHookResult
+from arbiter.cancellation import CancellationToken
+from arbiter.plugins.models import StopHookResult
 
 from tests.support.stop_precompact import make_runner_with_stub_llm
 

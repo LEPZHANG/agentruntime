@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from agentao import Agentao
+from arbiter import Arbiter
 
 
-def test_agent_fixture_yields_a_constructed_agentao(agent: Agentao) -> None:
-    assert isinstance(agent, Agentao)
+def test_agent_fixture_yields_a_constructed_arbiter(agent: Arbiter) -> None:
+    assert isinstance(agent, Arbiter)
     # No turn has run yet.
     assert agent.messages == []
 
 
-def test_agent_fixture_runs_one_turn(agent: Agentao) -> None:
+def test_agent_fixture_runs_one_turn(agent: Arbiter) -> None:
     """The patched ``_llm_call`` makes ``chat`` return the scripted reply."""
     reply = agent.chat("hello")
     assert reply == "fixture reply"
@@ -20,7 +20,7 @@ def test_agent_fixture_runs_one_turn(agent: Agentao) -> None:
     assert "user" in roles and "assistant" in roles
 
 
-def test_agents_are_isolated_per_test(agent: Agentao) -> None:
+def test_agents_are_isolated_per_test(agent: Arbiter) -> None:
     """Each test gets its own working_directory + message buffer.
 
     Pair this with ``test_agents_are_isolated_per_test_round_two`` to
@@ -31,7 +31,7 @@ def test_agents_are_isolated_per_test(agent: Agentao) -> None:
     assert len(agent.messages) >= 2  # user + assistant
 
 
-def test_agents_are_isolated_per_test_round_two(agent: Agentao) -> None:
+def test_agents_are_isolated_per_test_round_two(agent: Arbiter) -> None:
     """Companion to the previous test — must start with empty history."""
     assert agent.messages == []
 

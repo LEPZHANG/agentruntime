@@ -1,7 +1,7 @@
 # Long-Task Goals (`/goal`)
 
 `/goal` gives the CLI a **long-task continuation loop**: you state an objective
-once, and Agentao keeps driving the agent toward it across multiple turns —
+once, and Arbiter keeps driving the agent toward it across multiple turns —
 without you having to type "continue" — until the agent reports the objective
 **complete** or **blocked**, or a **time / turn budget** trips.
 
@@ -17,7 +17,7 @@ Design record: [`docs/design/codex-goal-mechanism-review.md`](../design/codex-go
 /goal Migrate every call site off the deprecated auth API and make the suite green
 ```
 
-Agentao sets the goal and immediately starts driving it. Each *turn* is a full
+Arbiter sets the goal and immediately starts driving it. Each *turn* is a full
 agent turn (the agent reads, edits, runs tests, …); between turns the loop
 re-prompts the agent to keep going. The loop stops when:
 
@@ -43,7 +43,7 @@ re-prompts the agent to keep going. The loop stops when:
   `max_iterations`: `max_iterations` bounds the inner tool-call loop *within one
   turn*; `--turns` bounds the *outer* number of turns. They are independent.
 
-When you omit a cap, the defaults from `.agentao/settings.json` apply (see
+When you omit a cap, the defaults from `.arbiter/settings.json` apply (see
 below). `--unbounded` opts out of both.
 
 > **Why the time default is large (`120m`) and turns small (`25`).** The two
@@ -87,7 +87,7 @@ pause/resume/clear/edit/budget; only the host loop sets `limit_reached`.
 
 ## Settings
 
-`.agentao/settings.json`:
+`.arbiter/settings.json`:
 
 ```jsonc
 "goal": {
@@ -101,7 +101,7 @@ See [configuration.md](../reference/configuration.md) §3 for the full schema.
 
 ## Persistence
 
-The goal is stored in `.agentao/goal.json` (one goal at a time) and survives
+The goal is stored in `.arbiter/goal.json` (one goal at a time) and survives
 process restarts — re-launch and `/goal` shows where it left off. A corrupt or
 missing file is treated as "no goal". This file is per-project working
 directory; it is safe to delete by hand (equivalent to `/goal clear`).

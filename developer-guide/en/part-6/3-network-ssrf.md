@@ -94,19 +94,19 @@ Customer-facing products should generally default to blocklist; internal tools m
 
 ## Layer 2 · HTTP client behavior
 
-Agentao's `web_fetch` uses `httpx`, defaults:
+Arbiter's `web_fetch` uses `httpx`, defaults:
 
 - 10s timeout
 - Follow up to 3 redirects
 - TLS verification on
 - Customizable User-Agent
 
-**Security note**: redirects let a 302 jump into an internal address, bypassing the hostname check. Production should **disable redirects** or **re-run the domain rule on each hop**. Agentao does not currently re-check across redirects — a known limitation.
+**Security note**: redirects let a 302 jump into an internal address, bypassing the hostname check. Production should **disable redirects** or **re-run the domain rule on each hop**. Arbiter does not currently re-check across redirects — a known limitation.
 
 You can **override `web_fetch`** with your own stricter version:
 
 ```python
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 import httpx
 
 class StrictWebFetchTool(Tool):
@@ -126,7 +126,7 @@ class StrictWebFetchTool(Tool):
 Inject it via `extra_tools=` — a same-named entry **replaces** the built-in silently, and the tool gets the same capability binding (`working_directory` / `filesystem` / `shell`) as built-ins:
 
 ```python
-agent = Agentao(..., extra_tools=[StrictWebFetchTool()])   # replaces built-in web_fetch
+agent = Arbiter(..., extra_tools=[StrictWebFetchTool()])   # replaces built-in web_fetch
 ```
 
 Prefer this over poking `agent.tools.register(StrictWebFetchTool())` after construction: the low-level path skips capability binding (the tool goes "bare") and only warns on the collision. See [5.1](/en/part-5/1-custom-tools). Schema replacement is **defense in depth, not the boundary** — Layer 3 below is what actually stops egress.
@@ -191,7 +191,7 @@ MCP servers are often **higher risk than `web_fetch`** — they have their own c
 
 ## ACP mode network considerations
 
-Agentao as an ACP server **does not listen on any port** — stdio only. Good news:
+Arbiter as an ACP server **does not listen on any port** — stdio only. Good news:
 
 - Hosts don't open inbound ports for the agent
 - Attack surface is limited to **egress**
@@ -214,7 +214,7 @@ def on_event(ev):
         })
 ```
 
-`agentao.log` already records tool call args — see [6.5 Secrets](./5-secrets-injection#four-log-scrubbing) for scrubbing.
+`arbiter.log` already records tool call args — see [6.5 Secrets](./5-secrets-injection#four-log-scrubbing) for scrubbing.
 
 ## ⚠️ Common pitfalls
 

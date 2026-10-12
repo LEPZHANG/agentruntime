@@ -18,21 +18,21 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-from agentao.acp import agentao_set_model as acp_vendor_set_model
-from agentao.acp import session_set_config_option as acp_set_config
-from agentao.acp.models import AcpSessionState
-from agentao.acp.protocol import (
+from arbiter.acp import arbiter_set_model as acp_vendor_set_model
+from arbiter.acp import session_set_config_option as acp_set_config
+from arbiter.acp.models import AcpSessionState
+from arbiter.acp.protocol import (
     INVALID_REQUEST,
-    METHOD_AGENTAO_SET_MODEL,
+    METHOD_ARBITER_SET_MODEL,
     METHOD_SESSION_SET_CONFIG_OPTION,
     SERVER_NOT_INITIALIZED,
 )
-from agentao.acp.server import AcpServer, JsonRpcHandlerError
-from agentao.acp.session_set_config_option import (
+from arbiter.acp.server import AcpServer, JsonRpcHandlerError
+from arbiter.acp.session_set_config_option import (
     config_options_for_session,
     default_provider_resolver,
 )
-from agentao.llm.client import KEEP_BASE_URL
+from arbiter.llm.client import KEEP_BASE_URL
 
 from .support.acp_server import make_initialized_server, make_server
 
@@ -356,7 +356,7 @@ class TestVendorSetModel:
         server = make_initialized_server()
         agent = _FakeAgent()
         _register(server, agent)
-        result = acp_vendor_set_model.handle_agentao_set_model(
+        result = acp_vendor_set_model.handle_arbiter_set_model(
             server, {"sessionId": "s", "model": "any-model-string"}
         )
         assert agent.set_model_calls == ["any-model-string"]
@@ -365,7 +365,7 @@ class TestVendorSetModel:
     def test_pre_initialize_raises(self):
         server = make_server()
         with pytest.raises(JsonRpcHandlerError) as exc:
-            acp_vendor_set_model.handle_agentao_set_model(
+            acp_vendor_set_model.handle_arbiter_set_model(
                 server, {"sessionId": "s", "model": "x"}
             )
         assert exc.value.code == SERVER_NOT_INITIALIZED
@@ -374,7 +374,7 @@ class TestVendorSetModel:
         server = make_initialized_server()
         _register(server, _FakeAgent())
         with pytest.raises(TypeError):
-            acp_vendor_set_model.handle_agentao_set_model(
+            acp_vendor_set_model.handle_arbiter_set_model(
                 server, {"sessionId": "s", "model": ""}
             )
 
@@ -383,7 +383,7 @@ class TestVendorSetModel:
         server = make_initialized_server()
         _register(server, _FakeAgent())
         with pytest.raises(TypeError):
-            acp_vendor_set_model.handle_agentao_set_model(
+            acp_vendor_set_model.handle_arbiter_set_model(
                 server,
                 {"sessionId": "s", "model": "x", secret_field: "leak"},
             )

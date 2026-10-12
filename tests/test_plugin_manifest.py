@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from agentao.embedding.plugins.manifest import PluginManifestParser
-from agentao.plugins.models import (
+from arbiter.embedding.plugins.manifest import PluginManifestParser
+from arbiter.plugins.models import (
     PluginCommandMetadata,
     PluginLoadError,
     PluginManifest,

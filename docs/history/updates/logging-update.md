@@ -4,13 +4,13 @@
 
 ### 概述
 
-已成功实现完整的日志记录系统，记录所有与 LLM 的交互到 `agentao.log` 文件。
+已成功实现完整的日志记录系统，记录所有与 LLM 的交互到 `arbiter.log` 文件。
 
 ### 实现内容
 
 #### 1. 核心日志功能
 
-**文件**: `agentao/llm/client.py`
+**文件**: `arbiter/llm/client.py`
 
 新增功能：
 - ✅ 完整的请求日志记录
@@ -90,7 +90,7 @@ Tool Calls (if present):
 
 #### 3. 代码更改
 
-**`agentao/llm/client.py`**:
+**`arbiter/llm/client.py`**:
 
 添加的功能：
 - `__init__()` 新增 `log_file` 参数
@@ -134,7 +134,7 @@ Tool Calls (if present):
 #### 5. 配置
 
 **日志文件位置**：
-- 默认：`agentao.log`（当前目录）
+- 默认：`arbiter.log`（当前目录）
 - 可配置：通过 `log_file` 参数
 
 **日志级别**：
@@ -143,7 +143,7 @@ Tool Calls (if present):
 
 **日志格式**：
 ```
-2026-02-09 14:30:45 - agentao.llm - INFO - [req_1] LLM REQUEST
+2026-02-09 14:30:45 - arbiter.llm - INFO - [req_1] LLM REQUEST
 ```
 
 #### 6. 安全性
@@ -182,7 +182,7 @@ Tool Calls (if present):
    - 新增"Logging System"完整章节
 
 4. **`.gitignore`**
-   - 添加 `agentao.log`
+   - 添加 `arbiter.log`
    - 添加 `*.log`
 
 ### 使用方法
@@ -192,38 +192,38 @@ Tool Calls (if present):
 日志功能默认开启，无需配置：
 
 ```bash
-# 启动 Agentao
+# 启动 Arbiter
 uv run python main.py
 
-# 所有与 LLM 的交互会自动记录到 agentao.log
+# 所有与 LLM 的交互会自动记录到 arbiter.log
 ```
 
 #### 查看日志
 
 ```bash
 # 实时查看
-tail -f agentao.log
+tail -f arbiter.log
 
 # 查看完整日志
-cat agentao.log
+cat arbiter.log
 
 # 搜索特定内容
-grep "read_file" agentao.log
-grep "ERROR" agentao.log
-grep "req_5" agentao.log
+grep "read_file" arbiter.log
+grep "ERROR" arbiter.log
+grep "req_5" arbiter.log
 ```
 
 #### 分析日志
 
 ```bash
 # 统计 Token 使用
-grep "Total Tokens" agentao.log | awk '{sum += $NF} END {print sum}'
+grep "Total Tokens" arbiter.log | awk '{sum += $NF} END {print sum}'
 
 # 查看工具调用
-grep -A 5 "Tool Calls" agentao.log
+grep -A 5 "Tool Calls" arbiter.log
 
 # 查找错误
-grep -B 5 -A 5 "ERROR" agentao.log
+grep -B 5 -A 5 "ERROR" arbiter.log
 ```
 
 ### 测试
@@ -237,13 +237,13 @@ $ uv run python test_imports.py
 
 #### 功能测试
 
-需要实际运行 Agentao 并进行对话来测试日志记录：
+需要实际运行 Arbiter 并进行对话来测试日志记录：
 
 1. 设置有效的 API 密钥
-2. 启动 Agentao
+2. 启动 Arbiter
 3. 进行对话
 4. 使用工具
-5. 检查 `agentao.log` 文件
+5. 检查 `arbiter.log` 文件
 
 预期结果：
 - ✅ 日志文件自动创建
@@ -255,7 +255,7 @@ $ uv run python test_imports.py
 ### 代码统计
 
 **修改的文件**：
-- `agentao/llm/client.py` - 约 150 行新增代码
+- `arbiter/llm/client.py` - 约 150 行新增代码
 
 **新增的文件**：
 - `LOGGING.md` - 完整文档
@@ -287,18 +287,18 @@ $ uv run python test_imports.py
 ### 示例日志
 
 ```
-2026-02-09 14:30:45 - agentao.llm - INFO - LLMClient initialized with model: claude-sonnet-4-5
-2026-02-09 14:30:50 - agentao.llm - INFO - ================================================================================
-2026-02-09 14:30:50 - agentao.llm - INFO - [req_1] LLM REQUEST
-2026-02-09 14:30:50 - agentao.llm - INFO - ================================================================================
-2026-02-09 14:30:50 - agentao.llm - INFO - Model: claude-sonnet-4-5
-2026-02-09 14:30:50 - agentao.llm - INFO - Temperature: 0.7
-2026-02-09 14:30:50 - agentao.llm - INFO -
+2026-02-09 14:30:45 - arbiter.llm - INFO - LLMClient initialized with model: claude-sonnet-4-5
+2026-02-09 14:30:50 - arbiter.llm - INFO - ================================================================================
+2026-02-09 14:30:50 - arbiter.llm - INFO - [req_1] LLM REQUEST
+2026-02-09 14:30:50 - arbiter.llm - INFO - ================================================================================
+2026-02-09 14:30:50 - arbiter.llm - INFO - Model: claude-sonnet-4-5
+2026-02-09 14:30:50 - arbiter.llm - INFO - Temperature: 0.7
+2026-02-09 14:30:50 - arbiter.llm - INFO -
 Messages (2 total):
-2026-02-09 14:30:50 - agentao.llm - INFO -
+2026-02-09 14:30:50 - arbiter.llm - INFO -
   Message 1 [user]:
-2026-02-09 14:30:50 - agentao.llm - INFO -     Content (25 chars):
-2026-02-09 14:30:50 - agentao.llm - INFO -       Read the file main.py
+2026-02-09 14:30:50 - arbiter.llm - INFO -     Content (25 chars):
+2026-02-09 14:30:50 - arbiter.llm - INFO -       Read the file main.py
 ...
 ```
 

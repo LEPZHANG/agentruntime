@@ -1,10 +1,10 @@
-"""Tests for agentao.skills.drafts — pending skill draft storage + helpers."""
+"""Tests for arbiter.skills.drafts — pending skill draft storage + helpers."""
 
 from pathlib import Path
 
 import pytest
 
-from agentao.skills.drafts import (
+from arbiter.skills.drafts import (
     SkillDraft,
     clear_skill_draft,
     extract_skill_name,
@@ -33,7 +33,7 @@ def test_save_and_load_roundtrip(tmp_path: Path):
     draft = new_draft(content=_SAMPLE, suggested_name="python-testing", session_id="sess_1")
     path = save_skill_draft(draft, working_directory=tmp_path)
     # Draft filename derives from session_id when one is present on the draft.
-    assert path == tmp_path / ".agentao" / "crystallize" / "skill_draft_sess_1.json"
+    assert path == tmp_path / ".arbiter" / "crystallize" / "skill_draft_sess_1.json"
     assert path.exists()
 
     loaded = load_skill_draft(working_directory=tmp_path, session_id="sess_1")
@@ -59,7 +59,7 @@ def test_clear_skill_draft(tmp_path: Path):
 
 def test_get_skill_draft_path_is_project_scoped(tmp_path: Path):
     path = get_skill_draft_path(working_directory=tmp_path)
-    assert path.parts[-3:] == (".agentao", "crystallize", "skill_draft.json")
+    assert path.parts[-3:] == (".arbiter", "crystallize", "skill_draft.json")
 
 
 def test_drafts_are_isolated_per_session(tmp_path: Path):
@@ -84,7 +84,7 @@ def test_session_id_sanitized_into_filename(tmp_path: Path):
     draft = new_draft(content=_SAMPLE, suggested_name="x", session_id="sess/../evil id")
     path = save_skill_draft(draft, working_directory=tmp_path)
     # Must stay under the crystallize/ directory — no path traversal.
-    assert path.parent == tmp_path / ".agentao" / "crystallize"
+    assert path.parent == tmp_path / ".arbiter" / "crystallize"
     assert "/" not in path.name and "\\" not in path.name
 
 
@@ -95,8 +95,8 @@ def test_working_directory_is_respected(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(other)
     draft = new_draft(content=_SAMPLE, suggested_name="x", session_id="sess_wd")
     save_skill_draft(draft, working_directory=tmp_path)
-    assert (tmp_path / ".agentao" / "crystallize").exists()
-    assert not (other / ".agentao").exists()
+    assert (tmp_path / ".arbiter" / "crystallize").exists()
+    assert not (other / ".arbiter").exists()
     assert load_skill_draft(working_directory=tmp_path, session_id="sess_wd") is not None
 
 

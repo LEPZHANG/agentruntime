@@ -19,9 +19,9 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Deliverables
 
-- `agentao/acp_client/process.py`
-- `agentao/acp_client/manager.py`
-- `agentao/acp_client/models.py` 中 runtime 状态类型
+- `arbiter/acp_client/process.py`
+- `arbiter/acp_client/manager.py`
+- `arbiter/acp_client/models.py` 中 runtime 状态类型
 - 基础生命周期单测
 
 ## Dependencies

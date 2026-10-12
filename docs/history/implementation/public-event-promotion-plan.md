@@ -3,7 +3,7 @@
 **Date:** 2026-05-01
 **Status:** Draft implementation plan; design rationale embedded.
 **Source design:** `docs/design/embedded-host-contract.md` (deferred items #3 and the LLM-call promotion rationale below)
-**Scope:** Promote two new event families to the stable `agentao.host` contract, plus the schema/test/projection plumbing that comes with each.
+**Scope:** Promote two new event families to the stable `arbiter.host` contract, plus the schema/test/projection plumbing that comes with each.
 
 ---
 
@@ -22,7 +22,7 @@ stable surface in two independent PRs:
    carrying `usage`, `model`, `finish_reason`, `duration_ms`, and a
    structured `error_type` (covers rate-limit, retry-exhausted, etc).
    Internal `LLM_CALL_*` events already exist in
-   `agentao/transport/events.py`; this PR adds a public projection
+   `arbiter/transport/events.py`; this PR adds a public projection
    plus schema snapshot.
 
 Both PRs follow the existing pattern from PR-5/PR-6/PR-7 of the
@@ -66,7 +66,7 @@ context compression as a public event (also runtime-internal).
   `LLMCallEvent(phase="failed", error_type="rate_limited")` makes
   them queryable and aggregatable.
 - **Cheap to do.** The internal emit sites already exist
-  (`agentao/runtime/llm_call.py:80, 122, 148`) with all the right
+  (`arbiter/runtime/llm_call.py:80, 122, 148`) with all the right
   fields. The work is a projection layer + redaction + Pydantic
   model, not new instrumentation.
 
@@ -88,7 +88,7 @@ context compression as a public event (also runtime-internal).
 - **`THINKING` / `LLM_TEXT` / `LLM_CALL_DELTA` / `LLM_CALL_IO`
   promotion.** These carry raw model output and prompt history;
   promoting them to the *stable* contract conflicts with the
-  existing redaction discipline in `agentao/host/projection.py`.
+  existing redaction discipline in `arbiter/host/projection.py`.
   Streaming chat UI is the documented use case for the internal
   `Transport` channel; this plan does not change that.
 
@@ -99,7 +99,7 @@ context compression as a public event (also runtime-internal).
 ### Public model
 
 ```python
-# agentao/host/models.py
+# arbiter/host/models.py
 
 class MCPLifecycleEvent(BaseModel):
     """Public lifecycle fact for one MCP server connection."""
@@ -111,7 +111,7 @@ class MCPLifecycleEvent(BaseModel):
     timestamp: RFC3339UTCString
     session_id: str
 
-    server_name: str               # logical name from .agentao/mcp.json
+    server_name: str               # logical name from .arbiter/mcp.json
     transport_type: Literal["stdio", "sse", "unknown"]
     phase: Literal[
         "connecting",
@@ -126,7 +126,7 @@ class MCPLifecycleEvent(BaseModel):
 
 ### Emit sites
 
-`agentao/mcp/client.py::McpClient.connect()` already mutates
+`arbiter/mcp/client.py::McpClient.connect()` already mutates
 `self.status` at four boundaries. Wire emission at each:
 
 | Existing transition | New emit |
@@ -150,13 +150,13 @@ endpoint URLs (URLs may contain tokens for SSE servers).
 
 ### Wiring
 
-- Extend the discriminated union in `agentao/host/models.py::HostEvent`
+- Extend the discriminated union in `arbiter/host/models.py::HostEvent`
   to include `MCPLifecycleEvent`.
 - Extend `host_event_to_replay_kind` / `host_event_to_replay_payload`
-  in `agentao/host/replay_projection.py` and the reverse projection
+  in `arbiter/host/replay_projection.py` and the reverse projection
   for round-trip.
 - Bump `host.events.v1.json` snapshot.
-- Add `mcp_lifecycle` to `agentao/replay/events.py::EventKind` v1.3
+- Add `mcp_lifecycle` to `arbiter/replay/events.py::EventKind` v1.3
   (or whatever the next replay schema version is); update replay
   schema policy doc.
 
@@ -179,7 +179,7 @@ endpoint URLs (URLs may contain tokens for SSE servers).
 ### Public model
 
 ```python
-# agentao/host/models.py
+# arbiter/host/models.py
 
 class LLMCallEvent(BaseModel):
     """Public lifecycle fact for one LLM request."""
@@ -212,14 +212,14 @@ class LLMCallEvent(BaseModel):
 
 ### Identity
 
-Add `llm_call_id` to `agentao/runtime/identity.py`. UUID4 minted at
-`agentao/runtime/llm_call.py::_llm_call` entry, kept in scope for
+Add `llm_call_id` to `arbiter/runtime/identity.py`. UUID4 minted at
+`arbiter/runtime/llm_call.py::_llm_call` entry, kept in scope for
 the matched `started` / `completed` / `failed` triple. Uniqueness
 scope: `(session_id, turn_id, llm_call_id)`.
 
 ### Emit sites
 
-Existing emit sites in `agentao/runtime/llm_call.py:80, 122, 148`
+Existing emit sites in `arbiter/runtime/llm_call.py:80, 122, 148`
 already gather every needed field. The promotion adds a parallel
 emit on the `EventStream` at the same three points:
 
@@ -285,7 +285,7 @@ addresses the more painful operational gap; recommend A → B.
   `oneOf` branches). Per the schema policy this is a v1
   backwards-compatible change, not a v2 cut.
 - `agent.events()` iterator surface unchanged.
-- No change to `Agentao.arun()` / `active_permissions()` / capability
+- No change to `Arbiter.arun()` / `active_permissions()` / capability
   injection.
 
 ---
@@ -305,7 +305,7 @@ addresses the more painful operational gap; recommend A → B.
 ## Open questions
 
 1. **`session_id` vs `agent_id`.** MCP servers can be configured at
-   the project (`<cwd>/.agentao/mcp.json`) or user (`~/.agentao/mcp.json`)
+   the project (`<cwd>/.arbiter/mcp.json`) or user (`~/.arbiter/mcp.json`)
    level. A "user-level server connecting" event has no natural
    `session_id`. Two options:
    - Tag with the *first* session that needs the server.

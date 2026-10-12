@@ -4,7 +4,7 @@
 
 ## `/sessions` — 已保存会话
 
-`/exit`、`/clear`、`/new` 都会把当前会话保存到 `.agentao/sessions/`。恢复入口是 `/sessions`，不是 replay。
+`/exit`、`/clear`、`/new` 都会把当前会话保存到 `.arbiter/sessions/`。恢复入口是 `/sessions`，不是 replay。
 
 ```text
 > /sessions
@@ -23,13 +23,13 @@
 启动时也可以恢复：
 
 ```bash
-agentao --resume          # 恢复最近会话
-agentao --resume a1b2c3   # 恢复指定前缀
+arbiter --resume          # 恢复最近会话
+arbiter --resume a1b2c3   # 恢复指定前缀
 ```
 
 ## `/agent` 与 `/agents` — 子 Agent
 
-子 agent 是一组预定义能力，可以前台跑，也可以后台跑。内置定义在 `agentao/agents/definitions/`，插件也可以注册更多 agent。
+子 agent 是一组预定义能力，可以前台跑，也可以后台跑。内置定义在 `arbiter/agents/definitions/`，插件也可以注册更多 agent。
 
 ```text
 > /agent
@@ -86,5 +86,5 @@ Task List (2/4 completed):
 ---
 
 ::: tip 真相源头
-命令语法：`/help`。会话恢复：[`agentao/cli/commands.py:handle_sessions_command`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands.py)。子 agent：[`agentao/cli/commands_ext/agents.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands_ext/agents.py)。工具列表：[`agentao/cli/commands.py:handle_tools_command`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands.py)。
+命令语法：`/help`。会话恢复：[`arbiter/cli/commands.py:handle_sessions_command`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands.py)。子 agent：[`arbiter/cli/commands_ext/agents.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands_ext/agents.py)。工具列表：[`arbiter/cli/commands.py:handle_tools_command`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands.py)。
 :::

@@ -38,12 +38,12 @@ env/
 
 # ChatAgent specific
 .chatagent_memory.json
-.agentao_memory.json
+.arbiter_memory.json
 chatagent.log
 *.log
 *.log.*
 .chatagent/
-.agentao/
+.arbiter/
 .claude/
 workspace/
 
@@ -58,13 +58,13 @@ examples/**/*.egg-info/
 examples/**/runs/
 examples/**/workspaces/
 examples/**/data/
-examples/**/agentao.log
+examples/**/arbiter.log
 examples/**/*.db
 
-# Un-ignore authored skill definitions (the blanket `.agentao/` above hides them)
-!examples/**/.agentao/
-!examples/**/.agentao/skills/
-!examples/**/.agentao/skills/**
+# Un-ignore authored skill definitions (the blanket `.arbiter/` above hides them)
+!examples/**/.arbiter/
+!examples/**/.arbiter/skills/
+!examples/**/.arbiter/skills/**
 
 # OS
 .DS_Store

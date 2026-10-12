@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from agentao.mcp.tool import (
+from arbiter.mcp.tool import (
     McpTool,
     _sanitize_name,
     make_mcp_tool_name,

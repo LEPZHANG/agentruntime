@@ -39,21 +39,21 @@ ToolRunner._execute_one()  (tool_runner.py:252)
 
 ### 关键模块
 
-- **`agentao/sandbox/policy.py`** — 配置加载 + 决策。`SandboxPolicy.resolve(tool_name, args) -> Optional[SandboxProfile]`。
-- **`agentao/sandbox/profiles/`** — 3 个内置 `.sb` 模板。
-- **`agentao/tools/shell.py`** — 增加 `_sandbox_profile` 私有 kwarg 与 `_wrap_with_sandbox` 函数。
-- **`agentao/tool_runner.py`** — Phase 3 执行前按策略注入 profile。
-- **`agentao/agent.py`** — `Agentao.__init__` 初始化 policy 并透传给 `ToolRunner`。
-- **`agentao/cli/`** — `/sandbox status|on|off|profile <name>` 命令。
+- **`arbiter/sandbox/policy.py`** — 配置加载 + 决策。`SandboxPolicy.resolve(tool_name, args) -> Optional[SandboxProfile]`。
+- **`arbiter/sandbox/profiles/`** — 3 个内置 `.sb` 模板。
+- **`arbiter/tools/shell.py`** — 增加 `_sandbox_profile` 私有 kwarg 与 `_wrap_with_sandbox` 函数。
+- **`arbiter/tool_runner.py`** — Phase 3 执行前按策略注入 profile。
+- **`arbiter/agent.py`** — `Arbiter.__init__` 初始化 policy 并透传给 `ToolRunner`。
+- **`arbiter/cli/`** — `/sandbox status|on|off|profile <name>` 命令。
 
 ## 配置
 
-### 文件位置（遵循 `.agentao/` 约定）
+### 文件位置（遵循 `.arbiter/` 约定）
 
 | 文件 | 作用域 | 优先级 |
 |---|---|---|
-| `~/.agentao/sandbox.json` | 用户级 | 低 |
-| `<project>/.agentao/sandbox.json` | 项目级 | 高（覆盖用户级） |
+| `~/.arbiter/sandbox.json` | 用户级 | 低 |
+| `<project>/.arbiter/sandbox.json` | 项目级 | 高（覆盖用户级） |
 
 ### Schema
 
@@ -76,12 +76,12 @@ ToolRunner._execute_one()  (tool_runner.py:252)
 | `platform` | 非 `darwin` 则静默禁用。 |
 | `default_profile` | 无 rule 命中时使用的模板名。 |
 | `rules` | Per-tool override。当前仅 `run_shell_command` 有效。 |
-| `profiles_dir` | 用户自定义 profile 目录；优先级高于内置。相对路径按配置文件所在层级解析：home 配置锚定 `~/.agentao/`，project 配置锚定 `<project>/`。 |
+| `profiles_dir` | 用户自定义 profile 目录；优先级高于内置。相对路径按配置文件所在层级解析：home 配置锚定 `~/.arbiter/`，project 配置锚定 `<project>/`。 |
 | `workspace_root` | 传给 `-D _RW1` 的工作区绝对路径；默认 `Path.cwd()`。相对路径解析规则同上。 |
 
 ## 内置 Profile
 
-三个开箱即用模板位于 `agentao/sandbox/profiles/`：
+三个开箱即用模板位于 `arbiter/sandbox/profiles/`：
 
 ### `readonly.sb`
 - 读 `/`
@@ -132,7 +132,7 @@ ToolRunner._execute_one()  (tool_runner.py:252)
 /sandbox profile <name>      切换到指定 profile
 ```
 
-持久配置请手动编辑 `.agentao/sandbox.json`。首次在 macOS 启动且配置缺失时，CLI 会打印一次提示：
+持久配置请手动编辑 `.arbiter/sandbox.json`。首次在 macOS 启动且配置缺失时，CLI 会打印一次提示：
 
 ```
 Tip: enable macOS sandbox-exec for shell commands with /sandbox on
@@ -190,8 +190,8 @@ uv run python -m pytest tests/test_sandbox_policy.py -v
 ### 手动 end-to-end（macOS）
 
 1. `cp .env.example .env && <配置 key>`
-2. 建 `.agentao/sandbox.json`：`{"enabled": true, "default_profile": "workspace-write-no-network"}`
-3. `uv run agentao`
+2. 建 `.arbiter/sandbox.json`：`{"enabled": true, "default_profile": "workspace-write-no-network"}`
+3. `uv run arbiter`
 4. `run_shell_command("echo hello > /tmp/ok.txt")` → 成功
 5. `run_shell_command("echo bad > /etc/passwd")` → 沙箱拒绝
 6. `run_shell_command("curl https://example.com")` → 沙箱拒绝
@@ -200,7 +200,7 @@ uv run python -m pytest tests/test_sandbox_policy.py -v
 
 ### 跨平台回归
 
-在 Linux / Windows 上：`uv run agentao` 不报错，policy 静默 disabled，shell 命令走原路径。
+在 Linux / Windows 上：`uv run arbiter` 不报错，policy 静默 disabled，shell 命令走原路径。
 
 ## 后续（本方案 out-of-scope）
 

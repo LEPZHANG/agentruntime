@@ -13,7 +13,7 @@ import subprocess
 
 import pytest
 
-from agentao.tools.shell import ShellTool
+from arbiter.tools.shell import ShellTool
 
 
 class _PopenSpy:

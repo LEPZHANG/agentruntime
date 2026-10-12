@@ -2,7 +2,7 @@
 
 ## Problem
 
-ACP clients require an `initialize` handshake before any session methods. Agentao currently has no ACP capability advertisement layer.
+ACP clients require an `initialize` handshake before any session methods. Arbiter currently has no ACP capability advertisement layer.
 
 ## Scope
 

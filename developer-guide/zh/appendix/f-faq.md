@@ -4,18 +4,18 @@
 
 ## F.1 安装与启动
 
-### "ImportError: cannot import name 'Agentao'"
+### "ImportError: cannot import name 'Arbiter'"
 
-- 检查是否装了包（`uv add agentao` 或 `pip install agentao`，不是只装 `openai`）
-- 从顶层导入：`from agentao import Agentao`（别走 `from agentao.agent import Agentao`——那条路径不保证稳定）
+- 检查是否装了包（`uv add arbiter` 或 `pip install arbiter`，不是只装 `openai`）
+- 从顶层导入：`from arbiter import Arbiter`（别走 `from arbiter.agent import Arbiter`——那条路径不保证稳定）
 
 ### "No module named 'openai' / 'mcp'"
 
 需要 MCP 时带上 extras：
 
 ```bash
-uv add 'agentao[mcp]'          # 或
-uv add 'agentao[all]'
+uv add 'arbiter[mcp]'          # 或
+uv add 'arbiter[all]'
 ```
 
 ### "ValueError: OPENAI_API_KEY is not set"
@@ -24,7 +24,7 @@ uv add 'agentao[all]'
 
 1. 工作目录根的 `.env`，写 `OPENAI_API_KEY=…`
 2. 进程环境变量：`export OPENAI_API_KEY=…`
-3. 构造器：`Agentao(api_key="sk-…")`
+3. 构造器：`Arbiter(api_key="sk-…")`
 
 构造器 > env > `.env`。见 [附录 B](./b-config-keys)。
 
@@ -38,7 +38,7 @@ uv add 'agentao[all]'
 
 你设了 `PermissionMode.READ_ONLY`（显式或默认）。两条路：
 
-- 构造后显式切模式：`e = PermissionEngine(project_root=workdir); e.set_mode(PermissionMode.WORKSPACE_WRITE); agent = Agentao(working_directory=workdir, permission_engine=e, ...)` —— 0.2.16 起 `project_root=` 必传
+- 构造后显式切模式：`e = PermissionEngine(project_root=workdir); e.set_mode(PermissionMode.WORKSPACE_WRITE); agent = Arbiter(working_directory=workdir, permission_engine=e, ...)` —— 0.2.16 起 `project_root=` 必传
 - 或在 transport 上实现 `confirm_tool`，让用户交互确认
 
 ### `chat()` 永不返回
@@ -64,7 +64,7 @@ reply = await asyncio.wait_for(asyncio.to_thread(agent.chat, msg), timeout=120)
 终端不支持颜色码。要么：
 
 - 显示前在 transport 侧关掉颜色（`rich.console.Console(no_color=True)`）
-- 加后处理过滤；Agentao 本身不强制任何颜色策略
+- 加后处理过滤；Arbiter 本身不强制任何颜色策略
 
 ## F.3 记忆与会话
 
@@ -79,7 +79,7 @@ agent.memory.clear(scope="project")
 
 ### 记忆跨租户泄漏
 
-经典多租户陷阱——你把 `~/.agentao/memory.db` 的 user 作用域跨租户挂了。两条路：
+经典多租户陷阱——你把 `~/.arbiter/memory.db` 的 user 作用域跨租户挂了。两条路：
 
 - 固定每租户的 working directory 并**禁用** user 作用域；或
 - user 作用域用 `tenant_id+user_id` 做 key
@@ -101,7 +101,7 @@ agent.memory.clear(scope="project")
 
 1. `/mcp` 命令（或 `agent.mcp_manager.get_status()`）——服务器是 `ready` 吗？
 2. 子进程 stderr——服务器把日志打到 stdout 会破坏帧格式
-3. 工具名冲突——同名 `{server}_{tool}` 注册两次会在 `agentao.log` 里警告
+3. 工具名冲突——同名 `{server}_{tool}` 注册两次会在 `arbiter.log` 里警告
 
 ### "'mcp' 命令找不到"
 
@@ -121,7 +121,7 @@ agent.memory.clear(scope="project")
 
 ### "macOS 报 sandbox-exec 拒绝"
 
-看 `agentao.log`——具体原因有记录。常见修法：
+看 `arbiter.log`——具体原因有记录。常见修法：
 
 - Shell profile 太严 → 把 `default_profile` 从 `readonly` 换成 `workspace-write-no-network`
 - 命令跑到 workspace 外了 → `working_directory` 内用绝对路径
@@ -129,17 +129,17 @@ agent.memory.clear(scope="project")
 
 ### "生产上有人把沙箱关了——如何强制"
 
-沙箱配置是合并的：项目 `.agentao/sandbox.json` 覆盖用户。容器里把项目配置以只读挂载，LLM 改不了持久化。见 [7.4 陷阱表](/zh/part-7/4-data-workbench#陷阱)。
+沙箱配置是合并的：项目 `.arbiter/sandbox.json` 覆盖用户。容器里把项目配置以只读挂载，LLM 改不了持久化。见 [7.4 陷阱表](/zh/part-7/4-data-workbench#陷阱)。
 
 ### "Agent 试图抓 169.254.169.254"
 
-正常——SSRF 尝试会被内置黑名单拦。`agentao.log` 里会有 deny 记录；核对 `PermissionEngine` 规则（[6.3](/zh/part-6/3-network-ssrf)）。
+正常——SSRF 尝试会被内置黑名单拦。`arbiter.log` 里会有 deny 记录；核对 `PermissionEngine` 规则（[6.3](/zh/part-6/3-network-ssrf)）。
 
 ## F.6 ACP 集成
 
 ### initialize 时报 `handshake_fail`
 
-多半是版本不匹配。Agentao v0.2.x 讲 `protocolVersion: 1`（整数）。如果你的客户端发 `"2025-09-01"` 这样的字符串，服务器会拒。见 [3.1](/zh/part-3/1-acp-tour)。如果错误到你手里是 `AcpRpcError`（不是带 `code=HANDSHAKE_FAIL` 的 `AcpClientError`），则握手阶段信号在 `details["phase"] == "handshake"`——完整分类规则见[附录 D §D.7](./d-error-codes#d-7-识别握手阶段失败规范写法)。
+多半是版本不匹配。Arbiter v0.2.x 讲 `protocolVersion: 1`（整数）。如果你的客户端发 `"2025-09-01"` 这样的字符串，服务器会拒。见 [3.1](/zh/part-3/1-acp-tour)。如果错误到你手里是 `AcpRpcError`（不是带 `code=HANDSHAKE_FAIL` 的 `AcpClientError`），则握手阶段信号在 `details["phase"] == "handshake"`——完整分类规则见[附录 D §D.7](./d-error-codes#d-7-识别握手阶段失败规范写法)。
 
 ### `prompt_once` 报 `server_busy`
 
@@ -218,7 +218,7 @@ Week 3 把历史裸字符串形式下掉了。新形态是结构化对象：
 
 ### "每租户怎么控 token 花销"
 
-`TokenBudget` 模式——见 [6.7](/zh/part-6/7-resource-concurrency#token-预算)。要精确计数装 `agentao[tokenizer]`（拉 `tiktoken`）。
+`TokenBudget` 模式——见 [6.7](/zh/part-6/7-resource-concurrency#token-预算)。要精确计数装 `arbiter[tokenizer]`（拉 `tiktoken`）。
 
 ### 成本一夜翻倍
 
@@ -234,9 +234,9 @@ Week 3 把历史裸字符串形式下掉了。新形态是结构化对象：
 
 ### "怎么单测自定义工具"
 
-Tool 就是普通类——`MyTool().execute(**args)`，不需要 Agentao 实例。要动磁盘的传临时 `working_directory`。
+Tool 就是普通类——`MyTool().execute(**args)`，不需要 Arbiter 实例。要动磁盘的传临时 `working_directory`。
 
-要端到端测试钻机——`agent` / `agent_with_reply` / `fake_llm_client` 三个 pytest fixture + 通过的烟雾测试——见 [`examples/pytest-fixture/`](https://github.com/jin-bo/agentao/tree/main/examples/pytest-fixture)。把 fixture drop 进自己测试套件，立刻获得无 `OPENAI_API_KEY` 依赖的密闭 Agentao 测试。
+要端到端测试钻机——`agent` / `agent_with_reply` / `fake_llm_client` 三个 pytest fixture + 通过的烟雾测试——见 [`examples/pytest-fixture/`](https://github.com/jin-bo/agentao/tree/main/examples/pytest-fixture)。把 fixture drop 进自己测试套件，立刻获得无 `OPENAI_API_KEY` 依赖的密闭 Arbiter 测试。
 
 ### "怎么断言 agent 做对了事"
 
@@ -254,10 +254,10 @@ Tool 就是普通类——`MyTool().execute(**args)`，不需要 Agentao 实例�
 
 最小复现 Bug 报告：
 
-1. Agentao 版本（`python -c "import agentao; print(agentao.__version__)"`）
+1. Arbiter 版本（`python -c "import arbiter; print(arbiter.__version__)"`）
 2. OS、Python 版本
 3. ≤ 30 行可复现的脚本
-4. 失败前后的 `agentao.log` 尾部
+4. 失败前后的 `arbiter.log` 尾部
 5. ACP 问题：`AcpClientError.code` + `.details`
 
 提到 <https://github.com/jin-bo/agentao/issues>。

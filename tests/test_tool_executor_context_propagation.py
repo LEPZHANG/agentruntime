@@ -14,8 +14,8 @@ import contextvars
 import logging
 from typing import Any, Dict, List
 
-from agentao.runtime.tool_executor import ToolExecutor
-from agentao.tools import Tool
+from arbiter.runtime.tool_executor import ToolExecutor
+from arbiter.tools import Tool
 
 from tests.support.host_events import NullTransport, make_plan
 
@@ -26,7 +26,7 @@ from tests.support.host_events import NullTransport, make_plan
 
 
 _TEST_VAR: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "agentao_test_propagation_var", default="<unset>",
+    "arbiter_test_propagation_var", default="<unset>",
 )
 
 

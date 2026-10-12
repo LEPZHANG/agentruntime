@@ -1,7 +1,7 @@
 {
-  "name": "agentao-ide-plugin-example",
+  "name": "arbiter-ide-plugin-example",
   "version": "0.1.0",
-  "description": "Blueprint B — reference VS Code extension that drives `agentao --acp --stdio`.",
+  "description": "Blueprint B — reference VS Code extension that drives `arbiter --acp --stdio`.",
   "private": true,
   "main": "./out/extension.js",
   "engines": {
@@ -15,13 +15,13 @@
   },
   "contributes": {
     "commands": [
-      { "command": "agentao.ask",    "title": "Agentao: Ask" },
-      { "command": "agentao.cancel", "title": "Agentao: Cancel current turn" }
+      { "command": "arbiter.ask",    "title": "Arbiter: Ask" },
+      { "command": "arbiter.cancel", "title": "Arbiter: Cancel current turn" }
     ]
   },
   "activationEvents": [
-    "onCommand:agentao.ask",
-    "onCommand:agentao.cancel"
+    "onCommand:arbiter.ask",
+    "onCommand:arbiter.cancel"
   ],
   "devDependencies": {
     "@types/node": "^20.11.0",

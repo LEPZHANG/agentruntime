@@ -4,13 +4,13 @@
 
 **Title**
 
-ACP support for Agentao via stdio JSON-RPC server
+ACP support for Arbiter via stdio JSON-RPC server
 
 **Summary**
 
-Implement minimum viable Agent Client Protocol (ACP) support in Agentao so ACP-compatible clients can launch Agentao over stdio, create and load sessions, send prompts, receive streaming session updates, request tool permissions, and cancel active turns.
+Implement minimum viable Agent Client Protocol (ACP) support in Arbiter so ACP-compatible clients can launch Arbiter over stdio, create and load sessions, send prompts, receive streaming session updates, request tool permissions, and cancel active turns.
 
-The first milestone targets a pragmatic compatibility layer on top of existing Agentao runtime abstractions rather than a full architecture rewrite. The implementation should reuse the current transport abstraction, session persistence, permission engine, cancellation flow, and MCP support where possible.
+The first milestone targets a pragmatic compatibility layer on top of existing Arbiter runtime abstractions rather than a full architecture rewrite. The implementation should reuse the current transport abstraction, session persistence, permission engine, cancellation flow, and MCP support where possible.
 
 **Goals**
 
@@ -22,7 +22,7 @@ The first milestone targets a pragmatic compatibility layer on top of existing A
 - Support `session/load`
 - Emit ACP-compatible `session/update` events
 - Map tool confirmation to `session/request_permission`
-- Reuse existing Agentao runtime and session persistence
+- Reuse existing Arbiter runtime and session persistence
 
 **Non-goals for v1**
 
@@ -33,7 +33,7 @@ The first milestone targets a pragmatic compatibility layer on top of existing A
 
 **Acceptance Criteria**
 
-- An ACP client can start Agentao in stdio mode and complete an `initialize -> session/new -> session/prompt` flow successfully.
+- An ACP client can start Arbiter in stdio mode and complete an `initialize -> session/new -> session/prompt` flow successfully.
 - Agent text and tool progress are surfaced as ACP `session/update` notifications.
 - ACP permission requests can approve or reject tool execution.
 - ACP cancel interrupts active turns and returns control cleanly.
@@ -41,11 +41,11 @@ The first milestone targets a pragmatic compatibility layer on top of existing A
 
 **Dependencies / Reuse**
 
-- Existing runtime transport abstraction: `agentao/transport/*`
-- Existing chat loop and cancellation: `agentao/agent.py`
-- Existing tool confirmation flow: `agentao/tool_runner.py`
-- Existing session persistence: `agentao/session.py`
-- Existing MCP client support: `agentao/mcp/*`
+- Existing runtime transport abstraction: `arbiter/transport/*`
+- Existing chat loop and cancellation: `arbiter/agent.py`
+- Existing tool confirmation flow: `arbiter/tool_runner.py`
+- Existing session persistence: `arbiter/session.py`
+- Existing MCP client support: `arbiter/mcp/*`
 
 **Risks**
 
@@ -61,11 +61,11 @@ Create ACP module skeleton and stdio JSON-RPC server foundation
 
 **Problem**
 
-Agentao does not expose any ACP-compatible server endpoint today. There is no JSON-RPC server, no ACP method dispatcher, and no ACP-specific module boundary.
+Arbiter does not expose any ACP-compatible server endpoint today. There is no JSON-RPC server, no ACP method dispatcher, and no ACP-specific module boundary.
 
 **Scope**
 
-- Create `agentao/acp/`
+- Create `arbiter/acp/`
 - Add `protocol.py`
 - Add `server.py`
 - Add `session_manager.py`
@@ -76,10 +76,10 @@ Agentao does not expose any ACP-compatible server endpoint today. There is no JS
 
 **Implementation Checklist**
 
-- [ ] Create `agentao/acp/__init__.py`
-- [ ] Define ACP constants and supported protocol version in `agentao/acp/protocol.py`
-- [ ] Implement stdio read loop in `agentao/acp/server.py`
-- [ ] Implement thread-safe JSON-RPC write path in `agentao/acp/server.py`
+- [ ] Create `arbiter/acp/__init__.py`
+- [ ] Define ACP constants and supported protocol version in `arbiter/acp/protocol.py`
+- [ ] Implement stdio read loop in `arbiter/acp/server.py`
+- [ ] Implement thread-safe JSON-RPC write path in `arbiter/acp/server.py`
 - [ ] Implement request dispatcher by `method`
 - [ ] Implement standard JSON-RPC error handling
 - [ ] Ensure logs never pollute stdout JSON-RPC stream
@@ -98,7 +98,7 @@ Implement ACP `initialize` handshake and capability negotiation
 
 **Problem**
 
-ACP clients require an `initialize` handshake before any session methods. Agentao currently has no ACP capability advertisement layer.
+ACP clients require an `initialize` handshake before any session methods. Arbiter currently has no ACP capability advertisement layer.
 
 **Scope**
 
@@ -126,30 +126,30 @@ ACP clients require an `initialize` handshake before any session methods. Agenta
 
 **Title**
 
-Add ACP session registry and per-session Agentao runtime lifecycle
+Add ACP session registry and per-session Arbiter runtime lifecycle
 
 **Problem**
 
-ACP is session-based, but Agentao currently does not maintain ACP session state or a registry of runtime instances keyed by ACP session ID.
+ACP is session-based, but Arbiter currently does not maintain ACP session state or a registry of runtime instances keyed by ACP session ID.
 
 **Scope**
 
 - Add ACP session registry
 - Create `AcpSessionState`
-- Manage Agentao instance lifecycle per ACP session
+- Manage Arbiter instance lifecycle per ACP session
 
 **Implementation Checklist**
 
-- [ ] Define `AcpSessionState` in `agentao/acp/models.py`
+- [ ] Define `AcpSessionState` in `arbiter/acp/models.py`
 - [ ] Track `session_id`, `agent`, `cwd`, `client_capabilities`, `cancel_token`
 - [ ] Implement create/get/delete/close operations in `session_manager.py`
-- [ ] Ensure server shutdown closes all session-owned Agentao instances
+- [ ] Ensure server shutdown closes all session-owned Arbiter instances
 - [ ] Add protection against duplicate or missing session IDs
 
 **Acceptance Criteria**
 
 - Multiple ACP sessions can exist at once in the same server process
-- Each ACP session has its own Agentao runtime state
+- Each ACP session has its own Arbiter runtime state
 - Session lookup and teardown are reliable
 
 ## Issue 4
@@ -167,14 +167,14 @@ There is no ACP entry point for creating a new session, binding a working direct
 - Implement `session/new`
 - Accept `cwd`
 - Accept session-level MCP server config
-- Create Agentao instance with ACP transport
+- Create Arbiter instance with ACP transport
 
 **Implementation Checklist**
 
 - [ ] Parse `cwd` from request
 - [ ] Parse `mcpServers` from request
 - [ ] Generate ACP `sessionId`
-- [ ] Create `ACPTransport` and inject it into Agentao
+- [ ] Create `ACPTransport` and inject it into Arbiter
 - [ ] Create `PermissionEngine` for the session
 - [ ] Initialize MCP connections for the session where possible
 - [ ] Return `sessionId`
@@ -190,7 +190,7 @@ There is no ACP entry point for creating a new session, binding a working direct
 
 **Title**
 
-Refactor Agentao to support per-session working directories
+Refactor Arbiter to support per-session working directories
 
 **Problem**
 
@@ -204,10 +204,10 @@ Current runtime code relies on `Path.cwd()` in several places. ACP sessions requ
 **Implementation Checklist**
 
 - [ ] Audit all runtime `Path.cwd()` usage
-- [ ] Add optional `working_directory` to `Agentao.__init__`
+- [ ] Add optional `working_directory` to `Arbiter.__init__`
 - [ ] Route system prompt cwd rendering through session context
 - [ ] Update file, shell, memory, and session persistence paths as needed
-- [ ] Define project-local `.agentao/` behavior under ACP sessions
+- [ ] Define project-local `.arbiter/` behavior under ACP sessions
 - [ ] Add tests for multiple sessions with different cwd values
 
 **Acceptance Criteria**
@@ -220,17 +220,17 @@ Current runtime code relies on `Path.cwd()` in several places. ACP sessions requ
 
 **Title**
 
-Implement ACP `session/prompt` with ContentBlock to Agentao message conversion
+Implement ACP `session/prompt` with ContentBlock to Arbiter message conversion
 
 **Problem**
 
-ACP prompt requests use structured content blocks, but Agentao currently accepts mostly string user input at its runtime boundary.
+ACP prompt requests use structured content blocks, but Arbiter currently accepts mostly string user input at its runtime boundary.
 
 **Scope**
 
 - Implement `session/prompt`
 - Convert ACP content blocks into internal user message text
-- Run Agentao chat loop for the session
+- Run Arbiter chat loop for the session
 
 **Implementation Checklist**
 
@@ -256,7 +256,7 @@ Implement ACP transport adapter for `session/update` notifications
 
 **Problem**
 
-Agentao emits internal runtime events, but ACP clients expect `session/update` notifications using ACP update types.
+Arbiter emits internal runtime events, but ACP clients expect `session/update` notifications using ACP update types.
 
 **Scope**
 
@@ -283,11 +283,11 @@ Agentao emits internal runtime events, but ACP clients expect `session/update` n
 
 **Title**
 
-Map Agentao tool confirmations to ACP `session/request_permission`
+Map Arbiter tool confirmations to ACP `session/request_permission`
 
 **Problem**
 
-Agentao tool confirmation is currently synchronous and transport-local. ACP requires a protocol-level permission request flow.
+Arbiter tool confirmation is currently synchronous and transport-local. ACP requires a protocol-level permission request flow.
 
 **Scope**
 
@@ -314,11 +314,11 @@ Agentao tool confirmation is currently synchronous and transport-local. ACP requ
 
 **Title**
 
-Implement ACP `session/cancel` using existing Agentao cancellation flow
+Implement ACP `session/cancel` using existing Arbiter cancellation flow
 
 **Problem**
 
-ACP clients must be able to cancel an active turn. Agentao already has cancellation primitives, but they are not exposed as ACP session methods.
+ACP clients must be able to cancel an active turn. Arbiter already has cancellation primitives, but they are not exposed as ACP session methods.
 
 **Scope**
 
@@ -347,7 +347,7 @@ Implement ACP `session/load` and replay saved session history as ACP updates
 
 **Problem**
 
-Agentao can persist and load sessions locally, but ACP requires protocol-level session loading and replay through `session/update`.
+Arbiter can persist and load sessions locally, but ACP requires protocol-level session loading and replay through `session/update`.
 
 **Scope**
 
@@ -357,7 +357,7 @@ Agentao can persist and load sessions locally, but ACP requires protocol-level s
 
 **Implementation Checklist**
 
-- [ ] Reuse `agentao/session.py` load path
+- [ ] Reuse `arbiter/session.py` load path
 - [ ] Define mapping from persisted messages to ACP replay events
 - [ ] Replay user messages as user message updates
 - [ ] Replay assistant messages as agent message updates
@@ -379,16 +379,16 @@ Support session-scoped MCP server injection from ACP `session/new`
 
 **Problem**
 
-ACP session creation may include MCP server configuration, but Agentao currently loads MCP mostly from local config files at startup.
+ACP session creation may include MCP server configuration, but Arbiter currently loads MCP mostly from local config files at startup.
 
 **Scope**
 
-- Convert ACP-provided MCP config into Agentao MCP client config
+- Convert ACP-provided MCP config into Arbiter MCP client config
 - Attach MCP tools to the session runtime
 
 **Implementation Checklist**
 
-- [ ] Define config translation from ACP `mcpServers` to Agentao MCP config
+- [ ] Define config translation from ACP `mcpServers` to Arbiter MCP config
 - [ ] Merge or override local MCP config with session-level config
 - [ ] Connect MCP servers for the session runtime
 - [ ] Register discovered MCP tools for that session
@@ -408,7 +408,7 @@ Add ACP CLI entrypoint and runtime wiring for stdio mode
 
 **Problem**
 
-There is no supported way to launch Agentao as an ACP server from the command line.
+There is no supported way to launch Arbiter as an ACP server from the command line.
 
 **Scope**
 
@@ -424,7 +424,7 @@ There is no supported way to launch Agentao as an ACP server from the command li
 
 **Acceptance Criteria**
 
-- `agentao --acp --stdio` starts a valid ACP server
+- `arbiter --acp --stdio` starts a valid ACP server
 - Stdout contains only ACP protocol messages
 - Shutdown cleans up MCP connections and session runtimes
 

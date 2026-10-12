@@ -25,13 +25,13 @@ import textwrap
 from pathlib import Path
 from typing import Optional
 
-from agentao.acp_client.manager import ACPManager
-from agentao.acp_client.models import (
+from arbiter.acp_client.manager import ACPManager
+from arbiter.acp_client.models import (
     AcpClientConfig,
     AcpServerConfig,
     InteractionPolicy,
 )
-from agentao.acp_client.process import ACPProcessHandle
+from arbiter.acp_client.process import ACPProcessHandle
 
 
 # ---------------------------------------------------------------------------

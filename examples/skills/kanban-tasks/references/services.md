@@ -17,14 +17,14 @@
 
 ```bash
 $SKILL_DIR/scripts/kanban-up.sh         # daemon (mock) + Web UI + 自动开浏览器
-$SKILL_DIR/scripts/kanban-up-real.sh    # daemon (--executor agentao) + Web UI
+$SKILL_DIR/scripts/kanban-up-real.sh    # daemon (--executor arbiter) + Web UI
 $SKILL_DIR/scripts/kanban-down.sh       # 先停 web 再停 daemon
 $SKILL_DIR/scripts/kanban-status.sh     # 一屏看 board/daemon/web/cards
 ```
 
 环境变量覆盖：`BOARD=path/to/board PORT=8765 bash $SKILL_DIR/scripts/kanban-up.sh`。
 
-## 真跑（`--executor agentao`）前置检查
+## 真跑（`--executor arbiter`）前置检查
 
 1. 用户**已明确**要真跑（不要从"启动 kanban"擅自升级）。
 2. 板里有 `READY` / `INBOX` 卡，且 acceptance / context 写齐。

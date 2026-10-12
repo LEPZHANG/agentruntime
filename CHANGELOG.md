@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Agentao are documented here.
+All notable changes to Arbiter are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
@@ -20,7 +20,7 @@ _Targeting 0.4.17. Add entries under the relevant heading as work lands._
 ## [0.4.16] — 2026-07-25
 
 A **boundary-hardening release**. 0.4.15 was about the harness not lying about
-its own internals; 0.4.16 extends that to the seams where agentao talks to
+its own internals; 0.4.16 extends that to the seams where arbiter talks to
 something it does not control — an ACP server subprocess, an MCP server over
 HTTP, a keyless search backend, a clipboard helper — and to the audit trail
 meant to record what happened at those seams.
@@ -30,9 +30,9 @@ No breaking changes. It upgrades in place.
 ### Added
 
 - **A host embedding the interactive CLI can now inject its own runtime.**
-  `Agentao` has accepted `extra_tools` / `disable_tools` / `enabled_tools` for
+  `Arbiter` has accepted `extra_tools` / `disable_tools` / `enabled_tools` for
   several releases and `build_from_environment(**overrides)` forwards them, but
-  `AgentaoCLI` called the factory with a fixed kwarg set and `main()`
+  `ArbiterCLI` called the factory with a fixed kwarg set and `main()`
   constructed the CLI and ran it immediately — so that contract was unreachable
   from the CLI surface. The only workaround was patching module globals, which
   fails silently: `cli/app.py` imported a name it never used, and four test
@@ -67,7 +67,7 @@ No breaking changes. It upgrades in place.
   answer `end_turn` or `cancelled`; its own TODO said the richer reasons were
   unreachable because `agent.chat()` returned no structured termination
   metadata. `TurnOutcome` shipped that metadata in 0.4.15, and two of the three
-  host surfaces (`agentao run`, the sub-agent path) were migrated onto it while
+  host surfaces (`arbiter run`, the sub-agent path) were migrated onto it while
   ACP was not — so a DeepChat-style client got `end_turn` for a turn that
   doom-looped, exhausted its iteration budget, or was cut off at the token
   limit. The mapping is now:
@@ -104,9 +104,9 @@ No breaking changes. It upgrades in place.
 
 - **MCP URL-transport requests now identify themselves.** SSE and Streamable
   HTTP traffic — the content-type preflight, the handshake, and every tool call
-  — went out with httpx's bare `python-httpx/x.y.z`, leaving agentao anonymous
+  — went out with httpx's bare `python-httpx/x.y.z`, leaving arbiter anonymous
   in server logs and indistinguishable from any other Python client. They now
-  send `User-Agent: agentao-mcp/<version>`. A `User-Agent` set in the server's
+  send `User-Agent: arbiter-mcp/<version>`. A `User-Agent` set in the server's
   `headers` block still wins, matched case-insensitively, and the config dict is
   copied rather than mutated, so a reconnect does not accumulate state. stdio
   servers are unaffected. This does change what remote servers see on the wire:
@@ -205,10 +205,10 @@ live path.
 1. `SubagentLifecycleEvent(phase="failed")` now also means "returned without
    answering", not only "raised". Hosts branching on it will see it fire on
    ordinary non-answers.
-2. Child processes no longer inherit agentao's provider credentials. **If an
+2. Child processes no longer inherit arbiter's provider credentials. **If an
    MCP or ACP server you configured relies on inheriting `OPENAI_API_KEY` (or
    similar), it will now fail with 401** — declare the key in its `env` block,
-   or set `AGENTAO_SCRUB_CHILD_ENV=0`.
+   or set `ARBITER_SCRUB_CHILD_ENV=0`.
 
 Everything else upgrades in place.
 
@@ -229,7 +229,7 @@ Everything else upgrades in place.
   deliberately separate axis — a sticky transport flag with its own exit code 4
   and `on_max_iterations` interaction, not a value here. (#126)
 
-- **`error.reason` on the `agentao run` envelope** — the machine-readable
+- **`error.reason` on the `arbiter run` envelope** — the machine-readable
   discriminator behind `error.type`, carrying the `incomplete_reason` value
   verbatim so a caller can branch on `no_output` vs `reasoning_only` without
   parsing `message`. (#126)
@@ -240,27 +240,27 @@ Everything else upgrades in place.
   `incomplete_reason`, `tool_count`, `error`, and an `is_answer` convenience)
   is how a host tells a real answer from a placeholder / harness notice without
   subscribing to the internal `Transport`. `TurnOutcome` is importable from the
-  top-level package (`from agentao import TurnOutcome`) without pulling the LLM
+  top-level package (`from arbiter import TurnOutcome`) without pulling the LLM
   stack. Mirrors the `TURN_END` payload field-for-field — both are fed from a
   single gated value in `runtime/turn.py`, so they never disagree. (#126)
 
-- **`agentao/security/secret_scan.py`** — the credential-pattern scanner, moved
-  out of `agentao/replay/` and put on the live path. It previously ran only
-  inside replay, which is off by default, so `agentao.log` and
-  `.agentao/tool-outputs/` were unscanned in every default install. Now
-  `agentao.log`'s file handler redacts through a `logging.Formatter` (**not** a
+- **`arbiter/security/secret_scan.py`** — the credential-pattern scanner, moved
+  out of `arbiter/replay/` and put on the live path. It previously ran only
+  inside replay, which is off by default, so `arbiter.log` and
+  `.arbiter/tool-outputs/` were unscanned in every default install. Now
+  `arbiter.log`'s file handler redacts through a `logging.Formatter` (**not** a
   `Filter` — a `Filter` mutates the shared `LogRecord` and would leak the
   redaction into every other handler on the logger, including an embedded
   host's own), and tool outputs are scanned before they hit disk, with a note
   appended to the tool result when hits occurred. `memory/guards.py` now derives
   its patterns from the same list instead of keeping a weaker third copy that
   was missing `sk-ant-`, JWTs, Slack, and most GitHub token variants.
-  `agentao/replay/redact.py` re-exports for existing callers.
+  `arbiter/replay/redact.py` re-exports for existing callers.
 
   Scope is deliberate and narrow: **disk artifacts only**. The conversation
   sent to the LLM provider stays verbatim, because pattern matching cannot tell
   a live credential from a test fixture and redacting the model's view breaks
-  legitimate work. `.agentao/sessions/*.json` and `.agentao/background_tasks.json`
+  legitimate work. `.arbiter/sessions/*.json` and `.arbiter/background_tasks.json`
   are likewise not scanned — both are read back into `agent.messages`, so
   redacting them would corrupt a resumed conversation. Best-effort defense in
   depth, not a seal. (#128)
@@ -272,7 +272,7 @@ Everything else upgrades in place.
   provider spelling of it, such as Gemini's `MAX_TOKENS`), any tool calls it
   contains are cut off mid-serialization — the arguments may be *valid JSON and
   still be wrong*, e.g. a `write_file` whose `content` stops halfway or a shell
-  command missing its final argument. Agentao used to run them. It now records
+  command missing its final argument. Arbiter used to run them. It now records
   the assistant message, answers each call with a re-issue prompt instead of a
   result, and lets the model send the call again with complete arguments. A
   call truncated before its name arrived is stamped `"unknown"` so the
@@ -282,7 +282,7 @@ Everything else upgrades in place.
   `max_iterations` budget. `TURN_END.tool_count` counts the refused calls, so it
   still matches the execute path. (#125)
 
-- **BREAKING — child processes no longer inherit agentao's own provider
+- **BREAKING — child processes no longer inherit arbiter's own provider
   credentials.** Shell children, MCP server children, ACP server children, and
   everything routed through `run_captured` (plugin hooks, `search_file_content`)
   now start from `build_child_env()`, which drops the 12 `HARNESS_ENV_KEYS`:
@@ -297,8 +297,8 @@ Everything else upgrades in place.
 
   **What this breaks:** an **MCP or ACP server that relied on inheriting the
   key now gets a 401** — declare it explicitly in that server's `env` block
-  (applied *after* the scrub), or set `AGENTAO_SCRUB_CHILD_ENV=0` to restore
-  full inheritance process-wide. Same for running `agentao run`, or any script
+  (applied *after* the scrub), or set `ARBITER_SCRUB_CHILD_ENV=0` to restore
+  full inheritance process-wide. Same for running `arbiter run`, or any script
   that calls the provider, from inside the agent's own shell.
   `ShellRequest(env=None)` consequently no longer means "inherit everything" —
   it means "inherit minus `HARNESS_ENV_KEYS`"; pass an explicit `env` for full
@@ -306,19 +306,19 @@ Everything else upgrades in place.
 
   **`GOOGLE_API_KEY` is deliberately NOT dropped.** It is the standard name for
   Maps / Drive / YouTube credentials as well, and stripping it would break user
-  scripts the agent was asked to run, with a 401 pointing nowhere near agentao.
+  scripts the agent was asked to run, with a 401 pointing nowhere near arbiter.
   If you authenticate Gemini through `GOOGLE_API_KEY` rather than
-  `GEMINI_API_KEY`, that key still reaches child processes. Only agentao's own
+  `GEMINI_API_KEY`, that key still reaches child processes. Only arbiter's own
   keys are dropped; the user's other secrets (AWS, GitHub, `DATABASE_URL`) are
   untouched — scrubbing those is the host's call. Defense in depth, not a seal:
   `cat .env` still works. Also fixes a false comment at `mcp/client.py` that
   had claimed a sanitized base environment while passing `dict(os.environ)`.
   (#128) The agent is a
   distinct principal from the user, and nothing the LLM decides to run needs
-  the key that pays for the LLM. Only agentao's keys are dropped; the user's
+  the key that pays for the LLM. Only arbiter's keys are dropped; the user's
   other secrets (AWS, GitHub, `DATABASE_URL`) are untouched — scrubbing those
-  is the host's call. **Set `AGENTAO_SCRUB_CHILD_ENV=0` to restore full
-  inheritance**, which is required if you run `agentao run`, or any script that
+  is the host's call. **Set `ARBITER_SCRUB_CHILD_ENV=0` to restore full
+  inheritance**, which is required if you run `arbiter run`, or any script that
   calls the provider, from inside the agent's own shell. Note that
   `ShellRequest(env=None)` consequently no longer means "inherit everything".
   Also fixes a false comment at `mcp/client.py` that had claimed a sanitized
@@ -362,7 +362,7 @@ Everything else upgrades in place.
   `tool_calls` with no matching `role: "tool"` reply. The strict
   Chat-Completions contract rejects that, so **every subsequent turn 400'd**
   until `/new` — the conversation was unrecoverable, and `/sessions resume`
-  restored the broken state. Agentao already upheld this invariant on the
+  restored the broken state. Arbiter already upheld this invariant on the
   doom-loop and length-truncation paths; interrupt was the one hole.
   `runtime/sanitize.py::backfill_orphaned_tool_calls` now stamps placeholder
   results from all three abnormal-exit handlers. The placeholder deliberately
@@ -395,7 +395,7 @@ Everything else upgrades in place.
   of iterations lost everything it had produced. It now surfaces the partial
   `result` alongside the reason. Background records carry an explicit
   `incomplete_reason` field so every reader — the tool, `/agent status`, the
-  dashboard, and any host reading `.agentao/background_tasks.json` — separates
+  dashboard, and any host reading `.arbiter/background_tasks.json` — separates
   "the sub-agent crashed" from "the sub-agent stopped short but produced work"
   without guessing from the presence of `result`. `/agent status` prints the
   partial output under a *Did not finish* header rather than only the error,
@@ -417,7 +417,7 @@ Everything else upgrades in place.
   the wire event and `agent.last_turn` both report it honestly (and a
   placeholder-vs-answer check does not read a cancelled turn as an answer). (#126)
 
-- **`agentao run` no longer exits `0` on a turn that produced no answer.**
+- **`arbiter run` no longer exits `0` on a turn that produced no answer.**
   A turn ending with an empty assistant message exited `0` and served the
   `[No response]` / `[No text response]` placeholder as if it were the model's
   answer; a turn the harness aborted after repeated length truncation or a
@@ -442,7 +442,7 @@ Streamable HTTP support and finer per-call MCP timeouts — plus a `/thinking`
 command, a Jina `web_search` backend, and three provider/sub-agent robustness
 fixes.
 
-**Breaking (config behavior):** a bare `url` in `.agentao/mcp.json` now defaults
+**Breaking (config behavior):** a bare `url` in `.arbiter/mcp.json` now defaults
 to the **Streamable HTTP** transport instead of SSE. Legacy SSE endpoints must
 add `"type": "sse"`. That is the only break; everything else upgrades in place.
 
@@ -475,7 +475,7 @@ add `"type": "sse"`. That is the only break; everything else upgrades in place.
   mode, retreats on *error* through jina → bocha → duckduckgo. An explicit
   `backend=` still pins exactly one backend with no fallback. Each fallback is
   surfaced in the result and logged. (#114)
-- **`AGENTAO_WEB_FETCH_ALLOW_CIDRS`** — an opt-in `web_fetch` SSRF allowlist of
+- **`ARBITER_WEB_FETCH_ALLOW_CIDRS`** — an opt-in `web_fetch` SSRF allowlist of
   non-globally-routable CIDRs (the escape hatch for hosts behind a fake-IP proxy
   such as Clash/V2Ray). Applied to the initial URL and every redirect hop,
   scoped (allowlisting `198.18.0.0/15` does not also permit `169.254.169.254`),
@@ -524,7 +524,7 @@ break; upgrade in place.
   read-only `update_goal` tool) or a time/turn budget trips (one wrap-up turn).
   Subcommands `show`/`budget`/`pause`/`resume`/`edit`/`clear`; flags
   `--for <duration>` / `--turns <n>` / `--unbounded`. State persists to
-  `.agentao/goal.json`. Built from existing harness primitives — the harness
+  `.arbiter/goal.json`. Built from existing harness primitives — the harness
   stays goal-agnostic; budgets are pure host-side time/turn accounting (no
   token budgets), and it deliberately does **not** use the plugin
   `Stop`/`force_continue` path. New developer-guide chapter 4.8 documents the
@@ -562,7 +562,7 @@ break; upgrade in place.
   grpc/protobuf, pandas/numpy, etc. into `[full]` for nothing. They are dropped
   from `[project.optional-dependencies]` and from `[full]`, which now closes
   over `cli + web + i18n + crawl4ai + tokenizer` only (122 → 106 packages in the
-  CI freeze baseline). `pip install 'agentao[pdf]'` (etc.) no longer resolves;
+  CI freeze baseline). `pip install 'arbiter[pdf]'` (etc.) no longer resolves;
   the Gemini path was always OpenAI-compatible and never imported `google-genai`.
   See `docs/design/optimization-opportunities-review.md` (T1.1).
 - **Internal consolidations and hot-path tidy-ups (behavior-preserving).**
@@ -581,9 +581,9 @@ break; upgrade in place.
 ### Fixed
 
 - **ACP: `session/update` `schema_version` is typed as `int`, not `str`.** (#103)
-- **CLI: `.agentao/settings.json` is read *and* written against the resolved
+- **CLI: `.arbiter/settings.json` is read *and* written against the resolved
   project root.** Previously both `_load_settings` and `_save_settings` used a
-  cwd-relative `Path(".agentao")`, so a CLI launched from a subdirectory
+  cwd-relative `Path(".arbiter")`, so a CLI launched from a subdirectory
   persisted `mode` to a file the factory never reads. Both now go through
   `replay.config.settings_path()` bound to the agent's frozen
   `working_directory`. (T2.3)
@@ -598,12 +598,12 @@ break; upgrade in place.
 
 ### Changed
 
-- **`AGENTAO.md` now drops a leading YAML frontmatter block before injecting
+- **`ARBITER.md` now drops a leading YAML frontmatter block before injecting
   it into the system prompt.** Previously the file was read verbatim, so a
   frontmatter block carried over from a Cursor rule or another tool's
   instruction file (`---\nname: ...\n---`) leaked into the prompt as literal
   text. `load_project_instructions` now routes the contents through a new
-  `agentao.prompts.strip_frontmatter()` helper. Stripping is conservative — it
+  `arbiter.prompts.strip_frontmatter()` helper. Stripping is conservative — it
   only fires when the document genuinely opens with a frontmatter *mapping*
   (opening `---` fence + YAML mapping + closing `---` fence); an absent block,
   malformed YAML, or a stray `---` thematic break wrapping prose is left
@@ -616,12 +616,12 @@ break; upgrade in place.
   across `skills/installer.py`, `skills/manager.py`, `agents/manager.py`, and
   `embedding/plugins/resolvers/{agents,skills}.py`, having drifted on value
   coercion, body stripping, and malformed-YAML fallback. All now delegate to a
-  single `agentao.frontmatter.parse_frontmatter(content, *, coerce_str=False)`:
+  single `arbiter.frontmatter.parse_frontmatter(content, *, coerce_str=False)`:
   `coerce_str=True` for the skill / plugin loaders (string values), the native
   default for the agent loaders (so `tools: [read_file]` stays a list). The
   shared parser adopts the safest behavior of the five — a malformed or
   non-mapping block degrades to `{}` instead of raising `AttributeError`. (The
-  AGENTAO.md `strip_frontmatter` helper stays separate by design: it uses a
+  ARBITER.md `strip_frontmatter` helper stays separate by design: it uses a
   stricter, line-anchored fence match for free-form prose.)
 
 ---
@@ -630,11 +630,11 @@ break; upgrade in place.
 
 ### Added
 
-- **Host LLM request passthrough: `Agentao(extra_body=...)`.** The LLM request
+- **Host LLM request passthrough: `Arbiter(extra_body=...)`.** The LLM request
   kwargs were a closed set, so a host could not reach `reasoning_effort` /
   `top_p` / `seed` / `response_format` or any provider-specific body field
   without subclassing `LLMClient` or monkeypatching — both off the
-  `agentao.host` contract. `extra_body` is the SDK-blessed escape hatch, now a
+  `arbiter.host` contract. `extra_body` is the SDK-blessed escape hatch, now a
   first-class harness primitive. (#91)
   - Forwarded verbatim to the OpenAI SDK `.create()` body on both the
     non-streaming and streaming paths via a single `_build_request_kwargs()`
@@ -708,7 +708,7 @@ break; upgrade in place.
   `169.254.169.254`), alternate IP encodings, and redirect hops into the
   internal network (the client used `follow_redirects=True` with no per-hop
   check); 8 of 13 bypass vectors slipped through. New
-  `agentao/security/url_policy.py`: `validate_outbound_url()` resolves the host
+  `arbiter/security/url_policy.py`: `validate_outbound_url()` resolves the host
   and rejects any non-global address, normalizes the hostname (trailing dot /
   case), rejects local/internal names, single-label hosts and embedded creds,
   and unwraps v4-mapped / 6to4 / NAT64 IPv6 forms; `guarded_get()` drives the
@@ -722,7 +722,7 @@ break; upgrade in place.
 
 ### Added
 
-- **Host tool injection: `Agentao(extra_tools=..., disable_tools=...)`.** Two
+- **Host tool injection: `Arbiter(extra_tools=..., disable_tools=...)`.** Two
   first-class, construction-time kwargs on the embedded-host contract for
   adding, replacing, and hiding tools — replacing post-construction pokes at
   the runtime `agent.tools.register(...)`.
@@ -739,13 +739,13 @@ break; upgrade in place.
     (that stays with the permission engine).
   - `WebSearchTool(backend=..., api_key=...)` — explicit constructor args now
     take precedence over the `BOCHA_API_KEY` env var, so two in-process
-    Agentao instances can use different search backends. Pass a configured
+    Arbiter instances can use different search backends. Pass a configured
     instance via `extra_tools=[...]`.
   - `Tool`, `AsyncToolBase`, `RegistrableTool` are now re-exported from
-    `agentao.host` as a stable import path for host tool authors.
+    `arbiter.host` as a stable import path for host tool authors.
   - Design: `docs/design/host-tool-injection.md` / `.zh.md`.
 
-- **Runtime tool injection: `Agentao.add_tool` / `remove_tool`.** The
+- **Runtime tool injection: `Arbiter.add_tool` / `remove_tool`.** The
   post-construction dual of `extra_tools=` / `disable_tools=`, for hosts that
   add or drop a tool between `chat()` / `arun()` calls without rebuilding the
   agent (e.g. long ACP sessions). (#65)
@@ -766,7 +766,7 @@ break; upgrade in place.
     call, so changes take effect on the **next** call, never mid-turn.
   - Design: `docs/design/runtime-tool-injection.md` / `.zh.md`.
 
-- **Host tool allowlist: `Agentao(enabled_tools=...)`.** The additive dual of
+- **Host tool allowlist: `Arbiter(enabled_tools=...)`.** The additive dual of
   `disable_tools=` — declare the minimal tool set to keep instead of
   enumerating everything to drop. Closes two gaps a blocklist can't: it's
   concise for a minimal core, and a built-in added later can't silently leak
@@ -776,7 +776,7 @@ break; upgrade in place.
     including the empty set — *enables* the allowlist (`is not None`
     semantics): after registration, every built-in / agent-path tool whose
     name is absent is pruned.
-  - Scope is agentao-owned tools only: `extra_tools` (host injected them
+  - Scope is arbiter-owned tools only: `extra_tools` (host injected them
     explicitly), MCP (`mcp_*`), and plan-only tools are always kept. Minimize
     MCP at the MCP layer instead.
   - Mutually exclusive with `disable_tools` (passing both raises). Reserved
@@ -796,7 +796,7 @@ break; upgrade in place.
   non-2xx status, or any transport error passes through — the real handshake
   stays authoritative. (#71)
 
-- **ACP server startup resume: `agentao --acp --resume [SESSION_ID]`.** The
+- **ACP server startup resume: `arbiter --acp --resume [SESSION_ID]`.** The
   ACP server can reattach to a persisted session: a one-shot
   `ResumeDirective` is consumed by the first `session/new`, which hydrates
   and replays the saved history (reusing the `session/load` loader) and
@@ -813,7 +813,7 @@ break; upgrade in place.
   behavior-preserving).** No public API, runtime behavior, or import path
   changed — method/class bodies moved verbatim and every historically
   imported name is re-exported from its original module. (#63)
-  - `agent.py`: the ~246-line `Agentao.__init__` is now a short sequence of
+  - `agent.py`: the ~246-line `Arbiter.__init__` is now a short sequence of
     ordered phase helpers (`_validate_construction_args`, `_init_mcp_sources`,
     `_init_session_state`, `_init_replay`, `_wire_tooling`).
   - `cli/diagnostics_cli.py` (862 lines) → a `cli/diagnostics/` package
@@ -822,7 +822,7 @@ break; upgrade in place.
   - `acp/transport.py` (950 lines) → `ACPTransport(_ReplayMixin,
     _InteractionMixin)` plus a shared `_transport_helpers` module.
   - `llm/client.py` (890 → 688 lines): request/response logging moved to a
-    `_LoggingMixin` (`agentao/llm/_logging.py`).
+    `_LoggingMixin` (`arbiter/llm/_logging.py`).
   - `acp_client/client.py` (937 → 779 lines): the exception hierarchy moved to
     `acp_client/errors.py`.
   - `plugins/hooks/_dispatcher.py` (756 → 542 lines): the structured-stdout
@@ -869,7 +869,7 @@ break; upgrade in place.
   loop but shares `kill_process_tree`. (#73, #74, #75)
 
 - **ACP sessions persist on server shutdown.** When an ACP client stopped an
-  agentao server subprocess, chat history was dropped (unlike the CLI, which
+  arbiter server subprocess, chat history was dropped (unlike the CLI, which
   saves on session end). `AcpSessionState.close()` now persists the
   conversation keyed by the ACP `sessionId` (so `session/load` can resume
   it) before cancelling the turn token, and the bundled `acp_client` closes
@@ -878,7 +878,7 @@ break; upgrade in place.
   the CLI and ACP teardown paths in one place. (#78)
 
 - **Sub-agent construction no longer crashes on `working_directory`.**
-  `AgentToolWrapper._run_sync` built the sub-`Agentao(...)` without
+  `AgentToolWrapper._run_sync` built the sub-`Arbiter(...)` without
   `working_directory` — required since 0.3.0 — so every sub-agent invocation
   raised `TypeError`. The parent's project root is now threaded through
   (`create_agent_tools` passes `working_directory=self.project_root`), with a
@@ -895,7 +895,7 @@ break; upgrade in place.
 - **SKILL.md relative paths resolve against the skill directory.** Skill
   instructions referencing `scripts/foo.py` failed whenever cwd ≠ skill
   directory — the common case, since skills install under
-  `~/.agentao/skills/` or `<project>/.agentao/skills/`. Fixed at the
+  `~/.arbiter/skills/` or `<project>/.arbiter/skills/`. Fixed at the
   activation layer so every skill (including third-party) self-heals:
   `activate_skill` and the per-turn skills context now report
   `Skill directory: <abs path>` plus the resolution rule, `scripts/` is
@@ -915,7 +915,7 @@ break; upgrade in place.
 - **ACP `session/set_mode` uses the standard `modeId` field and accepts
   unknown values.** The ACP-standard field is `modeId` (not the pre-existing
   non-standard `mode`), and a `modeId` is a UI/behavioural selector that need
-  not be an Agentao permission preset. The handler now reads `modeId`, applies
+  not be an Arbiter permission preset. The handler now reads `modeId`, applies
   a `PermissionEngine` preset **only** on an exact match (`read-only` /
   `workspace-write` / `full-access` / `plan`), and **persists + echoes** any
   other value without changing permission posture — so a client mode like
@@ -929,13 +929,13 @@ break; upgrade in place.
 - **ACP `initialize` advertises extensions through `_meta`, not a top-level
   `extensions` array.** The ACP-standard `initialize` response carries only
   `protocolVersion` / `agentCapabilities` / `agentInfo` / `authMethods`;
-  extension data belongs under `_meta`. Agentao now returns its
+  extension data belongs under `_meta`. Arbiter now returns its
   `_agentao.cn/ask_user` advertisement under
   `_meta["_agentao.cn/extensions"]` (vendor-namespaced so it never collides
   with another extension's `_meta` payload) instead of the non-standard
   top-level `extensions: [...]`. `AcpInitializeResponse` drops the
   `extensions` field for an open `_meta` object (`AcpInitializeMeta`); the
-  schema snapshot (`docs/schema/host.acp.v1.json`) is bumped. Agentao's own
+  schema snapshot (`docs/schema/host.acp.v1.json`) is bumped. Arbiter's own
   `acp_client` never read `extensions`, so no client code changes; a
   schema-following host that still sends a top-level `extensions` is now
   rejected (`extra="forbid"`).
@@ -952,7 +952,7 @@ break; upgrade in place.
   module top, so one wrap covers all three warnings). No behavior change;
   other warnings are untouched.
 - **Robust home-directory resolution when `$HOME` is unset.** Added
-  `agentao.paths.user_home()` — `Path.home()` with a fallback to
+  `arbiter.paths.user_home()` — `Path.home()` with a fallback to
   `$HOME` / `USERPROFILE` and finally the system temp dir, so an
   environment that can't resolve a home directory (stripped service
   accounts, some container/CI sandboxes, headless ACP launches) no longer
@@ -966,7 +966,7 @@ break; upgrade in place.
   paths, the skills registry, plugin discovery, the sandbox config, the
   log-handler fallback, the CLI history file) go through `user_home()` /
   `user_root()` — fixing the import-time crash risk where module-level
-  `~/.agentao` constants resolved `Path.home()` at import. Subsystem
+  `~/.arbiter` constants resolved `Path.home()` at import. Subsystem
   constructors still take explicit roots (unchanged from the Issue 5
   no-implicit-fallback contract); this only hardens the path helpers
   themselves.
@@ -978,7 +978,7 @@ break; upgrade in place.
   client switches model/provider by sending a `provider/model` *identifier*
   (e.g. `"openai/gpt-4o"`), and credentials are resolved **server-side**
   through a host-injectable `provider_resolver` — they never travel on the
-  ACP wire (nor into `agentao.log`). The value is split on the *first* `/`
+  ACP wire (nor into `arbiter.log`). The value is split on the *first* `/`
   (so `huggingface/meta-llama/Llama-3` → provider `huggingface`, model
   `meta-llama/Llama-3`); a bare value with no `/` is a model-only switch that
   keeps the current provider. Two mechanisms reject any credential-bearing
@@ -999,7 +999,7 @@ break; upgrade in place.
   core `agent.set_model()` path. The existing `session/set_model` and
   `session/list_models` are kept unchanged as one-release compatibility
   endpoints. Host ACP schema gains `AcpSessionSetConfigOptionRequest/Response`,
-  `AcpConfigOption`, `AcpConfigOptionChoice`, `AcpAgentaoSetModelRequest/Response`,
+  `AcpConfigOption`, `AcpConfigOptionChoice`, `AcpArbiterSetModelRequest/Response`,
   and `configOptions` on the `session/new` / `session/load` responses
   (snapshot `docs/schema/host.acp.v1.json` bumped).
 - **Multimodal image input through the turn.** `chat()` / `arun()` accept
@@ -1009,7 +1009,7 @@ break; upgrade in place.
   `data:` URL) instead of a plain string; text-only turns are unchanged.
   The LLM request logger summarizes multimodal parts (`text (N chars)`,
   `image_url (N chars, inline base64)`) rather than dumping the raw base64
-  blob into `agentao.log`. Image data arrives as standard content blocks,
+  blob into `arbiter.log`. Image data arrives as standard content blocks,
   so this is decoupled from any specific ACP client.
 - **ACP image input.** `session/prompt` now accepts ACP `image` content
   blocks (`{"type":"image","data":<base64>,"mimeType":...}`), rendering
@@ -1057,7 +1057,7 @@ break; upgrade in place.
 
 ### Added
 
-- **`agentao doctor` and `agentao config validate` — diagnostics CLI** (#45).
+- **`arbiter doctor` and `arbiter config validate` — diagnostics CLI** (#45).
   Two new non-interactive subcommands that aggregate or validate the
   harness's existing signals without instantiating an agent. `doctor`
   covers the `.env` provider check (API-key *presence*, never the value),
@@ -1070,13 +1070,13 @@ break; upgrade in place.
   human-readable is the default. Both are **read-only** (probing an
   absent `memory.db` reports `"absent"` instead of bootstrapping it) and
   reject unknown flags with exit `2`. Implementation in
-  `agentao/cli/diagnostics_cli.py`; documented under
+  `arbiter/cli/diagnostics_cli.py`; documented under
   `developer-guide/{en,zh}/cli/12-non-interactive.md`; design rationale in
   `docs/design/codex-reverse-review.md` (2026-05-17 follow-up).
 
 - **`collect_full_plugin_diagnostics()` helper** (#45) in
-  `agentao/embedding/plugins/diagnostics.py`. Shared by
-  `agentao plugin list` and `agentao doctor` so the two commands cannot
+  `arbiter/embedding/plugins/diagnostics.py`. Shared by
+  `arbiter plugin list` and `arbiter doctor` so the two commands cannot
   drift on which plugins they consider failed (it runs the post-load
   `resolve_plugin_entries` / `resolve_plugin_agents` simulation in
   addition to `PluginManager.load_plugins`).
@@ -1111,14 +1111,14 @@ break; upgrade in place.
     carried `duration_ms` and is now documented as the stable
     compaction-duration field.
   Hosts subscribe via the transport event stream (same path cost/usage
-  tracking already uses). Not re-exposed on `agentao.host` Pydantic models
+  tracking already uses). Not re-exposed on `arbiter.host` Pydantic models
   yet — the host contract does not currently project LLM-call events, and
   adding that surface is a larger decision than this increment.
 
 - **`/compact` manual-compaction command** (#38, #40). Runs full history
   compaction (`compress_messages(is_auto=False)`) on demand, without waiting
   for the auto-compaction threshold. Handler in
-  `agentao/cli/commands/compact.py`; documented in `CLAUDE.md` and in
+  `arbiter/cli/commands/compact.py`; documented in `CLAUDE.md` and in
   `developer-guide/{en,zh}/cli/7-context-status.md`.
 
 ### Fixed
@@ -1134,7 +1134,7 @@ break; upgrade in place.
   behavior auto-routed JS-rendered or failing fetches through a local
   headless browser whenever `crawl4ai` was installed — meaning a `[full]`
   install changed runtime behavior just by being present. The new model is
-  opt-in via the `AGENTAO_WEB_FETCH_FALLBACK` env var:
+  opt-in via the `ARBITER_WEB_FETCH_FALLBACK` env var:
   - `none` (default) — direct httpx fetch only; on a JS-detected page the
     static shell is returned with a `Note:` line telling the LLM the content
     is likely incomplete.
@@ -1143,14 +1143,14 @@ break; upgrade in place.
     `Fallback: jina reader (https://r.jina.ai/<url>)` line on the result so
     the audit surface matches the actual outbound request.
   - `crawl4ai` — falls back to the local headless browser (requires
-    `pip install agentao[crawl4ai]` and `playwright install chromium`).
+    `pip install arbiter[crawl4ai]` and `playwright install chromium`).
   Rationale: the confirmation prompt and host-visible URL must match the
   actual outbound destination — silently proxying user-supplied URLs through
   a third party breaks the audit contract embedded hosts depend on.
 
 ### Added
 
-- **`AGENTAO_WEB_FETCH_FALLBACK`** env var (values: `none` | `jina` |
+- **`ARBITER_WEB_FETCH_FALLBACK`** env var (values: `none` | `jina` |
   `crawl4ai`). Read once at `WebFetchTool` construction; invalid values log
   a warning and degrade to `none`.
 - **`JINA_API_KEY`** env var (optional). When set, the Jina Reader fallback
@@ -1165,20 +1165,20 @@ break; upgrade in place.
 ## [0.4.6] — 2026-05-08
 
 A non-interactive automation release on top of 0.4.5. The new
-`agentao run` subcommand is the headline; `agentao -p` is
+`arbiter run` subcommand is the headline; `arbiter -p` is
 reimplemented as a thin shim so both surfaces share one structured
 result envelope and one exit-code table. **No public Python API or
 wire-format change**, but `-p` callers that script on exit codes
 must read the migration note below — `max_iterations` moved from
 exit `2` to exit `4`, and exit `2` now means "invalid usage / spec
 validation failed". Everything else upgrades in place via
-`pip install -U agentao`.
+`pip install -U arbiter`.
 
 ### Added
 
-- **`agentao run` subcommand (M0).** Structured automation surface:
+- **`arbiter run` subcommand (M0).** Structured automation surface:
   YAML/JSON spec on stdin or `--spec FILE`, merged with explicit
-  CLI overrides, executed as one Agentao turn, emitting either the
+  CLI overrides, executed as one Arbiter turn, emitting either the
   final assistant text (`--format text`) or one machine-readable
   envelope (`--format json`). The spec contract (`RunSpec` /
   `RunPermissionRule(s)` / `RunOutputOptions`) and the result
@@ -1193,23 +1193,23 @@ validation failed". Everything else upgrades in place via
   documented for users in
   `developer-guide/{en,zh}/cli/12-non-interactive.md`.
 
-- **Unified exit-code table for `agentao run` and `agentao -p`.**
+- **Unified exit-code table for `arbiter run` and `arbiter -p`.**
   Both surfaces now exit `0` on success, `1` on runtime error, `2`
   on invalid usage / spec validation failure / unknown spec field,
   `3` on permission / interaction required (no interactive
   approval), `4` on max iterations, and `130` on SIGINT / SIGTERM.
-  Implemented in `agentao/cli/run.py:_classify_outcome`.
+  Implemented in `arbiter/cli/run.py:_classify_outcome`.
 
-- **Non-interactive transport (`agentao.transport.non_interactive`).**
+- **Non-interactive transport (`arbiter.transport.non_interactive`).**
   Records permission rejections, max-iteration hits, and
   interaction-required prompts as `RunErrorEnvelope` shapes the run
-  pipeline can read off without touching `Agentao` internals.
+  pipeline can read off without touching `Arbiter` internals.
   Composes `EventBroadcaster`, so the run pipeline can subscribe to
   `TOOL_COMPLETE` for the `tool_calls` counter.
 
-- **`Agentao.add_event_observer` / `Agentao.remove_event_observer`.**
+- **`Arbiter.add_event_observer` / `Arbiter.remove_event_observer`.**
   Sync pass-throughs to `EventStream.add_observer` for consumers
-  (notably the `agentao run` pipeline) that cannot drive the async
+  (notably the `arbiter run` pipeline) that cannot drive the async
   `events()` iterator. The callback fires inline on the producer
   thread; `EventStream` swallows raised exceptions.
 
@@ -1224,13 +1224,13 @@ validation failed". Everything else upgrades in place via
   [`jin-bo/agentao-kanban`](https://github.com/jin-bo/agentao-kanban).
   This is the first Part 7 blueprint that addresses the
   "many specialized agents as a system" shape rather than
-  "embed one Agentao instance into a product"; it fills the gap
+  "embed one Arbiter instance into a product"; it fills the gap
   that 7.1–7.6 leave open.
 
 - **Plugin runtime/loader import-boundary contract test
   (`tests/test_plugin_boundary_contract.py`).** Imports
-  `agentao.plugins` in a fresh subprocess and asserts that none of
-  `agentao.embedding.plugins.{manager, manifest, diagnostics, mcp,
+  `arbiter.plugins` in a fresh subprocess and asserts that none of
+  `arbiter.embedding.plugins.{manager, manifest, diagnostics, mcp,
   resolvers}.*` and no YAML parser is pulled in transitively. Turns
   the runtime/loader split that landed in 5a/5b into an executable
   invariant rather than a convention. Documented under "Import map
@@ -1238,9 +1238,9 @@ validation failed". Everything else upgrades in place via
 
 ### Changed
 
-- **`agentao -p` is now a thin shim** over
-  `agentao run --format text --prompt …` (`run_print_mode` in
-  `agentao/cli/entrypoints.py`). The success path
+- **`arbiter -p` is now a thin shim** over
+  `arbiter run --format text --prompt …` (`run_print_mode` in
+  `arbiter/cli/entrypoints.py`). The success path
   (`prompt → final_text → exit 0`) and runtime-error path
   (exit `1`) are unchanged. The behavior delta is the exit code
   mapping listed above and the appearance of exit `3` for
@@ -1250,15 +1250,15 @@ validation failed". Everything else upgrades in place via
 
 - **Spec-side permission rules layered on top of user rules.**
   `PermissionEngine` now accepts spec-injected `allow` / `deny`
-  rules from `agentao run`'s spec without disturbing the existing
+  rules from `arbiter run`'s spec without disturbing the existing
   project + user precedence. Action injection is isolated in
   `RunPermissionRule.to_engine_dict` so `extra="forbid"` can flatly
   reject hand-written `action:` fields in YAML.
 
-- **Logger / `agentao.log` silencing knobs documented across the
+- **Logger / `arbiter.log` silencing knobs documented across the
   embedding entrypoints.** New canonical anchor at `docs/guides/embedding.md
-  §2 → "Optional: silencing or redirecting agentao.log"` with a knob
-  matrix and `Agentao(...)` / `LLMClient(...)` recipes; the rest of
+  §2 → "Optional: silencing or redirecting arbiter.log"` with a knob
+  matrix and `Arbiter(...)` / `LLMClient(...)` recipes; the rest of
   the doc set
   (`docs/guides/logging.md`, `developer-guide/{en,zh}/part-2/2-constructor-reference.md`,
   `developer-guide/{en,zh}/part-6/6-observability.md`) crosslinks
@@ -1276,14 +1276,14 @@ Carried over from 0.4.5 unless noted:
   selection) / per-run `plugins:` fields. Same tracker.
 - SIGINT-precise JSONL termination (M0 ships best-effort signal
   routing through `CancellationToken`).
-- Session resume from `agentao run`.
+- Session resume from `arbiter run`.
 - A checked-in JSON Schema snapshot for `RunSpec` / `RunResult`.
-- `agentao.harness` deprecated alias removal — still scheduled for
+- `arbiter.harness` deprecated alias removal — still scheduled for
   0.5.0.
-- The eight legacy `Agentao(...)` callback kwargs — signature
+- The eight legacy `Arbiter(...)` callback kwargs — signature
   surgery scheduled for 0.5.0; they continue to emit a single
   `DeprecationWarning` per construction.
-- `agentao/session.py` shim removal + `Path.cwd()` fallback removal
+- `arbiter/session.py` shim removal + `Path.cwd()` fallback removal
   — scheduled for 0.5.0.
 - `PermissionEngine` legacy auto-load path tightening into a hard
   error.
@@ -1306,18 +1306,18 @@ Carried over from 0.4.5 unless noted:
   can now pass `RunPermissionRule.to_engine_dict("allow"|"deny")`
   to get an engine-ready dict, or use the existing
   `PermissionEngine(rules=...)` ctor kwarg directly.
-- **Hosts that don't want `agentao` to mutate their root logger**
-  should pass `logger=` to `Agentao(...)` (or to `LLMClient` if
+- **Hosts that don't want `arbiter` to mutate their root logger**
+  should pass `logger=` to `Arbiter(...)` (or to `LLMClient` if
   building it directly). That single switch also silences the
-  default `<wd>/agentao.log` file. See `docs/guides/embedding.md §2`.
+  default `<wd>/arbiter.log` file. See `docs/guides/embedding.md §2`.
 ## [0.4.5] — 2026-05-07
 
 A core-boundary review release. Architectural cleanup of the embedded-host
-boundary — replay state externalized from `Agentao`, persistent-session
+boundary — replay state externalized from `Arbiter`, persistent-session
 module relocated, `PermissionEngine` file I/O extracted, plugin loader
-relocated, and the legacy `Agentao(...)` callback surface formally
+relocated, and the legacy `Arbiter(...)` callback surface formally
 deprecated. **No breaking changes; no public API or wire-format change.**
-`pip install -U agentao` upgrades in place from any 0.4.x release.
+`pip install -U arbiter` upgrades in place from any 0.4.x release.
 
 ### Added
 
@@ -1326,8 +1326,8 @@ deprecated. **No breaking changes; no public API or wire-format change.**
   notify uses snapshot iteration so subscribing or unsubscribing
   mid-emit is safe; listener exceptions are swallowed and never poison
   the runtime emit path. `NullTransport` and `SdkTransport` provide it
-  by composing `agentao.transport.EventBroadcaster` (also re-exported
-  from `agentao.transport`) so from-scratch transports (ACP, message
+  by composing `arbiter.transport.EventBroadcaster` (also re-exported
+  from `arbiter.transport`) so from-scratch transports (ACP, message
   queues) can opt in the same way. Probe with
   `getattr(transport, "subscribe", None)` since bespoke implementations
   may omit it.
@@ -1340,7 +1340,7 @@ deprecated. **No breaking changes; no public API or wire-format change.**
   via `Transport.subscribe()` instead of being reached through agent
   state, removing the runtime-to-replay-adapter direct call path.
 
-- **`agentao.embedding.permission_loader`** — new module hosting the
+- **`arbiter.embedding.permission_loader`** — new module hosting the
   on-disk loading of `permissions.json` (project + user scope, JSON
   parsing, env-var expansion). The `PermissionEngine` constructor now
   accepts `rules=` / `loaded_sources=` kwargs to skip disk reads
@@ -1350,54 +1350,54 @@ deprecated. **No breaking changes; no public API or wire-format change.**
   preserved via lazy delegation to the loader and is **not** deprecated
   in this release.
 
-- **`agentao.embedding.sessions`** — new module hosting
+- **`arbiter.embedding.sessions`** — new module hosting
   `save_session` / `load_session` / `list_sessions` /
   `delete_session` / `delete_all_sessions` and their helpers.
-  `agentao/session.py` becomes a deprecation shim that wraps the new
+  `arbiter/session.py` becomes a deprecation shim that wraps the new
   module with the old permissive signature
   (`project_root: Optional[Path] = None`, falling back to
   `Path.cwd()`); the new module's API will require `project_root`
   explicitly once the shim is removed in 0.5.0.
 
-- **`agentao.embedding.plugins/*`** — plugin loader (`manager`,
+- **`arbiter.embedding.plugins/*`** — plugin loader (`manager`,
   `manifest`, `diagnostics`, `mcp`, `resolvers/{skills,agents}`)
-  relocated from `agentao/plugins/` to `agentao/embedding/plugins/`.
-  `agentao/plugins/` is now runtime-only (validators + LLM-facing
+  relocated from `arbiter/plugins/` to `arbiter/embedding/plugins/`.
+  `arbiter/plugins/` is now runtime-only (validators + LLM-facing
   surfaces); the boundary between "what core needs at runtime" and
   "what the embedding layer needs to discover from disk" matches the
-  rest of `agentao.embedding`.
+  rest of `arbiter.embedding`.
 
-- **`agentao.acp.schema_export`** — host-facing
+- **`arbiter.acp.schema_export`** — host-facing
   `export_host_acp_json_schema()` now lazy-delegates here so
-  `agentao.host.schema` no longer eagerly imports `agentao.acp` at
+  `arbiter.host.schema` no longer eagerly imports `arbiter.acp` at
   import time. Function signature, return type, and the snapshot at
   `docs/schema/host.acp.v1.json` are unchanged.
 
 ### Changed
 
-- **Replay state externalized into `ReplayManager`.** The `Agentao`
+- **Replay state externalized into `ReplayManager`.** The `Arbiter`
   facade's replay surface (`replay_config` constructor kwarg + 4
   instance attributes + 6 facade methods + `close()` teardown leg) is
-  consolidated behind `agentao.replay.manager.ReplayManager`. The
-  recorder is now wired by `agentao.embedding.factory` as a
+  consolidated behind `arbiter.replay.manager.ReplayManager`. The
+  recorder is now wired by `arbiter.embedding.factory` as a
   `Transport.subscribe()` listener, so `chat_loop` no longer reaches
   into `agent._emit_*(...)` and `runtime/turn.py` /
   `runtime/llm_call.py` no longer read agent attributes directly. Six
   deprecated facade methods (`replay_*` etc.) and the
   `replay_config=` kwarg remain as back-compat shims; **scheduled
-  removal in 0.5.0**. Touched: `agentao/agent.py`,
-  `agentao/transport/{base,broadcast,events,null,sdk}.py`,
-  `agentao/replay/{adapter,lifecycle,manager}.py`,
-  `agentao/runtime/{turn,llm_call}.py`, `agentao/embedding/factory.py`,
-  `agentao/acp/transport.py`.
+  removal in 0.5.0**. Touched: `arbiter/agent.py`,
+  `arbiter/transport/{base,broadcast,events,null,sdk}.py`,
+  `arbiter/replay/{adapter,lifecycle,manager}.py`,
+  `arbiter/runtime/{turn,llm_call}.py`, `arbiter/embedding/factory.py`,
+  `arbiter/acp/transport.py`.
 
-- **Eight `Agentao(...)` legacy callback kwargs now emit a single
+- **Eight `Arbiter(...)` legacy callback kwargs now emit a single
   `DeprecationWarning` per construction.** `confirmation_callback`,
   `step_callback`, `thinking_callback`, `ask_user_callback`,
   `output_callback`, `tool_complete_callback`, `llm_text_callback`,
   `on_max_iterations_callback` — passing any of them surfaces one
   warning that names all eight and points at
-  `agentao.embedding.compat.build_compat_transport` as the documented
+  `arbiter.embedding.compat.build_compat_transport` as the documented
   migration path. Mixing `transport=` with legacy callbacks (which
   silently ignored the callbacks) now also emits a warning so the
   dead kwargs surface in test runs. Hosts that already pass
@@ -1405,18 +1405,18 @@ deprecated. **No breaking changes; no public API or wire-format change.**
   bypass the warning entirely. The kwargs themselves remain accepted;
   **scheduled removal in 0.5.0**.
 
-- **Plugin validators split from resolvers.** `agentao/plugins/skills.py`
-  and `agentao/plugins/agents.py` are now validators-only (runtime
+- **Plugin validators split from resolvers.** `arbiter/plugins/skills.py`
+  and `arbiter/plugins/agents.py` are now validators-only (runtime
   shape checks, LLM-facing surfaces); resolution (front-matter parsing,
   manifest reading, file discovery) moved to
-  `agentao/plugins/resolvers/{skills,agents}.py`. Prerequisite for the
-  loader relocation under `agentao/embedding/plugins/`.
+  `arbiter/plugins/resolvers/{skills,agents}.py`. Prerequisite for the
+  loader relocation under `arbiter/embedding/plugins/`.
 
 - **Persistent-session module path migration.** Production import sites
   in `cli/{commands,session,replay_commands}.py` and
-  `acp/session_load.py` now import from `agentao.embedding.sessions`
+  `acp/session_load.py` now import from `arbiter.embedding.sessions`
   and pass `project_root` explicitly. The legacy import path
-  (`agentao.session.*`) keeps working through the wrapper shim;
+  (`arbiter.session.*`) keeps working through the wrapper shim;
   external test files migrate at 0.5.0 alongside the shim removal.
 
 ### Documentation
@@ -1447,13 +1447,13 @@ deprecated. **No breaking changes; no public API or wire-format change.**
   relabeled "removed in 0.5.0"; new version-note entries for the
   0.4.x `DeprecationWarning` emission and the 0.5.0 planned
   signature surgery; `build_compat_transport` doc expanded to mark
-  `agentao.embedding.compat` as the documented migration surface.
+  `arbiter.embedding.compat` as the documented migration surface.
 
 - **`docs/design/core-boundary-review.{md,zh.md}`** — full audit
   doc with verified reverse-import maps, codex baseline comparison,
   per-PR commit-hash backfills, and the priority-table execution log.
   This release ships PRs #1–#5b plus the #6 acp/ wheel-split boundary
-  prep; #7 (`agentao.harness/` alias removal) remains scheduled for
+  prep; #7 (`arbiter.harness/` alias removal) remains scheduled for
   0.5.0.
 
 ### 0.5.0 runway (no action required for 0.4.x users)
@@ -1461,24 +1461,24 @@ deprecated. **No breaking changes; no public API or wire-format change.**
 The following surgeries are scheduled for **0.5.0** and deliberately
 **not** shipped here:
 
-- **Eight legacy callback kwargs** removed from the `Agentao(...)`
+- **Eight legacy callback kwargs** removed from the `Arbiter(...)`
   signature. Migrate via `transport=SdkTransport(...)` or
-  `agentao.embedding.compat.build_compat_transport(...)`.
-- **`agentao/session.py` shim** removed; callers migrate to
-  `agentao.embedding.sessions` with explicit `project_root=`. The
+  `arbiter.embedding.compat.build_compat_transport(...)`.
+- **`arbiter/session.py` shim** removed; callers migrate to
+  `arbiter.embedding.sessions` with explicit `project_root=`. The
   shim's `Path.cwd()` fallback is removed at the same time.
-- **`agentao.harness` alias** removed (carried over from 0.4.x —
-  use `agentao.host` instead). One `DeprecationWarning` emitted on
+- **`arbiter.harness` alias** removed (carried over from 0.4.x —
+  use `arbiter.host` instead). One `DeprecationWarning` emitted on
   first import in 0.4.x.
-- **Six `Agentao.replay_*` facade methods** plus the
+- **Six `Arbiter.replay_*` facade methods** plus the
   `replay_config=` constructor kwarg removed; embedded hosts that need
-  the recorder wire it through `agentao.embedding.factory` (already
+  the recorder wire it through `arbiter.embedding.factory` (already
   the default since 0.4.5).
 
 ## [0.4.4] — 2026-05-06
 
 A Claude-Code compatibility + tool-hardening release. **No breaking
-changes; no public API or wire-format change.** `pip install -U agentao`
+changes; no public API or wire-format change.** `pip install -U arbiter`
 upgrades in place from any 0.4.x release.
 
 ### Added
@@ -1582,13 +1582,13 @@ upgrades in place from any 0.4.x release.
 ## [0.4.3] — 2026-05-04
 
 A permission-hardening + LLM-resilience release. **No breaking changes;
-no public API or wire-format change.** `pip install -U agentao` upgrades
+no public API or wire-format change.** `pip install -U arbiter` upgrades
 in place from any 0.4.x release.
 
 ### Added
 
 - **Hardline shell-safety floor** — a new
-  `agentao/permissions_hardline.py` denies unrecoverable shell
+  `arbiter/permissions_hardline.py` denies unrecoverable shell
   operations (`rm -rf /`, `mkfs`, `dd of=/dev/sda`, fork bombs,
   `shutdown`/`reboot`/`halt`, `init 0|6`, `systemctl poweroff|reboot`)
   *before* any rule — including `full-access` — is evaluated. The pattern
@@ -1621,7 +1621,7 @@ in place from any 0.4.x release.
   dropped — the server isn't listening at all. The live transport is
   now disconnected before reconnecting so the old subprocess / SSE
   stream doesn't leak for the manager's lifetime. New
-  `agentao.mcp.client.classify_mcp_error` + `McpErrorKind` are public.
+  `arbiter.mcp.client.classify_mcp_error` + `McpErrorKind` are public.
 
 - **Explicit LLM HTTP retry policy with progress-aware streaming** —
   `LLMClient` now controls retries end-to-end (the OpenAI SDK's built-
@@ -1647,13 +1647,13 @@ in place from any 0.4.x release.
   (#25):
 
   1. `PermissionEngine` no longer loads project-scope
-     `.agentao/permissions.json`. A checked-in
+     `.arbiter/permissions.json`. A checked-in
      `{"tool": "*", "action": "allow"}` would have defeated the user
      policy because the engine returns on the first matching rule. Only
      `<user_root>/permissions.json` is honored; a stray project file is
      logged once and ignored. Permissions are a user/host concern, not
      a cwd concern.
-  2. Project `.agentao/mcp.json` is **add-only** — it may declare new
+  2. Project `.arbiter/mcp.json` is **add-only** — it may declare new
      server names but cannot override a user-scope entry with the same
      key. Collisions warn and skip. Prevents a checked-in `mcp.json`
      from silently redirecting a known name (e.g. `"github"`) to a
@@ -1680,20 +1680,20 @@ in place from any 0.4.x release.
   wipes them all (single-key confirmation). The active recorder's file
   is skipped/refused so an in-flight write isn't orphaned.
 
-- **`agentao.redact.mask_secret`** — canonical helper for hiding
+- **`arbiter.redact.mask_secret`** — canonical helper for hiding
   credentials in logs, audit events, and host UIs. Default shape
   `sk-A...3xZk` for long values, `********` (same length) for short
   values, `(not set)` for missing. Forward-looking: no internal
   callers migrated in this release; replaces the next ad-hoc
   truncation site that needs it.
 
-- **Windows UTF-8 console enforcement** — `agentao/__init__.py`
+- **Windows UTF-8 console enforcement** — `arbiter/__init__.py`
   now calls `_ensure_utf8()` at package import. On Windows, sets
   `PYTHONIOENCODING=utf-8` (only if unset), switches the console
   code page to CP_UTF8 via `kernel32.SetConsoleOutputCP/SetConsoleCP`,
   and reconfigures `sys.stdin`/`stdout`/`stderr` with
   encoding=utf-8 + lenient error handler. POSIX is a single-instruction
-  no-op. Embedded hosts that import Agentao from a Windows console
+  no-op. Embedded hosts that import Arbiter from a Windows console
   no longer hit `UnicodeEncodeError` on CJK file paths, curly quotes
   from skill metadata, or model-output emoji.
 
@@ -1718,7 +1718,7 @@ in place from any 0.4.x release.
 ### Documentation
 
 - **Developer guide §7.6 — WeChat bot blueprint** (mirrored to
-  `examples/wechat-bot/`): a long-polling daemon that runs one Agentao
+  `examples/wechat-bot/`): a long-polling daemon that runs one Arbiter
   turn per inbound message, with a `WeChatClient` Protocol that fits
   ilink / wechaty / itchat alike and a contact-scoped permission preset
   (allowlist → `WORKSPACE_WRITE`, otherwise `READ_ONLY`). Up-front
@@ -1733,7 +1733,7 @@ in place from any 0.4.x release.
   `PUBLIC_EVENT_PROMOTION_PLAN.md` staging `MCPLifecycleEvent` and
   `LLMCallEvent` promotion to the stable contract.
 - **`examples/protocol-injection/`** — runnable end-to-end sample
-  replacing every host→Agentao injection slot with a small adapter
+  replacing every host→Arbiter injection slot with a small adapter
   (in-memory FileSystem, audit-logging ShellExecutor, dict-backed
   MemoryStore, programmatic MCPRegistry). Six smoke tests assert each
   slot is actually consulted; no `OPENAI_API_KEY` required. Wired into
@@ -1761,20 +1761,20 @@ in place from any 0.4.x release.
 
 ### Changed
 
-- **Public package rename: `agentao.harness` → `agentao.host`** (with
+- **Public package rename: `arbiter.harness` → `arbiter.host`** (with
   matching renames to public types, schema-export functions, and wire
   schema file names). The host-facing contract package is renamed to
   reflect what it actually is — the surface a host application talks
-  to, around the Agentao runtime (the design doc still calls Agentao
+  to, around the Arbiter runtime (the design doc still calls Arbiter
   itself the "harness" embedded inside the host). The old names are
-  inconsistent under the new package (`from agentao.host import
+  inconsistent under the new package (`from arbiter.host import
   HarnessEvent` reads wrong), so the cleanup is bundled.
 
   Renamed surface:
 
   | Old | New |
   |---|---|
-  | `agentao.harness` (module path) | `agentao.host` |
+  | `arbiter.harness` (module path) | `arbiter.host` |
   | `HarnessEvent` | `HostEvent` |
   | `export_harness_event_json_schema()` | `export_host_event_json_schema()` |
   | `export_harness_acp_json_schema()` | `export_host_acp_json_schema()` |
@@ -1786,18 +1786,18 @@ in place from any 0.4.x release.
   | `docs/schema/harness.acp.v1.json` | `docs/schema/host.acp.v1.json` |
 
   All old names continue to work as deprecated aliases on the
-  `agentao.harness` shim package, with one `DeprecationWarning` on
+  `arbiter.harness` shim package, with one `DeprecationWarning` on
   first import naming the new path. The whole alias surface — package,
   types, functions — is scheduled for removal in 0.5.0.
 
   Migration is a literal find/replace:
 
   ```diff
-  - from agentao.harness import HarnessEvent, EventStream
-  + from agentao.host    import HostEvent,    EventStream
+  - from arbiter.harness import HarnessEvent, EventStream
+  + from arbiter.host    import HostEvent,    EventStream
 
-  - from agentao.harness.protocols import FileSystem, ShellExecutor
-  + from agentao.host.protocols    import FileSystem, ShellExecutor
+  - from arbiter.harness.protocols import FileSystem, ShellExecutor
+  + from arbiter.host.protocols    import FileSystem, ShellExecutor
 
   - export_harness_event_json_schema()
   + export_host_event_json_schema()
@@ -1806,7 +1806,7 @@ in place from any 0.4.x release.
   Wire schema bytes are byte-for-byte regenerated from the same
   Pydantic models; the only differences vs. the 0.4.1 snapshots are the
   identifier names (`HostEvent` instead of `HarnessEvent`) and the
-  top-level title (`AgentaoHostEvents`). The `v1` lineage is unchanged
+  top-level title (`ArbiterHostEvents`). The `v1` lineage is unchanged
   — adding optional fields stays in v1; removing or renaming a field
   still requires a v2 bump.
 
@@ -1815,14 +1815,14 @@ in place from any 0.4.x release.
 The single break release of the Path A P0 plan
 (see `docs/design/path-a-roadmap.md` §3.2). The break is a packaging
 change only — no public Python API is renamed, removed, or signature-
-changed. The "no-change" upgrade line is `pip install 'agentao[full]'`,
+changed. The "no-change" upgrade line is `pip install 'arbiter[full]'`,
 which reproduces the 0.3.x bundled closure exactly (CI-enforced against
 a 122-package baseline).
 
 ### Breaking changes
 
-- **P0.9 dependency split** — `pip install agentao` now installs only
-  the core (7 packages) needed to construct an `Agentao()` instance and
+- **P0.9 dependency split** — `pip install arbiter` now installs only
+  the core (7 packages) needed to construct an `Arbiter()` instance and
   call `chat()` against an OpenAI-compatible endpoint. CLI, web fetch,
   and Chinese tokenization become opt-in extras.
 
@@ -1837,9 +1837,9 @@ a 122-package baseline).
 
   | You are… | Install line |
   |---|---|
-  | Embedding host (Python `from agentao import Agentao`) | `pip install agentao` |
-  | CLI user (`agentao` console script) | `pip install 'agentao[cli]'` |
-  | Want zero behaviour change | `pip install 'agentao[full]'` |
+  | Embedding host (Python `from arbiter import Arbiter`) | `pip install arbiter` |
+  | CLI user (`arbiter` console script) | `pip install 'arbiter[cli]'` |
+  | Want zero behaviour change | `pip install 'arbiter[full]'` |
 
   Closure equivalence is enforced by `tests/test_dependency_split.py`
   against `tests/data/full_extras_baseline.txt` (122 packages frozen
@@ -1848,26 +1848,26 @@ a 122-package baseline).
 
 ### Added
 
-- **P0.10 friendly missing-dep error** — running the `agentao` CLI in
+- **P0.10 friendly missing-dep error** — running the `arbiter` CLI in
   a core-only install (no `[cli]` extra) now exits 2 with a one-line
   actionable message instead of crashing with an opaque
   `ModuleNotFoundError: rich`:
 
   ```
-  agentao CLI requires extra packages (missing: rich).
-    pip install 'agentao[cli]'   # CLI surface only
-    pip install 'agentao[full]'  # 0.3.x-equivalent closure
+  arbiter CLI requires extra packages (missing: rich).
+    pip install 'arbiter[cli]'   # CLI surface only
+    pip install 'arbiter[full]'  # 0.3.x-equivalent closure
   See docs/migration/0.3.x-to-0.4.0.md for details.
   ```
 
-  Implementation: `agentao/cli/__init__.py` defines `entrypoint()`
+  Implementation: `arbiter/cli/__init__.py` defines `entrypoint()`
   inline (no module-level imports of rich / prompt_toolkit / readchar /
   pygments) so the module load itself stays free of CLI deps; every
   `[cli]` dep is preflighted via `importlib.util.find_spec` so a
   partial install (rich present, prompt_toolkit missing) still hits
   the friendly path instead of leaking a "Fatal error" from
   `entrypoints.run_init_wizard`'s broad `except Exception`. All other
-  public names in `agentao.cli` lazy-load via PEP 562 `__getattr__`.
+  public names in `arbiter.cli` lazy-load via PEP 562 `__getattr__`.
   Slow-marked tests in `tests/test_cli_missing_dep_message.py` cover
   the friendly-message path, the post-`[cli]` boot path, the
   no-trace-leak invariant, and the partial-install regression.
@@ -1892,10 +1892,10 @@ a 122-package baseline).
   when the query has no CJK characters (cheap regex check). On a
   CJK-bearing query in a `[i18n]`-less install, `_cjk_segment()`
   returns an empty set with a one-time warning pointing at
-  `pip install 'agentao[i18n]'` instead of silently failing.
+  `pip install 'arbiter[i18n]'` instead of silently failing.
 
 - **CI test environment installs `[cli,web,i18n]`** — the existing
-  unit-test surface imports `from agentao.cli import AgentaoCLI`,
+  unit-test surface imports `from arbiter.cli import ArbiterCLI`,
   the web-fetch tool, and the jieba memory path. The default `Test`
   matrix job now installs those three extras so the suite still
   resolves in the core-split world. The core-only contract is
@@ -1914,31 +1914,31 @@ Second release executing the **Path A roadmap** (see
 `docs/design/path-a-roadmap.md`). Lands the §11 P0.4–P0.8 working set
 in five logical commits. Still fully additive — no required code
 change to upgrade from 0.3.3 (the only namespace move,
-`agentao/display.py` → `agentao/cli/display.py`, had no in-tree
+`arbiter/display.py` → `arbiter/cli/display.py`, had no in-tree
 consumers).
 
 ### Added
 
-- **P0.4 typing gate** — `agentao.harness` now ships clean under
-  `mypy --strict`. New `agentao.harness.protocols` submodule re-exports
+- **P0.4 typing gate** — `arbiter.harness` now ships clean under
+  `mypy --strict`. New `arbiter.harness.protocols` submodule re-exports
   the capability `Protocol` types (`FileSystem`, `ShellExecutor`,
   `MCPRegistry`, `MemoryStore`) plus their value shapes so embedding
   hosts have one stable import path instead of reaching into
-  `agentao.capabilities.*`. CI gains a `Typing gate` job; tests cover
+  `arbiter.capabilities.*`. CI gains a `Typing gate` job; tests cover
   the package, a downstream-shaped consumer, and `__all__` drift.
-- **P0.5 lazy imports** — `from agentao import Agentao` no longer pulls
+- **P0.5 lazy imports** — `from arbiter import Arbiter` no longer pulls
   in the OpenAI SDK, BeautifulSoup, jieba, filelock, or rich (or their
   transitive click/pygments/starlette/uvicorn closure via the MCP SDK).
   Embedded hosts pay only for what they use; the deferred libs load on
   first runtime use. Two new enforcement tests
   (`tests/test_no_cli_deps_in_core.py`, `tests/test_import_cost.py`)
   catch regressions both statically (AST walk for top-level imports
-  outside `agentao/cli/`) and at runtime (`python -X importtime`).
+  outside `arbiter/cli/`) and at runtime (`python -X importtime`).
 - **P0.7 embedded-contract regression tests** — four new test files
   guard the host-facing properties most likely to silently break:
   `tests/test_no_host_logger_pollution.py` (no root-logger mutation
-  through import + construction), `tests/test_multi_agentao_isolation.py`
-  (two `Agentao()` instances share no state across messages, tools,
+  through import + construction), `tests/test_multi_arbiter_isolation.py`
+  (two `Arbiter()` instances share no state across messages, tools,
   skills, working_directory, or session_id), `tests/test_arun_events_cancel.py`
   (asyncio cancellation propagates to the chat token; events drain;
   no orphan tasks), and `tests/test_clean_install_smoke.py` (slow,
@@ -1952,10 +1952,10 @@ consumers).
   agent's harness `EventStream` and projects every published event
   into the recorder, so embedded hosts have one audit artifact
   instead of two parallel streams. Each new kind's `oneOf` variant carries a typed payload
-  derived from the public Pydantic model in `agentao.harness.models`,
+  derived from the public Pydantic model in `arbiter.harness.models`,
   so a model field rename / removal surfaces as schema drift in CI.
   v1.0 / v1.1 schemas remain frozen and continue to validate older
-  replays. New `agentao.harness.replay_projection` module:
+  replays. New `arbiter.harness.replay_projection` module:
   `HostReplaySink` (forward projection), `replay_payload_to_host_event`
   (reverse). The typed payload schemas explicitly allow the sanitizer's
   optional projection metadata (`redaction_hits`, `redacted`,
@@ -1984,9 +1984,9 @@ consumers).
 
 ### Changed
 
-- **`agentao/display.py` moved to `agentao/cli/display.py`** — the
+- **`arbiter/display.py` moved to `arbiter/cli/display.py`** — the
   `DisplayController` was used only by the CLI. Hosts that imported
-  `agentao.display` directly should now import from `agentao.cli.display`
+  `arbiter.display` directly should now import from `arbiter.cli.display`
   (no in-tree consumers were affected).
 
 ## [0.3.3] — 2026-04-30
@@ -1997,39 +1997,39 @@ code change to upgrade.
 
 ### Added
 
-- **PEP 561 `py.typed` marker** — `agentao/py.typed` ships in wheel
+- **PEP 561 `py.typed` marker** — `arbiter/py.typed` ships in wheel
   and sdist so downstream `mypy` / `pyright` consumers pick up
-  Agentao's type hints instead of treating the package as untyped.
+  Arbiter's type hints instead of treating the package as untyped.
 
 ### Changed
 
 - **README leads with embedding (`## Embed in 30 lines`)** — the
   CLI walkthrough is preserved verbatim under `## CLI Quickstart`.
-  Reflects the locked Path A positioning: `agentao` is primarily a
+  Reflects the locked Path A positioning: `arbiter` is primarily a
   library to embed in Python hosts.
 
 ### Internal
 
 - CI smoke job now asserts `py.typed` presence in the installed
-  wheel and verifies bare `Agentao(...)` construction (the README
+  wheel and verifies bare `Arbiter(...)` construction (the README
   snippet, verbatim) succeeds without env discovery or network.
 
 ## [0.3.1] — 2026-04-30
 
 Added-only patch in the 0.3.x series. Lands the **embedded harness
 contract** as the stable host-facing API surface for embedding
-Agentao: typed event stream, JSON-safe permission snapshot, and
+Arbiter: typed event stream, JSON-safe permission snapshot, and
 checked-in JSON schema snapshots for both events and ACP payloads.
 No required code change to upgrade from 0.3.0.
 
 ### Added
 
-- **`agentao.harness` public package** — the host-facing
-  compatibility boundary for embedding Agentao. Exports the
+- **`arbiter.harness` public package** — the host-facing
+  compatibility boundary for embedding Arbiter. Exports the
   Pydantic event models, the `EventStream` primitive, the
   `ActivePermissions` snapshot, and schema export helpers:
   ```python
-  from agentao.harness import (
+  from arbiter.harness import (
       ActivePermissions,
       EventStream,
       StreamSubscribeError,
@@ -2045,19 +2045,19 @@ No required code change to upgrade from 0.3.0.
   Internal runtime types (`AgentEvent`, `ToolExecutionResult`,
   `PermissionEngine`) are intentionally **not** re-exported — the
   harness package is the version-stable boundary. Hosts that target
-  only `agentao.harness` (plus the `Agentao(...)` constructor and
+  only `arbiter.harness` (plus the `Arbiter(...)` constructor and
   the new methods below) stay forward-compatible across releases.
 
-- **`Agentao.events(session_id: str | None = None)`** — async
+- **`Arbiter.events(session_id: str | None = None)`** — async
   iterator over `HostEvent`. No replay; bounded backpressure
   (slow consumers block the producer for matching events rather
   than dropping them). Same-session ordering is guaranteed; within
   one `tool_call_id`, `PermissionDecisionEvent` precedes
   `ToolLifecycleEvent(phase="started")`. MVP supports one stream
-  consumer per `Agentao` instance; a second concurrent subscriber
+  consumer per `Arbiter` instance; a second concurrent subscriber
   for the same `session_id` filter raises `StreamSubscribeError`.
 
-- **`Agentao.active_permissions() -> ActivePermissions`** — JSON-safe
+- **`Arbiter.active_permissions() -> ActivePermissions`** — JSON-safe
   snapshot of the active permission policy (`mode`, `rules`,
   `loaded_sources`). Cached; invalidated on `set_mode()` and on
   `add_loaded_source(...)` with a new label.
@@ -2082,7 +2082,7 @@ No required code change to upgrade from 0.3.0.
     `decision_id`; `matched_rule` projected when a rule fires,
     `None` on fallback semantics.
 
-- **ACP host-facing Pydantic schema** (`agentao.acp.schema`) —
+- **ACP host-facing Pydantic schema** (`arbiter.acp.schema`) —
   `initialize`, `session/new`, `session/load`, `session/prompt`,
   `session/cancel`, `session/setModel`, `session/setMode`,
   `session/listModels`, `session/update` notifications,
@@ -2101,11 +2101,11 @@ No required code change to upgrade from 0.3.0.
   Job 0 alongside the existing replay-schema check, so harness
   schema drift fails CI before the test matrix.
 
-- **Runtime identity helpers** (`agentao.runtime.identity`,
+- **Runtime identity helpers** (`arbiter.runtime.identity`,
   internal) — `session_id` / `turn_id` / `tool_call_id` /
   `decision_id` generation and normalization. Public events depend
   on stable id propagation; the helpers are not re-exported from
-  `agentao.harness`.
+  `arbiter.harness`.
 
 - **`examples/host_events.py`** — single-file runnable demo
   showing `agent.events()` + `agent.active_permissions()` wired
@@ -2122,7 +2122,7 @@ No required code change to upgrade from 0.3.0.
   §8 migration guide extended with a "From 0.3.0" subsection.
 
 - **Developer guide updates** — Appendix A.10 lists the
-  `agentao.harness` exports; A.1 Methods table marks `events()` and
+  `arbiter.harness` exports; A.1 Methods table marks `events()` and
   `active_permissions()` as `(0.3.1+)`; Part 4.2 adds an admonition
   distinguishing `HostEvent` (host-stable) from `AgentEvent`
   (internal); Part 5.4 gains a "Reading the active policy from the
@@ -2130,7 +2130,7 @@ No required code change to upgrade from 0.3.0.
 
 ### Changed
 
-- `agentao.runtime.sanitize.normalize_tool_calls` now synthesizes a
+- `arbiter.runtime.sanitize.normalize_tool_calls` now synthesizes a
   UUID4 `tool_call_id` when the LLM provider returns a missing or
   empty `id`, using the same `runtime.identity.normalize_tool_call_id`
   helper the planner uses downstream. Strict Chat Completions APIs
@@ -2170,22 +2170,22 @@ No required code change to upgrade from 0.3.0.
 - **`MCPRegistry` capability protocol** (Issue #17). Embedded hosts
   can now enumerate MCP servers from any source (in-process dict,
   plugin system, dynamic discovery, remote registry) without writing
-  to `.agentao/mcp.json`. Two default implementations ship in
-  `agentao.mcp.registry`: `FileBackedMCPRegistry` (CLI/ACP default —
-  reads `<wd>/.agentao/mcp.json` + `~/.agentao/mcp.json`,
+  to `.arbiter/mcp.json`. Two default implementations ship in
+  `arbiter.mcp.registry`: `FileBackedMCPRegistry` (CLI/ACP default —
+  reads `<wd>/.arbiter/mcp.json` + `~/.arbiter/mcp.json`,
   byte-equivalent to the pre-Protocol behavior) and
   `InMemoryMCPRegistry` (programmatic counterpart for hosts and
-  tests). Re-exported from `agentao.capabilities` for symmetry with
+  tests). Re-exported from `arbiter.capabilities` for symmetry with
   `FileSystem` / `MemoryStore`:
   ```python
-  from agentao.capabilities import (
+  from arbiter.capabilities import (
       MCPRegistry, FileBackedMCPRegistry, InMemoryMCPRegistry,
   )
   ```
-- `Agentao(mcp_registry=...)` keyword. Mutually exclusive with
+- `Arbiter(mcp_registry=...)` keyword. Mutually exclusive with
   `mcp_manager=` (which is the pre-built construction outcome — the
   registry is the config source for construction). Bare
-  `Agentao(working_directory=...)` outside the factory still falls
+  `Arbiter(working_directory=...)` outside the factory still falls
   back to `load_mcp_config` so existing CLI-shaped scripts keep
   working.
 
@@ -2193,10 +2193,10 @@ No required code change to upgrade from 0.3.0.
   can now swap memory backends — Redis, Postgres, in-process dict,
   remote API — without subclassing or forking `MemoryManager`. The
   `SQLiteMemoryStore` default is unchanged and remains the CLI/ACP
-  backing store. Re-exported from `agentao.capabilities` for symmetry
+  backing store. Re-exported from `arbiter.capabilities` for symmetry
   with `FileSystem` / `LocalFileSystem` / `ShellExecutor`:
   ```python
-  from agentao.capabilities import MemoryStore, SQLiteMemoryStore
+  from arbiter.capabilities import MemoryStore, SQLiteMemoryStore
   ```
 - `SQLiteMemoryStore.open(path)` — strict path-based constructor that
   creates the parent dir and propagates `OSError` / `sqlite3.Error`
@@ -2212,16 +2212,16 @@ No required code change to upgrade from 0.3.0.
 
 ### Changed
 
-- `agentao.embedding.build_from_environment()` now constructs a
+- `arbiter.embedding.build_from_environment()` now constructs a
   `FileBackedMCPRegistry(project_root=wd, user_root=user_root())` and
-  passes it to `Agentao` as `mcp_registry=`. CLI and ACP behavior is
+  passes it to `Arbiter` as `mcp_registry=`. CLI and ACP behavior is
   unchanged because the registry resolves the same files. Hosts that
   want programmatic registration pass an explicit `mcp_registry=`
   (or any `MCPRegistry`-compatible object) to override the default.
-- `agentao.memory.MemoryStore` is no longer re-exported from
-  `agentao.memory` — the canonical home is `agentao.capabilities`.
+- `arbiter.memory.MemoryStore` is no longer re-exported from
+  `arbiter.memory` — the canonical home is `arbiter.capabilities`.
   Re-exporting it from the memory package would force
-  `import agentao.memory` to load all of `agentao.capabilities`,
+  `import arbiter.memory` to load all of `arbiter.capabilities`,
   which after Issue #17 transitively pulls the MCP SDK and breaks
   the `tests/test_memory_decoupling.py` decoupling guarantee.
 
@@ -2238,14 +2238,14 @@ No required code change to upgrade from 0.3.0.
   )
   ```
   CLI and ACP users see no change because the factory
-  (`agentao.embedding.build_from_environment()`) absorbs the new
+  (`arbiter.embedding.build_from_environment()`) absorbs the new
   construction shape internally.
 - The `:memory:` fallback for unwritable project DBs has moved from
   `MemoryManager.__init__` into `SQLiteMemoryStore.open_or_memory`.
   Behavior is observably identical: project store still degrades to
   `:memory:` on `OSError` / `sqlite3.OperationalError`, user store
   is still disabled with a warning on the same errors.
-- `agentao.memory.MemoryManager` no longer imports `sqlite3` and has
+- `arbiter.memory.MemoryManager` no longer imports `sqlite3` and has
   no filesystem knowledge. Embedded hosts that construct it directly
   with custom stores see zero disk I/O from the manager.
 
@@ -2262,34 +2262,34 @@ No required code change to upgrade from 0.3.0.
 
 ### BREAKING
 
-- **`Agentao(working_directory=)` is now required** (Issue #14, the
+- **`Arbiter(working_directory=)` is now required** (Issue #14, the
   hard break promised in the 0.2.16 soft-deprecation cycle).
   `working_directory` is a required keyword argument; calling
-  `Agentao()` without it raises `TypeError` from Python's signature
+  `Arbiter()` without it raises `TypeError` from Python's signature
   dispatch — there is no longer a `Path.cwd()` lazy fallback. Two
-  Agentao instances created with different `working_directory`
+  Arbiter instances created with different `working_directory`
   values report independent paths even in the same process; an
   `os.chdir` inside the host has no effect on an already-constructed
-  Agentao. **Migration:** pass an explicit `Path` (preferred for
+  Arbiter. **Migration:** pass an explicit `Path` (preferred for
   embedded hosts), or use
-  `agentao.embedding.build_from_environment()` for CLI-style
-  auto-detection from the surrounding `cwd` / `.env` / `.agentao/`.
+  `arbiter.embedding.build_from_environment()` for CLI-style
+  auto-detection from the surrounding `cwd` / `.env` / `.arbiter/`.
   CLI and ACP behavior is unchanged because both already route
   through the factory; the audit confirmed `os.chdir` is never
-  called inside `agentao/`, so no mid-process cwd retargeting is
+  called inside `arbiter/`, so no mid-process cwd retargeting is
   affected.
 
 ### Removed
 
-- `Agentao.__init__` no longer emits a `DeprecationWarning` when
+- `Arbiter.__init__` no longer emits a `DeprecationWarning` when
   `working_directory` is missing — the warning was the 0.2.16
   one-cycle migration aid and is now obsolete because the argument
   is required at the signature level.
-- `Agentao._explicit_working_directory` private attribute renamed
-  to `Agentao._working_directory` (always populated, never
+- `Arbiter._explicit_working_directory` private attribute renamed
+  to `Arbiter._working_directory` (always populated, never
   `Optional`). External code should not read this; callers should
   use the `agent.working_directory` property.
-- `Agentao.working_directory` property no longer falls back to
+- `Arbiter.working_directory` property no longer falls back to
   `Path.cwd()`. The "lazy cwd" branch (`agent.py:376-378` in
   0.2.16) is deleted; the property now returns the frozen value
   unconditionally.
@@ -2299,15 +2299,15 @@ No required code change to upgrade from 0.3.0.
 ## [0.2.16] — 2026-04-28
 
 Maintenance release that completes the **embedded-harness M2/M3
-milestones**. `Agentao(...)` is now a pure-injection construction
+milestones**. `Arbiter(...)` is now a pure-injection construction
 surface: nothing in the constructor implicitly reads `os.environ`,
-`Path.home()`, `Path.cwd()`, or `<wd>/.agentao/*.json` unless the
-caller routes through `agentao.embedding.build_from_environment()`.
+`Path.home()`, `Path.cwd()`, or `<wd>/.arbiter/*.json` unless the
+caller routes through `arbiter.embedding.build_from_environment()`.
 CLI and ACP both go through the factory, so end-user behavior is
 unchanged; embedded hosts get a deterministic, side-effect-free
 construction surface plus an `await agent.arun(...)` async path,
 opt-in `replay` / `sandbox` / `bg_store`, and a
-`DeprecationWarning` for `Agentao()` constructed without
+`DeprecationWarning` for `Arbiter()` constructed without
 `working_directory=` (a `TypeError` in `0.3.0`).
 
 See [`docs/releases/v0.2.16.md`](docs/releases/v0.2.16.md) for the
@@ -2315,31 +2315,31 @@ release summary and maintainer checklist.
 
 ### Added
 
-- **Embedded harness foundations** (Issues #9-#13). Agentao is now
+- **Embedded harness foundations** (Issues #9-#13). Arbiter is now
   positioned as an embedded agent runtime that hosts can drop into
-  their own apps without the implicit cwd/env/.agentao/ side effects
+  their own apps without the implicit cwd/env/.arbiter/ side effects
   the CLI relies on. Headline pieces:
-  - `agentao.capabilities.FileSystem` / `ShellExecutor` protocols
+  - `arbiter.capabilities.FileSystem` / `ShellExecutor` protocols
     plus `LocalFileSystem` / `LocalShellExecutor` defaults. File,
     search, and shell tools route through them, so embedded hosts
     can swap in Docker exec, virtual filesystems, or remote runners
     without monkey-patching `subprocess` / `pathlib`.
-  - `agentao.embedding.build_from_environment(...)` factory that
-    captures every implicit `.env` / `.agentao/permissions.json` /
-    `.agentao/mcp.json` / cwd read in one place. CLI and ACP route
+  - `arbiter.embedding.build_from_environment(...)` factory that
+    captures every implicit `.env` / `.arbiter/permissions.json` /
+    `.arbiter/mcp.json` / cwd read in one place. CLI and ACP route
     through it so subsystem fallbacks become dead code from their
     perspective.
-  - `Agentao.__init__` accepts explicit injections for
+  - `Arbiter.__init__` accepts explicit injections for
     `llm_client`, `logger`, `memory_manager`, `skill_manager`,
     `project_instructions`, `mcp_manager`, `filesystem`, and
     `shell`. When `skill_manager` or `project_instructions` is
     injected, the auto-discovery / disk-read paths are skipped.
-  - `Agentao.arun(...)` async surface that bridges sync chat
+  - `Arbiter.arun(...)` async surface that bridges sync chat
     internals through `loop.run_in_executor`. Async hosts can
     `await agent.arun(...)` without rolling their own thread
     bridge; cancellation, replay, and `max_iterations` behave
     identically across `chat()` and `arun()`.
-- Sub-agent construction in `agentao/agents/tools.py` no longer
+- Sub-agent construction in `arbiter/agents/tools.py` no longer
   re-reads provider env vars (`{PROVIDER}_API_KEY` / `_BASE_URL`).
   Children inherit the parent's already-resolved LLM config so a
   mid-run env mutation cannot create a credential split.
@@ -2347,11 +2347,11 @@ release summary and maintainer checklist.
 ### Changed
 
 - **`Replay` / `Sandbox` / `BackgroundTaskStore` are now opt-in**
-  (Issue 9 of the embedded-harness epic). `Agentao.__init__` accepts
+  (Issue 9 of the embedded-harness epic). `Arbiter.__init__` accepts
   three new keyword-only kwargs: `replay_config`, `sandbox_policy`,
   and `bg_store`. Each defaults to `None`, which now means *fully
   disabled* — embedded hosts that didn't ask for the feature pay
-  zero cost. `agentao.embedding.build_from_environment()` constructs
+  zero cost. `arbiter.embedding.build_from_environment()` constructs
   CLI defaults for all three (anchored to the session's working
   directory) and passes them explicitly, so CLI and ACP behavior is
   unchanged. Callers can pass `bg_store=None` etc. as a factory
@@ -2364,51 +2364,51 @@ release summary and maintainer checklist.
     cannot be tempted to call a disabled feature, and ACP / OpenAI
     tool catalogs do not advertise it. `/agent bg|dashboard|cancel|
     delete|logs|result` CLI subcommands short-circuit with a clear
-    warning when invoked against an Agentao with `bg_store=None`.
+    warning when invoked against an Arbiter with `bg_store=None`.
   - When `sandbox_policy=None`: `ToolRunner` runs shell commands
     without the macOS sandbox-exec wrapper.
-  - When `replay_config=None`: no `<wd>/.agentao/replay.json` is
-    read at construction time; `Agentao._replay_config` falls back
+  - When `replay_config=None`: no `<wd>/.arbiter/replay.json` is
+    read at construction time; `Arbiter._replay_config` falls back
     to the no-op `ReplayConfig()` default.
 
 - **Subsystem constructors no longer fall back to `os.environ` /
   `Path.cwd()` / `Path.home()`** (Issue 5 of the embedded-harness
   epic, PR 3b). Callers must now supply explicit arguments — CLI,
-  ACP, and `agentao.embedding.build_from_environment()` already do,
+  ACP, and `arbiter.embedding.build_from_environment()` already do,
   so end-user behavior is unchanged. Direct constructions in
   embedded-host code or test code may break; the migration is to
   pass the previously-implicit values explicitly.
   - `LLMClient(api_key=, base_url=, model=)` are required keyword
     arguments; `temperature` defaults to `0.2` and `max_tokens` to
     `65536` in code (no more `LLM_TEMPERATURE` / `LLM_MAX_TOKENS`
-    env reads). `Agentao` now also accepts a top-level
+    env reads). `Arbiter` now also accepts a top-level
     `max_tokens=` kwarg that forwards to `LLMClient`. The factory
     is the single place that resolves `LLM_PROVIDER` /
     `*_API_KEY` / `*_BASE_URL` / `*_MODEL` / `LLM_TEMPERATURE` /
     `LLM_MAX_TOKENS`.
   - `PermissionEngine(project_root=)` is required; new keyword-only
     `user_root=` (defaults to `None`) replaces the implicit
-    `Path.home() / ".agentao"` user-rules read. The factory and ACP
+    `Path.home() / ".arbiter"` user-rules read. The factory and ACP
     `session/new` / `session/load` pass both roots explicitly.
   - `load_mcp_config(project_root=)` is required; new keyword-only
     `user_root=` (defaults to `None`) replaces the implicit
-    `Path.home() / ".agentao"` user-scope read. `save_mcp_config()`
+    `Path.home() / ".arbiter"` user-scope read. `save_mcp_config()`
     drops `global_config: bool` in favor of an explicit
     `config_dir: Path`. CLI `/mcp add` / `/mcp remove` resolve the
     project directory through `cli.agent.working_directory`
     instead of `Path.cwd()`.
-  - `Agentao.__init__` no longer defaults `MemoryManager`'s
-    `global_root` to `Path.home() / ".agentao"` when no
+  - `Arbiter.__init__` no longer defaults `MemoryManager`'s
+    `global_root` to `Path.home() / ".arbiter"` when no
     `memory_manager` is injected; pure-injection construction is
     now project-scope only. CLI / ACP receive the user root through
     the factory exactly as before.
 
 ### Deprecated
 
-- `Agentao()` without `working_directory=` emits a `DeprecationWarning`
+- `Arbiter()` without `working_directory=` emits a `DeprecationWarning`
   and will become a `TypeError` in 0.3.0. Pass an explicit `Path` —
-  or use `agentao.embedding.build_from_environment()` for CLI-style
-  cwd / `.env` / `.agentao/` auto-discovery.
+  or use `arbiter.embedding.build_from_environment()` for CLI-style
+  cwd / `.env` / `.arbiter/` auto-discovery.
 
 ---
 
@@ -2424,27 +2424,27 @@ correctness gaps around the ACP stdio channel and streaming
 
 ### Added
 
-- **`session/set_model` handler** (`agentao/acp/session_set_model.py`):
+- **`session/set_model` handler** (`arbiter/acp/session_set_model.py`):
   apply `model` / `contextLength` / `maxTokens` independently on a
   running session via `agent.set_model()` and `agent.context_manager.max_tokens`
   / `agent.llm.max_tokens`. Each knob is optional; partial requests
   do not reset untouched fields. Holds the session's idle turn lock
   so an in-flight `session/prompt` cannot observe a mid-stream
   change. Conversation history and tool state are preserved.
-- **`session/set_mode` handler** (`agentao/acp/session_set_mode.py`):
+- **`session/set_mode` handler** (`arbiter/acp/session_set_mode.py`):
   toggle `PermissionEngine` mode (`default` / `acceptEdits` /
   `bypassPermissions` / `plan`) per session via
   `permission_engine.set_mode(...)`.
-- **`session/list_models` handler** (`agentao/acp/session_list_models.py`):
+- **`session/list_models` handler** (`arbiter/acp/session_list_models.py`):
   call `agent.list_available_models()` and cache the result on
   `AcpSessionState.last_known_models`. On provider lookup failure,
   returns the cached list plus a `warning` field instead of a
   JSON-RPC error so transient provider outages don't blank the UI.
 - **Shared session-validation helper**
-  (`agentao/acp/_handler_utils.py`): single point for "does this
+  (`arbiter/acp/_handler_utils.py`): single point for "does this
   `session_id` exist, is it ours, did the client send a well-formed
   request" so each new handler does not re-derive the contract.
-- **Streaming `reasoning_content` capture** (`agentao/llm/client.py`):
+- **Streaming `reasoning_content` capture** (`arbiter/llm/client.py`):
   thinking-model output arriving on the streaming `delta` is now
   forwarded the same way as the non-streaming
   `message.reasoning_content` field, so transport `THINKING` events
@@ -2458,14 +2458,14 @@ correctness gaps around the ACP stdio channel and streaming
 ### Fixed
 
 - **Outsider log handlers preserved across `LLMClient` reconstruction**
-  (`agentao/llm/client.py`): the package-root handler eviction now
-  only drops handlers tagged with `_agentao_llm_file_handler=True`.
+  (`arbiter/llm/client.py`): the package-root handler eviction now
+  only drops handlers tagged with `_arbiter_llm_file_handler=True`.
   Previously, every `LLMClient` rebuild (which `set_model` triggers,
   and which the test suite triggers repeatedly) silently evicted
   unrelated handlers — including the `AcpServer` stderr-guard handler
   that protects the ACP JSON-RPC stdout/stdin channel.
 - **Shell subprocess no longer inherits parent stdin**
-  (`agentao/tools/shell.py`): `Popen(..., stdin=subprocess.DEVNULL)`.
+  (`arbiter/tools/shell.py`): `Popen(..., stdin=subprocess.DEVNULL)`.
   Children that read from stdin (interactive prompts, `read`-style
   tooling) can no longer consume bytes from the ACP JSON-RPC stdin
   channel that the parent process owns.
@@ -2491,7 +2491,7 @@ drift gating, and the GitHub-Actions Node 24 prep.
 
 ### Added
 
-- **Tool-call repair / outbound sanitize subsystem** (`agentao/runtime/`):
+- **Tool-call repair / outbound sanitize subsystem** (`arbiter/runtime/`):
   three cooperating modules that sit between the LLM and the tool
   dispatcher so models like GLM, DeepSeek, Kimi and local Ollama still
   land in a runnable shape.
@@ -2512,14 +2512,14 @@ drift gating, and the GitHub-Actions Node 24 prep.
   helper `tests/support/tool_calls.py`. Documented in developer-guide
   §5.1 ("Tool-call normalization").
 - **Per-instance background-task store** (commit `82edb55`): the
-  background-agent registry is now per-`Agentao` instance rather than
+  background-agent registry is now per-`Arbiter` instance rather than
   process-global, so concurrent ACP sessions / multi-tenant embeddings
   no longer leak handles across each other. Adds path-containment
   guards and prompt-diagnostics surfacing.
-- **Replay JSON Schema export** (commit `5c85179`): `agentao/replay/`
+- **Replay JSON Schema export** (commit `5c85179`): `arbiter/replay/`
   now ships an exported JSON Schema and a CI drift-detection job
   (`tests/test_replay_schema.py`) that fails fast when
-  `agentao/replay/events.py` evolves without the schema being
+  `arbiter/replay/events.py` evolves without the schema being
   regenerated.
 
 ### Changed
@@ -2527,14 +2527,14 @@ drift gating, and the GitHub-Actions Node 24 prep.
 - **`ToolRunner` split** (commit `f5dc034`): the monolithic
   `tool_runner` decomposed into focused `tool_planning`,
   `tool_runner` (executor), and `tool_result_formatter` modules under
-  `agentao/runtime/`. Public `Agentao.chat()` contract preserved.
+  `arbiter/runtime/`. Public `Arbiter.chat()` contract preserved.
 - **Test scaffolding** (commit `e6ccfee`): ACP test helpers extracted
   into `tests/support/` so individual test files stay focused on
   scenarios rather than fixture wiring.
-- **Logging rotation**: `agentao.log` now uses
+- **Logging rotation**: `arbiter.log` now uses
   `RotatingFileHandler(maxBytes=10_000_000, backupCount=5)` instead of
   a plain `FileHandler`, capping disk footprint at ~60 MB. The home-dir
-  fallback (`~/.agentao/agentao.log`) gets the same rotation. Long-
+  fallback (`~/.arbiter/arbiter.log`) gets the same rotation. Long-
   running sessions that previously grew the log into the hundreds of
   megabytes now self-cap.
 
@@ -2563,8 +2563,8 @@ Promotes `0.2.13rc1` to general availability, plus one additive feature
 
 Headline: **runtime decomposition + session replay subsystem**, now with
 **monorepo-aware `skill install`** layered on top. The substantive
-Added / Changed breakdown — session replay (`agentao/replay/`), the
-`agentao --help` / `-h` entry-point fix, and the four-module runtime
+Added / Changed breakdown — session replay (`arbiter/replay/`), the
+`arbiter --help` / `-h` entry-point fix, and the four-module runtime
 split (`runtime/`, `acp_client/manager/`, `cli/commands_ext/`, new
 `prompts/` and `tooling/` packages) — is preserved below from the
 `[0.2.13rc1]` soak entry.
@@ -2579,19 +2579,19 @@ developer guide refreshed to the current line.
 
 ### Added
 
-- **Monorepo skill install** (`agentao skill install owner/repo:path[@ref]`): extends the GitHub installer to pull a single skill out of a multi-skill repository — e.g. `agentao skill install anthropics/skills:pptx@main` installs only the `pptx/` subdirectory instead of rejecting the archive for missing a top-level `SKILL.md`. `SourceSpec.package_path` (`agentao/skills/sources.py`) carries the subpath; `GitHubSkillSource.resolve()` parses the `:path` segment and rejects empty / absolute / `.` / `..` components. `SkillInstaller._find_package_root()` (`agentao/skills/installer.py`) validates the subdirectory exists, is a directory, and contains `SKILL.md`; the recorded `source_ref` preserves the full `owner/repo:path@ref` string so `skill update` round-trips. CLI help on `skill install` now advertises the new form. Coverage: `tests/test_skill_installer.py` (+119 lines across success / empty-path / parent-dir-traversal / update paths), `tests/test_skill_cli.py`.
-- **Session replay subsystem** (`agentao/replay/`): JSONL timeline of runtime events written to `.agentao/replays/`, with recorder, reader, redaction, retention, and sanitization. Wired through `transport/events.py` and surfaced via the new `cli/replay_commands.py` / `replay_render.py`. Feature docs: `docs/guides/session-replay.md`. Tests: `tests/test_replay*`, `tests/test_replay_redact.py`.
-- **`agentao --help` / `agentao -h`**: explicit `-h` / `--help` handler on the top-level CLI parser. Prints usage and exits `0` instead of silently falling through to interactive mode (the previous `add_help=False` + `parse_known_args()` combination swallowed the flag). Regression coverage: `tests/test_acp_cli_entrypoint.py::TestEntrypointArgparse::test_help_flag_prints_help_and_exits` and `test_short_help_flag_prints_help_and_exits`.
+- **Monorepo skill install** (`arbiter skill install owner/repo:path[@ref]`): extends the GitHub installer to pull a single skill out of a multi-skill repository — e.g. `arbiter skill install anthropics/skills:pptx@main` installs only the `pptx/` subdirectory instead of rejecting the archive for missing a top-level `SKILL.md`. `SourceSpec.package_path` (`arbiter/skills/sources.py`) carries the subpath; `GitHubSkillSource.resolve()` parses the `:path` segment and rejects empty / absolute / `.` / `..` components. `SkillInstaller._find_package_root()` (`arbiter/skills/installer.py`) validates the subdirectory exists, is a directory, and contains `SKILL.md`; the recorded `source_ref` preserves the full `owner/repo:path@ref` string so `skill update` round-trips. CLI help on `skill install` now advertises the new form. Coverage: `tests/test_skill_installer.py` (+119 lines across success / empty-path / parent-dir-traversal / update paths), `tests/test_skill_cli.py`.
+- **Session replay subsystem** (`arbiter/replay/`): JSONL timeline of runtime events written to `.arbiter/replays/`, with recorder, reader, redaction, retention, and sanitization. Wired through `transport/events.py` and surfaced via the new `cli/replay_commands.py` / `replay_render.py`. Feature docs: `docs/guides/session-replay.md`. Tests: `tests/test_replay*`, `tests/test_replay_redact.py`.
+- **`arbiter --help` / `arbiter -h`**: explicit `-h` / `--help` handler on the top-level CLI parser. Prints usage and exits `0` instead of silently falling through to interactive mode (the previous `add_help=False` + `parse_known_args()` combination swallowed the flag). Regression coverage: `tests/test_acp_cli_entrypoint.py::TestEntrypointArgparse::test_help_flag_prints_help_and_exits` and `test_short_help_flag_prints_help_and_exits`.
 
 ### Changed
 
-- **Runtime decomposition** — four monolithic modules split into focused packages; public `Agentao.chat()` / `tool_runner` contract preserved (`agentao/tool_runner.py` kept as a compat shim):
-  - `agentao/runtime/` (new): `chat_loop`, `tool_runner`, `model`, `llm_call`, `turn` extracted from `agent.py` (~660 net lines removed from `agent.py`).
-  - `agentao/acp_client/manager.py` (2938 lines) → `manager/` package (`connection`, `core`, `helpers`, `interactions`, `lifecycle`, `recovery`, `status`, `turns`).
-  - `agentao/cli/commands_ext.py` (1688 lines) → `commands_ext/` package (`acp`, `agents`, `crystallize`, `memory`).
-  - `agentao/cli/app.py` shrunk by ~800 lines; new CLI modules `input_loop`, `ui`, `acp_inbox`.
-  - `agentao/prompts/` (new): `builder` + `sections` + `helpers` for system-prompt composition. `agent._build_system_prompt()` and `agent._load_project_instructions()` retained as thin facades so existing tests and external patches keep working.
-  - `agentao/tooling/` (new): `registry`, `agent_tools`, `mcp_tools`.
+- **Runtime decomposition** — four monolithic modules split into focused packages; public `Arbiter.chat()` / `tool_runner` contract preserved (`arbiter/tool_runner.py` kept as a compat shim):
+  - `arbiter/runtime/` (new): `chat_loop`, `tool_runner`, `model`, `llm_call`, `turn` extracted from `agent.py` (~660 net lines removed from `agent.py`).
+  - `arbiter/acp_client/manager.py` (2938 lines) → `manager/` package (`connection`, `core`, `helpers`, `interactions`, `lifecycle`, `recovery`, `status`, `turns`).
+  - `arbiter/cli/commands_ext.py` (1688 lines) → `commands_ext/` package (`acp`, `agents`, `crystallize`, `memory`).
+  - `arbiter/cli/app.py` shrunk by ~800 lines; new CLI modules `input_loop`, `ui`, `acp_inbox`.
+  - `arbiter/prompts/` (new): `builder` + `sections` + `helpers` for system-prompt composition. `agent._build_system_prompt()` and `agent._load_project_instructions()` retained as thin facades so existing tests and external patches keep working.
+  - `arbiter/tooling/` (new): `registry`, `agent_tools`, `mcp_tools`.
 - **Docs**: `docs/guides/acp.md` version examples bumped from `0.2.10` to `0.2.13`. Developer-guide `part-2/2-constructor-reference.md`, `part-5/5-memory.md`, `part-5/6-system-prompt.md` (en + zh mirrors) updated to reference the new `prompts/builder.py` location for system-prompt composition.
 
 ### Packaging / Release (GA)
@@ -2599,7 +2599,7 @@ developer guide refreshed to the current line.
 - Align package version, changelog, release notes, and publish workflow usage to the final `0.2.13` release line.
 - README / `docs/start/quickstart.md` Quick Start: document all three required provider variables (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`) up front. Previously only `OPENAI_API_KEY` was shown, contradicting the strict-provider-gating behaviour introduced in `0.2.11` — the single-key snippet would raise `ValueError` at startup.
 - `.github/workflows/jekyll-gh-pages.yml` replaced by a VitePress build + deploy pipeline pointed at `developer-guide/`. The Jekyll template was a repo-init leftover; the actual docs site is VitePress, so the previous workflow was deploying nothing useful.
-- Developer-guide install-pin / version-check examples refreshed from `0.2.10` / `0.2.11` to `0.2.13` in `part-1/5-requirements.md`, `part-2/1-install-import.md`, `part-3/2-agentao-as-server.md` (JSON response example), and `part-3/5-zed-ide-integration.md` (en + zh mirrors). Historical statements ("Since v0.2.10…", "Pre-0.2.10 Agentao used…") are kept — they describe when a surface was introduced, not the current pin.
+- Developer-guide install-pin / version-check examples refreshed from `0.2.10` / `0.2.11` to `0.2.13` in `part-1/5-requirements.md`, `part-2/1-install-import.md`, `part-3/2-arbiter-as-server.md` (JSON response example), and `part-3/5-zed-ide-integration.md` (en + zh mirrors). Historical statements ("Since v0.2.10…", "Pre-0.2.10 Arbiter used…") are kept — they describe when a surface was introduced, not the current pin.
 
 ### Documentation
 
@@ -2613,24 +2613,24 @@ developer guide refreshed to the current line.
 ### Added
 
 - **Headless runtime v1** (`docs/guides/headless-runtime.md`): operator-facing contract for `ACPManager` as a non-interactive embedding target — public entry points (`prompt_once`, `send_prompt`), single-active-turn concurrency pinned to `AcpErrorCode.SERVER_BUSY`, typed status snapshot. `send_prompt_nonblocking` family is classified **internal / unstable** and removed from the embedding contract.
-- **`ServerStatus` dataclass** (`agentao/acp_client/models.py`, re-exported from `agentao.acp_client`): frozen v1 shape with `server`, `state`, `pid`, `has_active_turn`.
+- **`ServerStatus` dataclass** (`arbiter/acp_client/models.py`, re-exported from `arbiter.acp_client`): frozen v1 shape with `server`, `state`, `pid`, `has_active_turn`.
 - **`examples/headless_worker.py`**: runnable headless smoke consumer. Spins up an inline mock ACP server, exercises success / non-interactive error / cancel paths, and prints the typed snapshot after each.
 - **`tests/test_headless_runtime.py`**: baseline smoke tests pinning the Week 1 contract — typed snapshot shape, `has_active_turn` derivation, `SERVER_BUSY` on concurrent submit, cancel-then-continue, non-interactive reject non-pollution, timeout recovery, session reuse.
 - **Headless runtime Week 2 diagnostics** (`docs/guides/headless-runtime.md` §3-§4, additive on `ServerStatus`): `active_session_id`, `last_error`, `last_error_at` (tz-aware UTC `datetime` assigned at *store time* inside the manager, not raise time), `inbox_pending`, `interaction_pending` (singular, replaces the pre-v1 `interactions_pending` alias), `config_warnings` (per-server list; Week 3 will populate on legacy config).
 - **`ACPManager.readiness(name)` / `.is_ready(name)`**: typed 4-valued classifier (`"ready" | "busy" | "failed" | "not_ready"`) over the combination of handle state and the active-turn slot. Consumers that only need a gating signal should prefer this over string-matching on `state`.
 - **`ACPManager.reset_last_error(name)`**: explicit clear for the sticky `last_error` / `last_error_at` surface. A new error overwrites automatically; this method is only needed when the host wants to drop the stored error without waiting for a new one.
 - **State-vs-error contract**: the recorded-error surface is diagnostic, not gating — `state` is the authoritative readiness signal, `last_error` is history. `SERVER_BUSY` and `SERVER_NOT_FOUND` are intentionally excluded from the store so fail-fast retries do not overwrite real failures. Pinned by tests (`tests/test_headless_runtime.py::TestLastErrorStore`) including a `datetime`-patch proof that the timestamp is taken inside `_record_last_error`, not pre-computed.
-- **`InteractionPolicy` dataclass** (Week 3, Issue 11) re-exported from `agentao.acp_client`. Minimal single-dimension policy model over the non-interactive interaction decision: `InteractionPolicy(mode="reject_all" | "accept_all")`. No other knobs — additional dimensions belong on a new options object.
+- **`InteractionPolicy` dataclass** (Week 3, Issue 11) re-exported from `arbiter.acp_client`. Minimal single-dimension policy model over the non-interactive interaction decision: `InteractionPolicy(mode="reject_all" | "accept_all")`. No other knobs — additional dimensions belong on a new options object.
 - **`interaction_policy=` per-call override** on `ACPManager.send_prompt` and `ACPManager.prompt_once`. Accepts `InteractionPolicy` or the bare strings `"reject_all"` / `"accept_all"`. Precedence: per-call override > server default (`nonInteractivePolicy`). `None` falls back to the server default. `send_prompt_nonblocking` is **internal / unstable** per the Week 1 decision and deliberately does **not** accept this kwarg — the Week 3 policy surface is `send_prompt` + `prompt_once` only.
 - **Headless runtime Week 4 lifecycle & recovery** (`docs/guides/headless-runtime.md` §7). Pins the deterministic release order on every failure path (pending-slot drop → turn-slot clear → lock release → `last_error` record) and introduces the client/process-death classifier.
-- **`classify_process_death` pure classifier** exported from `agentao.acp_client`. Maps `(exit_code, signaled, during_active_turn, restart_count, max_recoverable_restarts, handshake_fail_streak)` to `"recoverable"` / `"fatal"` per the Issue 16 decision matrix. Testable in isolation; the manager calls it inside `ensure_connected` to decide whether to lazy-rebuild or flip the server into the sticky fatal state.
+- **`classify_process_death` pure classifier** exported from `arbiter.acp_client`. Maps `(exit_code, signaled, during_active_turn, restart_count, max_recoverable_restarts, handshake_fail_streak)` to `"recoverable"` / `"fatal"` per the Issue 16 decision matrix. Testable in isolation; the manager calls it inside `ensure_connected` to decide whether to lazy-rebuild or flip the server into the sticky fatal state.
 - **`ACPManager.is_fatal(name)` / `.restart_count(name)`** surfaces for the recovery state. `is_fatal(name)` is sticky — cleared only by an explicit `restart_server` or `start_server` call (operator action required).
 - **`AcpServerConfig.max_recoverable_restarts`** (JSON: `maxRecoverableRestarts`, default 3). Caps consecutive auto-recoveries on recoverable idle non-zero exits before the manager flips the server to fatal. Active-turn deaths bypass the cap; each is always allowed at least one rebuild attempt.
 - **Daemon-style regression suite** (`tests/test_headless_runtime.py::TestDaemonRegression`): long session reuse, reject-then-continue, cancel-then-continue, timeout-then-continue, and process-death recovery (both recoverable and fatal). Pinned against the mock ACP server from `test_acp_client_embedding` so the scenarios stay executable in CI.
-- **`/crystallize` evidence + feedback loop**: `SkillEvidence` and `SkillFeedbackEntry` dataclasses (`agentao/skills/drafts.py`) extend `SkillDraft` with structured tool-activity grounding (`user_goals`, `assistant_conclusions`, `tool_calls`, `tool_results`, `key_files`, `workflow_steps`, `outcome_signals`), a `feedback_history` rewrite log, and `open_questions`. Drafts persist forward- and backward-compatible JSON — legacy payloads load with empty evidence/history.
-- **`collect_crystallize_evidence` / `render_crystallize_context`** (`agentao/cli/commands_ext.py`): pull structured evidence from the live `AgentaoCLI` message history (tool calls + tool results, not just narrated text) and render it as the `# Structured evidence` block consumed by `/crystallize suggest|refine|feedback`.
-- **`feedback_prompt` + `FEEDBACK_SYSTEM_PROMPT`** (`agentao/memory/crystallizer.py`): drive user-feedback-driven draft rewrites; `suggest_prompt()` and `refine_prompt()` gained an optional `evidence_text=` parameter so all three prompts share the same evidence grounding. Drafts grounded in tool activity, not just raw transcript.
-- **`append_skill_feedback` + `summarize_draft_status`** (`agentao/skills/drafts.py`): durable feedback log and lightweight status view for `/crystallize status`.
+- **`/crystallize` evidence + feedback loop**: `SkillEvidence` and `SkillFeedbackEntry` dataclasses (`arbiter/skills/drafts.py`) extend `SkillDraft` with structured tool-activity grounding (`user_goals`, `assistant_conclusions`, `tool_calls`, `tool_results`, `key_files`, `workflow_steps`, `outcome_signals`), a `feedback_history` rewrite log, and `open_questions`. Drafts persist forward- and backward-compatible JSON — legacy payloads load with empty evidence/history.
+- **`collect_crystallize_evidence` / `render_crystallize_context`** (`arbiter/cli/commands_ext.py`): pull structured evidence from the live `ArbiterCLI` message history (tool calls + tool results, not just narrated text) and render it as the `# Structured evidence` block consumed by `/crystallize suggest|refine|feedback`.
+- **`feedback_prompt` + `FEEDBACK_SYSTEM_PROMPT`** (`arbiter/memory/crystallizer.py`): drive user-feedback-driven draft rewrites; `suggest_prompt()` and `refine_prompt()` gained an optional `evidence_text=` parameter so all three prompts share the same evidence grounding. Drafts grounded in tool activity, not just raw transcript.
+- **`append_skill_feedback` + `summarize_draft_status`** (`arbiter/skills/drafts.py`): durable feedback log and lightweight status view for `/crystallize status`.
 - **`tests/test_skill_crystallize_enhancement.py`**: 15 tests covering the new dataclass schema, persistence round-trip, backward-compatible load of legacy drafts, prompt-builder evidence injection, and feedback append/history rendering.
 - **Plan doc** `docs/history/implementation/skill-crystallize-enhancement-plan.md`: design rationale and API surface for the three-problem scope (structured evidence in drafts, user feedback loop, `/help` discoverability).
 
@@ -2642,7 +2642,7 @@ developer guide refreshed to the current line.
   - `has_active_turn` is derived from the manager's active turn slot (not handle state), so it stays `True` across the in-flight interaction phase of non-interactive turns.
   - `last_error` is sticky across successful turns by design (so once-per-minute pollers still see the last-known failure); clear explicitly via `reset_last_error(name)` or wait for a new error to overwrite.
 - CLI `/acp list` / session status readouts and the embedding developer-guide pages (part-1 mode 3, part-3 reverse-ACP, appendix A / D / F / G, zh + en mirrors) are migrated to the typed contract.
-- **Breaking: `nonInteractivePolicy` bare-string config form is removed** (Week 3, Issue 12). `.agentao/acp.json` must now use the structured object form — `"nonInteractivePolicy": {"mode": "reject_all" | "accept_all"}`. The legacy strings `"reject_all"` / `"accept_all"` as a bare value raise `AcpConfigError` **at config-load time** (`AcpClientConfig.from_dict` / `load_acp_client_config`). There is no silent upgrade and no deferred runtime failure — a drifted config cannot slip through to `send_prompt` execution. Migration: see [developer-guide appendix E.7](./developer-guide/en/appendix/e-migration.md#e7-headless-runtime--noninteractivepolicy-shape-change-week-3) (and the zh mirror).
+- **Breaking: `nonInteractivePolicy` bare-string config form is removed** (Week 3, Issue 12). `.arbiter/acp.json` must now use the structured object form — `"nonInteractivePolicy": {"mode": "reject_all" | "accept_all"}`. The legacy strings `"reject_all"` / `"accept_all"` as a bare value raise `AcpConfigError` **at config-load time** (`AcpClientConfig.from_dict` / `load_acp_client_config`). There is no silent upgrade and no deferred runtime failure — a drifted config cannot slip through to `send_prompt` execution. Migration: see [developer-guide appendix E.7](./developer-guide/en/appendix/e-migration.md#e7-headless-runtime--noninteractivepolicy-shape-change-week-3) (and the zh mirror).
 - `AcpServerConfig.non_interactive_policy` is now typed as `InteractionPolicy` (previously `str`). Downstream callers that read `server_cfg.non_interactive_policy` should read `.mode` instead.
 
 ---
@@ -2704,20 +2704,20 @@ directly from `0.2.9` to `0.2.10`.
 
 Re-cut of `0.2.10-rc1`. `rc1` failed the CI tag-vs-package version
 consistency check because the `v0.2.10-rc1` tag was pushed against a
-commit where `agentao/__init__.py` still reported `0.2.9`. `rc2` carries
+commit where `arbiter/__init__.py` still reported `0.2.9`. `rc2` carries
 the identical feature set with the version string aligned to the tag.
 
 > **Note:** Neither `rc1` nor `rc2` actually shipped the feature code
 > described below — both tags pointed at docs-only commits. The feature
 > set first ships in the GA `0.2.10` release above.
 
-Prerelease focused on two initiatives: promoting `agentao.acp_client` as a
+Prerelease focused on two initiatives: promoting `arbiter.acp_client` as a
 stable **embedding facade for non-interactive runtimes**, and adding an
 explicit **`/crystallize refine` stage** to the skill-crystallization flow.
 
 ### Added
 
-- **ACP embedding facade** (`agentao/acp_client/`): non-interactive
+- **ACP embedding facade** (`arbiter/acp_client/`): non-interactive
   `send_prompt(..., interactive=False)` plus a one-shot `prompt_once(...)`
   entry point for daemon/workflow runtimes. Ephemeral clients created by
   `prompt_once` are tracked separately from durable `_clients` and do not
@@ -2733,13 +2733,13 @@ explicit **`/crystallize refine` stage** to the skill-crystallization flow.
 - **Per-call `cwd` and `mcp_servers` session reuse**: a mismatch on either
   field triggers a fresh session; otherwise sessions are reused per named
   server under a strict single-active-turn contract.
-- **`/crystallize refine`** (`agentao/cli/commands_ext.py`,
-  `agentao/skills/drafts.py`): three-stage workflow
+- **`/crystallize refine`** (`arbiter/cli/commands_ext.py`,
+  `arbiter/skills/drafts.py`): three-stage workflow
   `suggest -> refine -> create`, where `refine` re-runs the draft through
   the bundled `skill-creator` guidance. `suggest` now persists drafts under
-  `.agentao/skill-drafts/` so `refine`/`create` can pick them up across
+  `.arbiter/skill-drafts/` so `refine`/`create` can pick them up across
   turns.
-- **Skill draft helpers** (`agentao/skills/drafts.py`): `new_draft`,
+- **Skill draft helpers** (`arbiter/skills/drafts.py`): `new_draft`,
   `save_skill_draft`, `load_skill_draft`, `clear_skill_draft` with
   session-scoped paths and graceful handling of missing or malformed state.
 
@@ -2784,8 +2784,8 @@ of the ACP client subsystem and the default-model rollout.
 
 ### Added
 
-- **Explicit `@server` routing for the ACP client** (`agentao/acp_client/router.py`,
-  `agentao/cli/app.py::_try_acp_explicit_route`) — `@server-name <task>`,
+- **Explicit `@server` routing for the ACP client** (`arbiter/acp_client/router.py`,
+  `arbiter/cli/app.py::_try_acp_explicit_route`) — `@server-name <task>`,
   `server-name: <task>`, and `让 / 请 server-name <task>` forms route
   deterministically to the named ACP server from the main CLI input. Longest-first
   name matching handles overlapping names (`qa` vs `qa.bot`). High-confidence shapes
@@ -2795,12 +2795,12 @@ of the ACP client subsystem and the default-model rollout.
   by mtime each attempt, so new/renamed servers are picked up without a CLI restart.
 - **`$VAR` / `${VAR}` expansion in `AcpServerConfig.env`** — API keys and tokens
   can live in `.env` or the shell environment instead of being pasted into
-  `.agentao/acp.json`.
+  `.arbiter/acp.json`.
 
 ### Fixed
 
 - **ACP stdio is now forced to UTF-8 with `errors="strict"` before the server starts**
-  (`agentao/acp/__main__.py`). Non-UTF-8 default encodings silently corrupt the
+  (`arbiter/acp/__main__.py`). Non-UTF-8 default encodings silently corrupt the
   JSON-RPC stream; the entry point now reconfigures stdin/stdout/stderr, verifies the
   result, and exits with a diagnostic on stderr if the streams cannot be made safe.
 - **Default-model messaging realigned with the runtime** across the init wizard,
@@ -2844,10 +2844,10 @@ Git tag, release notes, and maintainer workflow all agree on the GA path.
 
 ## [0.2.8-rc1] — 2026-04-11
 
-Headline: **ACP Client for project-local server management** — Agentao can
+Headline: **ACP Client for project-local server management** — Arbiter can
 now act as an ACP client, connecting to and managing external ACP-compatible
 agent processes configured per-project. The old monolithic CLI is refactored
-into a modular `agentao/cli/` package for maintainability.
+into a modular `arbiter/cli/` package for maintainability.
 
 Release intent: **prerelease / TestPyPI path**. Use tag `v0.2.8-rc1` and a
 GitHub pre-release so `.github/workflows/publish-testpypi.yml` runs instead
@@ -2855,7 +2855,7 @@ of the full PyPI publish workflow.
 
 ### Added
 
-- **ACP client subsystem** (`agentao/acp_client/`, ~2 400 lines)
+- **ACP client subsystem** (`arbiter/acp_client/`, ~2 400 lines)
   - `ACPManager` — top-level façade: lazy init on first `/acp` command,
     config loading, server lifecycle orchestration
   - `ACPClient` — per-server JSON-RPC 2.0 client over stdio with NDJSON
@@ -2868,7 +2868,7 @@ of the full PyPI publish workflow.
   - `InteractionRegistry` — tracks pending permission and input requests
     from servers; supports `approve`, `reject`, and `reply` resolution
   - `AcpServerConfig` / `AcpClientConfig` models with validation
-  - `load_acp_client_config()` — reads `.agentao/acp.json` (project-only;
+  - `load_acp_client_config()` — reads `.arbiter/acp.json` (project-only;
     no global config)
   - Rich-based `render.py` for CLI output formatting
 - **`/acp` CLI commands**: `list`, `start`, `stop`, `restart`, `send`,
@@ -2896,7 +2896,7 @@ of the full PyPI publish workflow.
 ### Changed
 
 - **CLI refactored from monolith to package** — the old single-file CLI (3 246
-  lines) replaced by `agentao/cli/` package (~3 800 lines across 12
+  lines) replaced by `arbiter/cli/` package (~3 800 lines across 12
   modules): `app.py`, `commands.py`, `commands_ext.py`, `entrypoints.py`,
   `session.py`, `subcommands.py`, `transport.py`, `_globals.py`, `_utils.py`
 - `PermissionEngine.evaluate()` now checks `domain` rules before falling
@@ -2911,14 +2911,14 @@ of the full PyPI publish workflow.
   `test_acp_client_config.py`, `test_acp_client_inbox.py`,
   `test_acp_client_jsonrpc.py`, `test_acp_client_process.py`,
   `test_acp_client_prompt.py`, `test_acp_ask_user.py`
-- Existing CLI tests updated for the `agentao.cli` → `agentao.cli.app`
+- Existing CLI tests updated for the `arbiter.cli` → `arbiter.cli.app`
   import path change
 
 ---
 
 ## [0.2.7] — 2026-04-09
 
-Headline: **Agent Client Protocol (ACP)** — Agentao can now be driven as
+Headline: **Agent Client Protocol (ACP)** — Arbiter can now be driven as
 a headless JSON-RPC agent runtime by ACP-compatible clients (e.g. Zed).
 The entire ACP wire protocol, per-session working directory isolation,
 session-scoped MCP injection, and multi-session lifecycle are new.
@@ -2930,8 +2930,8 @@ constructor.
 
 ### Added
 
-- **ACP stdio JSON-RPC server** (`agentao/acp/`, ~3 500 lines)
-  - Launch with `agentao --acp --stdio` or `python -m agentao --acp --stdio`
+- **ACP stdio JSON-RPC server** (`arbiter/acp/`, ~3 500 lines)
+  - Launch with `arbiter --acp --stdio` or `python -m arbiter --acp --stdio`
   - Methods: `initialize`, `session/new`, `session/prompt`,
     `session/cancel`, `session/load`
   - Server→client `session/request_permission` with `allow_once` /
@@ -2942,14 +2942,14 @@ constructor.
   - Capability advertisement: `text` + `resource_link` content blocks,
     stdio + sse MCP transport, no `fs.*`/`terminal.*` host proxying
   - `AcpServer`, `AcpSessionManager`, `AcpSessionState`, `ACPTransport`
-    (maps Agentao transport events to ACP `session/update` notifications)
-- **`python -m agentao` module entry point** (`agentao/__main__.py`) so
+    (maps Arbiter transport events to ACP `session/update` notifications)
+- **`python -m arbiter` module entry point** (`arbiter/__main__.py`) so
   the CLI works even when the console script is not on PATH
 - **Per-session working directory isolation** (Issue 05)
-  - `Agentao(working_directory=Path)` freezes memory, permissions, MCP
-    config, AGENTAO.md loading, system-prompt rendering, file tools, and
+  - `Arbiter(working_directory=Path)` freezes memory, permissions, MCP
+    config, ARBITER.md loading, system-prompt rendering, file tools, and
     shell tool against that path
-  - `Agentao.working_directory` property: `None` → lazy `Path.cwd()`
+  - `Arbiter.working_directory` property: `None` → lazy `Path.cwd()`
     (CLI compatibility); `Path` → frozen resolved path (ACP sessions)
   - `Tool._resolve_path()` / `_resolve_directory()` helpers on the base
     class; all file, search, and shell tools use them
@@ -2959,19 +2959,19 @@ constructor.
     `delete_session(project_root=...)`, `delete_all_sessions(project_root=...)`
     all accept an explicit project root; `None` falls back to `Path.cwd()`
 - **Session-scoped MCP server injection** (Issue 11)
-  - `Agentao(extra_mcp_servers=...)` merges in-memory configs on top of
-    file-loaded `.agentao/mcp.json` (name-level override, no disk writes)
+  - `Arbiter(extra_mcp_servers=...)` merges in-memory configs on top of
+    file-loaded `.arbiter/mcp.json` (name-level override, no disk writes)
   - ACP `session/new` `mcpServers` wire field → translated by
-    `agentao.acp.mcp_translate.translate_acp_mcp_servers()`
+    `arbiter.acp.mcp_translate.translate_acp_mcp_servers()`
 - **LLM log file fallback** — `LLMClient._build_file_handler()` resolves
-  `agentao.log` to an absolute path anchored to the working directory;
+  `arbiter.log` to an absolute path anchored to the working directory;
   when the target is unwritable (ACP launches with cwd `/` on macOS),
-  falls back to `<home>/.agentao/agentao.log`
+  falls back to `<home>/.arbiter/arbiter.log`
 - **jieba word segmentation for CJK retrieval** — `MemoryRetriever` now
   segments Chinese/Japanese/Korean text with jieba instead of character
   bigrams. `"版本管理"` → `{"版本", "管理"}` (was `{"版本", "本管", "管理"}`).
   Single-character CJK tokens filtered out (matches the Latin `len > 1`
-  rule). Custom dictionary: `<home>/.agentao/userdict.txt` (lazy-loaded on
+  rule). Custom dictionary: `<home>/.arbiter/userdict.txt` (lazy-loaded on
   first recall). New dependency: `jieba>=0.42.1`
 - **Inverted index in `MemoryRetriever`** — `write_version`-gated
   token → record-ID map so recall scores only records sharing at least
@@ -2984,7 +2984,7 @@ constructor.
   branches. The previous `OSError`-only catch missed
   `sqlite3.OperationalError: unable to open database file` raised when
   the directory exists but the DB cannot be opened/WAL-journaled,
-  crashing `Agentao()` in restricted environments and killing every ACP
+  crashing `Arbiter()` in restricted environments and killing every ACP
   session spawn. Each fallback now logs a `WARNING` (was silent)
 - `_cjk_bigrams()` replaced by `_cjk_segment()` (jieba-backed); bigram
   noise eliminated from CJK recall scoring
@@ -2998,12 +2998,12 @@ constructor.
 
 ### Fixed
 
-- **`Agentao()` crash in restricted / non-writable environments** —
+- **`Arbiter()` crash in restricted / non-writable environments** —
   `sqlite3.OperationalError` from the user-scope memory DB now triggers
   the fallback path (user store disabled, project store in-memory) instead
   of propagating as an unhandled exception. Root cause of ACP subprocess
-  smoke-test failures and plain `Agentao(api_key='x')` startup failure
-  when `<home>/.agentao/memory.db` is unwritable
+  smoke-test failures and plain `Arbiter(api_key='x')` startup failure
+  when `<home>/.arbiter/memory.db` is unwritable
 
 ### Tests
 
@@ -3047,7 +3047,7 @@ hardening so the publish pipeline actually succeeds.
 - Activate the venv with `source .publish-venv/bin/activate` (and
   `.publish-testpypi-venv`) before the publish smoke step instead of
   invoking `.venv/bin/python` directly. Direct-invoke does not put the
-  venv's `bin/` on `PATH`, so `shutil.which('agentao')` returned `None`
+  venv's `bin/` on `PATH`, so `shutil.which('arbiter')` returned `None`
   and failed the smoke test even though the entry-point script was
   installed correctly. Applied to both `publish.yml` and
   `publish-testpypi.yml`
@@ -3071,8 +3071,8 @@ silently writing.
 
 ### Added
 
-- **SQLite-backed memory subsystem** — `agentao/memory/`
-  - Two stores: `.agentao/memory.db` (project) and `<home>/.agentao/memory.db` (user)
+- **SQLite-backed memory subsystem** — `arbiter/memory/`
+  - Two stores: `.arbiter/memory.db` (project) and `<home>/.arbiter/memory.db` (user)
   - Schema v3 with `memories`, `session_summaries`, `memory_review_queue`,
     `memory_events`, `schema_meta`
   - Three data types modeled separately: persistent `MemoryRecord`,
@@ -3119,9 +3119,9 @@ silently writing.
   size
 - **`clear_all_session_summaries()`** for hard reset across all sessions
 - **Memory subsystem decoupled from the LLM stack** —
-  `agentao/__init__.py` uses PEP 562 `__getattr__` for lazy `Agentao` /
-  `SkillManager` resolution, so `import agentao.memory` no longer pulls
-  `openai`, `mcp`, `agentao.tools.*`, or `agentao.llm.*`. Cold import:
+  `arbiter/__init__.py` uses PEP 562 `__getattr__` for lazy `Arbiter` /
+  `SkillManager` resolution, so `import arbiter.memory` no longer pulls
+  `openai`, `mcp`, `arbiter.tools.*`, or `arbiter.llm.*`. Cold import:
   **334 ms → 35 ms** (~10×); zero heavy modules leaked. Locked in by
   subprocess-isolated regression tests in `tests/test_memory_decoupling.py`
 
@@ -3171,7 +3171,7 @@ silently writing.
   recall lost the most recent context. `clear_session()` is no longer
   invoked from `/new`; `archive_session()` (in `on_session_start()`) is the
   correct primitive. (Codex P2)
-- **`Agentao._extract_context_hints` read the wrong key on text blocks** —
+- **`Arbiter._extract_context_hints` read the wrong key on text blocks** —
   list-shaped message content had `block.get("content")` instead of
   `block.get("text")`, silently dropping every multimodal/tool-use message
   and breaking `filepath_hint` scoring. Now matches the canonical
@@ -3209,8 +3209,8 @@ silently writing.
 
 ### Added
 
-- **`agentao init` setup wizard** — first-run interactive bootstrap for
-  `.agentao/` config, API keys, and skill discovery
+- **`arbiter init` setup wizard** — first-run interactive bootstrap for
+  `.arbiter/` config, API keys, and skill discovery
 - **Background agent lifecycle** — pending state, cancellation token plumbing,
   on-disk persistence so the dashboard survives restarts
 - **`cwd/skills/`** added as a third highest-priority skills layer
@@ -3224,7 +3224,7 @@ silently writing.
 
 - Bundled office / pdf / ocr skills removed from the default install
   (slimmer wheel; users opt in via the `pdf` / `excel` / `image` extras)
-- Install path unified to `pip install agentao` across docs and README
+- Install path unified to `pip install arbiter` across docs and README
 - ChatAgent / Claude naming remnants cleaned up
 
 ### Packaging / CI
@@ -3250,7 +3250,7 @@ silently writing.
   - Approval prompt shows the full plan before asking "Execute this plan? [y/N]"
   - One-shot `consume_approval_request()` flag prevents repeated approval prompts
   - Auto-save fallback skipped when a draft is already finalized
-- `agentao/plan/` sub-package: `session.py` (3-state FSM), `controller.py` (single exit path), `prompt.py` (mandatory turn protocol)
+- `arbiter/plan/` sub-package: `session.py` (3-state FSM), `controller.py` (single exit path), `prompt.py` (mandatory turn protocol)
 - 44 new tests covering FSM transitions, lifecycle, tools, and prompt structure
 
 ### Changed
@@ -3266,7 +3266,7 @@ silently writing.
 - `skills/` and `workspace/` excluded from both wheel and sdist
 - `requires-python` lowered from `>=3.12` to `>=3.10`
 - Added `authors`, `license`, `keywords`, `classifiers`, `[project.urls]`
-- Version is now defined once in `agentao/__init__.py` and read dynamically by hatchling
+- Version is now defined once in `arbiter/__init__.py` and read dynamically by hatchling
 
 ---
 
@@ -3274,7 +3274,7 @@ silently writing.
 
 ### Added
 - **Permission mode system** — three named presets: `read-only`, `workspace-write` (default), `full-access`
-- `/mode` command to switch and persist permission mode to `.agentao/settings.json`
+- `/mode` command to switch and persist permission mode to `.arbiter/settings.json`
 - Plan mode enforced via `PLAN` permission preset (no writes, no dangerous shell)
 - Mode restored exactly on `/plan implement` or `/plan clear`
 
@@ -3325,7 +3325,7 @@ silently writing.
 ### Added
 - **Task checklist** (`todo_write`) — LLM-managed task list injected into system prompt; visible via `/todos`
 - **MCP (Model Context Protocol)** support — stdio and SSE transports; `mcp_*` tool registration
-- **Memory management** — persistent `.agentao_memory.json`; `save_memory`, `search_memory`, `delete_memory` tools; `/memory` commands
+- **Memory management** — persistent `.arbiter_memory.json`; `save_memory`, `search_memory`, `delete_memory` tools; `/memory` commands
 - **Permission system** — per-tool confirmation with single-key menu; session escalation with **2** (Yes to all)
 - Cognitive Resonance — automatic memory recall with injection confirmation before each response
 - Session save/resume (`/sessions`)
@@ -3335,7 +3335,7 @@ silently writing.
 ## [0.1.1] — 2025-11-xx
 
 ### Added
-- Renamed to **Agentao** (Agent + Tao)
+- Renamed to **Arbiter** (Agent + Tao)
 - Gemini provider support (`google-genai`)
 - `web_fetch` with automatic crawl4ai fallback for JS-heavy pages
 - `/confirm`, `/stream`, `/tools`, `/provider` commands
@@ -3357,6 +3357,6 @@ silently writing.
 - CLI chat loop with OpenAI-compatible API
 - Tool system: `read_file`, `write_file`, `replace`, `glob`, `grep`, `run_shell_command`, `web_fetch`, `web_search`, `save_memory`
 - Skills system — auto-discovery from `skills/` with YAML frontmatter
-- `AGENTAO.md` auto-loading for project-specific instructions
+- `ARBITER.md` auto-loading for project-specific instructions
 - Current date injected as `<system-reminder>`
-- Complete LLM interaction logging to `agentao.log`
+- Complete LLM interaction logging to `arbiter.log`

@@ -1,4 +1,4 @@
-# Agentao — Refactor Audit & Reverse Review (2026-07)
+# Arbiter — Refactor Audit & Reverse Review (2026-07)
 
 **Status:** Review record. Drafted 2026-07-24/25 from a full-tree refactor audit
 (58.8k LOC / 268 modules) followed by an **adversarial reverse review of the
@@ -6,7 +6,7 @@ audit's own findings**. Three items shipped; five were declined *after* the
 reverse review killed or downgraded their premise. **The declined list is the
 substantive half of this document** — it exists so the same proposals are not
 re-raised without new evidence.
-**Audience:** Agentao maintainers.
+**Audience:** Arbiter maintainers.
 **Companion:** `refactor-audit-2026-07.zh.md`.
 **Related:**
 - `optimization-opportunities-review.md` — the 2026-06-19 audit. Its Tier 1–2
@@ -97,13 +97,13 @@ the plugin subsystem is an optional dependency). Nothing binds those names at
 module scope, so no static checker can resolve the annotations.
 
 Fixed by declaring them in `TYPE_CHECKING` blocks. Verified this adds **no
-runtime import** (`agentao.plugins.models` stays out of `sys.modules`).
+runtime import** (`arbiter.plugins.models` stays out of `sys.modules`).
 
 > **Value correction.** The audit implied this restored runtime introspection.
 > It does not — verified: `typing.get_type_hints()` still raises `NameError`,
 > because it resolves against runtime `__globals__` where `TYPE_CHECKING`
 > imports do not exist. Nothing in the tree calls `get_type_hints` on these
-> methods; the schema generators operate on `agentao.host` Pydantic models, and
+> methods; the schema generators operate on `arbiter.host` Pydantic models, and
 > the one introspecting test (`test_async_tool.py`) targets a different method
 > and already supplies a `localns` workaround. **This is future-proofing for a
 > widened mypy gate, not a live defect.**
@@ -129,7 +129,7 @@ refactor trigger — the same standard that keeps `agent.py`'s 231-line `__init_
 off the list (cx **3**, pure sequential wiring).
 
 **T3.2 fails on a second, independent ground.** The proposal was to move
-`Agentao.get_conversation_summary` out of core as presentation logic. It has a
+`Arbiter.get_conversation_summary` out of core as presentation logic. It has a
 real caller (`cli/ui.py:75`) *and* appears as a host-provided method in a test
 stub (`test_cli_host_events.py:133`) — it is part of an existing interface.
 Moving it is a breaking change for embedded hosts in exchange for zero
@@ -138,22 +138,22 @@ functional gain. Reopen only with a host actually blocked by it.
 ### 6 — mypy per-package ratchet
 
 The audit recommended extending the CI typing gate package by package, calling
-`agentao.replay` (16 errors) the natural entry point. Inspection killed it:
+`arbiter.replay` (16 errors) the natural entry point. Inspection killed it:
 
-- `agentao.replay` — 15 of 16 are `type-arg` / `no-any-return` cosmetics. One
+- `arbiter.replay` — 15 of 16 are `type-arg` / `no-any-return` cosmetics. One
   real annotation defect (`recorder.py:113`, missing `Optional[TextIO]`).
-- `agentao.runtime` — **27 of 89 are mixin false positives** (`_CompactionMixin`
+- `arbiter.runtime` — **27 of 89 are mixin false positives** (`_CompactionMixin`
   accessing `self._agent`, provided by the concrete class). Silencing them means
   writing Protocol scaffolding to satisfy the checker, not fixing anything. The
   rest: 26 `type-arg`, 24 missing annotations.
 
-Poor return on effort. `mypy --strict` stays scoped to `agentao.host` — the
+Poor return on effort. `mypy --strict` stays scoped to `arbiter.host` — the
 stability boundary, which is where it earns its keep. The single
 `recorder.py:113` defect can be fixed on its own whenever that file is touched.
 
 ### 7 — Broad linter adoption
 
-`uvx ruff check agentao` reports ~2800 findings, but the number is misleading:
+`uvx ruff check arbiter` reports ~2800 findings, but the number is misleading:
 926 are `List` → `list` modernization, 833 `Optional[X]` → `X | None`, and 224
 are the `except Exception` handlers that are a deliberate design posture. The
 high-signal subset (`--select F`) is 92, of which only the 4 F821 had any
@@ -165,7 +165,7 @@ at `--select F` and expect ~88 findings of pure cleanup value.
 ### 8 — Lazy-compile the hardline regex table
 
 `permissions_hardline/_patterns.py` compiles 23 regexes at import: 17ms of the
-88ms `import agentao.agent`, ~13% of a 130ms CLI cold start. It is the single
+88ms `import arbiter.agent`, ~13% of a 130ms CLI cold start. It is the single
 most expensive module in the import graph, which is what made it look like a
 finding. It is still 17ms, one-time, and for an embedded host it is paid once at
 module import. Demand-gated.
@@ -195,7 +195,7 @@ as shipped. The three that matter most:
   hand-wrote `turn_id: "t1"` on all six events, a shape the recorder cannot
   produce.** Fixed by giving `HostReplaySink` a `turn_id_provider`: the
   envelope is now the replay id space, the payload keeps the host's.
-- **A test soft-deleted the developer's real `~/.agentao/memory.db`.** Routing
+- **A test soft-deleted the developer's real `~/.arbiter/memory.db`.** Routing
   `_clear_reset` through the real handler was correct, but `MemoryManager.clear()`
   at `scope=None` clears the *user* store, which resolves to `user_root()`
   regardless of the fixture's `working_directory`. Every `pytest tests/` run

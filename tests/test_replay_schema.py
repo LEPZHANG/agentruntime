@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from agentao.replay.events import EventKind, SCHEMA_VERSION
-from agentao.replay.schema import (
+from arbiter.replay.events import EventKind, SCHEMA_VERSION
+from arbiter.replay.schema import (
     SUPPORTED_VERSIONS,
     build_event_schema,
     render,
@@ -136,7 +136,7 @@ def test_v12_kinds_have_typed_payloads() -> None:
     """The v1.2 harness-projection variants must carry a typed payload schema.
 
     Drift tripwire: a maintainer who removes the per-kind payload
-    derivation in :mod:`agentao.replay.schema` must update this test
+    derivation in :mod:`arbiter.replay.schema` must update this test
     too — silently regressing the payload to ``{}`` would defeat the
     schema as an audit-validation contract.
     """
@@ -167,5 +167,5 @@ def test_schema_version_constant_matches_latest_supported() -> None:
 def test_committed_schema_is_valid_json(version: str) -> None:
     path = SCHEMAS_DIR / f"replay-event-{version}.json"
     data = json.loads(path.read_text(encoding="utf-8"))
-    assert data["$id"] == f"urn:agentao:schema:replay-event:{version}"
+    assert data["$id"] == f"urn:arbiter:schema:replay-event:{version}"
     assert "oneOf" in data

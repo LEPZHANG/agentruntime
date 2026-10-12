@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from agentao.capabilities.process import run_captured
+from arbiter.capabilities.process import run_captured
 
 
 def test_returns_completed_process(tmp_path):

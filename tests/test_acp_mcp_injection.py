@@ -3,7 +3,7 @@
 Three layers of coverage:
 
 1. **Translator unit tests** for
-   :func:`agentao.acp.mcp_translate.translate_acp_mcp_servers` — every
+   :func:`arbiter.acp.mcp_translate.translate_acp_mcp_servers` — every
    ACP entry shape (stdio, http, sse), every ``env``/``headers`` edge
    case, name collisions, malformed input.
 
@@ -15,7 +15,7 @@ Three layers of coverage:
 3. **Leak prevention** — two ACP sessions created in the same process
    with different ``mcpServers`` lists must end up with independent
    per-runtime configs. Verified by inspecting the recorded factory
-   call args, since the ``Agentao`` constructor is the boundary.
+   call args, since the ``Arbiter`` constructor is the boundary.
 
 Running real MCP subprocesses is out of scope; the failure-isolation
 acceptance criterion is verified by checking that translation +
@@ -30,16 +30,16 @@ from typing import Any, Dict, List
 
 import pytest
 
-from agentao.acp import initialize as acp_initialize
-from agentao.acp import session_load as acp_session_load
-from agentao.acp import session_new as acp_session_new
-from agentao.acp.mcp_translate import (
+from arbiter.acp import initialize as acp_initialize
+from arbiter.acp import session_load as acp_session_load
+from arbiter.acp import session_new as acp_session_new
+from arbiter.acp.mcp_translate import (
     _name_value_list_to_dict,
     translate_acp_mcp_servers,
 )
-from agentao.acp.protocol import ACP_PROTOCOL_VERSION
-from agentao.acp.server import AcpServer
-from agentao.session import save_session
+from arbiter.acp.protocol import ACP_PROTOCOL_VERSION
+from arbiter.acp.server import AcpServer
+from arbiter.session import save_session
 
 
 # ===========================================================================
@@ -205,7 +205,7 @@ class TestTranslateHttp:
 
     def test_genuinely_unknown_type_is_dropped_with_warning(self, caplog):
         import logging as _logging
-        with caplog.at_level(_logging.WARNING, logger="agentao.acp.mcp_translate"):
+        with caplog.at_level(_logging.WARNING, logger="arbiter.acp.mcp_translate"):
             result = translate_acp_mcp_servers(
                 [{"type": "websocket", "name": "ws", "url": "wss://x"}]
             )
@@ -230,7 +230,7 @@ class TestTranslateMixedAndEdgeCases:
 
     def test_duplicate_name_last_wins(self, caplog):
         import logging as _logging
-        with caplog.at_level(_logging.WARNING, logger="agentao.acp.mcp_translate"):
+        with caplog.at_level(_logging.WARNING, logger="arbiter.acp.mcp_translate"):
             result = translate_acp_mcp_servers(
                 [
                     {"name": "dup", "command": "first", "args": []},
@@ -356,7 +356,7 @@ class TestNameValueListHelper:
 class CapturingFactory:
     """Records every factory invocation along with the kwargs.
 
-    Returns a dummy stand-in for an :class:`Agentao` runtime so the
+    Returns a dummy stand-in for an :class:`Arbiter` runtime so the
     handler's downstream code (registry insert, response shape) keeps
     working without loading the LLM stack.
     """
@@ -600,7 +600,7 @@ class TestFailureIsolation:
         # logic by injecting through translate directly (the parser is
         # strict about transport type, so we test the translator's
         # resilience instead).
-        from agentao.acp.mcp_translate import translate_acp_mcp_servers
+        from arbiter.acp.mcp_translate import translate_acp_mcp_servers
 
         # Direct translator call: an unknown transport is silently dropped.
         result = translate_acp_mcp_servers(
@@ -610,14 +610,14 @@ class TestFailureIsolation:
 
 
 # ===========================================================================
-# Part 6 — Agentao constructor accepts extra_mcp_servers (smoke)
+# Part 6 — Arbiter constructor accepts extra_mcp_servers (smoke)
 # ===========================================================================
 
 
-class TestAgentaoMergeLogic:
+class TestArbiterMergeLogic:
     """Verify the ``_init_mcp`` merge contract directly.
 
-    We bypass :meth:`Agentao.__init__` entirely (via ``__new__``) and
+    We bypass :meth:`Arbiter.__init__` entirely (via ``__new__``) and
     set only the attributes ``_init_mcp`` actually reads. This avoids
     stubbing the LLM stack, memory subsystem, and MCP subprocesses
     while still exercising the real merge code path.
@@ -628,12 +628,12 @@ class TestAgentaoMergeLogic:
         cwd: Path,
         extras: Dict[str, Dict[str, Any]],
     ) -> Any:
-        """Construct just enough Agentao state to call ``_init_mcp``."""
+        """Construct just enough Arbiter state to call ``_init_mcp``."""
         import logging as _logging
-        from agentao.agent import Agentao
-        from agentao.tools.base import ToolRegistry
+        from arbiter.agent import Arbiter
+        from arbiter.tools.base import ToolRegistry
 
-        agent = Agentao.__new__(Agentao)
+        agent = Arbiter.__new__(Arbiter)
         agent._working_directory = cwd
         agent._extra_mcp_servers = {
             name: dict(cfg) for name, cfg in (extras or {}).items()
@@ -668,10 +668,10 @@ class TestAgentaoMergeLogic:
                 return None
 
         monkeypatch.setattr(
-            "agentao.tooling.mcp_tools.load_mcp_config", fake_load_mcp_config
+            "arbiter.tooling.mcp_tools.load_mcp_config", fake_load_mcp_config
         )
         monkeypatch.setattr(
-            "agentao.tooling.mcp_tools.McpClientManager", _FakeManager
+            "arbiter.tooling.mcp_tools.McpClientManager", _FakeManager
         )
 
         agent = self._make_bare_agent(
@@ -712,10 +712,10 @@ class TestAgentaoMergeLogic:
                 return None
 
         monkeypatch.setattr(
-            "agentao.tooling.mcp_tools.load_mcp_config", fake_load_mcp_config
+            "arbiter.tooling.mcp_tools.load_mcp_config", fake_load_mcp_config
         )
         monkeypatch.setattr(
-            "agentao.tooling.mcp_tools.McpClientManager", _FakeManager
+            "arbiter.tooling.mcp_tools.McpClientManager", _FakeManager
         )
 
         agent = self._make_bare_agent(
@@ -738,7 +738,7 @@ class TestAgentaoMergeLogic:
         self, tmp_path, monkeypatch
     ):
         monkeypatch.setattr(
-            "agentao.tooling.mcp_tools.load_mcp_config", lambda **kw: {}
+            "arbiter.tooling.mcp_tools.load_mcp_config", lambda **kw: {}
         )
         agent = self._make_bare_agent(tmp_path, {})
         assert agent._init_mcp() is None
@@ -767,9 +767,9 @@ class TestAgentaoMergeLogic:
             def get_client(self, name):
                 return None
 
-        monkeypatch.setattr("agentao.tooling.mcp_tools.load_mcp_config", boom)
+        monkeypatch.setattr("arbiter.tooling.mcp_tools.load_mcp_config", boom)
         monkeypatch.setattr(
-            "agentao.tooling.mcp_tools.McpClientManager", _FakeManager
+            "arbiter.tooling.mcp_tools.McpClientManager", _FakeManager
         )
 
         agent = self._make_bare_agent(
@@ -799,10 +799,10 @@ class TestAgentaoMergeLogic:
                 return None
 
         monkeypatch.setattr(
-            "agentao.tooling.mcp_tools.load_mcp_config", lambda **kw: {}
+            "arbiter.tooling.mcp_tools.load_mcp_config", lambda **kw: {}
         )
         monkeypatch.setattr(
-            "agentao.tooling.mcp_tools.McpClientManager", _FakeManager
+            "arbiter.tooling.mcp_tools.McpClientManager", _FakeManager
         )
 
         agent = self._make_bare_agent(
@@ -819,13 +819,13 @@ class TestAgentaoMergeLogic:
         Tests this by exercising the constructor's deep-copy line in
         isolation — we manually call it on a __new__-built instance.
         """
-        from agentao.agent import Agentao
+        from arbiter.agent import Arbiter
 
         caller_dict: Dict[str, Dict[str, Any]] = {
             "foo": {"command": "echo", "args": ["original"]}
         }
 
-        agent = Agentao.__new__(Agentao)
+        agent = Arbiter.__new__(Arbiter)
         # Run the deep-copy step the real __init__ runs.
         agent._extra_mcp_servers = (
             {name: dict(cfg) for name, cfg in caller_dict.items()}

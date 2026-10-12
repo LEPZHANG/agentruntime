@@ -17,18 +17,18 @@ from typing import Any, Dict, List
 
 import pytest
 
-from agentao.host.models import (
+from arbiter.host.models import (
     ActivePermissions,
     PermissionDecisionEvent,
     ToolLifecycleEvent,
 )
-from agentao.host.projection import (
+from arbiter.host.projection import (
     HostPermissionEmitter,
     HostToolEmitter,
 )
-from agentao.permissions import PermissionEngine
-from agentao.runtime.tool_runner import ToolRunner
-from agentao.tools import Tool, ToolRegistry
+from arbiter.permissions import PermissionEngine
+from arbiter.runtime.tool_runner import ToolRunner
+from arbiter.tools import Tool, ToolRegistry
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 # Jupyter · kernel-lifetime session
 
-One `Agentao` per kernel; subsequent cells reuse it. The same code
+One `Arbiter` per kernel; subsequent cells reuse it. The same code
 that the notebook (`session.ipynb`) imports is exercised by the smoke
 test against a fake LLM, so CI runs without any API key.
 
@@ -14,7 +14,7 @@ OPENAI_API_KEY=sk-... uv run jupyter notebook session.ipynb
 
 Cells:
 
-1. Build the session (one `Agentao` for the kernel lifetime).
+1. Build the session (one `Arbiter` for the kernel lifetime).
 2. Run a turn via `await turn(session, "...")`. The helper kicks off
    `agent.arun()` and concurrently drains the first two harness events
    so you can see the lifecycle without blocking the cell.
@@ -28,7 +28,7 @@ uv sync --extra dev
 uv run pytest tests/ -v
 ```
 
-`tests/test_smoke.py` patches `Agentao._llm_call` to return a scripted
+`tests/test_smoke.py` patches `Arbiter._llm_call` to return a scripted
 reply and asserts the same `build_session` / `turn` / `close_session`
 helpers wire up correctly.
 

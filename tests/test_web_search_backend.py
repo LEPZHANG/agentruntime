@@ -11,7 +11,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from agentao.tools.web import WebSearchTool
+from arbiter.tools.web import WebSearchTool
 
 
 def _clear_keys(monkeypatch):
@@ -298,7 +298,7 @@ def test_bocha_non_dict_root_raises(monkeypatch):
 
 
 def test_format_results_coerces_non_string_snippet_and_caps():
-    from agentao.tools.web import _format_search_results
+    from arbiter.tools.web import _format_search_results
 
     items = [
         {"title": "T", "url": "u", "snippet": ["a", "b"]},   # non-string → no crash

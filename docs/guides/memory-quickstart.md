@@ -1,10 +1,10 @@
 # Memory Management Quick Start
 
-快速上手 Agentao 的 memory 管理功能。
+快速上手 Arbiter 的 memory 管理功能。
 
 ## 心智模型
 
-Agentao 的 memory 子系统现在由 SQLite 支撑，**职责拆分**很重要：
+Arbiter 的 memory 子系统现在由 SQLite 支撑，**职责拆分**很重要：
 
 | 能力 | 谁可以触发 | 接口 |
 |------|------------|------|
@@ -20,8 +20,8 @@ Agentao 的 memory 子系统现在由 SQLite 支撑，**职责拆分**很重要�
 
 | 数据库 | 路径 | 内容 |
 |--------|------|------|
-| 项目库 | `.agentao/memory.db` | 项目级持久记忆 + 全部会话摘要 + 审阅队列 |
-| 用户库 | `<home>/.agentao/memory.db` | 跨项目的用户级偏好 |
+| 项目库 | `.arbiter/memory.db` | 项目级持久记忆 + 全部会话摘要 + 审阅队列 |
+| 用户库 | `<home>/.arbiter/memory.db` | 跨项目的用户级偏好 |
 
 两个文件首次启动时自动创建，目录已加入 `.gitignore`。
 
@@ -34,7 +34,7 @@ Agentao 的 memory 子系统现在由 SQLite 支撑，**职责拆分**很重要�
 让 AI 自然语言保存：
 
 ```
-You: 请记住这个项目叫 Agentao，用 Python 写的，标签为 project 和 python
+You: 请记住这个项目叫 Arbiter，用 Python 写的，标签为 project 和 python
 AI: [调用 save_memory 工具]
     Saved memory: project_name
 ```
@@ -44,7 +44,7 @@ AI: [调用 save_memory 工具]
 ```python
 save_memory(
     key="project_name",
-    value="Agentao - Python CLI tool",
+    value="Arbiter - Python CLI tool",
     tags=["project", "python"],
 )
 ```
@@ -99,7 +99,7 @@ save_memory(
 
 ## 自动召回是怎么工作的
 
-每轮对话构建系统提示时，Agentao 会注入两个块：
+每轮对话构建系统提示时，Arbiter 会注入两个块：
 
 - **`<memory-stable>`** — 稳定前缀，永远包含 user-scope 条目和结构化的 project 类型（`decision` / `constraint` / `workflow` / `preference` / `profile`）；`project_fact` / `note` 中最近更新的 3 条也无条件纳入。预算紧张时按 created_at 倒序保留**最新**条目，不会被陈年记忆挤掉。
 - **`<memory-context>`** — 动态召回，基于当前用户消息评分得到 top-k 候选；五路索引：
@@ -236,17 +236,17 @@ LLM 调用 `save_memory` 是一种写入路径；另一种是规则 crystallizer
 
 ```bash
 # 备份
-cp .agentao/memory.db .agentao/memory.db.bak
-cp <home>/.agentao/memory.db <home>/.agentao/memory.db.bak
+cp .arbiter/memory.db .arbiter/memory.db.bak
+cp <home>/.arbiter/memory.db <home>/.arbiter/memory.db.bak
 
 # 检查内容（需 sqlite3 客户端）
-sqlite3 .agentao/memory.db "SELECT scope, type, key_normalized, title FROM memories WHERE deleted_at IS NULL;"
+sqlite3 .arbiter/memory.db "SELECT scope, type, key_normalized, title FROM memories WHERE deleted_at IS NULL;"
 
 # 恢复
-cp .agentao/memory.db.bak .agentao/memory.db
+cp .arbiter/memory.db.bak .arbiter/memory.db
 ```
 
-> 不要手动改 SQL 表结构。schema 版本由 `agentao/memory/storage.py::_SCHEMA_VERSION` 管理；后续版本会自动迁移。
+> 不要手动改 SQL 表结构。schema 版本由 `arbiter/memory/storage.py::_SCHEMA_VERSION` 管理；后续版本会自动迁移。
 
 ---
 
@@ -254,7 +254,7 @@ cp .agentao/memory.db.bak .agentao/memory.db
 
 ### Q: 记忆没有保存？
 
-A: 检查 `.agentao/memory.db` 是否可写（权限问题时会回退到 `:memory:`，重启就丢）。`/memory status` 也会显示当前条目数。
+A: 检查 `.arbiter/memory.db` 是否可写（权限问题时会回退到 `:memory:`，重启就丢）。`/memory status` 也会显示当前条目数。
 
 ### Q: 搜索找不到记忆？
 
@@ -270,7 +270,7 @@ A:
 - `/memory status` 看 "Recall hits (session)" 是否在涨；不涨说明分数都是 0
 - 检查保存条目的 tags / title 是否和你的提问有 token 重叠
 - 重要条目可以通过类型升级到 stable block：把 type 设为 `decision` / `preference` / `constraint` 等结构化类型（用对应的 tag 触发）
-- 看 `/memory status` 里 "Recall errors" 是否有累计——出现错误时会记录 WARNING 到 `agentao.log`
+- 看 `/memory status` 里 "Recall errors" 是否有累计——出现错误时会记录 WARNING 到 `arbiter.log`
 
 ### Q: `/memory delete <key>` 没删掉条目？
 

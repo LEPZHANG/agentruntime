@@ -63,35 +63,35 @@ The `description` is injected into the system prompt's skills catalog. When the 
 ## Three-layer directory search
 
 ```
-1. ~/.agentao/skills/             ← global (shared across projects)
-2. <cwd>/.agentao/skills/         ← project config dir
+1. ~/.arbiter/skills/             ← global (shared across projects)
+2. <cwd>/.arbiter/skills/         ← project config dir
 3. <cwd>/skills/                  ← project repo dir
 ```
 
-**Later layers override earlier ones** (`.agentao/skills/` overrides global, `skills/` overrides both). So:
+**Later layers override earlier ones** (`.arbiter/skills/` overrides global, `skills/` overrides both). So:
 
 - **When shipping with your product**: place skills in your repo's `skills/` — users get them on clone
-- **User-customizable**: leave `~/.agentao/skills/` for user-authored skills
-- **Ephemeral/test**: use `.agentao/skills/` for project-local skills you don't want in git
+- **User-customizable**: leave `~/.arbiter/skills/` for user-authored skills
+- **Ephemeral/test**: use `.arbiter/skills/` for project-local skills you don't want in git
 
 ### Remote installs
 
 The CLI can install managed skills from GitHub:
 
 ```bash
-agentao skill install owner/repo[:path][@ref]
+arbiter skill install owner/repo[:path][@ref]
 ```
 
-If `:path` is present, Agentao installs that repository subdirectory as a single
+If `:path` is present, Arbiter installs that repository subdirectory as a single
 skill package. For example, Anthropic's official PDF skill lives inside a larger
 repository:
 
 ```bash
-agentao skill install anthropics/skills:skills/pdf
+arbiter skill install anthropics/skills:skills/pdf
 ```
 
-Project-scoped installs go to `<project-root>/.agentao/skills/`; global installs
-use `~/.agentao/skills/`. The repo-level `skills/` directory still has the
+Project-scoped installs go to `<project-root>/.arbiter/skills/`; global installs
+use `~/.arbiter/skills/`. The repo-level `skills/` directory still has the
 highest priority, so product-shipped skills can override managed installs.
 
 ### Multi-tenant isolation
@@ -100,12 +100,12 @@ In ACP / multi-instance Python, each agent's `working_directory` determines whic
 
 ```python
 # tenant-a sees only skills under /data/tenant-a
-agent_a = Agentao(working_directory=Path("/data/tenant-a"))
+agent_a = Arbiter(working_directory=Path("/data/tenant-a"))
 # tenant-b sees only /data/tenant-b
-agent_b = Agentao(working_directory=Path("/data/tenant-b"))
+agent_b = Arbiter(working_directory=Path("/data/tenant-b"))
 ```
 
-But **`~/.agentao/skills/` is process-global** (user HOME). If you don't want it loaded, change HOME before constructing the agent or use `SkillManager(skills_dir=...)` with a private path.
+But **`~/.arbiter/skills/` is process-global** (user HOME). If you don't want it loaded, change HOME before constructing the agent or use `SkillManager(skills_dir=...)` with a private path.
 
 ## Activation flow
 
@@ -216,7 +216,7 @@ End with one paragraph on overall quality and merge readiness.
 ## Debugging: is the skill actually in the prompt?
 
 ```python
-agent = Agentao(working_directory=Path.cwd())
+agent = Arbiter(working_directory=Path.cwd())
 print(list(agent.skill_manager.available_skills.keys()))   # all discovered
 print(list(agent.skill_manager.active_skills.keys()))       # currently active
 
@@ -244,7 +244,7 @@ print(agent.skill_manager.get_skills_context())
 
 - A skill is a **directory** with `SKILL.md` (YAML frontmatter + body) and optional `references/*.md` loaded on activation.
 - The `description` decides *when* the LLM activates the skill — write it from the LLM's POV ("activate this when the user asks about X").
-- 3 search layers: `~/.agentao/skills/` (global) → `<wd>/.agentao/skills/` → `<wd>/skills/`. Project-local wins.
+- 3 search layers: `~/.arbiter/skills/` (global) → `<wd>/.arbiter/skills/` → `<wd>/skills/`. Project-local wins.
 - Many small specific skills > one monster skill. Activating a skill costs context tokens; small ones stay cheap.
 
 → Next: [5.3 MCP Integration](./3-mcp)

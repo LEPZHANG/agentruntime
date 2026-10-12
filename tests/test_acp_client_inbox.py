@@ -6,13 +6,13 @@ from typing import List
 
 import pytest
 
-from agentao.acp_client.inbox import (
+from arbiter.acp_client.inbox import (
     DEFAULT_CAPACITY,
     Inbox,
     InboxMessage,
     MessageKind,
 )
-from agentao.acp_client.render import flush_to_console, render_plain, render_all_plain
+from arbiter.acp_client.render import flush_to_console, render_plain, render_all_plain
 
 
 # ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ class TestTerminalSanitization:
     """A third-party ACP server's text must not carry terminal escapes."""
 
     def test_sanitize_strips_c0_c1_keeps_whitespace(self) -> None:
-        from agentao.acp_client.render import _sanitize_terminal_text as san
+        from arbiter.acp_client.render import _sanitize_terminal_text as san
 
         # ESC (begins every CSI/OSC), BEL, DEL, and a C1 CSI are removed.
         assert san("a\x1bb") == "ab"
@@ -317,7 +317,7 @@ class TestTerminalSanitization:
 
     def test_sanitize_strips_bidi_overrides_keeps_zwj(self) -> None:
         # Trojan-Source (CVE-2021-42574): bidi controls reorder text with no ESC.
-        from agentao.acp_client.render import _sanitize_terminal_text as san
+        from arbiter.acp_client.render import _sanitize_terminal_text as san
 
         for cp in (0x202A, 0x202B, 0x202C, 0x202D, 0x202E,
                    0x2066, 0x2067, 0x2068, 0x2069, 0x200E, 0x200F, 0x061C):
@@ -396,7 +396,7 @@ class TestChunkCap:
     """AC5 — agent chunks are size-bounded so a server can't force GB buffering."""
 
     def test_cap_chunk_passthrough_at_or_under_limit(self) -> None:
-        from agentao.acp_client.manager.helpers import (
+        from arbiter.acp_client.manager.helpers import (
             _cap_chunk,
             _MAX_CHUNK_DISPLAY_CHARS,
         )
@@ -406,7 +406,7 @@ class TestChunkCap:
         assert _cap_chunk(exact) == exact  # exactly at the cap is untouched
 
     def test_cap_chunk_truncates_pathological(self) -> None:
-        from agentao.acp_client.manager.helpers import (
+        from arbiter.acp_client.manager.helpers import (
             _cap_chunk,
             _MAX_CHUNK_DISPLAY_CHARS,
         )
@@ -421,14 +421,14 @@ class TestChunkCap:
     def test_cap_chunk_passthrough_non_str(self) -> None:
         # A hostile server may send a JSON number/bool for content.text; the cap
         # must return it unchanged (no TypeError on len()), matching pre-cap code.
-        from agentao.acp_client.manager.helpers import _cap_chunk
+        from arbiter.acp_client.manager.helpers import _cap_chunk
 
         assert _cap_chunk(42) == 42
         assert _cap_chunk(None) is None
         assert _cap_chunk(True) is True
 
     def test_format_session_update_caps_agent_message_chunk(self) -> None:
-        from agentao.acp_client.manager.helpers import (
+        from arbiter.acp_client.manager.helpers import (
             _format_session_update,
             _MAX_CHUNK_DISPLAY_CHARS,
         )
@@ -445,7 +445,7 @@ class TestChunkCap:
         assert "truncated 100 chars" in out
 
     def test_format_session_update_caps_agent_thought_chunk(self) -> None:
-        from agentao.acp_client.manager.helpers import (
+        from arbiter.acp_client.manager.helpers import (
             _format_session_update,
             _MAX_CHUNK_DISPLAY_CHARS,
         )
@@ -460,7 +460,7 @@ class TestChunkCap:
         assert "truncated 7 chars" in _format_session_update(params)
 
     def test_extract_display_text_caps_permission_title(self) -> None:
-        from agentao.acp_client.manager.helpers import (
+        from arbiter.acp_client.manager.helpers import (
             _extract_display_text,
             _MAX_CHUNK_DISPLAY_CHARS,
         )
@@ -473,7 +473,7 @@ class TestChunkCap:
         assert len(out) <= _MAX_CHUNK_DISPLAY_CHARS + 64
 
     def test_extract_display_text_caps_ask_user_question(self) -> None:
-        from agentao.acp_client.manager.helpers import (
+        from arbiter.acp_client.manager.helpers import (
             _extract_display_text,
             _MAX_CHUNK_DISPLAY_CHARS,
         )
@@ -489,7 +489,7 @@ class TestAggregateRenderCap:
     def test_flush_bounds_accumulated_agent_text(self, monkeypatch) -> None:
         import io
         from rich.console import Console
-        import agentao.acp_client.render as render_mod
+        import arbiter.acp_client.render as render_mod
 
         # Shrink the aggregate bound so the test stays cheap.
         monkeypatch.setattr(render_mod, "_MAX_AGENT_RENDER_CHARS", 1000)
@@ -529,7 +529,7 @@ class TestLogOnlySanitized:
                 update_kind="tool_call",  # a log-only kind
             ),
         ]
-        with caplog.at_level(logging.DEBUG, logger="agentao.acp_client"):
+        with caplog.at_level(logging.DEBUG, logger="arbiter.acp_client"):
             flush_to_console(msgs, c)
         joined = "".join(r.getMessage() for r in caplog.records)
         assert "\x1b" not in joined

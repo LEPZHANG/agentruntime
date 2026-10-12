@@ -1,7 +1,7 @@
 # Metacognitive Boundary as a Host-Injectable Protocol
 
 **Status:** Design record. Decision captured 2026-04-29. Implementation deferred.
-**Audience:** agentao maintainers and host integrators considering self-vs-project
+**Audience:** arbiter maintainers and host integrators considering self-vs-project
 boundary semantics.
 **Companion:** `metacognitive-boundary.zh.md`.
 
@@ -18,9 +18,9 @@ Concrete failure modes:
   prompt template instead of updating its own configuration.
 - User pastes a GitHub URL and asks "install this skill" → agent commits the URL into
   project source as a TODO instead of installing into the agent's skills directory.
-- User asks an agent in a harness's own source tree (e.g. agentao itself) to "调一下
+- User asks an agent in a harness's own source tree (e.g. arbiter itself) to "调一下
   你的 tool 执行循环" → "你" is genuinely ambiguous between (a) the agent harness
-  Claude Code is running on, and (b) the agentao module being developed.
+  Claude Code is running on, and (b) the arbiter module being developed.
 
 A "metacognitive boundary" addresses these by making explicit which operations
 target the **agent layer** versus the **project layer** versus other categories.
@@ -51,24 +51,24 @@ references at the end of this document.
 
 ## Decision
 
-agentao **does not** ship a fixed metacognitive-boundary block in its system prompt.
-agentao ships:
+arbiter **does not** ship a fixed metacognitive-boundary block in its system prompt.
+arbiter ships:
 
 1. A **schema** — invariants every host's boundary must satisfy.
 2. A **default content set** — what gets injected if a host does nothing.
 3. A **host-override protocol** — the contract by which embedders supply their own
    identity, paths, vocabulary, and disambiguation defaults.
 
-Rationale: agentao's defining positioning is **embedded harness**. The 13 surveyed
+Rationale: arbiter's defining positioning is **embedded harness**. The 13 surveyed
 agents are single-tenant CLIs that own their entire UX, so they can hard-code their
-boundary. agentao runs inside heterogeneous host applications (CLI, IDE plugin,
+boundary. arbiter runs inside heterogeneous host applications (CLI, IDE plugin,
 internal data tool, customer-facing SaaS) whose UX semantics differ — what counts as
 a "project object" or where the "agent home" lives is host-specific by definition.
 Hard-coding would force every host into a CLI-shaped mental model. Capability
-injection is the discipline agentao already follows for tools, skills, memory
+injection is the discipline arbiter already follows for tools, skills, memory
 backends, and MCP; metacognitive boundary is the same kind of concern.
 
-## Schema (agentao-defined invariants)
+## Schema (arbiter-defined invariants)
 
 These are stable across hosts — the host cannot opt out of them, only fill them in.
 
@@ -88,7 +88,7 @@ These are stable across hosts — the host cannot opt out of them, only fill the
    when the host explicitly designates an in-project identifier with the same
    spelling.
 5. **Harness-self-development opt-in.** When the host declares the working area is
-   the source of an agent framework (including agentao itself, or another agent
+   the source of an agent framework (including arbiter itself, or another agent
    project), priority reverses for that area: in-project files matching agent-layer
    names (`skills/`, `memory/`, `agent.py`, etc.) are **project objects**, not agent
    objects. Modifying agent self-state still goes to the agent home.
@@ -108,19 +108,19 @@ The host supplies, at embed time, the values that fill the schema:
 
 ## Default content set
 
-A CLI-like default ships with agentao for hosts that do not override. Approximate
+A CLI-like default ships with arbiter for hosts that do not override. Approximate
 shape (~25 lines, generated from defaults; not a literal prompt fragment to paste
 verbatim into a host's system prompt):
 
-> I am agentao, running in `${WORKING_DIR}`. I act on the USER's behalf — I do not
+> I am arbiter, running in `${WORKING_DIR}`. I act on the USER's behalf — I do not
 > explain how to do things, I do them.
 >
-> "You" refers to me (agentao); "USER" refers to the human, unless project code uses
+> "You" refers to me (arbiter); "USER" refers to the human, unless project code uses
 > the same identifier.
 >
 > Operation classes by location:
 > - **Project objects** — files under `${WORKING_DIR}`.
-> - **Agent objects** — files under `${AGENT_HOME}` (default `~/.agentao/`):
+> - **Agent objects** — files under `${AGENT_HOME}` (default `~/.arbiter/`):
 >   skills, memory, tool config, system prompt.
 > - **External objects** — accessed via WebFetch / API / MCP.
 > - **User-intent objects** — text I produce without persisting.
@@ -152,7 +152,7 @@ Continue.dev as open-source self-developable harnesses).
 
 - Not an implementation plan. The protocol's interface signature, the integration
   point in `agent.py::_build_system_prompt`, the migration of any boundary content
-  out of `AGENTAO.md`, and the per-host default tuning are deferred.
+  out of `ARBITER.md`, and the per-host default tuning are deferred.
 - Not a finished prompt. The default-content sketch above is illustrative, not
   ready-to-ship copy.
 - Not a recommendation that hosts should override every slot. Most hosts will adopt

@@ -1,6 +1,6 @@
 # 3.5 Zed / IDE Integration Walkthrough
 
-Zed's external-agent feature speaks ACP natively — meaning Agentao drops into Zed with no custom glue. The same pattern applies to any IDE / editor that supports external ACP agents. This section shows the end-to-end wiring.
+Zed's external-agent feature speaks ACP natively — meaning Arbiter drops into Zed with no custom glue. The same pattern applies to any IDE / editor that supports external ACP agents. This section shows the end-to-end wiring.
 
 ## 3.5.1 What "ACP integration" means in an IDE
 
@@ -14,16 +14,16 @@ An IDE that implements the ACP client side can:
 
 The user just adds your agent in the IDE's settings — everything else is transport.
 
-## 3.5.2 Registering Agentao with Zed
+## 3.5.2 Registering Arbiter with Zed
 
-Zed reads its agent config from `~/.config/zed/settings.json` (or the UI's **Settings → Agents**). Add an entry that points to `agentao --acp --stdio`:
+Zed reads its agent config from `~/.config/zed/settings.json` (or the UI's **Settings → Agents**). Add an entry that points to `arbiter --acp --stdio`:
 
 ```json
 {
   "agents": [
     {
-      "name": "agentao",
-      "command": "agentao",
+      "name": "arbiter",
+      "command": "arbiter",
       "args": ["--acp", "--stdio"],
       "env": {
         "OPENAI_API_KEY": "sk-...",
@@ -34,13 +34,13 @@ Zed reads its agent config from `~/.config/zed/settings.json` (or the UI's **Set
 }
 ```
 
-Restart Zed, open any project, and Agentao appears in the agent picker.
+Restart Zed, open any project, and Arbiter appears in the agent picker.
 
 ### Notes
 
-- `command` must be on `PATH`. If you installed via `uv tool install agentao`, it's already there. Otherwise use the absolute path: `/Users/you/.local/bin/agentao`
+- `command` must be on `PATH`. If you installed via `uv tool install arbiter`, it's already there. Otherwise use the absolute path: `/Users/you/.local/bin/arbiter`
 - The `env` block is merged with Zed's own environment. Prefer pulling API keys from `~/.zshenv` / `~/.bashrc` and leaving them out of `settings.json`
-- Zed passes the workspace root as `cwd` in `session/new` — so `AGENTAO.md`, `.agentao/mcp.json`, skills, memory are all workspace-scoped automatically
+- Zed passes the workspace root as `cwd` in `session/new` — so `ARBITER.md`, `.arbiter/mcp.json`, skills, memory are all workspace-scoped automatically
 
 ## 3.5.3 End-to-end wire trace
 
@@ -49,20 +49,20 @@ What happens when the user types a message in Zed's agent pane:
 ```
 USER types "find TODOs" in Zed                               time
                                                               ────▶
-Zed → agentao:  initialize (once per launch)
-agentao → Zed:  capabilities + extensions
+Zed → arbiter:  initialize (once per launch)
+arbiter → Zed:  capabilities + extensions
 
-Zed → agentao:  session/new  {cwd: "/workspace"}
-agentao → Zed:  {sessionId: "sess-1"}
+Zed → arbiter:  session/new  {cwd: "/workspace"}
+arbiter → Zed:  {sessionId: "sess-1"}
 
-Zed → agentao:  session/prompt  {sessionId, prompt:[{"type":"text",
+Zed → arbiter:  session/prompt  {sessionId, prompt:[{"type":"text",
                                                       "text":"find TODOs"}]}
 
-agentao → Zed:  session/update  agent_message_chunk  "Let me search..."
-agentao → Zed:  session/update  tool_call            {title:"grep -r TODO"}
-agentao → Zed:  session/update  tool_call_update     {output:"src/x.py:42: TODO ..."}
-agentao → Zed:  session/update  agent_message_chunk  "Found 3 TODOs in..."
-agentao → Zed:  response        {stopReason: "end_turn"}
+arbiter → Zed:  session/update  agent_message_chunk  "Let me search..."
+arbiter → Zed:  session/update  tool_call            {title:"grep -r TODO"}
+arbiter → Zed:  session/update  tool_call_update     {output:"src/x.py:42: TODO ..."}
+arbiter → Zed:  session/update  agent_message_chunk  "Found 3 TODOs in..."
+arbiter → Zed:  response        {stopReason: "end_turn"}
 
 (ongoing)       session/update  notifications stream to Zed's UI
 ```
@@ -71,7 +71,7 @@ Zed renders each `session/update` as you'd expect: text chunks stream into the r
 
 ## 3.5.4 Required Zed capabilities
 
-Agentao advertises the following in `initialize`:
+Arbiter advertises the following in `initialize`:
 
 ```json
 {
@@ -96,10 +96,10 @@ Zed falls back gracefully on unsupported capabilities.
 
 ## 3.5.5 Multi-workspace & multi-window
 
-Zed spawns **one `agentao` subprocess per agent instance**, and creates separate sessions via `session/new` for each project. That means:
+Zed spawns **one `arbiter` subprocess per agent instance**, and creates separate sessions via `session/new` for each project. That means:
 
-- Multiple Zed windows share one `agentao` process
-- Each workspace's `.agentao/memory.db` is isolated by `cwd`
+- Multiple Zed windows share one `arbiter` process
+- Each workspace's `.arbiter/memory.db` is isolated by `cwd`
 - MCP servers spawned via per-session `mcpServers` are scoped to that session
 
 If you prefer one process per workspace (tighter isolation, higher RAM), configure Zed to spawn a separate agent per workspace — consult Zed's own docs for the latest toggle name.
@@ -108,7 +108,7 @@ If you prefer one process per workspace (tighter isolation, higher RAM), configu
 
 The pattern repeats:
 
-1. Launch `agentao --acp --stdio` as a child process
+1. Launch `arbiter --acp --stdio` as a child process
 2. Speak NDJSON JSON-RPC 2.0 over stdio
 3. Wire `session/update` → UI, `session/request_permission` → modal
 
@@ -120,26 +120,26 @@ JetBrains IDEs can spawn subprocesses from plugins; the ACP client can be implem
 
 ### Neovim
 
-Use `vim.fn.jobstart()` (Lua) or similar to spawn `agentao --acp --stdio`. Forward `session/update` to a floating window. Community plugins for LSP transport make this straightforward.
+Use `vim.fn.jobstart()` (Lua) or similar to spawn `arbiter --acp --stdio`. Forward `session/update` to a floating window. Community plugins for LSP transport make this straightforward.
 
 ## 3.5.7 Environment & secrets
 
 Across every IDE:
 
 - **Never** commit API keys into workspace settings
-- Prefer OS keychain (`security` on macOS, Credential Manager on Windows, `secret-tool` on Linux) + a small wrapper script that reads the key and execs `agentao`
+- Prefer OS keychain (`security` on macOS, Credential Manager on Windows, `secret-tool` on Linux) + a small wrapper script that reads the key and execs `arbiter`
 - Or: require the user to set `OPENAI_API_KEY` in their shell profile, and let the IDE inherit the environment
 
 Example wrapper (macOS):
 
 ```bash
 #!/usr/bin/env bash
-# /usr/local/bin/agentao-wrapper
+# /usr/local/bin/arbiter-wrapper
 export OPENAI_API_KEY="$(security find-generic-password -ws openai-api-key)"
-exec agentao "$@"
+exec arbiter "$@"
 ```
 
-Point the IDE at `agentao-wrapper` instead of `agentao`.
+Point the IDE at `arbiter-wrapper` instead of `arbiter`.
 
 ## 3.5.8 Debugging integration issues
 
@@ -148,30 +148,30 @@ When things go wrong in the IDE:
 | Symptom | Where to look |
 |---------|---------------|
 | Agent doesn't appear in picker | IDE's own log (e.g. Zed's `Help → Open Log`) |
-| Agent crashes on first message | `<workspace>/agentao.log` |
+| Agent crashes on first message | `<workspace>/arbiter.log` |
 | Tool call hangs forever | IDE is probably not responding to `session/request_permission` — look at its permission UI code |
 | All text comes as one big blob at end | IDE isn't treating `session/update` as streamed; check its UI rendering |
 | MCP server doesn't show up | `mcpCapabilities.http` is true — stdio, Streamable HTTP, or SSE all work; check the entry's `type`/`url`/`command` |
 | Conversation disappears after restart | IDE isn't calling `session/load` — feature may not be implemented yet |
 
-Capture the wire trace by launching Agentao manually and piping JSON in:
+Capture the wire trace by launching Arbiter manually and piping JSON in:
 
 ```bash
 # Send hand-crafted JSON via stdin
-agentao --acp --stdio < trace.ndjson > output.ndjson 2> agentao.stderr.log
+arbiter --acp --stdio < trace.ndjson > output.ndjson 2> arbiter.stderr.log
 ```
 
-This bisects whether the issue is in your JSON, in Agentao's handling, or in the IDE's rendering.
+This bisects whether the issue is in your JSON, in Arbiter's handling, or in the IDE's rendering.
 
-## 3.5.9 Upgrading Agentao cleanly
+## 3.5.9 Upgrading Arbiter cleanly
 
-When a user updates the `agentao` binary:
+When a user updates the `arbiter` binary:
 
 - Zed / VS Code spawn a new process on next launch — no action needed
-- `protocolVersion` negotiation handles version mismatch: if the IDE sends version `2` and Agentao supports `1`, Agentao returns `1` and the IDE either continues or disconnects
+- `protocolVersion` negotiation handles version mismatch: if the IDE sends version `2` and Arbiter supports `1`, Arbiter returns `1` and the IDE either continues or disconnects
 - Skills, MCP, and memory are **workspace-scoped**, so they survive binary upgrades
 
-Breaking protocol changes are avoided. If you need to pin a specific version, ask users to install with `uv tool install agentao==0.2.14`.
+Breaking protocol changes are avoided. If you need to pin a specific version, ask users to install with `uv tool install arbiter==0.2.14`.
 
 ## 3.5.10 Checklist for a new IDE integration
 

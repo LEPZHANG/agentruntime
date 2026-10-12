@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from agentao.plugins.models import (
+from arbiter.plugins.models import (
     LoadedPlugin,
     PluginCommandMetadata,
     PluginLoadError,
     PluginManifest,
     PluginSkillEntry,
 )
-from agentao.embedding.plugins.resolvers.skills import resolve_plugin_entries
-from agentao.plugins.skills import validate_no_external_collisions
+from arbiter.embedding.plugins.resolvers.skills import resolve_plugin_entries
+from arbiter.plugins.skills import validate_no_external_collisions
 
 
 # ======================================================================
@@ -341,7 +341,7 @@ class TestCollisionDetection:
 
 class TestSkillManagerRegistration:
     def test_register_plugin_skills(self, tmp_path):
-        from agentao.skills.manager import SkillManager
+        from arbiter.skills.manager import SkillManager
 
         mgr = SkillManager(skills_dir=str(tmp_path / "empty"))
 
@@ -370,7 +370,7 @@ class TestSkillManagerRegistration:
         assert mgr.available_skills["demo:linter"]["source_kind"] == "plugin-skill"
 
     def test_register_collision_with_builtin(self, tmp_path):
-        from agentao.skills.manager import SkillManager
+        from arbiter.skills.manager import SkillManager
 
         # Create a "native" skill first.
         native_skill = tmp_path / "native-skills" / "my-skill"
@@ -394,7 +394,7 @@ class TestSkillManagerRegistration:
         assert "collides" in errors[0].message.lower()
 
     def test_get_skill_content_inline(self, tmp_path):
-        from agentao.skills.manager import SkillManager
+        from arbiter.skills.manager import SkillManager
 
         mgr = SkillManager(skills_dir=str(tmp_path / "empty"))
         entry = PluginSkillEntry(
@@ -409,7 +409,7 @@ class TestSkillManagerRegistration:
         assert content == "# Inline\n\nInline content here."
 
     def test_plugin_skills_appear_in_listing(self, tmp_path):
-        from agentao.skills.manager import SkillManager
+        from arbiter.skills.manager import SkillManager
 
         mgr = SkillManager(skills_dir=str(tmp_path / "empty"))
         entry = PluginSkillEntry(

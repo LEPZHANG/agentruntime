@@ -1,6 +1,6 @@
-# Agentao K8S 迁移改造
+# Arbiter K8S 迁移改造
 
-将 Agentao 部署到 Kubernetes 时，原有的单机安全假设不再完全适用。容器本身就是隔离边界，部分本地防护可以降级或转由 K8S 原生机制接管。
+将 Arbiter 部署到 Kubernetes 时，原有的单机安全假设不再完全适用。容器本身就是隔离边界，部分本地防护可以降级或转由 K8S 原生机制接管。
 
 本文档记录五项改造的内容、改动范围、改进与风险消除。
 
@@ -29,8 +29,8 @@
 ### 改动文件
 
 ```
-agentao/permissions.py        — PermissionEngine 已有 enable_hardline 参数
-agentao/embedding/factory.py  — 新增环境变量/配置读取，注入该参数
+arbiter/permissions.py        — PermissionEngine 已有 enable_hardline 参数
+arbiter/embedding/factory.py  — 新增环境变量/配置读取，注入该参数
 ```
 
 ### 改动方式
@@ -39,7 +39,7 @@ agentao/embedding/factory.py  — 新增环境变量/配置读取，注入该参
 
 ```python
 # build_from_environment() 内
-hardline_enabled = os.getenv("AGENTAO_HARDLINE_ENABLED", "1") != "0"
+hardline_enabled = os.getenv("ARBITER_HARDLINE_ENABLED", "1") != "0"
 permission_engine = PermissionEngine(
     project_root=wd,
     user_root=ur,
@@ -53,7 +53,7 @@ K8S Deployment 通过环境变量控制：
 
 ```yaml
 env:
-  - name: AGENTAO_HARDLINE_ENABLED
+  - name: ARBITER_HARDLINE_ENABLED
     value: "0"
 ```
 
@@ -77,7 +77,7 @@ env:
 ### 改动文件
 
 ```
-agentao/security/url_policy.py  — _LOCAL_HOSTNAMES / _LOCAL_HOST_SUFFIXES 扩容
+arbiter/security/url_policy.py  — _LOCAL_HOSTNAMES / _LOCAL_HOST_SUFFIXES 扩容
 ```
 
 ### 新增黑名单
@@ -143,13 +143,13 @@ _LOCAL_HOST_SUFFIXES = (
 
 ### 改了什么
 
-当前 `.agentao/memory.db` 和 `.agentao/sessions/*.json` 写在本地磁盘。Pod 重建后数据丢失。改为支持通过环境变量配置存储路径，使其可以挂载 PVC。
+当前 `.arbiter/memory.db` 和 `.arbiter/sessions/*.json` 写在本地磁盘。Pod 重建后数据丢失。改为支持通过环境变量配置存储路径，使其可以挂载 PVC。
 
 ### 改动文件
 
 ```
-agentao/embedding/factory.py  — memory.db 路径支持环境变量覆盖
-agentao/embedding/sessions.py — session 保存/读取路径支持环境变量覆盖
+arbiter/embedding/factory.py  — memory.db 路径支持环境变量覆盖
+arbiter/embedding/sessions.py — session 保存/读取路径支持环境变量覆盖
 ```
 
 ### 改动方式
@@ -158,16 +158,16 @@ agentao/embedding/sessions.py — session 保存/读取路径支持环境变量�
 # factory.py :: build_from_environment()
 # 当前:
 project_store = SQLiteMemoryStore.open_or_memory(
-    wd / ".agentao" / "memory.db"
+    wd / ".arbiter" / "memory.db"
 )
 
 # 改为:
-memory_path = os.getenv("AGENTAO_MEMORY_DB_PATH")  # 可选，默认 None
+memory_path = os.getenv("ARBITER_MEMORY_DB_PATH")  # 可选，默认 None
 if memory_path:
     project_store = SQLiteMemoryStore.open_or_memory(Path(memory_path))
 else:
     project_store = SQLiteMemoryStore.open_or_memory(
-        wd / ".agentao" / "memory.db"
+        wd / ".arbiter" / "memory.db"
     )
 ```
 
@@ -176,15 +176,15 @@ else:
 # 当前:
 def _session_dir(project_root=None):
     root = project_root if project_root else Path.cwd()
-    return root / ".agentao" / "sessions"
+    return root / ".arbiter" / "sessions"
 
 # 改为:
 def _session_dir(project_root=None):
-    override = os.getenv("AGENTAO_SESSION_DIR")
+    override = os.getenv("ARBITER_SESSION_DIR")
     if override:
         return Path(override)
     root = project_root if project_root else Path.cwd()
-    return root / ".agentao" / "sessions"
+    return root / ".arbiter" / "sessions"
 ```
 
 ### K8S 部署配置
@@ -193,14 +193,14 @@ def _session_dir(project_root=None):
 apiVersion: apps/v1
 kind: StatefulSet    # 必须 StatefulSet，保证每个 pod 独立 PVC
 spec:
-  serviceName: agentao
+  serviceName: arbiter
   template:
     spec:
       containers:
         - env:
-            - name: AGENTAO_MEMORY_DB_PATH
+            - name: ARBITER_MEMORY_DB_PATH
               value: /data/memory.db
-            - name: AGENTAO_SESSION_DIR
+            - name: ARBITER_SESSION_DIR
               value: /data/sessions
           volumeMounts:
             - name: data
@@ -235,13 +235,13 @@ spec:
 
 ### 改了什么
 
-当前权限规则从 `~/.agentao/permissions.json` 读取（用户主目录）。K8S 中用户主目录不存在，改为从 ConfigMap 挂载的路径 `/etc/agentao/permissions.json` 读取。
+当前权限规则从 `~/.arbiter/permissions.json` 读取（用户主目录）。K8S 中用户主目录不存在，改为从 ConfigMap 挂载的路径 `/etc/arbiter/permissions.json` 读取。
 
 ### 改动文件
 
 ```
-agentao/embedding/permission_loader.py  — 新增 K8S 配置路径
-agentao/embedding/factory.py            — 传递规则给 PermissionEngine
+arbiter/embedding/permission_loader.py  — 新增 K8S 配置路径
+arbiter/embedding/factory.py            — 传递规则给 PermissionEngine
 ```
 
 ### 改动方式
@@ -253,11 +253,11 @@ def load_permission_rules(*, project_root, user_root):
     rules = []
 
     # 1. K8S ConfigMap 优先级最高（集群运维人员策略）
-    k8s_path = Path("/etc/agentao/permissions.json")
+    k8s_path = Path("/etc/arbiter/permissions.json")
     if k8s_path.is_file():
         k8s_rules, k8s_loaded = _read_rule_file(k8s_path)
         if k8s_loaded:
-            sources.append("k8s:/etc/agentao/permissions.json")
+            sources.append("k8s:/etc/arbiter/permissions.json")
             rules = k8s_rules          # K8S 规则优先
 
     # 2. 用户规则（兜底）
@@ -269,7 +269,7 @@ def load_permission_rules(*, project_root, user_root):
             rules = user_rules
 
     # 3. 项目规则警告（不变）
-    project_path = project_root / ".agentao" / "permissions.json"
+    project_path = project_root / ".arbiter" / "permissions.json"
     if project_path.exists():
         logger.warning("Ignoring project-scope permissions.json (unchanged)")
 
@@ -282,7 +282,7 @@ def load_permission_rules(*, project_root, user_root):
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: agentao-permissions
+  name: arbiter-permissions
 data:
   permissions.json: |
     {
@@ -299,11 +299,11 @@ spec:
   volumes:
     - name: permissions
       configMap:
-        name: agentao-permissions
+        name: arbiter-permissions
   containers:
     - volumeMounts:
         - name: permissions
-          mountPath: /etc/agentao/permissions
+          mountPath: /etc/arbiter/permissions
 ```
 
 ```yaml
@@ -311,7 +311,7 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agentao-llm
+  name: arbiter-llm
 type: Opaque
 stringData:
   OPENAI_API_KEY: "sk-..."
@@ -342,8 +342,8 @@ stringData:
 ### 改动文件
 
 ```
-agentao/capabilities/process.py  — 新增 K8sShellExecutor
-agentao/capabilities/shell.py   — 新增 K8S exec 执行路径
+arbiter/capabilities/process.py  — 新增 K8sShellExecutor
+arbiter/capabilities/shell.py   — 新增 K8S exec 执行路径
 ```
 
 ### 改动方式
@@ -358,9 +358,9 @@ class K8sShellExecutor:
 
     def run(self, command: str, timeout: int = 60) -> subprocess.CompletedProcess:
         """kubectl exec 到目标 pod 执行命令。"""
-        target_pod = os.getenv("AGENTAO_TARGET_POD")
-        target_ns = os.getenv("AGENTAO_TARGET_NAMESPACE", "default")
-        target_container = os.getenv("AGENTAO_TARGET_CONTAINER", "")
+        target_pod = os.getenv("ARBITER_TARGET_POD")
+        target_ns = os.getenv("ARBITER_TARGET_NAMESPACE", "default")
+        target_container = os.getenv("ARBITER_TARGET_CONTAINER", "")
 
         if not target_pod:
             # 未配置目标 pod → 回退到本地执行
@@ -380,7 +380,7 @@ class K8sShellExecutor:
 ```python
 # shell.py :: LocalShellExecutor.run()
 # 添加执行后端选择:
-executor_backend = os.getenv("AGENTAO_SHELL_BACKEND", "local")
+executor_backend = os.getenv("ARBITER_SHELL_BACKEND", "local")
 if executor_backend == "k8s":
     executor = K8sShellExecutor()
     return executor.run(command, timeout=timeout)
@@ -393,7 +393,7 @@ if executor_backend == "k8s":
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agentao
+  name: arbiter
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -410,24 +410,24 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: agentao-pod-exec
+  name: arbiter-pod-exec
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: pod-exec
 subjects:
   - kind: ServiceAccount
-    name: agentao
+    name: arbiter
 ---
 apiVersion: v1
 kind: Pod
 spec:
-  serviceAccountName: agentao
+  serviceAccountName: arbiter
   containers:
     - env:
-        - name: AGENTAO_SHELL_BACKEND
+        - name: ARBITER_SHELL_BACKEND
           value: "k8s"
-        - name: AGENTAO_TARGET_POD
+        - name: ARBITER_TARGET_POD
           value: "worker-pod"    # 命令在此 pod 中执行
 ```
 
@@ -452,12 +452,12 @@ spec:
 
 | 文件 | 新增行数 | 修改类型 |
 |---|---|---|
-| `agentao/permissions.py` | ~0 | 无需改代码，已有参数 |
-| `agentao/embedding/factory.py` | ~15 | 读取环境变量并传递 |
-| `agentao/security/url_policy.py` | ~10 | 常量扩容 |
-| `agentao/embedding/permission_loader.py` | ~15 | 新增 K8S 文件路径 |
-| `agentao/embedding/sessions.py` | ~10 | 新增路径环境变量覆盖 |
-| `agentao/capabilities/process.py` | ~40 | 新增 K8sShellExecutor 类 |
+| `arbiter/permissions.py` | ~0 | 无需改代码，已有参数 |
+| `arbiter/embedding/factory.py` | ~15 | 读取环境变量并传递 |
+| `arbiter/security/url_policy.py` | ~10 | 常量扩容 |
+| `arbiter/embedding/permission_loader.py` | ~15 | 新增 K8S 文件路径 |
+| `arbiter/embedding/sessions.py` | ~10 | 新增路径环境变量覆盖 |
+| `arbiter/capabilities/process.py` | ~40 | 新增 K8sShellExecutor 类 |
 | **合计** | **~90 行** | 新增代码，不删不改现有逻辑 |
 
 ### 崩溃风险评估

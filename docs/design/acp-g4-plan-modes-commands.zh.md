@@ -7,25 +7,25 @@ chat 相关 ACP 差距。`modes` 部分按设计落地（且 `--resume` 路径�
 的 `/code-review` 中被纠正**：plan 现**延迟到 `TOOL_COMPLETE`（仅 `status=="ok"` 时发）**，而非在
 `TOOL_START`——后者在**权限判定之前**触发（被拒的 `todo_write` 会显示一个幻象「已生效」plan），且会
 把空/畸形回落的 `tool_call` 变成孤儿；校验改为**全有或全无**。§4.2 与 §7 描述最终落地设计。
-**读者：** Agentao 维护者；DeepChat/TensorChat 集成负责人。
+**读者：** Arbiter 维护者；DeepChat/TensorChat 集成负责人。
 **对照件：** `acp-g4-plan-modes-commands.md`。
 **相关：**
 - `acp-server-conformance-review.md` —— 定义了 G4 与本设计所服务的 chat/automation 决定。
 - `deepchat-acp-patch-revision.md` —— `session/set_mode` accept-unknown + 自由文本模型；§4.1 的兼容约束源于此。
 - `embedding-vs-acp.md` —— ACP 是嵌入式内核之上的前端；映射应留在 ACP 层，而非 runtime。
 
-**方法：** ACP 形状逐字引自官方 v1 schema（`schema/v1/schema.json`，2026-06-18 拉取）。agentao
+**方法：** ACP 形状逐字引自官方 v1 schema（`schema/v1/schema.json`，2026-06-18 拉取）。arbiter
 原语锚定 `main`@`bcdb8e4`。下文每条映射都对照了真实源码——无凭直觉的映射。
 
 ---
 
 ## TL;DR
 
-G4 把 Agentao 三个内部概念暴露为 chat client 能原生渲染的标准 ACP `session/update` 通知：
+G4 把 Arbiter 三个内部概念暴露为 chat client 能原生渲染的标准 ACP `session/update` 通知：
 **任务清单**（→ `plan`）、**权限模式**（→ `modes` + `current_mode_update`）、**斜杠命令**
 （→ `available_commands_update`）。每个都对应一个现有原语：
 
-| ACP 面（schema 实证） | Agentao 原语 | 契合 | 建议 |
+| ACP 面（schema 实证） | Arbiter 原语 | 契合 | 建议 |
 |---|---|---|---|
 | `plan` 更新 —— `Plan{entries:[PlanEntry{content, priority, status}]}` | `todo_write` 工具（`tools/todo.py`）；`todos:[{content,status}]`，status 枚举完全一致 | 高——仅缺 `priority` | **第二做**——transport 映射，**延迟到 `TOOL_COMPLETE`-on-`ok`**，合成 `priority:"medium"` |
 | `modes`（session/new）+ `current_mode_update` | `PermissionMode{read-only, workspace-write, full-access, plan}`（`permissions.py:75`）；把既有的宽松 `modes` schema 字段 typed 化；`current_mode_update` **从 set_mode handler 发** | 高——4 个 preset → availableModes | **第一做**——最小、一致性收益最高 |
@@ -37,7 +37,7 @@ G4 把 Agentao 三个内部概念暴露为 chat client 能原生渲染的标准 
 核实时顺手发现两个一致性细节（回填进 review doc）：**(1)** ACP `ToolKind` 有 **10** 个值
 （`read, edit, delete, move, search, execute, think, fetch, switch_mode, other`）——review 写的是
 9。**(2)** ACP 标准 `SetSessionModeResponse` 是**空对象**，模式变更经 `current_mode_update` 传达，
-而 agentao 现在返回 `{modeId}`（`session_set_mode.py:86`）。
+而 arbiter 现在返回 `{modeId}`（`session_set_mode.py:86`）。
 
 ---
 
@@ -81,7 +81,7 @@ AvailableCommandInput   = { hint: string }                 // "命令名之后�
 
 ---
 
-## 3. Agentao 源原语
+## 3. Arbiter 源原语
 
 - **`todo_write`**（`tools/todo.py` —— `TodoWriteTool`）：持有 `self.todos:
   List[{content, status}]`；status 枚举 `pending|in_progress|completed` 与 `PlanEntryStatus`
@@ -105,7 +105,7 @@ AvailableCommandInput   = { hint: string }                 // "命令名之后�
 
 ### 4.1 Modes（第一做）
 
-**Schema**（`agentao/acp/schema.py`）：新增 `AcpSessionMode{id, name, description?}`、
+**Schema**（`arbiter/acp/schema.py`）：新增 `AcpSessionMode{id, name, description?}`、
 `AcpSessionModeState{currentModeId, availableModes}`、以及
 `AcpSessionUpdateCurrentMode{sessionUpdate:"current_mode_update", currentModeId}`；把后者加进
 `AcpSessionUpdate` 联合（`schema.py:567`）。注意 `modes` **已存在**于 session/new 响应上、是个
@@ -177,13 +177,13 @@ runtime 内部切换也能冒出来，但 handler 不得依赖它。）
 > 代价是 per-`call_id` 暂存——有界，因为 `TOOL_START`/`TOOL_COMPLETE` 必成对、完成时即 pop。
 > （`todo_write` 是无 `output_callback` 的纯同步工具，两者之间不会发 `TOOL_OUTPUT`，故无中间孤儿风险。）
 
-**priority**：agentao todo 无 priority，而 ACP 必填 → 全部发 `"medium"`。**本 PR 超范围：**给
+**priority**：arbiter todo 无 priority，而 ACP 必填 → 全部发 `"medium"`。**本 PR 超范围：**给
 `todo_write` 工具 schema 加 `priority` 字段——那会把一个 ACP 适配改动扩成 runtime/工具契约改动，不
 值得。零 runtime 改动：映射全在 ACP transport 内，符合 `embedding-vs-acp.md`。
 
 ### 4.3 Commands —— 延后，本轮不规划实现
 
-agentao 的斜杠命令是 host/CLI 子系统控制，在 ACP 上**对 agent runtime 无语义**；而 ACP 命令的
+arbiter 的斜杠命令是 host/CLI 子系统控制，在 ACP 上**对 agent runtime 无语义**；而 ACP 命令的
 *调用*是把命令当 `session/prompt` 文本回传（`UnstructuredCommandInput` = "命令名之后的所有文本"），
 需要 agent 端解析并 dispatch——这是与"广告"相互独立的一套机制。**不要照搬 CLI 命令列表。**
 
@@ -198,7 +198,7 @@ agentao 的斜杠命令是 host/CLI 子系统控制，在 ACP 上**对 agent run
 1. **ToolKind = 10 个值**，不是 9：`read, edit, delete, move, search, execute, think, fetch,
    switch_mode, other`。review 的 G2 注（以及本地 `kind` 枚举，现 6 个）应对齐到 10。`switch_mode`
    也是把"模式切换"呈现为 tool call 的候选 kind（可选）。
-2. **`session/set_mode` 响应**：ACP 标准为空、经 `current_mode_update` 传达变更。agentao 的
+2. **`session/set_mode` 响应**：ACP 标准为空、经 `current_mode_update` 传达变更。arbiter 的
    `{modeId}` 是非标准多余字段（为 DeepChat 保留）。G4.1 通过加这条通知来解决。
 
 ---
@@ -207,19 +207,19 @@ agentao 的斜杠命令是 host/CLI 子系统控制，在 ACP 上**对 agent run
 
 **PR-1 —— 且只有这一个 PR。两件事：** typed modes + `current_mode_update`，以及防御性的
 `todo_write`→`plan` transport 映射。
-- `agentao/acp/schema.py`：新增 `AcpSessionMode` / `AcpSessionModeState` /
+- `arbiter/acp/schema.py`：新增 `AcpSessionMode` / `AcpSessionModeState` /
   `AcpSessionUpdateCurrentMode` / `AcpPlanEntry` / `AcpSessionUpdatePlan`；**用
   `AcpSessionModeState` 替换宽松的 `modes: Optional[Dict[str,Any]]`**（`schema.py:198`）；把两个
   新 update 加进 `AcpSessionUpdate` 联合。重生成 `docs/schema/host.acp.v1.json`；更新 schema 快照测试。
-- `agentao/acp/transport.py`：`todo_write`→`plan`，**延迟到 `TOOL_COMPLETE`-on-`ok`**（在
+- `arbiter/acp/transport.py`：`todo_write`→`plan`，**延迟到 `TOOL_COMPLETE`-on-`ok`**（在
   `TOOL_START` 按 `call_id` 暂存；全有或全无校验；被拒/失败 → 不发 plan；空/畸形 → 回落 `tool_call`
   并正常 complete）。可选地也映射 `PERMISSION_MODE_CHANGED`→`current_mode_update` 求完整——但它对
   ACP 路径不是承重的（见 §4.1）。
-- `agentao/acp/_transport_helpers.py`：`_todo_write_plan`（全有或全无校验，合成 `priority:"medium"`）。
-- `agentao/acp/session_new.py`：响应里发 typed `modes`。
-- `agentao/acp/session_load.py`：`resume_session_on_new` 同样播报 typed `modes`，让 `--resume` 的
+- `arbiter/acp/_transport_helpers.py`：`_todo_write_plan`（全有或全无校验，合成 `priority:"medium"`）。
+- `arbiter/acp/session_new.py`：响应里发 typed `modes`。
+- `arbiter/acp/session_load.py`：`resume_session_on_new` 同样播报 typed `modes`，让 `--resume` 的
   client 与新建会话一样拿到模式选择器。
-- `agentao/acp/session_set_mode.py`：在 `session.mode_id = mode_id` 之后**从 handler 发
+- `arbiter/acp/session_set_mode.py`：在 `session.mode_id = mode_id` 之后**从 handler 发
   `current_mode_update`**；保留返回 `{modeId}` 给 DeepChat。
 - 测试：`tests/test_acp_transport.py`（plan 在 `TOOL_START` 暂存、`TOOL_COMPLETE`-`ok` 时才发；被拒/
   失败 → 不发 plan；空/畸形 → 回落 `tool_call` 并 complete；模式变更发 `current_mode_update`）、

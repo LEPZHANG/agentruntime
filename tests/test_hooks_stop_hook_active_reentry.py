@@ -8,9 +8,9 @@ of a fresh chat() (ChatLoopRunner is instantiated fresh each turn).
 
 from __future__ import annotations
 
-from agentao.cancellation import CancellationToken
-from agentao.plugins.models import StopHookResult
-from agentao.runtime.chat_loop import ChatLoopRunner
+from arbiter.cancellation import CancellationToken
+from arbiter.plugins.models import StopHookResult
+from arbiter.runtime.chat_loop import ChatLoopRunner
 
 from tests.support.stop_precompact import make_bare_agent, make_runner_with_stub_llm
 

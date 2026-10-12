@@ -18,10 +18,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from agentao.runtime.llm_call import run_llm_call
-from agentao.runtime.turn import run_turn
-from agentao.transport import EventType
-from agentao.transport.events import AgentEvent
+from arbiter.runtime.llm_call import run_llm_call
+from arbiter.runtime.turn import run_turn
+from arbiter.transport import EventType
+from arbiter.transport.events import AgentEvent
 
 
 class _CaptureTransport:
@@ -138,8 +138,8 @@ def test_turn_end_tool_count_zero_when_no_tools():
 
 
 def test_replay_adapter_mirrors_tool_count_on_turn_completed(tmp_path):
-    from agentao.replay import ReplayAdapter, ReplayReader, ReplayRecorder
-    from agentao.transport import NullTransport
+    from arbiter.replay import ReplayAdapter, ReplayReader, ReplayRecorder
+    from arbiter.transport import NullTransport
 
     rec = ReplayRecorder.create("sess", tmp_path)
     adapter = ReplayAdapter(NullTransport(), rec)

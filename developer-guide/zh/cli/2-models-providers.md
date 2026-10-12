@@ -147,9 +147,9 @@ LLM_EXTRA_BODY='{"reasoning_effort":"high"}'
 ---
 
 ::: info 这一章在体系里的位置
-CLI 用的是 `cli.agent.set_provider(api_key, base_url, model)` 和 `cli.agent.set_model(name)` — 这两个都是 `Agentao` 实例的公开方法，嵌入式宿主也可以调，效果完全一致（同一份内存里的会话）。嵌入式 API 的等价用法和线程注意事项见 [Part 2.5 · 运行时切换 LLM](/zh/part-2/5-runtime-llm-switch)。
+CLI 用的是 `cli.agent.set_provider(api_key, base_url, model)` 和 `cli.agent.set_model(name)` — 这两个都是 `Arbiter` 实例的公开方法，嵌入式宿主也可以调，效果完全一致（同一份内存里的会话）。嵌入式 API 的等价用法和线程注意事项见 [Part 2.5 · 运行时切换 LLM](/zh/part-2/5-runtime-llm-switch)。
 :::
 
 ::: tip 真相源头
-命令语法：`/help` 与 [`agentao/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/help_text.py)。Provider 发现逻辑：[`agentao/cli/commands.py:_list_providers_from_env`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands.py)。
+命令语法：`/help` 与 [`arbiter/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/help_text.py)。Provider 发现逻辑：[`arbiter/cli/commands.py:_list_providers_from_env`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands.py)。
 :::

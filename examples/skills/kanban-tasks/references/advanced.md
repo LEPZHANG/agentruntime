@@ -5,7 +5,7 @@
 `--executor multi-backend` 把卡按 `agent_profiles.yaml` 路由到不同 backend。
 
 - 配置文件：`<cwd>/.kanban/agent_profiles.yaml`，缺省回退 `docs/agent_profiles.sample.yaml`。
-- Backend：`subagent`（agentao 角色子 agent）/ `acp`（Anthropic Claude Pro 协议）。
+- Backend：`subagent`（arbiter 角色子 agent）/ `acp`（Anthropic Claude Pro 协议）。
 - `RouterPolicy`：可让 `kanban-router` agent 从角色的候选 profile 中挑一个。**永远不会**覆盖卡片 pin（`card.agent_profile`）或 planner 推荐；任何失败（disabled / 缺 spec / parse error / timeout）都降级到角色默认。
 
 ```bash
@@ -63,7 +63,7 @@ per-file 累加：到上限后剩余文件**跳过**，已复制保留——不�
 
 ## Mock 执行器细节
 
-`MockAgentaoExecutor` 是确定性状态机：每卡 `INBOX → READY → DOING → REVIEW → DONE`，不调任何 LLM。
+`MockArbiterExecutor` 是确定性状态机：每卡 `INBOX → READY → DOING → REVIEW → DONE`，不调任何 LLM。
 
 适用：
 
@@ -71,11 +71,11 @@ per-file 累加：到上限后剩余文件**跳过**，已复制保留——不�
 - 教学 / 演示。
 - 给新接入的 store / executor 做基线测试。
 
-不适用：要真改文件、真跑 review / verify 的场景——用 `--executor agentao` 或 `multi-backend`。
+不适用：要真改文件、真跑 review / verify 的场景——用 `--executor arbiter` 或 `multi-backend`。
 
-## 真跑（`--executor agentao`）
+## 真跑（`--executor arbiter`）
 
-四角色 sub-agent：`planner` / `worker` / `reviewer` / `verifier`，定义在 `.agentao/agents/kanban-<role>.md`。每次 `run()` 各角色一个 `agentao.Agentao` 实例，解析尾部 ```json 围栏（`{ok, summary, output[, acceptance_criteria][, blocked_reason]}`）。任何异常 → 卡进 `BLOCKED`。
+四角色 sub-agent：`planner` / `worker` / `reviewer` / `verifier`，定义在 `.arbiter/agents/kanban-<role>.md`。每次 `run()` 各角色一个 `arbiter.Arbiter` 实例，解析尾部 ```json 围栏（`{ok, summary, output[, acceptance_criteria][, blocked_reason]}`）。任何异常 → 卡进 `BLOCKED`。
 
 每条事件携带 `prompt_version` / `duration_ms` / 完整 raw 响应，便于审计。
 

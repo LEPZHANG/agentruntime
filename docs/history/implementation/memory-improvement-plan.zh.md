@@ -2,16 +2,16 @@
 
 状态：供后续继续研究与实施设计的草案
 
-本文档记录当前已经达成一致的 Agentao Memory 改进方案，目标是围绕现有架构做
+本文档记录当前已经达成一致的 Arbiter Memory 改进方案，目标是围绕现有架构做
 渐进式增强，而不是一次性重写。
 
 相关代码：
 
-- `agentao/memory/retriever.py`
-- `agentao/memory/manager.py`
-- `agentao/memory/render.py`
-- `agentao/memory/crystallizer.py`
-- `agentao/memory/storage.py`
+- `arbiter/memory/retriever.py`
+- `arbiter/memory/manager.py`
+- `arbiter/memory/render.py`
+- `arbiter/memory/crystallizer.py`
+- `arbiter/memory/storage.py`
 
 ## 目标
 
@@ -61,8 +61,8 @@
 
 实现说明：
 
-- budget enforcement 保持在 `agentao/memory/render.py`
-- selection policy 保持在 `agentao/memory/manager.py`
+- budget enforcement 保持在 `arbiter/memory/render.py`
+- selection policy 保持在 `arbiter/memory/manager.py`
 - renderer 侧截断逻辑与 manager 侧筛选逻辑必须保持一致，避免漂移
 - P1 落地后，默认从 stable block 中排除 superseded 记录
 
@@ -118,7 +118,7 @@
 
 主要文件：
 
-- `agentao/memory/retriever.py`
+- `arbiter/memory/retriever.py`
 
 ### P1：为历史型 memory 引入 append-only 语义
 
@@ -153,8 +153,8 @@ Schema 说明：
 
 - 本阶段需要 schema migration
 - migration 必须同时覆盖：
-  - project store：`.agentao/memory.db`
-  - user store：`<home>/.agentao/memory.db`
+  - project store：`.arbiter/memory.db`
+  - user store：`<home>/.arbiter/memory.db`
 - user store 可能不存在，必须安全跳过
 - migration 应在 `SQLiteMemoryStore` 初始化时幂等执行
 
@@ -166,9 +166,9 @@ ALTER TABLE memories ADD COLUMN is_superseded INTEGER NOT NULL DEFAULT 0;
 
 主要文件：
 
-- `agentao/memory/manager.py`
-- `agentao/memory/storage.py`
-- `agentao/memory/models.py`
+- `arbiter/memory/manager.py`
+- `arbiter/memory/storage.py`
+- `arbiter/memory/models.py`
 
 ### P2：LLM 结构化 episodic 提取 + 确定性的 review queue 入库
 
@@ -231,9 +231,9 @@ confidence: high
 
 主要文件：
 
-- `agentao/context_manager.py`
-- `agentao/memory/crystallizer.py`
-- `agentao/memory/manager.py`
+- `arbiter/context_manager.py`
+- `arbiter/memory/crystallizer.py`
+- `arbiter/memory/manager.py`
 
 ### P3：显式的只读 Memory Recall Tool
 

@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.10"
 
 [[package]]
-name = "agentao"
+name = "arbiter"
 source = { editable = "../../" }
 dependencies = [
     { name = "filelock" },
@@ -66,11 +66,11 @@ dev = [
 ]
 
 [[package]]
-name = "agentao-example-fastapi-background"
+name = "arbiter-example-fastapi-background"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "agentao" },
+    { name = "arbiter" },
     { name = "fastapi" },
     { name = "httpx" },
 ]
@@ -82,7 +82,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentao", editable = "../../" },
+    { name = "arbiter", editable = "../../" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.25" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },

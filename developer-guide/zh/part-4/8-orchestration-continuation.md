@@ -6,10 +6,10 @@
 > - 一个带时间/轮次预算的 **host 自有续航循环**,端到端(约 40 行)
 > - **为什么不用** `force_continue`(插件 `Stop` 钩子),以及边界在哪
 
-Agentao 的 CLI 自带 `/goal` 命令:一次声明目标,它就会跨多轮持续驱动 agent,
+Arbiter 的 CLI 自带 `/goal` 命令:一次声明目标,它就会跨多轮持续驱动 agent,
 直到目标被报告完成或受阻、或预算触限。本章讲的是**它背后的模式**,好让你在
-自己的 host 里复刻同样的能力。CLI 实现(`agentao/cli/commands/goal.py` +
-`agentao/cli/input_loop.py`)是范例;设计记录见
+自己的 host 里复刻同样的能力。CLI 实现(`arbiter/cli/commands/goal.py` +
+`arbiter/cli/input_loop.py`)是范例;设计记录见
 [`docs/design/codex-goal-mechanism-review.md`](https://github.com/jin-bo/agentao/blob/main/docs/design/codex-goal-mechanism-review.md) §11。
 
 ## 4.8.1 harness 没有"goal"—— 也不该有
@@ -27,7 +27,7 @@ harness 给的是**三个通用原语**,而"goal"就是 host 把它们组合进�
 | **注入工具** | `agent.add_tool(tool)` / `agent.remove_tool(name)` | 给 agent 一个发出*完成* / *受阻*信号的途径 |
 
 别无所需。时间与轮次预算纯属 host 记账(`chat()` 之间的墙钟;一个你自增的计数器)。
-Token 预算**不**在本模式内 —— Agentao 刻意把 goal 预算限定为时间/轮次,所以
+Token 预算**不**在本模式内 —— Arbiter 刻意把 goal 预算限定为时间/轮次,所以
 harness 无需任何用量观测原语。
 
 ## 4.8.2 续航循环
@@ -36,7 +36,7 @@ harness 无需任何用量观测原语。
 
 ```python
 import time
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 
 class UpdateGoalTool(Tool):
     """The agent's ONLY write into goal state: mark complete / blocked."""
@@ -118,7 +118,7 @@ def run_goal(agent, objective, *, max_turns=25, time_budget_s=7200):
 
 ## 4.8.4 为什么不用 `Stop` 钩子 / `force_continue`?
 
-Agentao 插件有个 `Stop` 钩子可以重入循环(`StopHookResult.force_continue`)。
+Arbiter 插件有个 `Stop` 钩子可以重入循环(`StopHookResult.force_continue`)。
 对 goal 而言它是**错的工具**:
 
 - 它被**硬上限**(`_stop_reentry_cap`,默认 3)钉死,作为失控护栏 —— 用于"再推一把"
@@ -130,7 +130,7 @@ goal 是 **host 自有**的循环:*你*掌握停止条件、预算与引导。`f
 
 ## 4.8.5 想要重启续命就持久化
 
-CLI 在每轮后把 goal 写入 `.agentao/goal.json`,使 goal 跨进程重启存活。持久化
+CLI 在每轮后把 goal 写入 `.arbiter/goal.json`,使 goal 跨进程重启存活。持久化
 完全在 host 侧 —— 上面的 `goal` dict 就变成一个小 JSON 文件;启动时重新载入,
 若仍是 `active` 或 `paused` 就提示恢复。harness 不参与。
 
@@ -143,5 +143,5 @@ CLI 在每轮后把 goal 写入 `.agentao/goal.json`,使 goal 跨进程重启存
 - [ ](可选)持久化状态以支持重启续命。
 - [ ] **不**建在 `force_continue` 上。
 
-→ 范例:`agentao/cli/input_loop.py::run_goal_continuation`。用户指南:
+→ 范例:`arbiter/cli/input_loop.py::run_goal_continuation`。用户指南:
 [长任务目标](https://github.com/jin-bo/agentao/blob/main/docs/guides/goal.md)。

@@ -1,14 +1,14 @@
 # 附录 E · 从 LangChain / AutoGen / CrewAI 迁移
 
-如果你已经在其他框架上建过 agent，Agentao 的心智模型大部分会让你觉得"眼熟"，但有几处承重点非常不同。本附录就是那本对照字典。
+如果你已经在其他框架上建过 agent，Arbiter 的心智模型大部分会让你觉得"眼熟"，但有几处承重点非常不同。本附录就是那本对照字典。
 
 ## E.1 一页心智对照表
 
-| 概念 | LangChain | AutoGen | CrewAI | Agentao |
+| 概念 | LangChain | AutoGen | CrewAI | Arbiter |
 |------|-----------|---------|--------|---------|
-| Agent 单元 | `AgentExecutor`（+ chain / graph） | `ConversableAgent` | `Agent` 角色 | `Agentao` 实例 |
+| Agent 单元 | `AgentExecutor`（+ chain / graph） | `ConversableAgent` | `Agent` 角色 | `Arbiter` 实例 |
 | 工具 | `BaseTool` | 带 docstring 的函数 | `tool` 装饰器 | `Tool` ABC |
-| 多 agent | LangGraph | `GroupChat` | `Crew` | 再起一个 `Agentao` 或 ACP 反向调另一个 |
+| 多 agent | LangGraph | `GroupChat` | `Crew` | 再起一个 `Arbiter` 或 ACP 反向调另一个 |
 | 记忆 | `ConversationBufferMemory` / 向量库 | agent 上的 `memory` | agent 上的 `memory` | `MemoryManager`（SQLite，项目+用户） |
 | 流式 | callback / LCEL `astream` | `register_hook` | event hook | `Transport` + `AgentEvent` |
 | 工具审批 | 用 `interrupt` 的 HITL | `a_human_input_mode` | `human_input=True` | `Transport.confirm_tool` |
@@ -19,22 +19,22 @@
 
 ### 一致的部分
 
-- **工具**——样板几乎一样。LC 的 `BaseTool.name/description/args_schema/_run` 与 Agentao 的 `Tool.name/description/parameters/execute` 一一对应
-- **回调式流式**——LC 的 callback handler 和 Agentao 的 `Transport.emit(AgentEvent)` 目的相同
-- **提示词拼装**——LC 的 system prompt 片段 → Agentao 的 `AGENTAO.md` + 技能
+- **工具**——样板几乎一样。LC 的 `BaseTool.name/description/args_schema/_run` 与 Arbiter 的 `Tool.name/description/parameters/execute` 一一对应
+- **回调式流式**——LC 的 callback handler 和 Arbiter 的 `Transport.emit(AgentEvent)` 目的相同
+- **提示词拼装**——LC 的 system prompt 片段 → Arbiter 的 `ARBITER.md` + 技能
 
 ### 不同的部分
 
-- **没有 LCEL / 图** —— Agentao 是一条执行回路，不是可组合流水线。如果你建了 chain DAG，先塌平成"一条系统提示 + 工具"。分支逻辑交给 LLM，而非框架
+- **没有 LCEL / 图** —— Arbiter 是一条执行回路，不是可组合流水线。如果你建了 chain DAG，先塌平成"一条系统提示 + 工具"。分支逻辑交给 LLM，而非框架
 - **检索器不能当工具硬塞** —— 包一个薄的自定义工具，在 `execute()` 里调你现成的 `.get_relevant_documents()`
-- **记忆不是向量库** —— Agentao 的记忆是结构化键值 SQLite。如果你依赖向量召回，留着向量库——把它以 MCP 服务器或自定义工具暴露出来，让 LLM 去调
-- **默认跑很久** —— LC 有 `max_iterations`；Agentao 也有（`chat(max_iterations=)`）默认 100。为控本请调低
+- **记忆不是向量库** —— Arbiter 的记忆是结构化键值 SQLite。如果你依赖向量召回，留着向量库——把它以 MCP 服务器或自定义工具暴露出来，让 LLM 去调
+- **默认跑很久** —— LC 有 `max_iterations`；Arbiter 也有（`chat(max_iterations=)`）默认 100。为控本请调低
 
 ### 迁移食谱
 
 1. 先移工具。`_run(self, **kw)` → `execute(self, **kw)`；`args_schema` Pydantic → `parameters` JSON Schema（或用 `pydantic.TypeAdapter` 生成）
-2. 提示词文本放 `AGENTAO.md` + 技能文件。每请求的动态上下文仍放在用户消息里
-3. `AgentExecutor(..., memory=ConversationBufferMemory())` 换成 `Agentao(...)`；历史自动存在 `agent.messages`
+2. 提示词文本放 `ARBITER.md` + 技能文件。每请求的动态上下文仍放在用户消息里
+3. `AgentExecutor(..., memory=ConversationBufferMemory())` 换成 `Arbiter(...)`；历史自动存在 `agent.messages`
 4. 接流式：callback handler 换成 `SdkTransport(on_event=…)`
 5. RAG：向量库以 MCP 服务器或 `Tool` 子类暴露
 
@@ -42,19 +42,19 @@
 
 ### 一致的部分
 
-- **对话循环** —— AG 的"agent 说话，工具被调，结果返回"与 Agentao 的内循环一致
+- **对话循环** —— AG 的"agent 说话，工具被调，结果返回"与 Arbiter 的内循环一致
 - **异步友好** —— 两者都能在 `asyncio.to_thread` / 事件循环下工作
 
 ### 不同的部分
 
-- **没有 `GroupChat`** —— AG 的强项是多 agent 编排。Agentao 支持子 agent（一个 `Agentao` 启另一个，或 ACP 反向调不同服务器），但没有内置的"群聊管理"。多角色场景请模型化为"技能 + 单 agent"，或自建协调器
-- **工具调用仅 OpenAI 风格** —— AG 支持多家 LLM，格式各异；Agentao 统一到 OpenAI 兼容的 tool-call schema。非 OpenAI 家也得说这个格式
+- **没有 `GroupChat`** —— AG 的强项是多 agent 编排。Arbiter 支持子 agent（一个 `Arbiter` 启另一个，或 ACP 反向调不同服务器），但没有内置的"群聊管理"。多角色场景请模型化为"技能 + 单 agent"，或自建协调器
+- **工具调用仅 OpenAI 风格** —— AG 支持多家 LLM，格式各异；Arbiter 统一到 OpenAI 兼容的 tool-call schema。非 OpenAI 家也得说这个格式
 - **人类介入** —— AG 的 `human_input_mode` ≈ `Transport.confirm_tool` + `Transport.ask_user`
 - **没有 `UserProxyAgent`** —— 用户在循环之外，通过 `chat()` 调用与 agent 通信。宿主代码就是"用户代理"
 
 ### 迁移食谱
 
-1. 找 AG 里最"自主"的那个 agent——它就是你的 `Agentao`
+1. 找 AG 里最"自主"的那个 agent——它就是你的 `Arbiter`
 2. 其他 `ConversableAgent` 折叠成：无状态 → 工具；塑造行为 → 技能
 3. `GroupChat` 管理器变成你的宿主代码（FastAPI 接口、调度循环），决定何时调 `agent.chat()`
 4. `register_function` 调用迁到 `Tool` 子类
@@ -63,12 +63,12 @@
 
 ### 一致的部分
 
-- **role / goal / backstory** —— CrewAI 每 agent 的 `role` + `goal` + `backstory` → Agentao 的 `AGENTAO.md` + 激活的技能
-- **工具是独立单元** —— CrewAI `@tool` ≈ Agentao `Tool` 子类
+- **role / goal / backstory** —— CrewAI 每 agent 的 `role` + `goal` + `backstory` → Arbiter 的 `ARBITER.md` + 激活的技能
+- **工具是独立单元** —— CrewAI `@tool` ≈ Arbiter `Tool` 子类
 
 ### 不同的部分
 
-- **没有 `Crew` 编排器** —— CrewAI 的显式 `tasks` / `process` 管线与 Agentao 风格相反。Agentao 里由 LLM 根据"工具 + 技能 + 用户消息"决定下一步。多步工作流放提示里或放宿主侧循环，不放框架配置
+- **没有 `Crew` 编排器** —— CrewAI 的显式 `tasks` / `process` 管线与 Arbiter 风格相反。Arbiter 里由 LLM 根据"工具 + 技能 + 用户消息"决定下一步。多步工作流放提示里或放宿主侧循环，不放框架配置
 - **层级 vs 扁平** —— CrewAI 的 `Process.hierarchical` / `sequential` 变成"一个超级 agent + 技能"或宿主侧编排
 - **没有管理器 agent 抽象** —— 有的话，把它重塑成宿主代码，多次以不同提示调 `agent.chat()`
 
@@ -76,7 +76,7 @@
 
 1. 挑最有用的 CrewAI agent——连带工具先移过来
 2. `Process.sequential`：写一个宿主侧函数调 `agent.chat("step 1 …")`，检查输出，再 `agent.chat("step 2 …")`
-3. `Process.hierarchical`：管理器变宿主代码；worker agent 变成额外 `Agentao` 实例（隔离）或技能（仅改语气/思路时）
+3. `Process.hierarchical`：管理器变宿主代码；worker agent 变成额外 `Arbiter` 实例（隔离）或技能（仅改语气/思路时）
 4. 移工具
 5. `memory=True` 换成 `MemoryManager`（见 [5.5](/zh/part-5/5-memory)）
 
@@ -97,10 +97,10 @@
 
 ## E.6 平滑迁移的模式
 
-| 模式 | LC / AG / CrewAI | Agentao |
+| 模式 | LC / AG / CrewAI | Arbiter |
 |------|------------------|---------|
 | "调我们 API 的工具" | BaseTool | `Tool` 子类 |
-| "把公司政策注入提示" | system message | `AGENTAO.md` |
+| "把公司政策注入提示" | system message | `ARBITER.md` |
 | "任务特定行为切换" | 系统提示分支 | 技能（按需激活） |
 | "写操作需人审" | HITL 回调 | `Transport.confirm_tool` |
 | "按用户区分的对话记忆" | 按用户的 `ConversationBufferMemory` | 按用户的 `working_directory` → 项目作用域记忆 |
@@ -152,9 +152,9 @@ Week 3 之前的裸字符串形式不再接受。`AcpClientConfig.from_dict` / `
 ## E.8 迁移时的常见坑
 
 1. **过度抽象** —— 不需要 DAG，信 LLM + 工具
-2. **低估工具描述的重要性** —— Agentao 没有思维链脚手架；工具描述和 AGENTAO.md **就是**行为计划，要写厚
+2. **低估工具描述的重要性** —— Arbiter 没有思维链脚手架；工具描述和 ARBITER.md **就是**行为计划，要写厚
 3. **把用户和项目记忆混用** —— 默认就是租户隔离（见 [6.4](/zh/part-6/4-multi-tenant-fs)）；user 作用域仅限单用户场景
-4. **不开确认** —— 其他框架常常默认"什么都问"。Agentao 让你白名单——请在审过工具的爆炸半径之后再白名单
+4. **不开确认** —— 其他框架常常默认"什么都问"。Arbiter 让你白名单——请在审过工具的爆炸半径之后再白名单
 
 ## E.9 从 0.2.x 迁移到 0.3.0
 
@@ -164,9 +164,9 @@ Week 3 之前的裸字符串形式不再接受。`AcpClientConfig.from_dict` / `
 
 ```python
 from pathlib import Path
-from agentao import Agentao
+from arbiter import Arbiter
 
-agent = Agentao(working_directory=Path("/srv/agent-workdir"), ...)
+agent = Arbiter(working_directory=Path("/srv/agent-workdir"), ...)
 ```
 
 绝大多数调用点只需这一处修改。传入前先解析为绝对路径，冻结值才始终可预期。
@@ -175,12 +175,12 @@ agent = Agentao(working_directory=Path("/srv/agent-workdir"), ...)
 
 ```python
 from pathlib import Path
-from agentao.embedding import build_from_environment
+from arbiter.embedding import build_from_environment
 
 agent = build_from_environment(working_directory=Path("/srv/agent-workdir"))
 ```
 
-`build_from_environment` 会读取 `.env`、发现 `.agentao/` 配置文件，并连接完整的 CLI 等价默认值（用户级记忆、MCP 文件配置、沙箱、回放）。显式传入 `working_directory=`；若省略，工厂回退到 `Path.cwd()`——CLI 入口点可接受，嵌入式宿主不应依赖此行为。
+`build_from_environment` 会读取 `.env`、发现 `.arbiter/` 配置文件，并连接完整的 CLI 等价默认值（用户级记忆、MCP 文件配置、沙箱、回放）。显式传入 `working_directory=`；若省略，工厂回退到 `Path.cwd()`——CLI 入口点可接受，嵌入式宿主不应依赖此行为。
 
 ### 方案三——曾测试懒惰 cwd 默认行为的测试
 
@@ -191,7 +191,7 @@ import warnings
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", DeprecationWarning)
-    agent = Agentao(...)   # 懒惰 cwd 行为
+    agent = Arbiter(...)   # 懒惰 cwd 行为
 ```
 
 在 0.3.0 中，相同的调用会抛 `TypeError`。将这些测试改为：

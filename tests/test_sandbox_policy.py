@@ -7,13 +7,13 @@ from unittest.mock import patch
 
 import pytest
 
-from agentao.sandbox import (
+from arbiter.sandbox import (
     SandboxMisconfiguredError,
     SandboxPolicy,
     SandboxProfile,
     load_sandbox_config,
 )
-from agentao.tools.shell import _wrap_with_sandbox, _annotate_sandbox_denial
+from arbiter.tools.shell import _wrap_with_sandbox, _annotate_sandbox_denial
 
 
 MACOS_ONLY = pytest.mark.skipif(sys.platform != "darwin", reason="sandbox-exec is macOS only")
@@ -26,7 +26,7 @@ MACOS_ONLY = pytest.mark.skipif(sys.platform != "darwin", reason="sandbox-exec i
 
 def test_default_config_is_disabled():
     """When no config file exists, defaults are safe (disabled, darwin)."""
-    with patch("agentao.sandbox.policy._load_json", return_value=({}, None)):
+    with patch("arbiter.sandbox.policy._load_json", return_value=({}, None)):
         cfg = load_sandbox_config(project_root=Path("/nonexistent"))
     assert cfg["enabled"] is False
     assert cfg["platform"] == "darwin"
@@ -39,19 +39,19 @@ def test_project_config_overrides_home(tmp_path):
     home_cfg = {"enabled": True, "default_profile": "readonly"}
     proj_dir = tmp_path / "proj"
     proj_dir.mkdir()
-    (proj_dir / ".agentao").mkdir()
-    (proj_dir / ".agentao" / "sandbox.json").write_text(
+    (proj_dir / ".arbiter").mkdir()
+    (proj_dir / ".arbiter" / "sandbox.json").write_text(
         json.dumps({"default_profile": "workspace-write"})
     )
 
     def _fake_load(path: Path):
         if str(path).startswith(str(Path.home())):
             return home_cfg, None
-        if path == proj_dir / ".agentao" / "sandbox.json":
+        if path == proj_dir / ".arbiter" / "sandbox.json":
             return json.loads(path.read_text()), None
         return {}, None
 
-    with patch("agentao.sandbox.policy._load_json", side_effect=_fake_load):
+    with patch("arbiter.sandbox.policy._load_json", side_effect=_fake_load):
         cfg = load_sandbox_config(project_root=proj_dir)
 
     assert cfg["enabled"] is True  # from home
@@ -72,7 +72,7 @@ def test_project_null_clears_inherited_home_value():
             return home_cfg, None
         return project_cfg, None
 
-    with patch("agentao.sandbox.policy._load_json", side_effect=_fake_load):
+    with patch("arbiter.sandbox.policy._load_json", side_effect=_fake_load):
         cfg = load_sandbox_config(project_root=Path("/tmp/irrelevant"))
 
     # Explicit project null beats inherited user path
@@ -90,8 +90,8 @@ def test_malformed_sandbox_json_fails_closed(tmp_path):
     """
     proj_dir = tmp_path / "proj"
     proj_dir.mkdir()
-    (proj_dir / ".agentao").mkdir()
-    (proj_dir / ".agentao" / "sandbox.json").write_text("{ not valid json")
+    (proj_dir / ".arbiter").mkdir()
+    (proj_dir / ".arbiter" / "sandbox.json").write_text("{ not valid json")
 
     # Need to patch HOME so the test doesn't accidentally pick up a real
     # user-level sandbox.json sitting outside the fixture.
@@ -118,8 +118,8 @@ def test_malformed_platform_field_does_not_silently_disable_sandbox(tmp_path):
     unsandboxed — the exact fail-open case the validation was meant to
     block. Must fail-closed instead."""
     proj_dir = tmp_path / "proj"
-    (proj_dir / ".agentao").mkdir(parents=True)
-    (proj_dir / ".agentao" / "sandbox.json").write_text(
+    (proj_dir / ".arbiter").mkdir(parents=True)
+    (proj_dir / ".arbiter" / "sandbox.json").write_text(
         '{"enabled": true, "platform": 123, "default_profile": "workspace-write-no-network"}'
     )
 
@@ -149,8 +149,8 @@ def test_session_off_overrides_malformed_config_fail_closed(tmp_path):
     because the user consciously turned sandboxing off."""
     proj_dir = tmp_path / "proj"
     proj_dir.mkdir()
-    (proj_dir / ".agentao").mkdir()
-    (proj_dir / ".agentao" / "sandbox.json").write_text("{ not valid json")
+    (proj_dir / ".arbiter").mkdir()
+    (proj_dir / ".arbiter" / "sandbox.json").write_text("{ not valid json")
 
     with patch.object(Path, "home", return_value=tmp_path / "home"):
         cfg = load_sandbox_config(project_root=proj_dir)
@@ -182,8 +182,8 @@ def test_wrong_typed_config_fields_do_not_crash(tmp_path):
     fields (both load-time validation AND runtime tolerance)."""
     # Load-time: validation produces a health error, policy fail-closes
     proj = tmp_path / "proj"
-    (proj / ".agentao").mkdir(parents=True)
-    (proj / ".agentao" / "sandbox.json").write_text(
+    (proj / ".arbiter").mkdir(parents=True)
+    (proj / ".arbiter" / "sandbox.json").write_text(
         '{"enabled": true, "profiles_dir": 123}'
     )
     with patch.object(Path, "home", return_value=tmp_path / "home"):
@@ -222,8 +222,8 @@ def test_non_object_sandbox_json_fails_closed(tmp_path):
     """Array or scalar at the root is also a config error, not silently ignored."""
     proj_dir = tmp_path / "proj"
     proj_dir.mkdir()
-    (proj_dir / ".agentao").mkdir()
-    (proj_dir / ".agentao" / "sandbox.json").write_text("[1, 2, 3]")
+    (proj_dir / ".arbiter").mkdir()
+    (proj_dir / ".arbiter" / "sandbox.json").write_text("[1, 2, 3]")
 
     with patch.object(Path, "home", return_value=tmp_path / "home"):
         cfg = load_sandbox_config(project_root=proj_dir)
@@ -513,7 +513,7 @@ def test_wrap_with_sandbox_is_noop_on_non_macos(tmp_path):
         workspace_root=tmp_path,
         params={"_RW1": str(tmp_path)},
     )
-    with patch("agentao.tools.shell.IS_MACOS", False):
+    with patch("arbiter.tools.shell.IS_MACOS", False):
         assert _wrap_with_sandbox("ls", profile) == "ls"
 
 
@@ -526,7 +526,7 @@ def test_wrap_with_sandbox_handles_single_quotes(tmp_path):
     `test_wrap_with_sandbox_is_noop_on_non_macos`."""
     profile = SandboxProfile(
         name="readonly",
-        path=Path(__file__).parent.parent / "agentao" / "sandbox" / "profiles" / "readonly.sb",
+        path=Path(__file__).parent.parent / "arbiter" / "sandbox" / "profiles" / "readonly.sb",
         workspace_root=tmp_path,
         params={"_RW1": str(tmp_path)},
     )
@@ -636,7 +636,7 @@ def test_relative_workspace_root_resolves_against_project_not_cwd(tmp_path, monk
 def test_relative_profiles_dir_resolves_against_project_not_cwd(tmp_path, monkeypatch):
     """Regression: relative `profiles_dir` must anchor to the project."""
     proj = tmp_path / "proj"
-    profiles = proj / ".agentao" / "profiles"
+    profiles = proj / ".arbiter" / "profiles"
     profiles.mkdir(parents=True)
     (profiles / "custom.sb").write_text("(version 1)(allow default)")
     other = tmp_path / "other"
@@ -648,7 +648,7 @@ def test_relative_profiles_dir_resolves_against_project_not_cwd(tmp_path, monkey
         config={
             "enabled": True,
             "platform": "darwin",
-            "profiles_dir": ".agentao/profiles",  # relative!
+            "profiles_dir": ".arbiter/profiles",  # relative!
             "default_profile": "custom",
         },
     )
@@ -659,19 +659,19 @@ def test_relative_profiles_dir_resolves_against_project_not_cwd(tmp_path, monkey
 
 
 def test_home_relative_profiles_dir_anchors_at_home_not_project(tmp_path):
-    """Regression: a relative `profiles_dir` in ~/.agentao/sandbox.json must
-    resolve under ~/.agentao/, NOT under whatever project later consumes the
+    """Regression: a relative `profiles_dir` in ~/.arbiter/sandbox.json must
+    resolve under ~/.arbiter/, NOT under whatever project later consumes the
     merged config. Previously the merge step stripped provenance and then
     `_resolve_config_path` rebased every relative path onto the project
     root — so a shared user-level `"profiles_dir": "profiles"` became
     `<project>/profiles` and the user's profile file was invisible.
     """
     fake_home = tmp_path / "home"
-    (fake_home / ".agentao" / "profiles").mkdir(parents=True)
-    (fake_home / ".agentao" / "profiles" / "homemade.sb").write_text(
+    (fake_home / ".arbiter" / "profiles").mkdir(parents=True)
+    (fake_home / ".arbiter" / "profiles" / "homemade.sb").write_text(
         "(version 1)(allow default)"
     )
-    (fake_home / ".agentao" / "sandbox.json").write_text(
+    (fake_home / ".arbiter" / "sandbox.json").write_text(
         json.dumps({
             "enabled": True,
             "default_profile": "homemade",
@@ -686,20 +686,20 @@ def test_home_relative_profiles_dir_anchors_at_home_not_project(tmp_path):
         cfg = load_sandbox_config(project_root=proj)
         policy = SandboxPolicy(project_root=proj, config=cfg)
 
-    # The home-relative path must have been baked to ~/.agentao/profiles
+    # The home-relative path must have been baked to ~/.arbiter/profiles
     # during load, not rebased onto <project>/profiles at runtime.
-    assert cfg["profiles_dir"] == str(fake_home / ".agentao" / "profiles")
+    assert cfg["profiles_dir"] == str(fake_home / ".arbiter" / "profiles")
     located = policy._locate_profile("homemade")
-    assert located == (fake_home / ".agentao" / "profiles" / "homemade.sb").resolve()
+    assert located == (fake_home / ".arbiter" / "profiles" / "homemade.sb").resolve()
     assert "homemade" in policy.list_profiles()
 
 
 def test_home_relative_workspace_root_anchors_at_home_not_project(tmp_path):
     """Same provenance rule for `workspace_root`: a home-level relative path
-    must resolve under ~/.agentao/, not under the project root."""
+    must resolve under ~/.arbiter/, not under the project root."""
     fake_home = tmp_path / "home"
-    (fake_home / ".agentao" / "ws").mkdir(parents=True)
-    (fake_home / ".agentao" / "sandbox.json").write_text(
+    (fake_home / ".arbiter" / "ws").mkdir(parents=True)
+    (fake_home / ".arbiter" / "sandbox.json").write_text(
         json.dumps({"enabled": True, "workspace_root": "ws"})
     )
     proj = tmp_path / "proj"
@@ -709,8 +709,8 @@ def test_home_relative_workspace_root_anchors_at_home_not_project(tmp_path):
         cfg = load_sandbox_config(project_root=proj)
         policy = SandboxPolicy(project_root=proj, config=cfg)
 
-    assert cfg["workspace_root"] == str(fake_home / ".agentao" / "ws")
-    assert policy.workspace_root == (fake_home / ".agentao" / "ws").resolve()
+    assert cfg["workspace_root"] == str(fake_home / ".arbiter" / "ws")
+    assert policy.workspace_root == (fake_home / ".arbiter" / "ws").resolve()
 
 
 def test_absolute_workspace_root_is_honoured_as_is(tmp_path):
@@ -739,12 +739,12 @@ def test_project_root_provider_follows_live_cwd(tmp_path, monkeypatch):
     the old one."""
     proj_a = tmp_path / "proj_a"
     proj_b = tmp_path / "proj_b"
-    (proj_a / ".agentao").mkdir(parents=True)
-    (proj_b / ".agentao").mkdir(parents=True)
-    (proj_a / ".agentao" / "sandbox.json").write_text(
+    (proj_a / ".arbiter").mkdir(parents=True)
+    (proj_b / ".arbiter").mkdir(parents=True)
+    (proj_a / ".arbiter" / "sandbox.json").write_text(
         '{"enabled": true, "default_profile": "readonly"}'
     )
-    (proj_b / ".agentao" / "sandbox.json").write_text(
+    (proj_b / ".arbiter" / "sandbox.json").write_text(
         '{"enabled": true, "default_profile": "workspace-write"}'
     )
 
@@ -768,12 +768,12 @@ def test_session_overrides_survive_cwd_drift(tmp_path, monkeypatch):
     but explicit session toggles stay put."""
     proj_a = tmp_path / "proj_a"
     proj_b = tmp_path / "proj_b"
-    (proj_a / ".agentao").mkdir(parents=True)
-    (proj_b / ".agentao").mkdir(parents=True)
-    (proj_a / ".agentao" / "sandbox.json").write_text(
+    (proj_a / ".arbiter").mkdir(parents=True)
+    (proj_b / ".arbiter").mkdir(parents=True)
+    (proj_a / ".arbiter" / "sandbox.json").write_text(
         '{"enabled": false, "default_profile": "readonly"}'
     )
-    (proj_b / ".agentao" / "sandbox.json").write_text(
+    (proj_b / ".arbiter" / "sandbox.json").write_text(
         '{"enabled": false, "default_profile": "workspace-write"}'
     )
 
@@ -849,7 +849,7 @@ def test_sandbox_injection_does_not_mutate_hook_visible_args(tmp_path):
 def test_all_builtin_profiles_pass_sandbox_exec_parser():
     """Every built-in .sb file must be accepted by the kernel's TinyScheme parser."""
     import subprocess
-    profiles_dir = Path(__file__).parent.parent / "agentao" / "sandbox" / "profiles"
+    profiles_dir = Path(__file__).parent.parent / "arbiter" / "sandbox" / "profiles"
     assert profiles_dir.is_dir()
     profiles = list(profiles_dir.glob("*.sb"))
     assert profiles, "expected built-in profiles to exist"
@@ -869,7 +869,7 @@ def test_all_builtin_profiles_pass_sandbox_exec_parser():
 def test_no_network_profile_actually_blocks_curl(tmp_path):
     """Integration: curl should fail under workspace-write-no-network."""
     import subprocess
-    sb = Path(__file__).parent.parent / "agentao" / "sandbox" / "profiles" / "workspace-write-no-network.sb"
+    sb = Path(__file__).parent.parent / "arbiter" / "sandbox" / "profiles" / "workspace-write-no-network.sb"
     r = subprocess.run(
         [
             "sandbox-exec", "-D", f"_RW1={tmp_path}", "-f", str(sb),
@@ -884,7 +884,7 @@ def test_no_network_profile_actually_blocks_curl(tmp_path):
 def test_workspace_write_profile_blocks_writes_outside(tmp_path):
     """Integration: writing outside _RW1 must be denied; inside must succeed."""
     import subprocess
-    sb = Path(__file__).parent.parent / "agentao" / "sandbox" / "profiles" / "workspace-write-no-network.sb"
+    sb = Path(__file__).parent.parent / "arbiter" / "sandbox" / "profiles" / "workspace-write-no-network.sb"
 
     # Inside the workspace — should succeed
     inside = subprocess.run(
@@ -903,7 +903,7 @@ def test_workspace_write_profile_blocks_writes_outside(tmp_path):
     outside = subprocess.run(
         [
             "sandbox-exec", "-D", f"_RW1={tmp_path}", "-f", str(sb),
-            "/bin/sh", "-c", "echo bad > /private/etc/agentao_sandbox_probe",
+            "/bin/sh", "-c", "echo bad > /private/etc/arbiter_sandbox_probe",
         ],
         capture_output=True, text=True, timeout=10,
     )

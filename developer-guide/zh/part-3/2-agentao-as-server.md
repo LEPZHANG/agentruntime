@@ -1,11 +1,11 @@
-# 3.2 Agentao 作为 ACP Server
+# 3.2 Arbiter 作为 ACP Server
 
-把 Agentao 当成黑盒 ACP Server 驱动——这是**任意语言**宿主（Node / Go / Rust / Kotlin / Swift / C#…）的集成路径。
+把 Arbiter 当成黑盒 ACP Server 驱动——这是**任意语言**宿主（Node / Go / Rust / Kotlin / Swift / C#…）的集成路径。
 
 ## 启动命令
 
 ```bash
-agentao --acp --stdio
+arbiter --acp --stdio
 ```
 
 - `--acp` 打开 ACP 模式
@@ -14,18 +14,18 @@ agentao --acp --stdio
 
 **环境变量**：和 CLI / SDK 完全一致（`OPENAI_API_KEY` 等）——ACP 协议层不负责凭据传递。
 
-**日志**：Agentao 会把日志写入 `<session-cwd>/agentao.log`（ACP 握手里客户端传入的 `cwd`）。宿主可以轮询/监听这个文件做调试。
+**日志**：Arbiter 会把日志写入 `<session-cwd>/arbiter.log`（ACP 握手里客户端传入的 `cwd`）。宿主可以轮询/监听这个文件做调试。
 
 ## 启动时恢复会话
 
 ```bash
-agentao --acp --resume                 # 恢复最近保存的会话
-agentao --acp --resume <SESSION_ID>    # 恢复指定会话（UUID / 前缀 / 时间戳）
+arbiter --acp --resume                 # 恢复最近保存的会话
+arbiter --acp --resume <SESSION_ID>    # 恢复指定会话（UUID / 前缀 / 时间戳）
 ```
 
 ACP 是客户端驱动的——server 不能自己开会话——所以 `--resume` 装载一个**由第一个 `session/new` 消费的一次性指令**。该请求会注入持久化历史、把它作为 `session/update` 通知重放（和 `session/load` 完全一致），并返回**持久化的 `sessionId`** 而非新生成的。此后该连接上的每个 `session/new` 都是全新空会话。
 
-会话存储以客户端传入的 `cwd` 为键，因此查找在请求时针对 `<cwd>/.agentao/sessions` 进行。任何可恢复的未命中——空存储、未知 id、文件损坏、或 id 已在注册表中存活——都会**降级为全新会话**（以 WARNING 记录），而不是让客户端的第一个 `session/new` 失败。
+会话存储以客户端传入的 `cwd` 为键，因此查找在请求时针对 `<cwd>/.arbiter/sessions` 进行。任何可恢复的未命中——空存储、未知 id、文件损坏、或 id 已在注册表中存活——都会**降级为全新会话**（以 WARNING 记录），而不是让客户端的第一个 `session/new` 失败。
 
 > 恢复出的 `sessionId` 只在 `session/new` 响应里返回，因此重放的 `session/update` 通知会**先于**客户端得知该 id 到达。对 `session/update.sessionId` 做严格校验的客户端可能会丢弃这些早到的更新；但从下一次 prompt 起对话仍能正确续上。参见 [docs/guides/acp.md](https://github.com/jin-bo/agentao/blob/main/docs/guides/acp.md#resume-a-session-on-startup)。
 
@@ -69,7 +69,7 @@ ACP 是客户端驱动的——server 不能自己开会话——所以 `--resum
 }
 ```
 
-**Agentao 响应**：
+**Arbiter 响应**：
 
 ```json
 {
@@ -91,8 +91,8 @@ ACP 是客户端驱动的——server 不能自己开会话——所以 `--resum
     },
     "authMethods": [],
     "agentInfo": {
-      "name": "agentao",
-      "title": "Agentao",
+      "name": "arbiter",
+      "title": "Arbiter",
       "version": "0.2.14"
     },
     "_meta": {
@@ -110,7 +110,7 @@ ACP 是客户端驱动的——server 不能自己开会话——所以 `--resum
 ### 规则要点
 
 - `protocolVersion` 必须是**整数**（`"1"` 字符串、`True` 都会被拒）
-- 版本协商：若你传的版本 Agentao 支持，原样回传；否则回传 Agentao 支持的最高版本。**不报错**——由 Client 决定是否继续
+- 版本协商：若你传的版本 Arbiter 支持，原样回传；否则回传 Arbiter 支持的最高版本。**不报错**——由 Client 决定是否继续
 - `clientCapabilities` 是 `{}` 也必须传（必填，类型必须是 object）
 
 ## 创建会话 `session/new`
@@ -143,7 +143,7 @@ ACP 是客户端驱动的——server 不能自己开会话——所以 `--resum
 
 ### 关键说明
 
-- `cwd` 决定了这个会话的**工作目录**——文件工具、`AGENTAO.md`、`.agentao/` 全部相对它。多会话并发时务必不同
+- `cwd` 决定了这个会话的**工作目录**——文件工具、`ARBITER.md`、`.arbiter/` 全部相对它。多会话并发时务必不同
 - `mcpServers` 接受 `"type":"stdio"`、`"type":"sse"` 或 `"type":"http"`（`mcpCapabilities.http=true`）；裸 `url` 默认走 Streamable HTTP
 - 这些 MCP 配置被内部映射为 [`extra_mcp_servers` 参数](/zh/part-2/2-constructor-reference#会话级-mcp-服务器)
 
@@ -181,7 +181,7 @@ v1 `prompt` 数组里只能放 `{"type":"text", "text": ...}`。
 
 ## 流式更新 `session/update`（通知）
 
-在 `session/prompt` 返回前，Agentao 会发出**多条**：
+在 `session/prompt` 返回前，Arbiter 会发出**多条**：
 
 ```json
 {
@@ -210,7 +210,7 @@ v1 `prompt` 数组里只能放 `{"type":"text", "text": ...}`。
 
 ## 工具确认 `session/request_permission`（请求）
 
-当 Agentao 尝试调用一个 `requires_confirmation=True` 的工具时：
+当 Arbiter 尝试调用一个 `requires_confirmation=True` 的工具时：
 
 ```json
 {
@@ -255,7 +255,7 @@ sequenceDiagram
     autonumber
     participant U as 终端用户
     participant H as 宿主 UI
-    participant S as agentao server
+    participant S as arbiter server
 
     S--)H: session/update {tool_call started, status:pending}
     S->>H: session/request_permission {id:42, toolCall, options}
@@ -286,7 +286,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant H as 宿主
-    participant S as agentao server
+    participant S as arbiter server
 
     H->>S: session/prompt {sessionId, prompt}
     S--)H: session/update {agent_message_chunk} ...
@@ -303,7 +303,7 @@ sequenceDiagram
 
 ## 恢复会话 `session/load`
 
-用于**持久化会话**场景：你把 `sessionId` + 历史消息存到数据库，进程重启后 restore。Agentao 在 `initialize` 响应里声明 `loadSession:true` 表示支持。
+用于**持久化会话**场景：你把 `sessionId` + 历史消息存到数据库，进程重启后 restore。Arbiter 在 `initialize` 响应里声明 `loadSession:true` 表示支持。
 
 ```json
 {
@@ -325,7 +325,7 @@ sequenceDiagram
 
 ::: warning ACP 协议层最容易踩的坑
 1. **帧格式**：一定是 NDJSON，JSON 里**不能有裸换行**——写 JSON 库时注意 compact 模式
-2. **stdout 污染**：Agentao 保证所有日志走 `agentao.log` + stderr，**不污染 stdout**。你的 Client 读 stdout 一定拿到纯 JSON
+2. **stdout 污染**：Arbiter 保证所有日志走 `arbiter.log` + stderr，**不污染 stdout**。你的 Client 读 stdout 一定拿到纯 JSON
 3. **stdin 阻塞**：如果 Client 在发送请求后不读 stdout，Server 的 stdout buffer 会撑爆。用异步 I/O 或专门读取线程
 4. **版本字段类型**：`protocolVersion` 必须 int，不是日期字符串
 5. **`session/update` 不回应**：JSON-RPC 2.0 禁止为通知发响应
@@ -334,8 +334,8 @@ sequenceDiagram
 ## 端到端最小宿主（Python 实现，仅作演示）
 
 ::: tip ⚡ 端到端可跑（约 5 分钟）
-**产出** —— 从 50 行 Python 客户端驱动 `agentao --acp --stdio`；能看到 `session/update` 流式通知 + 最终 `stopReason`。
-**技术栈** —— `pip install 'agentao[cli]>=0.4.0'` + 3 个环境变量；下方 Python 即所需的全部宿主代码。
+**产出** —— 从 50 行 Python 客户端驱动 `arbiter --acp --stdio`；能看到 `session/update` 流式通知 + 最终 `stopReason`。
+**技术栈** —— `pip install 'arbiter[cli]>=0.4.0'` + 3 个环境变量；下方 Python 即所需的全部宿主代码。
 **运行** —— 粘贴到 `acp_demo.py`，然后 `python acp_demo.py`。
 **宿主不是 Python？** —— 读懂线协议流后，照 [3.3 宿主作为 ACP Client](./3-host-client-architecture) 翻译到目标语言。
 :::
@@ -343,13 +343,13 @@ sequenceDiagram
 即便你的宿主不是 Python，这个例子也帮助理解协议流：
 
 ```python
-"""最小 ACP 客户端（Python），驱动 agentao --acp --stdio。"""
+"""最小 ACP 客户端（Python），驱动 arbiter --acp --stdio。"""
 import json, subprocess, threading, queue, uuid
 
 class AcpClient:
     def __init__(self):
         self.proc = subprocess.Popen(
-            ["agentao", "--acp", "--stdio"],
+            ["arbiter", "--acp", "--stdio"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             bufsize=0, text=True,
         )
@@ -398,11 +398,11 @@ cli.call("session/prompt", {
 
 | 话题 | 文件 |
 |------|------|
-| 启动入口 | `agentao/cli/entrypoints.py:254-389` |
-| 协议常量 | `agentao/acp/protocol.py:18, 47-58` |
-| 握手 | `agentao/acp/initialize.py` |
-| 能力宣告 | `agentao/acp/initialize.py:53-76` |
-| 会话创建 | `agentao/acp/session_new.py` |
-| Prompt 处理 | `agentao/acp/session_prompt.py` |
+| 启动入口 | `arbiter/cli/entrypoints.py:254-389` |
+| 协议常量 | `arbiter/acp/protocol.py:18, 47-58` |
+| 握手 | `arbiter/acp/initialize.py` |
+| 能力宣告 | `arbiter/acp/initialize.py:53-76` |
+| 会话创建 | `arbiter/acp/session_new.py` |
+| Prompt 处理 | `arbiter/acp/session_prompt.py` |
 
 → [第 4 部分 · 事件层与 UI 集成](/zh/part-4/)

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Agentao dynamically loads skills from the `skills` directory. Each skill is defined in its own subdirectory with a `SKILL.md` file.
+Arbiter dynamically loads skills from the `skills` directory. Each skill is defined in its own subdirectory with a `SKILL.md` file.
 
 ## How Skills Are Loaded
 
@@ -94,7 +94,7 @@ Main documentation content goes here...
    This skill provides...
    ```
 
-4. Reload (restart Agentao or use reload feature)
+4. Reload (restart Arbiter or use reload feature)
 
 ### Method 2: Copy from Template
 
@@ -110,40 +110,40 @@ Main documentation content goes here...
 ## Installing Anthropic Official Claude Code Skills
 
 Anthropic publishes the official Claude Code skills in
-[`anthropics/skills`](https://github.com/anthropics/skills). Agentao can install
+[`anthropics/skills`](https://github.com/anthropics/skills). Arbiter can install
 a single skill from a GitHub repository subdirectory with:
 
 ```bash
-agentao skill install owner/repo:path/to/skill
+arbiter skill install owner/repo:path/to/skill
 ```
 
 To install the official document and documentation co-authoring skills into the
 current project:
 
 ```bash
-agentao skill install anthropics/skills:skills/pptx
-agentao skill install anthropics/skills:skills/docx
-agentao skill install anthropics/skills:skills/xlsx
-agentao skill install anthropics/skills:skills/pdf
-agentao skill install anthropics/skills:skills/doc-coauthoring
+arbiter skill install anthropics/skills:skills/pptx
+arbiter skill install anthropics/skills:skills/docx
+arbiter skill install anthropics/skills:skills/xlsx
+arbiter skill install anthropics/skills:skills/pdf
+arbiter skill install anthropics/skills:skills/doc-coauthoring
 ```
 
-By default, Agentao installs into the current project's managed skill directory:
+By default, Arbiter installs into the current project's managed skill directory:
 
 ```text
-<project-root>/.agentao/skills/
+<project-root>/.arbiter/skills/
 ```
 
 Use `--scope global` if you want the skills available across projects:
 
 ```bash
-agentao skill install anthropics/skills:skills/pdf --scope global
+arbiter skill install anthropics/skills:skills/pdf --scope global
 ```
 
-Verify that Agentao can discover them:
+Verify that Arbiter can discover them:
 
 ```bash
-agentao skill list
+arbiter skill list
 ```
 
 Expected skill names:
@@ -155,24 +155,24 @@ Expected skill names:
 - `doc-coauthoring` - structured documentation co-authoring
 
 These skills may rely on external tools such as LibreOffice, Poppler, Node
-packages, or Python packages. Agentao installs the skill instructions; runtime
+packages, or Python packages. Arbiter installs the skill instructions; runtime
 dependencies are documented inside each skill's `SKILL.md` and are not installed
 automatically.
 
 To pin a branch, tag, or commit:
 
 ```bash
-agentao skill install anthropics/skills:skills/pdf@main
+arbiter skill install anthropics/skills:skills/pdf@main
 ```
 
 Managed installs can be updated later:
 
 ```bash
-agentao skill update pdf
-agentao skill update --all
+arbiter skill update pdf
+arbiter skill update --all
 ```
 
-## Using Skills in Agentao
+## Using Skills in Arbiter
 
 ### List Available Skills
 
@@ -220,7 +220,7 @@ skills/
 On activation, the agent is told the skill's directory and that relative
 paths inside SKILL.md (e.g. `scripts/foo.py`) resolve against that
 directory rather than the agent's current working directory — the skill is
-usually installed under `~/.agentao/skills/` or `.agentao/skills/`, not in
+usually installed under `~/.arbiter/skills/` or `.arbiter/skills/`, not in
 the cwd. The activation message also enumerates resource files by absolute
 path: `references/` and `assets/` (`*.md`), and helper files under
 `scripts/` (hidden files and caches such as `__pycache__` are skipped, and
@@ -281,7 +281,7 @@ Common issues and solutions...
 ### In Python Code
 
 ```python
-from agentao.skills import SkillManager
+from arbiter.skills import SkillManager
 
 # Initialize with default location
 manager = SkillManager()
@@ -340,7 +340,7 @@ This will:
 1. **Check directory structure**: Ensure `SKILL.md` exists
 2. **Verify frontmatter**: Check YAML syntax (name and description)
 3. **Check file encoding**: Use UTF-8 encoding
-4. **Restart Agentao**: Skills are loaded at startup
+4. **Restart Arbiter**: Skills are loaded at startup
 
 ### Skill Not Activating
 
@@ -408,7 +408,7 @@ All commands start with `/`:
 
 ## API Integration
 
-Skills integrate with the Agentao through:
+Skills integrate with the Arbiter through:
 
 1. **activate_skill tool**: LLM can call this tool
 2. **Skills context**: Active skills are added to system prompt

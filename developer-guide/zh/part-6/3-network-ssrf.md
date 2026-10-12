@@ -94,19 +94,19 @@ WORKSPACE_WRITE 预设自带的 SSRF 黑名单值得每个项目都**保留+扩�
 
 ## 层 2 · HTTP 客户端行为
 
-Agentao 的 `web_fetch` 使用 `httpx`，默认：
+Arbiter 的 `web_fetch` 使用 `httpx`，默认：
 
 - 10 秒超时
 - 跟随 3 次重定向
 - TLS 验证开启
 - User-Agent 可定制
 
-**安全注意**：允许重定向 = 允许 302 跳转到内网地址绕过 hostname 检查。生产上建议**禁止重定向**或**每次重定向重新跑域名规则**。目前 Agentao 未做"重定向后重检"——这是已知限制。
+**安全注意**：允许重定向 = 允许 302 跳转到内网地址绕过 hostname 检查。生产上建议**禁止重定向**或**每次重定向重新跑域名规则**。目前 Arbiter 未做"重定向后重检"——这是已知限制。
 
 你可以**自定义 web_fetch**（替代内置）来加严：
 
 ```python
-from agentao.tools.base import Tool
+from arbiter.tools.base import Tool
 import httpx
 
 class StrictWebFetchTool(Tool):
@@ -126,7 +126,7 @@ class StrictWebFetchTool(Tool):
 用 `extra_tools=` 注入——同名条目会静默**替换**内置 `web_fetch`，并和内置一样获得能力绑定（`working_directory` / `filesystem` / `shell`）：
 
 ```python
-agent = Agentao(..., extra_tools=[StrictWebFetchTool()])   # 替换内置 web_fetch
+agent = Arbiter(..., extra_tools=[StrictWebFetchTool()])   # 替换内置 web_fetch
 ```
 
 优先用这个，而不是构造后去戳 `agent.tools.register(StrictWebFetchTool())`：底层路径会绕过能力绑定（工具变「裸」），且冲突只是 warn。见 [5.1](/zh/part-5/1-custom-tools)。schema 替换是**纵深防御，不是边界**——真正拦住外联的是下面的层 3。
@@ -191,7 +191,7 @@ MCP 服务器通常**比 web_fetch 风险更高**——它们有自己的凭据�
 
 ## ACP 模式的网络考量
 
-Agentao 作为 ACP Server 时**不监听端口**——只用 stdio。这是好消息：
+Arbiter 作为 ACP Server 时**不监听端口**——只用 stdio。这是好消息：
 
 - 宿主不需要为 Agent 开 inbound 端口
 - 网络攻击面缩到**出站**方向
@@ -215,7 +215,7 @@ def on_event(ev):
         })
 ```
 
-`agentao.log` 默认已经记录工具调用的完整参数——日志脱敏请看 [6.5 密钥管理](./5-secrets-injection)。
+`arbiter.log` 默认已经记录工具调用的完整参数——日志脱敏请看 [6.5 密钥管理](./5-secrets-injection)。
 
 ## ⚠️ 常见陷阱
 

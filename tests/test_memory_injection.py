@@ -1,4 +1,4 @@
-"""Regression tests for memory injection into system prompt (agentao/agent.py)."""
+"""Regression tests for memory injection into system prompt (arbiter/agent.py)."""
 
 import tempfile
 from contextlib import contextmanager
@@ -8,23 +8,23 @@ from unittest.mock import Mock, patch
 
 @contextmanager
 def _agent_with_temp_memory():
-    """Yield an Agentao instance whose memory manager uses isolated temp dirs."""
+    """Yield an Arbiter instance whose memory manager uses isolated temp dirs."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_proj = Path(tmpdir) / ".agentao"
+        tmp_proj = Path(tmpdir) / ".arbiter"
         tmp_global = Path(tmpdir) / "global"
-        with patch("agentao.agent.LLMClient") as mock_llm_cls, \
-             patch("agentao.tooling.mcp_tools.load_mcp_config", return_value=[]), \
-             patch("agentao.tooling.mcp_tools.McpClientManager"):
+        with patch("arbiter.agent.LLMClient") as mock_llm_cls, \
+             patch("arbiter.tooling.mcp_tools.load_mcp_config", return_value=[]), \
+             patch("arbiter.tooling.mcp_tools.McpClientManager"):
             mock_llm = Mock()
             mock_llm.logger = Mock()
             mock_llm.model = "test-model"
             mock_llm_cls.return_value = mock_llm
 
-            from agentao.agent import Agentao
-            from agentao.memory import MemoryManager, SQLiteMemoryStore
-            from agentao.tools.memory import SaveMemoryTool
+            from arbiter.agent import Arbiter
+            from arbiter.memory import MemoryManager, SQLiteMemoryStore
+            from arbiter.tools.memory import SaveMemoryTool
 
-            agent = Agentao(working_directory=Path(tmpdir))
+            agent = Arbiter(working_directory=Path(tmpdir))
             # Override manager with isolated temp dirs
             agent.memory_manager = MemoryManager(
                 project_store=SQLiteMemoryStore.open_or_memory(tmp_proj / "memory.db"),
@@ -36,12 +36,12 @@ def _agent_with_temp_memory():
 
 def test_memories_injected_into_system_prompt():
     with _agent_with_temp_memory() as agent:
-        agent.memory_tool.execute(key="project", value="agentao regression", tags=[])
+        agent.memory_tool.execute(key="project", value="arbiter regression", tags=[])
         agent.memory_tool.execute(key="owner", value="jin-bo", tags=[])
         prompt = agent._build_system_prompt()
         assert "<memory-stable>" in prompt
         assert "project" in prompt
-        assert "agentao regression" in prompt
+        assert "arbiter regression" in prompt
         assert "owner" in prompt
         assert "jin-bo" in prompt
         assert "</memory-stable>" in prompt

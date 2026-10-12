@@ -1,8 +1,8 @@
 # Session Replay
 
-Session Replay captures the runtime timeline of an Agentao session — turns,
+Session Replay captures the runtime timeline of an Arbiter session — turns,
 tool calls, permission decisions, streaming chunks, errors — as an
-append-only JSONL file under `.agentao/replays/`. It is separate from
+append-only JSONL file under `.arbiter/replays/`. It is separate from
 `save_session` / `load_session`: sessions restore the conversation you
 can continue; replays record *what the agent did* for debugging, audit,
 and future protocol replay.
@@ -12,10 +12,10 @@ and future protocol replay.
 Recording is **disabled by default**. Turn it on with either:
 
 ```bash
-/replay on        # writes replay.enabled=true into .agentao/settings.json
+/replay on        # writes replay.enabled=true into .arbiter/settings.json
 ```
 
-or by editing `.agentao/settings.json` directly:
+or by editing `.arbiter/settings.json` directly:
 
 ```json
 {
@@ -28,8 +28,8 @@ or by editing `.agentao/settings.json` directly:
 ```
 
 - `replay.enabled` — boolean master switch.
-- `replay.max_instances` — retention cap under `.agentao/replays/`. Defaults
-  to 20. Does not affect `.agentao/sessions/`.
+- `replay.max_instances` — retention cap under `.arbiter/replays/`. Defaults
+  to 20. Does not affect `.arbiter/sessions/`.
 
 Toggling recording takes effect on the **next** session; the currently
 running instance is not touched. Use `/replay off` to stop recording
@@ -37,7 +37,7 @@ future sessions without deleting existing files.
 
 ## File layout
 
-- Directory: `.agentao/replays/`
+- Directory: `.arbiter/replays/`
 - Filename: `<session_id>.<instance_id>.jsonl`
 - First line: a `replay_header` event carrying `schema_version`,
   `session_id`, `instance_id`, and `created_at`.
@@ -59,11 +59,11 @@ never span across those boundaries.
 `<id>` can be a full `session_id.instance_id` or any unambiguous prefix
 (an `instance_id` is unique enough in practice). Readers stop at the
 current end of the file — there is no follow / live-tail mode; live
-observation remains the job of normal output and `agentao.log`.
+observation remains the job of normal output and `arbiter.log`.
 
 ## What is recorded
 
-Each `turn` corresponds to one `Agentao.chat()` call. Inside that turn
+Each `turn` corresponds to one `Arbiter.chat()` call. Inside that turn
 you will see, typically in this order:
 
 | Kind | When |
@@ -96,8 +96,8 @@ Explicitly reserved but **not emitted in v1**:
   rolled up into `replay_footer.redaction_hits`. This is best-effort
   pattern matching, **not** full secrets scanning: a credential that
   does not look like one passes through untouched. The scanner lives in
-  `agentao/security/secret_scan.py` — shared with `agentao.log` and
-  `.agentao/tool-outputs/`, which are written whether or not replay is
+  `arbiter/security/secret_scan.py` — shared with `arbiter.log` and
+  `.arbiter/tool-outputs/`, which are written whether or not replay is
   enabled, so it cannot sit inside this optional subsystem.
 - `tool_output_chunk` payloads over the per-event cap are kept as
   head+tail excerpts with `truncated`, `original_chars`, and
@@ -106,7 +106,7 @@ Explicitly reserved but **not emitted in v1**:
 
 ## Failure model
 
-- A broken `.agentao/settings.json` falls back to safe defaults rather
+- A broken `.arbiter/settings.json` falls back to safe defaults rather
   than blocking startup.
 - Sanitizer or write failures are logged (warning level) and never
   raise. The runtime is unaffected by replay bookkeeping.

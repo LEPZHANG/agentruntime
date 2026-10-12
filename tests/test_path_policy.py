@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from agentao.security import PathPolicy, PathPolicyError
+from arbiter.security import PathPolicy, PathPolicyError
 
 
 @pytest.fixture

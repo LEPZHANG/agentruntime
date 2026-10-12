@@ -13,15 +13,15 @@ from typing import Dict
 
 import pytest
 
-import agentao.acp_client.process as acp_process
-from agentao.acp_client.manager import ACPManager
-from agentao.acp_client.models import (
+import arbiter.acp_client.process as acp_process
+from arbiter.acp_client.manager import ACPManager
+from arbiter.acp_client.models import (
     AcpClientConfig,
     AcpProcessInfo,
     AcpServerConfig,
     ServerState,
 )
-from agentao.acp_client.process import ACPProcessHandle
+from arbiter.acp_client.process import ACPProcessHandle
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -56,7 +56,7 @@ def _instant_exit_config(code: int = 0) -> AcpServerConfig:
 
 
 def _write_acp_config(root: Path, servers: Dict[str, dict]) -> None:
-    cfg_dir = root / ".agentao"
+    cfg_dir = root / ".arbiter"
     cfg_dir.mkdir(parents=True, exist_ok=True)
     (cfg_dir / "acp.json").write_text(
         json.dumps({"servers": servers}), encoding="utf-8"
@@ -214,7 +214,7 @@ class TestACPProcessHandle:
     def test_start_makes_child_process_group_leader(self) -> None:
         """AC3 spawn-side: the child leads its own process group so a
         force-stop can reap the whole tree via ``killpg(pid)`` without
-        signalling agentao's own group.
+        signalling arbiter's own group.
         """
         handle = ACPProcessHandle("pg", _sleeper_config())
         handle.start()

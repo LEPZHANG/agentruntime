@@ -26,7 +26,7 @@ import time
 
 import pytest
 
-from agentao.cli import input_loop
+from arbiter.cli import input_loop
 
 
 class _Cli:

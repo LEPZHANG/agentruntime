@@ -1,0 +1,189 @@
+"""AgentManager — loads agent definitions and creates AgentToolWrapper instances."""
+
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+
+from arbiter.frontmatter import parse_frontmatter
+
+from ..tools.base import RegistrableTool, Tool
+from .tools import AgentToolWrapper, CheckBackgroundAgentTool
+
+if TYPE_CHECKING:
+    # Declared here, not at module scope: the plugin subsystem is an
+    # optional dependency, so ``register_plugin_agents`` keeps its real
+    # import inside the function body. Without these the string
+    # annotations on that method name types that nothing ever binds, so
+    # no static checker can resolve them (ruff F821).
+    from arbiter.plugins.models import PluginAgentDefinition, PluginLoadError
+
+    from .bg_store import BackgroundTaskStore
+
+
+class AgentManager:
+    """Discovers and manages agent definitions from Markdown files with YAML frontmatter."""
+
+    def __init__(
+        self,
+        *,
+        project_root: Optional[Path] = None,
+        include_builtin_agents: bool = False,
+    ):
+        self.definitions: Dict[str, Dict[str, Any]] = {}
+        self.project_root = (project_root or Path.cwd()).expanduser().resolve()
+        self.include_builtin_agents = include_builtin_agents
+        self._load_definitions()
+
+    def _load_definitions(self):
+        # 1. Built-in definitions: arbiter/agents/definitions/*.md
+        if self.include_builtin_agents:
+            builtin_dir = Path(__file__).parent / "definitions"
+            self._scan_directory(builtin_dir)
+
+        # 2. User-defined: .arbiter/agents/*.md (project-level)
+        user_dir = self.project_root / ".arbiter" / "agents"
+        self._scan_directory(user_dir)
+
+    def _scan_directory(self, directory: Path):
+        if not directory.exists():
+            return
+
+        for md_file in sorted(directory.glob("*.md")):
+            try:
+                content = md_file.read_text(encoding="utf-8")
+                frontmatter, body = parse_frontmatter(content, source=str(md_file))
+
+                name = frontmatter.get("name", md_file.stem)
+                description = frontmatter.get("description", "")
+                tools_list = frontmatter.get("tools")  # None means all tools
+                max_turns = int(frontmatter.get("max_turns", 15))
+                # model: optional "Provider/model-name" or bare "model-name"; None = inherit parent
+                model = frontmatter.get("model") or None
+                # temperature: optional float; None = inherit parent
+                raw_temp = frontmatter.get("temperature")
+                temperature = float(raw_temp) if raw_temp is not None else None
+
+                # Parse tools as list if it's a string
+                if isinstance(tools_list, str):
+                    tools_list = [t.strip() for t in tools_list.split(",")]
+
+                self.definitions[name] = {
+                    "name": name,
+                    "description": description,
+                    "tools": tools_list,
+                    "max_turns": max_turns,
+                    "system_instructions": body.strip() or None,
+                    "model": model,
+                    "temperature": temperature,
+                }
+            except Exception:
+                continue
+
+    # ------------------------------------------------------------------
+    # Plugin agent registration
+    # ------------------------------------------------------------------
+
+    def register_plugin_agents(
+        self,
+        agent_defs: "list[PluginAgentDefinition]",
+    ) -> "list[PluginLoadError]":
+        """Register plugin-provided agent definitions.
+
+        Returns a list of collision errors.  If the list is non-empty the
+        caller should treat the plugin as failed.
+
+        Imports are deferred to avoid a hard dependency when the plugin
+        subsystem is not installed.
+        """
+        from arbiter.plugins.agents import validate_no_external_collisions
+        from arbiter.plugins.models import PluginAgentDefinition, PluginLoadError
+
+        plugin_name = agent_defs[0].plugin_name if agent_defs else ""
+        errors = validate_no_external_collisions(
+            plugin_name, agent_defs, set(self.definitions.keys())
+        )
+        if errors:
+            return errors
+
+        for defn in agent_defs:
+            frontmatter, body = parse_frontmatter(
+                defn.raw_markdown, source=str(defn.source_path)
+            )
+
+            tools_list = frontmatter.get("tools")
+            if isinstance(tools_list, str):
+                tools_list = [t.strip() for t in tools_list.split(",")]
+
+            raw_temp = frontmatter.get("temperature")
+
+            self.definitions[defn.runtime_name] = {
+                "name": defn.runtime_name,
+                "description": defn.description or frontmatter.get("description", ""),
+                "tools": tools_list,
+                "max_turns": int(frontmatter.get("max_turns", 15)),
+                "system_instructions": body.strip() or None,
+                "model": frontmatter.get("model") or None,
+                "temperature": float(raw_temp) if raw_temp is not None else None,
+                # Plugin metadata
+                "plugin_name": defn.plugin_name,
+                "source_path": str(defn.source_path),
+            }
+
+        return []
+
+    def list_agents(self) -> Dict[str, str]:
+        """Return {name: description} for all loaded agents."""
+        return {name: defn["description"] for name, defn in self.definitions.items()}
+
+    def create_agent_tools(
+        self,
+        all_tools: Dict[str, RegistrableTool],
+        llm_config_getter: Callable[[], Dict[str, Any]],
+        bg_store: Optional["BackgroundTaskStore"] = None,
+        confirmation_callback: Optional[Callable] = None,
+        step_callback: Optional[Callable] = None,
+        output_callback: Optional[Callable] = None,
+        tool_complete_callback: Optional[Callable] = None,
+        ask_user_callback: Optional[Callable] = None,
+        max_context_tokens: Optional[int] = None,
+        parent_messages_getter: Optional[Callable] = None,
+        cancellation_token_getter: Optional[Callable] = None,
+        readonly_mode_getter: Optional[Callable[[], bool]] = None,
+        permission_mode_getter: Optional[Callable] = None,
+        permission_user_root_getter: Optional[Callable] = None,
+        sandbox_policy: Optional[Any] = None,
+        subagent_emitter: Optional[Any] = None,
+    ) -> List[RegistrableTool]:
+        """Create an :class:`AgentToolWrapper` per agent definition.
+
+        When ``bg_store`` is ``None`` the background-agent surface is
+        disabled: each wrapper drops ``run_in_background`` from its
+        parameter schema and the trailing
+        :class:`CheckBackgroundAgentTool` is not appended.
+        """
+        _readonly_getter = readonly_mode_getter or (lambda: False)
+        wrappers = [
+            AgentToolWrapper(
+                definition=defn,
+                all_tools=all_tools,
+                llm_config_getter=llm_config_getter,
+                working_directory=self.project_root,
+                bg_store=bg_store,
+                confirmation_callback=confirmation_callback,
+                step_callback=step_callback,
+                output_callback=output_callback,
+                tool_complete_callback=tool_complete_callback,
+                ask_user_callback=ask_user_callback,
+                max_context_tokens=max_context_tokens,
+                parent_messages_getter=parent_messages_getter,
+                cancellation_token_getter=cancellation_token_getter,
+                readonly_mode_getter=_readonly_getter,
+                permission_mode_getter=permission_mode_getter,
+                permission_user_root_getter=permission_user_root_getter,
+                sandbox_policy=sandbox_policy,
+                subagent_emitter=subagent_emitter,
+            )
+            for defn in self.definitions.values()
+        ]
+        if bg_store is None:
+            return wrappers
+        return wrappers + [CheckBackgroundAgentTool(bg_store=bg_store)]

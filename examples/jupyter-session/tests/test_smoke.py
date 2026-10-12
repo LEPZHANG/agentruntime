@@ -39,7 +39,7 @@ def test_build_and_turn_offline(tmp_path: Path) -> None:
     session = build_session(llm_client=_fake_llm(), working_directory=tmp_path)
     try:
         with patch(
-            "agentao.agent.Agentao._llm_call",
+            "arbiter.agent.Arbiter._llm_call",
             lambda self, msgs, tools, token: _fake_response(),
         ):
             reply, _events = asyncio.run(turn(session, "hello"))

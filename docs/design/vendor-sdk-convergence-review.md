@@ -7,7 +7,7 @@ landscape sweep (CLI agents, embeddable agent-loop SDKs, general agent framework
 evidence, and proposes — *for the maintainer's judgment* — what changes and what does
 not. It does **not** unilaterally retire or rewrite Path A; §1–§8 of the roadmap remain
 locked until a maintainer decision says otherwise.
-**Audience:** Agentao maintainers and strategic reviewers.
+**Audience:** Arbiter maintainers and strategic reviewers.
 **Companion:** `vendor-sdk-convergence-review.zh.md`.
 **Related:**
 - `path-a-roadmap.md` — the locked embed-first strategy this review tests against (esp. §2.1 success metrics, §2.3 non-goals, §7.1 Mode 2, §16.4 retirement triggers).
@@ -15,7 +15,7 @@ locked until a maintainer decision says otherwise.
 - `pi-mono-borrow-review.md` / `codex-reverse-review.md` — the reverse-review discipline this record follows (evidence before recommendation; gap ≠ need).
 
 **Method:** competitive sweep → identify the single market shift that postdates the
-roadmap lock → re-score Agentao's moat axis-by-axis → keep/cut/gate the implied
+roadmap lock → re-score Arbiter's moat axis-by-axis → keep/cut/gate the implied
 directions → determine whether §16.4 fires. Code references anchored to `main`@`bcdb8e4`
 (2026-06-18); positioning claims about external SDKs are dated and will drift — re-verify
 before acting on any one of them.
@@ -35,13 +35,13 @@ Python/TypeScript process — **the literal Path A value proposition**:
   file-level permissions, snapshot/rehydrate). Non-OpenAI models are reachable via
   Any-LLM / LiteLLM adapters that the docs label **best-effort / beta**, with known gaps
   in tool calling, structured output, and usage reporting — i.e. broad adapter coverage,
-  *not* Agentao-style first-class provider-neutrality.
+  *not* Arbiter-style first-class provider-neutrality.
 
 **Finding:** "embeddable governed agent loop for Python" is no longer a differentiator —
 it is now table stakes offered by Anthropic and OpenAI with far greater distribution and
 native model integration. This is exactly the condition `path-a-roadmap.md` §16.4 names
 as a retirement/re-examination trigger. **The embed contract is not the problem (P0
-proved it clean); the *answer to "why embed Agentao instead of the vendor SDK"* is the
+proved it clean); the *answer to "why embed Arbiter instead of the vendor SDK"* is the
 problem.**
 
 **Disposition (proposed, maintainer to ratify):**
@@ -55,7 +55,7 @@ problem.**
   distribution channel riding **early-but-real** ecosystem signals, not just a feature (§4 D3).
 - **Re-prioritize but still demand-gate:** roadmap P1.1 (`on_usage_event`) and P1.2
   (OTel) gain salience because the vendor SDKs *already ship* usage/cost tracking and
-  OpenTelemetry — so these are **table-stakes parity items Agentao currently lacks**, not
+  OpenTelemetry — so these are **table-stakes parity items Arbiter currently lacks**, not
   vendor weak spots. Raise priority *only when a lighthouse asks* (§4 D4).
 - **Cut / hold (unchanged from §2.3):** CLI/TUI polish, hosted SaaS, strong cross-platform
   sandbox, speculative P1 without a named adopter.
@@ -79,16 +79,16 @@ guard against that.
 
 ## 2. The competitive landscape (June 2026)
 
-Agentao sits at the cross-section of four categories, contested individually on each axis:
+Arbiter sits at the cross-section of four categories, contested individually on each axis:
 
-| Category | 2026 leaders | Agentao position |
+| Category | 2026 leaders | Arbiter position |
 |---|---|---|
 | **A. CLI coding-agent products** | opencode (~150k★, ~6.5M MAU), Claude Code, Codex CLI, Gemini CLI, Aider, Goose (now under Linux Foundation), Crush, Continue `cn` | Capable CLI, but **Path A §2.3 already concedes this** ("opencode already wins TUI"). Not the battlefield. |
 | **B. Embeddable agent-loop SDKs** — *Path A's real arena* | **Claude Agent SDK**, **OpenAI Agents SDK**, Vercel AI SDK ("program agent harnesses"), Pi | **Newly crowded by first-party vendor SDKs.** This is the §3 shift. |
-| **C. General agent frameworks** | pydantic-ai (typed contracts), smolagents (code-first), Agno (~39k★), Strands, LangGraph, Instructor | *Build-your-own-agent toolkits.* Agentao differs: **batteries-included** (tools + skills + permissions + memory + replay already wired), not an orchestration kit. Genuine, stable distinction. |
+| **C. General agent frameworks** | pydantic-ai (typed contracts), smolagents (code-first), Agno (~39k★), Strands, LangGraph, Instructor | *Build-your-own-agent toolkits.* Arbiter differs: **batteries-included** (tools + skills + permissions + memory + replay already wired), not an orchestration kit. Genuine, stable distinction. |
 | **D. Coding-agent platforms** | OpenHands, SWE-agent | Hosted products/research. Out of Path A scope. |
 
-The takeaway is not "Agentao is behind in four races." It is that Agentao's identity is a
+The takeaway is not "Arbiter is behind in four races." It is that Arbiter's identity is a
 *combination* (a governed, provider-neutral, batteries-included coding runtime that is also
 a clean embeddable library), and the combination remains unique even though **each
 individual axis is contested** — most newly so in category B.
@@ -107,12 +107,12 @@ Both facts below postdate the 2026-04-30 roadmap lock:
   adapters that the official docs flag as **best-effort / beta**, with capability gaps
   (tool calling, structured output, usage reporting) versus the native OpenAI path.
 
-Map that against Agentao's README first line — *"local-first, private-first, embeddable
+Map that against Arbiter's README first line — *"local-first, private-first, embeddable
 agent harness for Python hosts"* — and the **"embeddable / permissioned / subagents /
 sandbox" portion is now matched by both vendors**, who bring distribution and native model
-integration Agentao cannot. The clean embed contract that P0 delivered is necessary but no
+integration Arbiter cannot. The clean embed contract that P0 delivered is necessary but no
 longer sufficient differentiation. The strategic question shifts from *"is the embed
-contract clean?"* (yes) to *"why would a host embed Agentao instead of the vendor's own
+contract clean?"* (yes) to *"why would a host embed Arbiter instead of the vendor's own
 SDK?"*
 
 ## 4. Moat re-score, axis by axis
@@ -120,24 +120,24 @@ SDK?"*
 ### Still defensible — structurally hard for a vendor SDK to match
 
 1. **Provider-neutral *and vendor-data-path-free* by construction.** OpenAI-compatible
-   *any* provider + runtime `/provider` switching (`agentao/runtime/`, `LLM_PROVIDER`).
+   *any* provider + runtime `/provider` switching (`arbiter/runtime/`, `LLM_PROVIDER`).
    Note the distinction precisely: the vendor SDKs now ship *broad third-party provider
    adapters* (Claude Agent SDK can target other models; OpenAI's SDK reaches 100+ via
    Any-LLM/LiteLLM, best-effort/beta) — so "you can point it at another model" is **no
-   longer exclusive to Agentao**. What stays exclusive is the *posture*: agentao is not a
+   longer exclusive to Arbiter**. What stays exclusive is the *posture*: arbiter is not a
    vendor's loop wearing an adapter, carries no vendor harness culture, and routes through
    no vendor data path. The moat is **no-vendor-loop / no-vendor-telemetry**, not merely
    "multi-model."
 2. **Local-first / private-first / no managed infra / no global state.** Capability
-   injection, no host-logger pollution, multi-`Agentao()` isolation
-   (`tests/test_multi_agentao_isolation.py`, `tests/test_no_host_logger_pollution.py`).
+   injection, no host-logger pollution, multi-`Arbiter()` isolation
+   (`tests/test_multi_arbiter_isolation.py`, `tests/test_no_host_logger_pollution.py`).
    Hosts that *cannot* route code through a vendor loop are the wedge.
 3. **Local, in-process audit contract.** Permission modes + replay JSONL audit sink
-   (v1.2, `agentao/host/replay_projection.py`) + `events()` host stream. **Do not
+   (v1.2, `arbiter/host/replay_projection.py`) + `events()` host stream. **Do not
    overclaim here:** both vendor SDKs ship first-class governance/observability — Claude
    Agent SDK lists hooks, permissions, sessions, cost/usage tracking, OpenTelemetry, and
    checkpointing; OpenAI's SDK has tracing, usage, and sandbox permissions/results/resume
-   state. Agentao's narrower, defensible edge is that its audit trail is a **local JSONL
+   state. Arbiter's narrower, defensible edge is that its audit trail is a **local JSONL
    replay artifact under a no-vendor-loop posture** — the record lives in the host's files,
    not a vendor's tracing backend — which is the relevant property for hosts that cannot
    emit telemetry to a vendor. It is a *locality/ownership* edge, not a "vendors lack
@@ -159,16 +159,16 @@ SDK?"*
 
 - **"Embeddable" alone** — now table stakes (§3).
 - **CLI UX** — conceded to opencode (§2.3, no change).
-- **Sandbox sophistication** — OpenAI/Claude now ship container snapshotting; Agentao's
+- **Sandbox sophistication** — OpenAI/Claude now ship container snapshotting; Arbiter's
   macOS `sandbox-exec` is narrower. **No action implied** — §2.3 already declares strong
   cross-platform sandbox a non-goal; the vendor move *confirms* that call rather than
   reversing it.
 
 ## 5. A measurable distribution drag
 
-**Method snapshot (for reproducibility):** query `"agentao" python agent framework github`
+**Method snapshot (for reproducibility):** query `"arbiter" python agent framework github`
 run 2026-06-18 via the assistant's `WebSearch` tool (US locale, logged-out, top-10
-results); the top organic hit was an unrelated `github.com/taoagents/agentao` ("ridges-old"
+results); the top organic hit was an unrelated `github.com/taoagents/arbiter` ("ridges-old"
 repo) and **`jin-bo/agentao` did not appear in the top results.** Search ranking drifts by
 locale, login state, and date — re-run incognito/logged-out and record the engine + date
 before citing this as current. As of this snapshot: given §2.1's success metric is *"being
@@ -187,8 +187,8 @@ demand-gating holds). Ordered by leverage.
 | **D1** | Re-headline differentiation: lead with "provider-neutral + local/private-first + **governed & auditable**", demote "embeddable" | **Do now** (messaging, ~zero code) | Directly answers the new "why not the vendor SDK?" question; the current README leads with the now-commodity word. |
 | **D2** | Fix discoverability: repo topics, PyPI keywords, a "vs Claude/OpenAI Agent SDK" comparison page; lean into the Chinese-ecosystem wedge | **Do now** (distribution) | §5 is unambiguous; §14 already names distribution as the dominant non-engineering risk. |
 | **D3** | Position ACP-server as a *channel*, not just a feature ("the governed, provider-neutral agent you plug into an ACP editor") | **Reframe (weight gated on §4.4 verification)** | Turns a large existing code investment into distribution; rides early-but-real ACP signals. Weight should scale with how many §4.4 unverified-adoption claims (JetBrains / Copilot CLI / "25+ agents") survive primary-source checking. Harness-appropriate (interop, like `acp_client`). |
-| **D4** | Roadmap P1.1 `on_usage_event` + P1.2 OTel | **Re-prioritize, still gate** | These are **table-stakes parity items** — both vendor SDKs already ship usage/cost tracking + OpenTelemetry, so this is Agentao closing a gap, not exploiting a vendor weak spot. Salience ↑, but **start only when a lighthouse asks** — §4 discipline unchanged. |
-| **D5** | Interop bridge: drive a Claude/OpenAI Agent SDK agent *from* Agentao, or expose Agentao *under* their tool interface | **Hold (demand-gated)** | Passes the harness-vs-product test (interop, like `acp_client`), but speculative without a named host. Record as a candidate, not a commitment. |
+| **D4** | Roadmap P1.1 `on_usage_event` + P1.2 OTel | **Re-prioritize, still gate** | These are **table-stakes parity items** — both vendor SDKs already ship usage/cost tracking + OpenTelemetry, so this is Arbiter closing a gap, not exploiting a vendor weak spot. Salience ↑, but **start only when a lighthouse asks** — §4 discipline unchanged. |
+| **D5** | Interop bridge: drive a Claude/OpenAI Agent SDK agent *from* Arbiter, or expose Arbiter *under* their tool interface | **Hold (demand-gated)** | Passes the harness-vs-product test (interop, like `acp_client`), but speculative without a named host. Record as a candidate, not a commitment. |
 | — | CLI/TUI polish · hosted SaaS · strong cross-platform sandbox · speculative P1 | **Cut / hold (unchanged)** | Consistent with §2.3 and prior boundary-rejections; the §3 shift reinforces these calls rather than reopening them. |
 
 ## 7. §16.4 trigger determination
@@ -226,7 +226,7 @@ is the §16.4 note alone; the §2.1 line is held behind an explicit unlock.
 
 Listed so the record can be falsified rather than defended:
 
-- **If** a lighthouse adopter reports they chose Agentao *specifically* for vendor-neutrality
+- **If** a lighthouse adopter reports they chose Arbiter *specifically* for vendor-neutrality
   or audit → the moat (§4) is confirmed stronger than scored; D1/D2 are validated, escalate
   distribution.
 - **If** the next two monthly snapshots show PyPI dependents moving on the back of the

@@ -9,15 +9,15 @@ import time
 
 import pytest
 
-from agentao.agents.bg_store import BackgroundTaskStore, _VALID_BG_STATUSES
-from agentao.agents.tools import (
+from arbiter.agents.bg_store import BackgroundTaskStore, _VALID_BG_STATUSES
+from arbiter.agents.tools import (
     CancelBackgroundAgentTool,
     CheckBackgroundAgentTool,
     CompleteTaskTool,
     SubagentProgress,
     TaskComplete,
 )
-from agentao.cancellation import AgentCancelledError, CancellationToken
+from arbiter.cancellation import AgentCancelledError, CancellationToken
 
 
 @pytest.fixture
@@ -183,7 +183,7 @@ def test_update_bg_task_accepts_failed(bg_store):
 def test_error_string_not_used_in_module():
     """Regression: 'error' must not appear as a state value in agents/tools.py."""
     import inspect
-    import agentao.agents.tools as mod
+    import arbiter.agents.tools as mod
     source = inspect.getsource(mod)
     assert 'state="error"' not in source
 
@@ -464,7 +464,7 @@ def test_flush_to_disk_serializes_writes(tmp_path, monkeypatch):
             second_entered = True
 
     store.register("flush-1", "worker", "first")  # initial flush goes through real save
-    monkeypatch.setattr("agentao.agents.store.save_bg_task_store", fake_save)
+    monkeypatch.setattr("arbiter.agents.store.save_bg_task_store", fake_save)
 
     t1 = threading.Thread(target=store._flush_to_disk)
     t1.start()

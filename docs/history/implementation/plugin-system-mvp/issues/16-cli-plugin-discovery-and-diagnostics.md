@@ -11,13 +11,13 @@ Issue index: [Plugin System MVP Issues](README.md)
 ## Scope
 
 - repeatable `--plugin-dir`
-- `agentao plugin list`
+- `arbiter plugin list`
 - startup warnings surface
 - optional reload entry if adopted
 
 ## Deliverables
 
-- `agentao/cli/subcommands.py`
+- `arbiter/cli/subcommands.py`
 - CLI tests
 
 ## Dependencies

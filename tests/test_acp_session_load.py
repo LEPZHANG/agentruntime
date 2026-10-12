@@ -9,7 +9,7 @@ Three layers:
    detection, session-not-found behavior, end-to-end factory wiring.
 3. **End-to-end** ``session/load`` then ``session/prompt`` — drive the
    real :class:`AcpServer.run` loop, persist a fixture session via the
-   real :func:`agentao.session.save_session`, load it through the wire,
+   real :func:`arbiter.session.save_session`, load it through the wire,
    and confirm a follow-up prompt continues the same conversation.
 
 Test doubles and server builders live in :mod:`tests.support.acp_agents`
@@ -31,12 +31,12 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pytest
 
-from agentao.acp import initialize as acp_initialize
-from agentao.acp import session_load as acp_session_load
-from agentao.acp import session_new as acp_session_new
-from agentao.acp import session_prompt as acp_session_prompt
-from agentao.acp.models import AcpSessionState
-from agentao.acp.protocol import (
+from arbiter.acp import initialize as acp_initialize
+from arbiter.acp import session_load as acp_session_load
+from arbiter.acp import session_new as acp_session_new
+from arbiter.acp import session_prompt as acp_session_prompt
+from arbiter.acp.models import AcpSessionState
+from arbiter.acp.protocol import (
     ACP_PROTOCOL_VERSION,
     INVALID_PARAMS,
     INVALID_REQUEST,
@@ -45,14 +45,14 @@ from agentao.acp.protocol import (
     METHOD_SESSION_UPDATE,
     SERVER_NOT_INITIALIZED,
 )
-from agentao.acp.server import AcpServer, JsonRpcHandlerError
-from agentao.acp.transport import (
+from arbiter.acp.server import AcpServer, JsonRpcHandlerError
+from arbiter.acp.transport import (
     ACPTransport,
     _coerce_message_text,
     _strip_system_reminder_blocks,
 )
-from agentao.cancellation import CancellationToken
-from agentao.session import save_session
+from arbiter.cancellation import CancellationToken
+from arbiter.session import save_session
 
 from .support.acp_agents import FakeAgent, make_factory
 from .support.acp_server import make_initialized_server, make_server
@@ -704,7 +704,7 @@ class TestSessionLoadMissingSession:
     def test_missing_sessions_directory_raises_invalid_request(
         self, initialized_server, tmp_path
     ):
-        # Empty tmp_path → no .agentao/sessions directory at all.
+        # Empty tmp_path → no .arbiter/sessions directory at all.
         with pytest.raises(JsonRpcHandlerError) as exc:
             acp_session_load.handle_session_load(
                 initialized_server, _load_params(tmp_path, "any-id")
@@ -1045,5 +1045,5 @@ def test_initialize_still_advertises_load_session_capability():
     """Issue 02 advertised loadSession=True before the handler existed.
     Issue 10 backs that promise — verify the capability is still True
     so the contract is consistent."""
-    from agentao.acp.initialize import AGENT_CAPABILITIES
+    from arbiter.acp.initialize import AGENT_CAPABILITIES
     assert AGENT_CAPABILITIES.get("loadSession") is True

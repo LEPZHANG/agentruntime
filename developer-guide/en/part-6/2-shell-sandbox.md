@@ -5,7 +5,7 @@
 > - The three macOS sandbox profiles (`readonly` / `workspace-write` / `workspace-write-no-network`)
 > - Linux equivalents: containers, namespaces, seccomp
 
-`run_shell_command` is Agentao's most capable — and most dangerous — tool. Agentao provides **three progressive defenses**, ranked cheap-to-expensive:
+`run_shell_command` is Arbiter's most capable — and most dangerous — tool. Arbiter provides **three progressive defenses**, ranked cheap-to-expensive:
 
 ```
 Layer A · PermissionEngine   (always on)
@@ -20,7 +20,7 @@ A and B are covered in [Part 4.5](/en/part-4/5-tool-confirmation-ui) and [Part 5
 
 ## macOS sandbox-exec
 
-macOS ships with `sandbox-exec`, a kernel-level isolator for file writes and network. Agentao's `SandboxPolicy` wraps shell commands with it when enabled.
+macOS ships with `sandbox-exec`, a kernel-level isolator for file writes and network. Arbiter's `SandboxPolicy` wraps shell commands with it when enabled.
 
 ### Three built-in profiles
 
@@ -30,13 +30,13 @@ macOS ships with `sandbox-exec`, a kernel-level isolator for file writes and net
 | `workspace-write-no-network` | `_RW1` only | ❌ | Code editing without net |
 | `workspace-write` | `_RW1` only | ✅ | Default for dev |
 
-`_RW1` is a sandbox-profile variable for "the writable path"; Agentao passes `workspace_root` (defaults to the project root).
+`_RW1` is a sandbox-profile variable for "the writable path"; Arbiter passes `workspace_root` (defaults to the project root).
 
 ## Enabling it
 
 ### Minimum config
 
-In `~/.agentao/sandbox.json` or `<project>/.agentao/sandbox.json`:
+In `~/.arbiter/sandbox.json` or `<project>/.arbiter/sandbox.json`:
 
 ```json
 {
@@ -64,7 +64,7 @@ Current rule matching is by `tool` name only; future versions may route by comma
 ### Runtime toggle
 
 ```python
-from agentao.sandbox import SandboxPolicy
+from arbiter.sandbox import SandboxPolicy
 
 policy = SandboxPolicy(project_root=Path("/data/tenant-a"))
 policy.set_enabled(True)
@@ -110,7 +110,7 @@ Drop `.sb` files under `profiles_dir`:
 
 ## Fail-closed semantics
 
-Agentao's sandbox policy is **strictly fail-closed** — misconfiguration refuses execution, never silently degrades:
+Arbiter's sandbox policy is **strictly fail-closed** — misconfiguration refuses execution, never silently degrades:
 
 | Error | Behavior |
 |-------|----------|
@@ -150,7 +150,7 @@ docker run --rm \
 Wrap `run_shell_command` in a lightweight sandbox. Not built in — customize `ShellTool`:
 
 ```python
-from agentao.tools.shell import ShellTool
+from arbiter.tools.shell import ShellTool
 import shlex
 
 class FirejailShellTool(ShellTool):
@@ -169,7 +169,7 @@ Run the agent in gVisor / Kata Containers / AWS Lambda — stronger-isolation en
 
 | Scenario | Enable? |
 |----------|---------|
-| Developer using Agentao CLI locally | Optional (enable for safety) |
+| Developer using Arbiter CLI locally | Optional (enable for safety) |
 | Embedded in your personal SaaS (single tenant) | **Yes** |
 | Multi-tenant SaaS (high risk) | **Yes + container isolation, belt + suspenders** |
 | Trusted internal tool | Optional |

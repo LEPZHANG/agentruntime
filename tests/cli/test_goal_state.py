@@ -1,8 +1,8 @@
-"""Tests for GoalState — model, state machine, persistence (agentao/cli/goal_state.py)."""
+"""Tests for GoalState — model, state machine, persistence (arbiter/cli/goal_state.py)."""
 
 import json
 
-from agentao.cli.goal_state import (
+from arbiter.cli.goal_state import (
     GoalState,
     GoalStatus,
     budget_summary,

@@ -5,7 +5,7 @@
 > - The 4 preset modes (`READ_ONLY` / `WORKSPACE_WRITE` / `FULL_ACCESS` / `PLAN`)
 > - The domain rule semantics for `web_fetch` (allowlist, blocklist, exact vs. suffix match)
 
-**The PermissionEngine is Agentao's first line of defense.** It makes a rule-based decision **before** the tool actually runs, automatically handling "clearly safe" and "clearly dangerous" requests and leaving only edge cases to `confirm_tool()` ([Part 4.5](/en/part-4/5-tool-confirmation-ui)).
+**The PermissionEngine is Arbiter's first line of defense.** It makes a rule-based decision **before** the tool actually runs, automatically handling "clearly safe" and "clearly dangerous" requests and leaving only edge cases to `confirm_tool()` ([Part 4.5](/en/part-4/5-tool-confirmation-ui)).
 
 ## Two-layer defense model
 
@@ -46,7 +46,7 @@ If no rule matches (`decide()` returns `None`), the agent falls back to the tool
 **Switching modes**:
 
 ```python
-from agentao.permissions import PermissionMode
+from arbiter.permissions import PermissionMode
 
 agent.permission_engine.set_mode(PermissionMode.READ_ONLY)
 ```
@@ -58,11 +58,11 @@ Switchable at runtime — takes effect on the next tool call.
 **Location**:
 
 ```
-~/.agentao/permissions.json           ← user-level (only file-based source)
+~/.arbiter/permissions.json           ← user-level (only file-based source)
 ```
 
 ::: warning Project-scope file is ignored
-A `<cwd>/.agentao/permissions.json` is **not** loaded — the engine logs a warning and ignores it. A checked-in `{"tool": "*", "action": "allow"}` would defeat the user policy on first match (the engine returns at the first matching rule), so project files cannot grant capabilities. Permissions are a user/host concern, not a cwd concern — same model OS permissions and IDE workspace-trust use. If you need project-aware policy, inject it from the host: see [4.7.6 active_permissions](/en/part-4/7-host-contract#4-7-6-agent-active-permissions-policy-snapshots).
+A `<cwd>/.arbiter/permissions.json` is **not** loaded — the engine logs a warning and ignores it. A checked-in `{"tool": "*", "action": "allow"}` would defeat the user policy on first match (the engine returns at the first matching rule), so project files cannot grant capabilities. Permissions are a user/host concern, not a cwd concern — same model OS permissions and IDE workspace-trust use. If you need project-aware policy, inject it from the host: see [4.7.6 active_permissions](/en/part-4/7-host-contract#4-7-6-agent-active-permissions-policy-snapshots).
 :::
 
 **Structure**:
@@ -156,7 +156,7 @@ The built-in WORKSPACE_WRITE preset already ships a reasonable set (see below).
 
 ## Preset cheat sheet
 
-The WORKSPACE_WRITE preset (source `agentao/permissions.py:68-118`):
+The WORKSPACE_WRITE preset (source `arbiter/permissions.py:68-118`):
 
 ```json
 [
@@ -181,8 +181,8 @@ The WORKSPACE_WRITE preset (source `agentao/permissions.py:68-118`):
 Pass your own engine to the agent:
 
 ```python
-from agentao import Agentao
-from agentao.permissions import PermissionEngine, PermissionMode
+from arbiter import Arbiter
+from arbiter.permissions import PermissionEngine, PermissionMode
 
 engine = PermissionEngine(project_root=Path("/data/tenant-a"))
 engine.set_mode(PermissionMode.WORKSPACE_WRITE)
@@ -192,7 +192,7 @@ engine.rules.insert(0, {
     "action": "ask" if tenant.free_tier else "allow",
 })
 
-agent = Agentao(
+agent = Arbiter(
     working_directory=Path("/data/tenant-a"),
     permission_engine=engine,
 )
@@ -207,7 +207,7 @@ snap = agent.active_permissions()
 # snap.mode            -> "workspace-write"
 # snap.rules           -> [...]                 # list[dict], JSON-safe
 # snap.loaded_sources  -> ["preset:workspace-write",
-#                          "user:/Users/me/.agentao/permissions.json"]
+#                          "user:/Users/me/.arbiter/permissions.json"]
 ```
 
 `loaded_sources` carries stable string labels: `preset:<mode>`, `user:<path>`, `injected:<name>`. (The `project:<path>` label is no longer emitted — see the warning above.) The MVP intentionally does **not** expose per-rule provenance — hosts that need rule-level provenance combine `loaded_sources` with their own injected policy metadata.
@@ -285,7 +285,7 @@ When `decide()` returns `ASK`, the agent calls `transport.confirm_tool(...)`. Yo
 **Verify rules work**:
 
 ```python
-from agentao.permissions import PermissionDecision
+from arbiter.permissions import PermissionDecision
 
 for tool, args in [
     ("write_file", {"path": "/tmp/safe.txt", "content": "..."}),

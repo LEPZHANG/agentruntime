@@ -5,7 +5,7 @@
 ## 启动
 
 ```bash
-uv run agentao
+uv run arbiter
 # 或
 ./run.sh
 ```
@@ -13,7 +13,7 @@ uv run agentao
 进 REPL。当前 shell 的工作目录会成为 agent 的 `working_directory` — agent 跑的所有 file / glob / shell 工具都以这里为根。**启动前先 `cd` 到你要让 agent 操作的项目目录。**
 
 ```text
-🌟 Agentao — terminal agent
+🌟 Arbiter — terminal agent
 Working dir: /Users/you/projects/my-app
 Model: gpt-5.4 · Mode: workspace-write
 
@@ -101,9 +101,9 @@ Model: gpt-5.4 · Mode: workspace-write
 ---
 
 ::: info 这一章在体系里的位置
-本页这些命令（`/help` `/status` `/clear` `/new` `/exit`）都是纯 CLI 会话控制。嵌入式宿主用 `Agentao(...)` / `agent.close()` 管理生命周期，用 `active_permissions()` / 事件流读状态。见 [Part 2 · 生命周期](/zh/part-2/3-lifecycle) 和 [Part 4 · Host 合约](/zh/part-4/7-host-contract)。
+本页这些命令（`/help` `/status` `/clear` `/new` `/exit`）都是纯 CLI 会话控制。嵌入式宿主用 `Arbiter(...)` / `agent.close()` 管理生命周期，用 `active_permissions()` / 事件流读状态。见 [Part 2 · 生命周期](/zh/part-2/3-lifecycle) 和 [Part 4 · Host 合约](/zh/part-4/7-host-contract)。
 :::
 
 ::: tip 真相源头
-本页讲行为；命令语法的权威定义在 `/help` 和 [`agentao/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/help_text.py)。两边不一致以 `/help` 为准。
+本页讲行为；命令语法的权威定义在 `/help` 和 [`arbiter/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/help_text.py)。两边不一致以 `/help` 为准。
 :::

@@ -1,4 +1,4 @@
-"""Blueprint A — FastAPI + SSE embed of Agentao.
+"""Blueprint A — FastAPI + SSE embed of Arbiter.
 
 Endpoints:
     POST   /chat/{session_id}         — SSE stream of the agent's turn
@@ -26,11 +26,11 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from agentao import Agentao  # type alias for the cache values
-from agentao.cancellation import CancellationToken
-from agentao.embedding import build_from_environment
-from agentao.permissions import PermissionEngine, PermissionMode
-from agentao.transport import SdkTransport
+from arbiter import Arbiter  # type alias for the cache values
+from arbiter.cancellation import CancellationToken
+from arbiter.embedding import build_from_environment
+from arbiter.permissions import PermissionEngine, PermissionMode
+from arbiter.transport import SdkTransport
 
 from .auth import User, current_user
 from .tools import CreateTaskTool, ListProjectsTool
@@ -43,10 +43,10 @@ from .tools import CreateTaskTool, ListProjectsTool
 class SessionPool:
     def __init__(self, root: Path):
         self.root = root
-        self._sessions: Dict[str, tuple[Agentao, Lock]] = {}
+        self._sessions: Dict[str, tuple[Arbiter, Lock]] = {}
         self._mu = Lock()
 
-    async def get(self, key: str, tenant_id: str) -> tuple[Agentao, Lock]:
+    async def get(self, key: str, tenant_id: str) -> tuple[Arbiter, Lock]:
         async with self._mu:
             entry = self._sessions.get(key)
             if entry is not None:
@@ -89,7 +89,7 @@ class SessionPool:
 async def lifespan(app: FastAPI):
     load_dotenv()
     app.state.pool = SessionPool(
-        Path(os.environ.get("AGENTAO_ROOT",
+        Path(os.environ.get("ARBITER_ROOT",
                             str(Path(__file__).resolve().parent.parent / "data" / "tenants")))
     )
     app.state.active_tokens: Dict[str, CancellationToken] = {}
@@ -97,7 +97,7 @@ async def lifespan(app: FastAPI):
     await app.state.pool.close_all()
 
 
-app = FastAPI(lifespan=lifespan, title="Agentao · SaaS assistant demo")
+app = FastAPI(lifespan=lifespan, title="Arbiter · SaaS assistant demo")
 
 
 # ──────────────────────────────────────────────────────────────────────────

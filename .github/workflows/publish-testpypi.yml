@@ -26,10 +26,10 @@ jobs:
           import pathlib
           import re
 
-          init_py = pathlib.Path("agentao/__init__.py").read_text(encoding="utf-8")
+          init_py = pathlib.Path("arbiter/__init__.py").read_text(encoding="utf-8")
           match = re.search(r'^__version__\s*=\s*"([^"]+)"', init_py, re.MULTILINE)
           if not match:
-              raise SystemExit("Could not find __version__ in agentao/__init__.py")
+              raise SystemExit("Could not find __version__ in arbiter/__init__.py")
 
           package_version = match.group(1)
           release_tag = "${{ github.event.release.tag_name }}"
@@ -56,8 +56,8 @@ jobs:
       - name: Run tests in CI offline mode
         env:
           GITHUB_ACTIONS: "true"
-          AGENTAO_TEST_LIVE_MODELS: "0"
-          AGENTAO_TEST_LIVE_LLM: "0"
+          ARBITER_TEST_LIVE_MODELS: "0"
+          ARBITER_TEST_LIVE_LLM: "0"
         run: uv run --python 3.12 python -m pytest tests/ -v --tb=short
 
       - name: Build wheel and sdist
@@ -72,15 +72,15 @@ jobs:
           source .publish-testpypi-venv/bin/activate
           pip install dist/*.whl
           python -c "
-          import agentao
-          print('version:', agentao.__version__)
-          from agentao import Agentao, SkillManager
+          import arbiter
+          print('version:', arbiter.__version__)
+          from arbiter import Arbiter, SkillManager
           print('Public API OK')
           "
-          python -c "from agentao.cli import entrypoint; print('CLI entrypoint OK')"
-          python -c "import shutil; assert shutil.which('agentao'), 'agentao not found on PATH'; print('agentao on PATH OK')"
+          python -c "from arbiter.cli import entrypoint; print('CLI entrypoint OK')"
+          python -c "import shutil; assert shutil.which('arbiter'), 'arbiter not found on PATH'; print('arbiter on PATH OK')"
           python -c "
-          import agentao.skills.manager as m
+          import arbiter.skills.manager as m
           bundled = m._BUNDLED_SKILLS_DIR
           assert bundled.exists(), f'Bundled skills dir missing: {bundled}'
           skills = [d.name for d in bundled.iterdir() if d.is_dir()]

@@ -9,9 +9,9 @@ from types import SimpleNamespace
 from typing import List, Tuple
 from unittest.mock import MagicMock
 
-from agentao.agent import Agentao
-from agentao.plugins.models import ParsedHookRule
-from agentao.runtime.chat_loop import ChatLoopRunner
+from arbiter.agent import Arbiter
+from arbiter.plugins.models import ParsedHookRule
+from arbiter.runtime.chat_loop import ChatLoopRunner
 
 from .host_events import CapturingTransport
 
@@ -27,11 +27,11 @@ __all__ = [
 ]
 
 
-def make_bare_agent(working_directory: Path, transport=None) -> Agentao:
-    """Build a minimal Agentao with no plugins, suitable for driving the
+def make_bare_agent(working_directory: Path, transport=None) -> Arbiter:
+    """Build a minimal Arbiter with no plugins, suitable for driving the
     chat-loop helpers (`_dispatch_stop` / `_dispatch_pre_compact`)
     directly."""
-    return Agentao(
+    return Arbiter(
         working_directory=working_directory,
         api_key="k",
         base_url="https://test.local/v1",
@@ -108,7 +108,7 @@ def make_runner_with_stub_llm(
 
     Stubs out compaction/notification helpers and skill/memory/tools
     managers so ``runner.run()`` is exercisable without a real
-    Agentao environment.
+    Arbiter environment.
     """
     if rules is None:
         rules = [ParsedHookRule(
@@ -158,7 +158,7 @@ def dispatch_stop_with_json_payload(tmp_path: Path, hook_payload: dict):
     tests that need real subprocess execution. Tests that exercise only
     the JSON parser should call ``_parse_stop_command_output`` directly.
     """
-    from agentao.plugins.hooks import (
+    from arbiter.plugins.hooks import (
         ClaudeHookPayloadAdapter,
         PluginHookDispatcher,
     )

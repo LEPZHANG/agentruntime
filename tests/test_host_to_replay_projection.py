@@ -22,21 +22,21 @@ from pathlib import Path
 import pytest
 from pydantic import TypeAdapter
 
-from agentao.host.models import (
+from arbiter.host.models import (
     PermissionDecisionEvent,
     SubagentLifecycleEvent,
     ToolLifecycleEvent,
 )
-from agentao.host.replay_projection import (
+from arbiter.host.replay_projection import (
     HostReplaySink,
     host_event_to_replay_kind,
     host_event_to_replay_payload,
     replay_payload_to_host_event,
 )
-from agentao.replay.events import EventKind
-from agentao.replay.recorder import ReplayRecorder
-from agentao.replay.schema import build_event_schema
-from agentao.runtime import identity as runtime_identity
+from arbiter.replay.events import EventKind
+from arbiter.replay.recorder import ReplayRecorder
+from arbiter.replay.schema import build_event_schema
+from arbiter.runtime import identity as runtime_identity
 
 
 def _now() -> str:
@@ -331,24 +331,24 @@ def test_start_replay_auto_attaches_host_sink(tmp_path: Path) -> None:
     """``start_replay()`` must wire host events into the recorder.
 
     Repro for the round-5 codex P2: without the auto-wire, events
-    published on ``Agentao._host_events`` were never written to the
+    published on ``Arbiter._host_events`` were never written to the
     replay JSONL — embedded hosts saw two parallel streams instead of
     one audit artifact.
     """
     from unittest.mock import Mock, patch
 
-    from agentao.replay.config import ReplayConfig
+    from arbiter.replay.config import ReplayConfig
 
     mock_llm = Mock()
     mock_llm.logger = Mock()
     mock_llm.model = "gpt-test"
     mock_llm.api_key = "fake"
-    with patch("agentao.tooling.mcp_tools.McpClientManager"), patch(
-        "agentao.tooling.mcp_tools.load_mcp_config", return_value={}
+    with patch("arbiter.tooling.mcp_tools.McpClientManager"), patch(
+        "arbiter.tooling.mcp_tools.load_mcp_config", return_value={}
     ):
-        from agentao.agent import Agentao
+        from arbiter.agent import Arbiter
 
-        agent = Agentao(
+        agent = Arbiter(
             working_directory=tmp_path,
             llm_client=mock_llm,
             replay_config=ReplayConfig(enabled=True),

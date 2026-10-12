@@ -10,22 +10,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 uv sync                    # Install dependencies
 uv add package-name        # Add a new dependency
 uv run python script.py    # Run Python scripts
-uv run agentao             # Run the CLI
+uv run arbiter             # Run the CLI
 ```
 
-Core deps live in `[project.dependencies]`; the heavyweight UI / fetch / tokenization deps are opt-in extras. A bare `pip install agentao` gets a library-only install; `pip install 'agentao[cli]'` is the smallest interactive CLI. (The `[pdf]` / `[excel]` / `[image]` / `[crypto]` / `[google]` extras were removed as dead weight — zero in-tree consumers; see `docs/design/optimization-opportunities-review.md` T1.1.)
+Core deps live in `[project.dependencies]`; the heavyweight UI / fetch / tokenization deps are opt-in extras. A bare `pip install arbiter` gets a library-only install; `pip install 'arbiter[cli]'` is the smallest interactive CLI. (The `[pdf]` / `[excel]` / `[image]` / `[crypto]` / `[google]` extras were removed as dead weight — zero in-tree consumers; see `docs/design/optimization-opportunities-review.md` T1.1.)
 
 ## Running
 
 ```bash
 ./run.sh                              # Quick start (interactive)
-uv run agentao                        # Interactive CLI
-uv run python -m agentao              # Same, via module entrypoint
-uv run agentao run --prompt "..."     # Non-interactive automation (M0)
-uv run agentao --acp --stdio          # ACP server (Issue 12)
+uv run arbiter                        # Interactive CLI
+uv run python -m arbiter              # Same, via module entrypoint
+uv run arbiter run --prompt "..."     # Non-interactive automation (M0)
+uv run arbiter --acp --stdio          # ACP server (Issue 12)
 ```
 
-`agentao run` is the canonical non-interactive surface. Exit codes: `0` ok, `1` runtime, `2` invalid usage, `3` permission/interaction, `4` max iterations, `130` interrupted. See `agentao/cli/run.py` and `docs/reference/configuration.md`. The legacy `agentao -p "..."` is now a thin shim over `agentao run`.
+`arbiter run` is the canonical non-interactive surface. Exit codes: `0` ok, `1` runtime, `2` invalid usage, `3` permission/interaction, `4` max iterations, `130` interrupted. See `arbiter/cli/run.py` and `docs/reference/configuration.md`. The legacy `arbiter -p "..."` is now a thin shim over `arbiter run`.
 
 ## Testing
 
@@ -42,59 +42,59 @@ The `slow` marker is excluded by default (`pyproject.toml :: tool.pytest.ini_opt
 cp .env.example .env       # Edit with OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
 ```
 
-**Reference for all config files** (`.env`, `.agentao/settings.json`, `permissions.json`, `mcp.json`, `acp.json`, `skills_config.json`, `AGENTAO.md`, memory DBs): see [docs/reference/configuration.md](docs/reference/configuration.md) for paths, schema, defaults, and precedence rules.
+**Reference for all config files** (`.env`, `.arbiter/settings.json`, `permissions.json`, `mcp.json`, `acp.json`, `skills_config.json`, `ARBITER.md`, memory DBs): see [docs/reference/configuration.md](docs/reference/configuration.md) for paths, schema, defaults, and precedence rules.
 
 ## Architecture
 
-Agentao is an **embedded agent harness**: the same runtime drives the interactive CLI, the `agentao run` automation surface, and the ACP server, with hosts free to embed `Agentao(...)` directly. The package boundary between "host-facing contract" and "internal runtime" is load-bearing — see `docs/design/embedded-host-contract.md` and `docs/reference/host-api.md`.
+Arbiter is an **embedded agent harness**: the same runtime drives the interactive CLI, the `arbiter run` automation surface, and the ACP server, with hosts free to embed `Arbiter(...)` directly. The package boundary between "host-facing contract" and "internal runtime" is load-bearing — see `docs/design/embedded-host-contract.md` and `docs/reference/host-api.md`.
 
-> **Embedding Agentao into a *different* project?** (e.g. a coding agent asked to "add Agentao" to another codebase.) Read the distilled playbook at `docs/guides/embed-for-agents.md` — construction skeletons, import rules, and an integration checklist. Note that *this* `CLAUDE.md` and `AGENTAO.md` are for working inside the Agentao repo, not for the embedding target.
+> **Embedding Arbiter into a *different* project?** (e.g. a coding agent asked to "add Arbiter" to another codebase.) Read the distilled playbook at `docs/guides/embed-for-agents.md` — construction skeletons, import rules, and an integration checklist. Note that *this* `CLAUDE.md` and `ARBITER.md` are for working inside the Arbiter repo, not for the embedding target.
 
 ### Subpackage map
 
 | Path | Purpose |
 |---|---|
-| `agentao/agent.py` | `Agentao` class — sync `chat()` and async `arun()`. Construction wires LLM, tools, skills, plugins, permissions, replay. |
-| `agentao/runtime/` | Per-turn machinery extracted from `Agentao` — `ChatLoopRunner` (loop body), `ToolRunner` (4-phase tool pipeline: plan / execute / format / sanitize), `run_llm_call`, model/provider switching. |
-| `agentao/host/` | **Public host contract.** `HostEvent`, `ToolLifecycleEvent`, `SubagentLifecycleEvent`, `PermissionDecisionEvent`, `EventStream`, `ActivePermissions`. Stability boundary for embedded hosts. |
-| `agentao/harness/` | **Deprecated alias for `agentao.host`** (renamed in 0.4.2). Re-exports with old names + `DeprecationWarning`; scheduled for removal in 0.5.0. |
-| `agentao/embedding/` | Host-side construction: `build_from_environment()` (env / dotenv / `.agentao/*.json` reads routed through explicit kwargs), `permission_loader`, `sessions`, `plugins/` (manifest loader, validators, MCP merge, resolvers). |
-| `agentao/plugins/` | Plugin **runtime path** only — models, hooks, skill/agent validators. Loader lives in `embedding/plugins/`. |
-| `agentao/permissions.py` + `permissions_hardline/` | `PermissionEngine` + shell-pattern hardline scanner (heredoc, contexts, decoder). |
-| `agentao/cli/` | Interactive CLI **package** (was `cli.py` before 0.4.x). `app.py` (`AgentaoCLI`), `entrypoints.py` (argparse + `main`), `run.py` (`agentao run`), `commands/` (per-slash-command handlers), `subcommands.py`, `diagnostics_cli.py`. |
-| `agentao/prompts/`, `agentao/agents/`, `agentao/plan/`, `agentao/capabilities/`, `agentao/tooling/`, `agentao/security/`, `agentao/session.py`, `agentao/context_manager.py` | Supporting modules — prompt assembly (`SystemPromptBuilder`), sub-agent runners, plan-mode state, capability declarations (incl. `capabilities/process.py::run_captured` — the shared hardened subprocess runner; see Common gotchas), tool registration (`tooling/registry.py::register_builtin_tools` + agent/MCP tool wiring), security utilities (`security/secret_scan.py` — the shared credential-pattern scanner behind `agentao.log`, `.agentao/tool-outputs/`, `MemoryGuard`, and replay; plus `path_policy.py` / `url_policy.py`), session save/load, context-window compaction. |
+| `arbiter/agent.py` | `Arbiter` class — sync `chat()` and async `arun()`. Construction wires LLM, tools, skills, plugins, permissions, replay. |
+| `arbiter/runtime/` | Per-turn machinery extracted from `Arbiter` — `ChatLoopRunner` (loop body), `ToolRunner` (4-phase tool pipeline: plan / execute / format / sanitize), `run_llm_call`, model/provider switching. |
+| `arbiter/host/` | **Public host contract.** `HostEvent`, `ToolLifecycleEvent`, `SubagentLifecycleEvent`, `PermissionDecisionEvent`, `EventStream`, `ActivePermissions`. Stability boundary for embedded hosts. |
+| `arbiter/harness/` | **Deprecated alias for `arbiter.host`** (renamed in 0.4.2). Re-exports with old names + `DeprecationWarning`; scheduled for removal in 0.5.0. |
+| `arbiter/embedding/` | Host-side construction: `build_from_environment()` (env / dotenv / `.arbiter/*.json` reads routed through explicit kwargs), `permission_loader`, `sessions`, `plugins/` (manifest loader, validators, MCP merge, resolvers). |
+| `arbiter/plugins/` | Plugin **runtime path** only — models, hooks, skill/agent validators. Loader lives in `embedding/plugins/`. |
+| `arbiter/permissions.py` + `permissions_hardline/` | `PermissionEngine` + shell-pattern hardline scanner (heredoc, contexts, decoder). |
+| `arbiter/cli/` | Interactive CLI **package** (was `cli.py` before 0.4.x). `app.py` (`ArbiterCLI`), `entrypoints.py` (argparse + `main`), `run.py` (`arbiter run`), `commands/` (per-slash-command handlers), `subcommands.py`, `diagnostics_cli.py`. |
+| `arbiter/prompts/`, `arbiter/agents/`, `arbiter/plan/`, `arbiter/capabilities/`, `arbiter/tooling/`, `arbiter/security/`, `arbiter/session.py`, `arbiter/context_manager.py` | Supporting modules — prompt assembly (`SystemPromptBuilder`), sub-agent runners, plan-mode state, capability declarations (incl. `capabilities/process.py::run_captured` — the shared hardened subprocess runner; see Common gotchas), tool registration (`tooling/registry.py::register_builtin_tools` + agent/MCP tool wiring), security utilities (`security/secret_scan.py` — the shared credential-pattern scanner behind `arbiter.log`, `.arbiter/tool-outputs/`, `MemoryGuard`, and replay; plus `path_policy.py` / `url_policy.py`), session save/load, context-window compaction. |
 
 ### Tool system
 
-All tools inherit from `Tool` (sync) or `AsyncToolBase` (async) in `agentao/tools/base.py`. Both are registered through the same `ToolRegistry` which converts them to OpenAI function-calling format.
+All tools inherit from `Tool` (sync) or `AsyncToolBase` (async) in `arbiter/tools/base.py`. Both are registered through the same `ToolRegistry` which converts them to OpenAI function-calling format.
 
 `AsyncToolBase` dispatches through `runtime_loop` with a `CancellationToken`; cleanup-ack uses `_bridged()` `finally` + `threading.Event` so the runtime can cancel mid-tool. `RegistrableTool = Tool | AsyncToolBase`.
 
-**Registration**: `agent.py::_register_tools()` is a thin delegation — the real wiring lives in `agentao/tooling/registry.py::register_builtin_tools()` (`agent_tools.py` / `mcp_tools.py` cover sub-agent and MCP tools). Note `agentao/tools/goal.py` is *not* registered by default (the CLI injects it via `add_tool` when a `/goal` is active).
+**Registration**: `agent.py::_register_tools()` is a thin delegation — the real wiring lives in `arbiter/tooling/registry.py::register_builtin_tools()` (`agent_tools.py` / `mcp_tools.py` cover sub-agent and MCP tools). Note `arbiter/tools/goal.py` is *not* registered by default (the CLI injects it via `add_tool` when a `/goal` is active).
 
-**Confirmation / permissions**: tools with `requires_confirmation=True` are gated by `PermissionEngine`, which evaluates rules from `.agentao/permissions.json` (project) + `<home>/.agentao/permissions.json` (user). The engine itself does **no file I/O** — `agentao/embedding/permission_loader.py::load_permission_rules()` reads and passes `(rules, sources)` in. Default presets auto-allow common docs domains (`.github.com`, `.docs.python.org`, …) and auto-deny SSRF targets (`localhost`, `127.0.0.1`, `169.254.169.254`, …).
+**Confirmation / permissions**: tools with `requires_confirmation=True` are gated by `PermissionEngine`, which evaluates rules from `.arbiter/permissions.json` (project) + `<home>/.arbiter/permissions.json` (user). The engine itself does **no file I/O** — `arbiter/embedding/permission_loader.py::load_permission_rules()` reads and passes `(rules, sources)` in. Default presets auto-allow common docs domains (`.github.com`, `.docs.python.org`, …) and auto-deny SSRF targets (`localhost`, `127.0.0.1`, `169.254.169.254`, …).
 
 ### Permission modes (replaces the old `allow_all_tools` flag)
 
-`/mode read-only | workspace-write | full-access` switches the runtime's permission posture. `plan` is the fourth posture — entered via `/plan` interactively (not `/mode plan`), or `--permission-mode plan` on `agentao run`:
+`/mode read-only | workspace-write | full-access` switches the runtime's permission posture. `plan` is the fourth posture — entered via `/plan` interactively (not `/mode plan`), or `--permission-mode plan` on `arbiter run`:
 
 - `read-only` — blocks all write and shell tools.
 - `workspace-write` — allows file writes and safe shell; asks for web (default).
 - `full-access` — allows all tools without prompting.
 - `plan` — LLM plans, does not execute; entered via `/plan`.
 
-State is on `AgentaoCLI` (`agentao/cli/app.py`) and projected into prompts.
+State is on `ArbiterCLI` (`arbiter/cli/app.py`) and projected into prompts.
 
 ### System prompt composition
 
-Built fresh on every `chat()` — `agent.py::_build_system_prompt()` delegates to `agentao/prompts/` (`SystemPromptBuilder`). Sections are ordered to keep the **stable prefix byte-identical across turns** so provider prompt-caching can reuse it; everything that changes within a session sits below that line. `builder.py::_build_sections()` is the authoritative order. The stable prefix ends at `<memory-stable>`; skills, todos, `<memory-context>` and the plan prompt form the volatile suffix. One non-obvious rule: available agents are suppressed in plan mode (delegation contradicts research-only intent).
+Built fresh on every `chat()` — `agent.py::_build_system_prompt()` delegates to `arbiter/prompts/` (`SystemPromptBuilder`). Sections are ordered to keep the **stable prefix byte-identical across turns** so provider prompt-caching can reuse it; everything that changes within a session sits below that line. `builder.py::_build_sections()` is the authoritative order. The stable prefix ends at `<memory-stable>`; skills, todos, `<memory-context>` and the plan prompt form the volatile suffix. One non-obvious rule: available agents are suppressed in plan mode (delegation contradicts research-only intent).
 
 **The date/time is *not* in the system prompt.** It is injected per-turn as a `<system-reminder>` prepended to the *user message* (`runtime/chat_loop/_runner.py::run`, `Current Date/Time: YYYY-MM-DD HH:MM:SS (Day)`) — keeping it out of the cached prefix is the whole point. `tests/test_date_in_prompt.py` asserts both halves.
 
 ### Conversation flow
 
 ```
-Agentao.chat() / Agentao.arun()
+Arbiter.chat() / Arbiter.arun()
   └─ ChatLoopRunner.run()                  # runtime/chat_loop/_runner.py
        loop (max_iterations):
          ├─ run_llm_call(messages, tools)  # runtime/llm_call.py
@@ -109,18 +109,18 @@ Agentao.chat() / Agentao.arun()
 
 ### Skills
 
-Auto-discovered from `skills/`. Each subdir has `SKILL.md` (YAML frontmatter `name:` / `description:`) and optional `references/*.md` (loaded on activation). The skill manager (`agentao/skills/`) maintains `available_skills` (all) and `active_skills` (this session). Cross-process locking via `filelock` — installs and updates are safe across concurrent CLI processes.
+Auto-discovered from `skills/`. Each subdir has `SKILL.md` (YAML frontmatter `name:` / `description:`) and optional `references/*.md` (loaded on activation). The skill manager (`arbiter/skills/`) maintains `available_skills` (all) and `active_skills` (this session). Cross-process locking via `filelock` — installs and updates are safe across concurrent CLI processes.
 
 Activate via the `activate_skill` tool or `/skills activate <name>`.
 
 ### Memory system
 
-**Architecture:** SQLite-backed storage managed by `MemoryManager` (`agentao/memory/manager.py`).
+**Architecture:** SQLite-backed storage managed by `MemoryManager` (`arbiter/memory/manager.py`).
 
 | Database | Path | Content |
 |---|---|---|
-| Project store | `.agentao/memory.db` | Project-scoped persistent memories + session summaries |
-| User store | `<home>/.agentao/memory.db` | Cross-project user-scoped persistent memories |
+| Project store | `.arbiter/memory.db` | Project-scoped persistent memories + session summaries |
+| User store | `<home>/.arbiter/memory.db` | Cross-project user-scoped persistent memories |
 
 **Three data types:**
 
@@ -138,45 +138,45 @@ See `docs/guides/memory-management.md`.
 
 ### Replay
 
-`ReplayManager` (`agentao/replay/manager.py`) records every turn to `.agentao/replays/*.jsonl` when enabled. Replay state lives **outside** `Agentao` core — Transport emits `TURN_BEGIN` / `TURN_END` events that the manager subscribes to. Configure via `.agentao/settings.json :: replay.{enabled, max_instances}` or `/replay on|off`.
+`ReplayManager` (`arbiter/replay/manager.py`) records every turn to `.arbiter/replays/*.jsonl` when enabled. Replay state lives **outside** `Arbiter` core — Transport emits `TURN_BEGIN` / `TURN_END` events that the manager subscribes to. Configure via `.arbiter/settings.json :: replay.{enabled, max_instances}` or `/replay on|off`.
 
 ### MCP
 
-External MCP servers via `.agentao/mcp.json` (project) + `<home>/.agentao/mcp.json` (global):
+External MCP servers via `.arbiter/mcp.json` (project) + `<home>/.arbiter/mcp.json` (global):
 
-Transports (`mcp/config.py :: resolve_transport`, fail-closed): `command` → stdio, or `url` → **Streamable HTTP by default** (add `"type": "sse"` for the legacy SSE transport; `"type": "http"` is the explicit form). A bare `url` used to mean SSE — this is a **breaking change**. Tools are registered as `mcp_{server}_{tool}`. The MCP SDK is async-only; `McpClientManager` runs a dedicated event loop and bridges into sync Agentao via `run_until_complete()`.
+Transports (`mcp/config.py :: resolve_transport`, fail-closed): `command` → stdio, or `url` → **Streamable HTTP by default** (add `"type": "sse"` for the legacy SSE transport; `"type": "http"` is the explicit form). A bare `url` used to mean SSE — this is a **breaking change**. Tools are registered as `mcp_{server}_{tool}`. The MCP SDK is async-only; `McpClientManager` runs a dedicated event loop and bridges into sync Arbiter via `run_until_complete()`.
 
-Key files: `agentao/mcp/config.py`, `client.py`, `tool.py`.
+Key files: `arbiter/mcp/config.py`, `client.py`, `tool.py`.
 
 CLI: `/mcp list`, `/mcp add [--http|--sse] <name> <command|url>`, `/mcp remove <name>`.
 
 ### Logging
 
-`agentao.log` captures every LLM request/response, all tool calls with formatted JSON arguments, tool results, token usage, timestamps. Nothing is truncated. Logger lives in `agentao/llm/client.py` — read this file first when debugging tool execution or LLM behavior.
+`arbiter.log` captures every LLM request/response, all tool calls with formatted JSON arguments, tool results, token usage, timestamps. Nothing is truncated. Logger lives in `arbiter/llm/client.py` — read this file first when debugging tool execution or LLM behavior.
 
-Content is **not verbatim**: the file handler carries a `_RedactingFormatter` that rewrites credential-shaped strings to `[REDACTED:<kind>]` using the shared patterns in `agentao/security/secret_scan.py`. It is a `Formatter`, not a `Filter`, deliberately — a `Filter` mutates the shared `LogRecord` and would leak the redaction into every other handler on the logger, including an embedded host's own. If a debugging session needs the raw bytes, that formatter is the single place to bypass.
+Content is **not verbatim**: the file handler carries a `_RedactingFormatter` that rewrites credential-shaped strings to `[REDACTED:<kind>]` using the shared patterns in `arbiter/security/secret_scan.py`. It is a `Formatter`, not a `Filter`, deliberately — a `Filter` mutates the shared `LogRecord` and would leak the redaction into every other handler on the logger, including an embedded host's own. If a debugging session needs the raw bytes, that formatter is the single place to bypass.
 
 ### CLI slash commands
 
-The authoritative list with full subcommand syntax lives in `agentao/cli/help_text.py`; `/help` renders it. The high-impact commands to know about when reasoning about agent behavior:
+The authoritative list with full subcommand syntax lives in `arbiter/cli/help_text.py`; `/help` renders it. The high-impact commands to know about when reasoning about agent behavior:
 
 - `/mode read-only|workspace-write|full-access` — permission posture (see Permission modes above).
 - `/plan` / `/plan implement` / `/plan show` — plan mode (LLM plans, does not execute).
-- `/goal <objective> [--for 30m] [--turns 10] [--unbounded]` — long-task auto-continuation with a time/turn budget; subcommands `show|budget|pause|resume|edit|clear`. Host-owned loop in `cli/input_loop.py::run_goal_continuation`; state in `.agentao/goal.json` (`cli/goal_state.py`); `update_goal` tool injected via `add_tool` (`tools/goal.py`). See Common gotchas for `--turns` vs `max_iterations`.
+- `/goal <objective> [--for 30m] [--turns 10] [--unbounded]` — long-task auto-continuation with a time/turn budget; subcommands `show|budget|pause|resume|edit|clear`. Host-owned loop in `cli/input_loop.py::run_goal_continuation`; state in `.arbiter/goal.json` (`cli/goal_state.py`); `update_goal` tool injected via `add_tool` (`tools/goal.py`). See Common gotchas for `--turns` vs `max_iterations`.
 - `/clear` — saves current session, clears conversation + **all memories**, starts a new one.
 - `/model`, `/provider`, `/temperature`, `/thinking` — LLM config. `/thinking [minimal|low|medium|high|off]` sets thinking depth (`reasoning_effort`) on the live client's `extra_body` passthrough (`cli/commands/provider.py::handle_thinking_command`); `off` clears it. No auto-recovery — a model that rejects `reasoning_effort` fails until `off` (see `docs/design/host-llm-extra-params.md`).
 
 ## Adding new components
 
-Adding a built-in tool or a skill to this repo: see [docs/guides/adding-components.md](docs/guides/adding-components.md). The non-obvious part is that tools register in `agentao/tooling/registry.py::register_builtin_tools()`, not in `agent.py`.
+Adding a built-in tool or a skill to this repo: see [docs/guides/adding-components.md](docs/guides/adding-components.md). The non-obvious part is that tools register in `arbiter/tooling/registry.py::register_builtin_tools()`, not in `agent.py`.
 
 ## Common gotchas
 
-- **`cli.py` was split into the `cli/` package** in 0.4.x. Older docs and design notes may still say `cli.py` — grep `agentao/cli/` for the actual handler.
-- **`agentao.harness` → `agentao.host`** rename in 0.4.2. The old name is a deprecated alias scheduled for removal in 0.5.0. Use `agentao.host.HostEvent`, `export_host_acp_json_schema`, etc.
+- **`cli.py` was split into the `cli/` package** in 0.4.x. Older docs and design notes may still say `cli.py` — grep `arbiter/cli/` for the actual handler.
+- **`arbiter.harness` → `arbiter.host`** rename in 0.4.2. The old name is a deprecated alias scheduled for removal in 0.5.0. Use `arbiter.host.HostEvent`, `export_host_acp_json_schema`, etc.
 - **`allow_all_tools` is gone.** Use `/mode full-access` (or the equivalent host-API call) instead.
-- **`agentao -p` is a shim** over `agentao run`. New automation should target `agentao run` directly — that's where the spec schema, Jinja2 templating, and exit codes are documented.
-- **`Agentao` constructor takes 8 legacy callbacks** (`confirmation_callback`, `step_callback`, …) that emit `DeprecationWarning`. They will be removed in 0.5.0 — `agentao.embedding.compat` is the documented migration surface.
-- **Don't intuition-audit architecture.** Before recommending borrowed patterns or claiming a gap exists, grep agentao to verify; subpackage `__init__.py` docstrings document intentional shims and rename trails.
+- **`arbiter -p` is a shim** over `arbiter run`. New automation should target `arbiter run` directly — that's where the spec schema, Jinja2 templating, and exit codes are documented.
+- **`Arbiter` constructor takes 8 legacy callbacks** (`confirmation_callback`, `step_callback`, …) that emit `DeprecationWarning`. They will be removed in 0.5.0 — `arbiter.embedding.compat` is the documented migration surface.
+- **Don't intuition-audit architecture.** Before recommending borrowed patterns or claiming a gap exists, grep arbiter to verify; subpackage `__init__.py` docstrings document intentional shims and rename trails.
 - **`/goal --turns` is NOT `max_iterations`.** `--turns` caps the *outer* continuation count (how many `chat()` calls the goal loop drives); `max_iterations` caps the *inner* tool-call loop within a single `chat()`. They are orthogonal — both stay in force. The goal loop is host-owned (`cli/input_loop.py`), deliberately not the plugin `Stop`/`force_continue` path. Design: `docs/design/codex-goal-mechanism-review.md` §11.
-- **Don't call `subprocess.run` for batch commands — use `agentao/capabilities/process.py::run_captured()`.** A bare `subprocess.run(timeout=)` only kills the direct child on timeout, so a grandchild holding the captured pipe (Windows `git` credential helpers, a user hook backgrounding a process) hangs `communicate()` past the timeout — and over ACP-stdio a hung tool wedges the turn until the client times out and drops the connection. `run_captured` runs the child in its own process group/session, feeds/detaches stdin explicitly (`input=` over a pipe, else `DEVNULL` so a child can't read the JSON-RPC channel), kills the whole tree via `kill_process_tree()` on timeout (`taskkill /T` / `killpg(pid)` — never `getpgid`, which races a zombie child), and decodes with `errors="replace"`. It also defaults `env=` to `build_child_env()`, which strips agentao's own provider credentials (`HARNESS_ENV_KEYS`) from the child — so a plugin hook that shells out to the provider needs an explicit `env=` or `AGENTAO_SCRUB_CHILD_ENV=0`. `search_file_content` and the plugin hook dispatcher route through `run_captured`; `LocalShellExecutor.run` keeps its own streaming + inactivity-timeout loop but shares `kill_process_tree` and the same scrubbed base env. (PRs #73/#74/#75.)
+- **Don't call `subprocess.run` for batch commands — use `arbiter/capabilities/process.py::run_captured()`.** A bare `subprocess.run(timeout=)` only kills the direct child on timeout, so a grandchild holding the captured pipe (Windows `git` credential helpers, a user hook backgrounding a process) hangs `communicate()` past the timeout — and over ACP-stdio a hung tool wedges the turn until the client times out and drops the connection. `run_captured` runs the child in its own process group/session, feeds/detaches stdin explicitly (`input=` over a pipe, else `DEVNULL` so a child can't read the JSON-RPC channel), kills the whole tree via `kill_process_tree()` on timeout (`taskkill /T` / `killpg(pid)` — never `getpgid`, which races a zombie child), and decodes with `errors="replace"`. It also defaults `env=` to `build_child_env()`, which strips arbiter's own provider credentials (`HARNESS_ENV_KEYS`) from the child — so a plugin hook that shells out to the provider needs an explicit `env=` or `ARBITER_SCRUB_CHILD_ENV=0`. `search_file_content` and the plugin hook dispatcher route through `run_captured`; `LocalShellExecutor.run` keeps its own streaming + inactivity-timeout loop but shares `kill_process_tree` and the same scrubbed base env. (PRs #73/#74/#75.)

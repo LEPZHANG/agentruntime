@@ -1,6 +1,6 @@
 """Tests for PlanSession state management."""
 
-from agentao.plan.session import PlanPhase, PlanSession
+from arbiter.plan.session import PlanPhase, PlanSession
 
 
 def test_defaults():

@@ -19,7 +19,7 @@ Agents are **unpredictable workloads** — a simple Q&A may take 200 ms; a compl
 ## Control 1 · Context window
 
 ```python
-agent = Agentao(
+agent = Arbiter(
     max_context_tokens=128_000,   # default 200_000
 )
 ```
@@ -45,7 +45,7 @@ reply = agent.chat(msg, max_iterations=50)   # default 100
 
 Pair with `on_max_iterations_callback` ([4.6](/en/part-4/6-max-iterations)) for bailout.
 
-Agentao also tracks repeated tool-call failures inside a turn. Identical repeated tool calls trip doom-loop protection, and repeated unparseable argument payloads for the same tool are answered with a `role:tool` halt message so the next LLM request remains protocol-valid instead of spinning forever.
+Arbiter also tracks repeated tool-call failures inside a turn. Identical repeated tool calls trip doom-loop protection, and repeated unparseable argument payloads for the same tool are answered with a `role:tool` halt message so the next LLM request remains protocol-valid instead of spinning forever.
 
 Tune by scenario:
 
@@ -57,7 +57,7 @@ Tune by scenario:
 
 ## Control 3 · Per-turn timeout
 
-Agentao **has no built-in `chat()` timeout** — it runs forever. Enforce at the host:
+Arbiter **has no built-in `chat()` timeout** — it runs forever. Enforce at the host:
 
 ```python
 import asyncio
@@ -109,7 +109,7 @@ MCP tool timeout comes from the `timeout` field:
 async def chat(req):
     workdir = Path(f"/tmp/ephemeral-{uuid.uuid4()}")
     try:
-        agent = Agentao(working_directory=workdir)
+        agent = Arbiter(working_directory=workdir)
         return await asyncio.to_thread(agent.chat, req.message)
     finally:
         agent.close()
@@ -132,14 +132,14 @@ class AgentPool:
         self.max_sessions = max_sessions
         self.ttl_s = ttl_s
 
-    async def get(self, session_id: str, workdir: Path) -> tuple[Agentao, Lock]:
+    async def get(self, session_id: str, workdir: Path) -> tuple[Arbiter, Lock]:
         async with self._global_lock:
             now = monotonic()
             self._evict_expired(now)
             while len(self._pool) >= self.max_sessions:
                 self._evict_lru()
             if session_id not in self._pool:
-                agent = Agentao(working_directory=workdir)
+                agent = Arbiter(working_directory=workdir)
                 self._pool[session_id] = (agent, Lock(), now)
             entry = list(self._pool[session_id])
             entry[2] = now
@@ -199,7 +199,7 @@ def on_event(ev):
             budget.used_today.get(current_user, 0) + len(ev.data["chunk"]) // 4
 ```
 
-Exact counting: `tiktoken` via `pip install 'agentao[tokenizer]'`.
+Exact counting: `tiktoken` via `pip install 'arbiter[tokenizer]'`.
 
 ## Memory footprint
 

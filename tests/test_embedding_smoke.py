@@ -8,10 +8,10 @@ from unittest.mock import Mock
 
 def test_embedding_public_modules_import() -> None:
     """Host-facing modules import without constructing the runtime."""
-    import agentao  # noqa: F401
-    import agentao.embedding  # noqa: F401
-    import agentao.host  # noqa: F401
-    import agentao.host.protocols  # noqa: F401
+    import arbiter  # noqa: F401
+    import arbiter.embedding  # noqa: F401
+    import arbiter.host  # noqa: F401
+    import arbiter.host.protocols  # noqa: F401
 
 
 def test_explicit_embedded_construction_and_observer_api(tmp_path: Path) -> None:
@@ -20,11 +20,11 @@ def test_explicit_embedded_construction_and_observer_api(tmp_path: Path) -> None
     mock_llm.logger = Mock()
     mock_llm.model = "gpt-test"
 
-    from agentao import Agentao
-    from agentao.mcp import InMemoryMCPRegistry
-    from agentao.transport import NullTransport
+    from arbiter import Arbiter
+    from arbiter.mcp import InMemoryMCPRegistry
+    from arbiter.transport import NullTransport
 
-    agent = Agentao(
+    agent = Arbiter(
         working_directory=tmp_path,
         llm_client=mock_llm,
         transport=NullTransport(),

@@ -1,14 +1,14 @@
-# Code Mode / PTC —— 路线对比与 Agentao 决策记录
+# Code Mode / PTC —— 路线对比与 Arbiter 决策记录
 
 **状态：** 决策记录（初稿）。2026-07-09 起草，基于对 `../codex/`（`code-mode*` crates）、
 `../hermes-agent/`（`tools/code_execution_tool.py`）、`../goose/`
-（`platform_extensions/code_execution.rs`）三套实现的 grep 验证式通读，以及对 agentao
+（`platform_extensions/code_execution.rs`）三套实现的 grep 验证式通读，以及对 arbiter
 现状的对照。**2026-07-11 补入第四套参考实现** `../opencode/`（`packages/codemode/` +
 `packages/opencode/src/tool/code-mode.ts`，自建受限解释器路线，见 §2 与附录 F）。**这是一份
 决策记录，不是已批准的方案。** 是否落地、以何种形态落地，是维护者的判断；本文只呈现证据、
 路线差异与启动条件。opencode 这个数据点**强化而非推翻**当前结论（§6、附录 F 末）。
 
-**读者：** 关注"多步工具链压缩为一次推理轮次 / 中间结果不进上下文"这类能力的 agentao
+**读者：** 关注"多步工具链压缩为一次推理轮次 / 中间结果不进上下文"这类能力的 arbiter
 维护者。
 
 **配套：** 英文版 `code-mode-ptc-review.md` **待补**。英文版不是实现前置条件，可在方案
@@ -23,7 +23,7 @@
 - `permission-hardening-plan.zh.md` / `host-fs-policy.zh.md` —— Code Mode 会开出一个
   新的、绕过常规工具审批的执行面，必须接回 `PermissionEngine` 与沙箱边界。
 
-**锚点：** agentao `fix/test-retriever-time-bomb`@`a794fab`（2026-07-09，与 `main` 无
+**锚点：** arbiter `fix/test-retriever-time-bomb`@`a794fab`（2026-07-09，与 `main` 无
 相关差异）；codex `main`@`2b44896c5a`；hermes `main`@`79f127480`；goose `main`@`b7eb1e973`
 （含 #10214）；opencode `main`@`34e58090`（2026-07-11 pull，含 code-mode 系列
 `#34677`→revert `#35077`→`#35079`/`#35085`/`#35185`/`#35192`/`#35574`）。逐文件的通读
@@ -33,7 +33,7 @@
 
 ## TL;DR / 当前决定
 
-> Agentao 当前没有足够的真实需求证据支持立即实现 Code Mode。现阶段不立项，优先完成
+> Arbiter 当前没有足够的真实需求证据支持立即实现 Code Mode。现阶段不立项，优先完成
 > tool-search 并观察多工具往返与大中间结果是否成为稳定瓶颈。
 >
 > 若需求触发，可优先实验 Python 子进程方案，但必须先验证专用沙箱、不可绕过的整脚本审批、
@@ -48,7 +48,7 @@
 
 ## 1. 是否现在做
 
-Code Mode 的收益随"每轮多工具往返 + 大中间输出"规模增长。agentao 当前约 15 个原生工具 +
+Code Mode 的收益随"每轮多工具往返 + 大中间输出"规模增长。arbiter 当前约 15 个原生工具 +
 轻量 MCP，痛感未必到位。**这是需求门 —— 痛不痛由维护者与真实使用判断**，不该由本文单方面
 宣布。触发信号可能是：接多个 MCP server 后出现"抓 N 页 / 处理 N 文件 / 带条件重试"这类
 脚本化工作流的真实、反复出现的需求。
@@ -97,10 +97,10 @@ V8 再削全局**（default-allow-then-strip，漏删一个＝逃逸，安全押
 
 ---
 
-## 3. Agentao 当前缺少什么
+## 3. Arbiter 当前缺少什么
 
 - 工具都是**独立的 function-calling 工具**；MCP 工具注册为 `mcp_{server}_{tool}` 直接
-  暴露给模型（`agentao/mcp/tool.py`、`agentao/tools/base.py::ToolRegistry`）。
+  暴露给模型（`arbiter/mcp/tool.py`、`arbiter/tools/base.py::ToolRegistry`）。
 - **没有** Code Mode / PTC / 代码执行工具。
 
 有一些相邻地基，但都需要改造，**不是现成可复用**：
@@ -160,7 +160,7 @@ V8 再削全局**（default-allow-then-strip，漏删一个＝逃逸，安全押
 > 先完成 tool-search 并收集多工具任务数据。出现稳定需求后，再进行受限的 Python 子进程
 > 实验。实验通过前，不承诺 RPC 结构、跨平台支持、流式协议或生产化路线。
 
-若/当决定推进，Python 子进程 + 桥回现有派发链是与 agentao 架构最近的**候选**方向，但这只是
+若/当决定推进，Python 子进程 + 桥回现有派发链是与 arbiter 架构最近的**候选**方向，但这只是
 起点假设，须经 §4 实验验证，而非本文的结论。
 
 **本文状态：分析初稿，未批准、未实现。**
@@ -199,7 +199,7 @@ in-flight/session 上限）、`code-mode-protocol`（wire 类型 + 描述）、
 
 ## 附录 B：hermes PTC 实现要点（Python / 子进程 + RPC）
 
-hermes 的路线与 agentao 架构最近，值得细看。以下均带 `tools/code_execution_tool.py`
+hermes 的路线与 arbiter 架构最近，值得细看。以下均带 `tools/code_execution_tool.py`
 行号（除非另注）。hermes 的模块 docstring 标题即 *"Code Execution Tool — Programmatic
 Tool Calling (PTC)"*（`:3`）；在该仓库里 "Code Mode" 与 "PTC" 都指同一个工具
 `execute_code`。
@@ -376,15 +376,15 @@ codex 与 hermes 都把嵌套工具调用桥回宿主的**同一个**派发器�
 脚本敌对，包住爆炸半径"（进程 + 审批 + 脱敏）。前者上限更高、更简洁但更死板；后者更灵活但
 安全靠一摞补偿控制。
 
-### E.3 对 agentao 的含义
+### E.3 对 arbiter 的含义
 
 这正是 §2 归纳的"codex 约束解释器 vs hermes 约束进程 + 事后兜底"。它解释了 §4.3 候选路线的
-关键取舍：agentao 若走 hermes 式子进程，**核心补强是给它一个 codex 式的主边界** —— 但用
+关键取舍：arbiter 若走 hermes 式子进程，**核心补强是给它一个 codex 式的主边界** —— 但用
 **OS 强制的 `sandbox-exec`** 替代语言层 isolate，把隔离从"事后脱敏"抬到"内核强制"。§3 已验证
 的现实约束仍在：当前三个 profile 都是 `(allow file-read*)`，且模型输出无通用密钥脱敏 ——
-这两块基石不补齐，hermes 式子进程在 agentao 上就仍是 hermes 那种"弱主边界 + 补偿控制"姿态，
+这两块基石不补齐，hermes 式子进程在 arbiter 上就仍是 hermes 那种"弱主边界 + 补偿控制"姿态，
 拿不到 codex 那级的结构性保证。因此本附录的结论回流到 §4 实验项 1（专用沙箱）与项 2（不可
-绕过的整脚本审批）—— 二者正是把 agentao 从 hermes 姿态推向 codex 姿态的两块最小拼图。
+绕过的整脚本审批）—— 二者正是把 arbiter 从 hermes 姿态推向 codex 姿态的两块最小拼图。
 
 （**opencode 提供了第三种主边界**：既不嵌 V8、也不开子进程，而是自建受限解释器 —— 见附录 F。
 它在"无引擎逃逸面 + 跨平台"上比 codex 更进一步，但对 Python 宿主代价过高。）
@@ -445,10 +445,10 @@ program/schema/tool/limit 四类稳定分类，保留 public（模型可见）/p
 仅"约束脚本的是什么"从"V8 isolate 本身"换成"自建解释器本身"、"进程隔离深度"从"hosted 进程"
 换成"无（不需要）"。
 
-**对 agentao 的含义（回流 §5 开放问题 #2 跨平台成本）：** opencode 证明了一条**不依赖 OS
-沙箱、天然跨平台**的可信执行边界确实**存在** —— 这正击中 agentao 现有推荐（hermes 式子进程
-+ `sandbox-exec`）的软肋：`sandbox-exec` 仅 macOS。**但这条路对 agentao 不便宜**：opencode
-能自建，是因为写一个受限 **JS 子集**解释器可行；agentao 是 Python 宿主，等价物是自写受限
+**对 arbiter 的含义（回流 §5 开放问题 #2 跨平台成本）：** opencode 证明了一条**不依赖 OS
+沙箱、天然跨平台**的可信执行边界确实**存在** —— 这正击中 arbiter 现有推荐（hermes 式子进程
++ `sandbox-exec`）的软肋：`sandbox-exec` 仅 macOS。**但这条路对 arbiter 不便宜**：opencode
+能自建，是因为写一个受限 **JS 子集**解释器可行；arbiter 是 Python 宿主，等价物是自写受限
 **Python 子集** AST 解释器 —— Python 语义远重（描述符 / dunder / 元类 / 生成器 / 异常），
 `RestrictedPython` 素以易漏著称，维护负担也更大。故 opencode 这个数据点**强化而非推翻** §6
 结论：对 Python 宿主，OS 沙箱路线仍是更务实的一步；opencode 的价值在于把"跨平台"从一句抱怨

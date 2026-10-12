@@ -1,6 +1,6 @@
-"""Shared Agentao test doubles and agent-factory helpers for ACP tests.
+"""Shared Arbiter test doubles and agent-factory helpers for ACP tests.
 
-All real ``Agentao`` construction pulls in the LLM/tool stack and needs
+All real ``Arbiter`` construction pulls in the LLM/tool stack and needs
 provider credentials. ACP handlers only duck-type the runtime, so a
 small ``FakeAgent`` with ``.chat`` and ``.close`` is enough.
 
@@ -25,7 +25,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from agentao.cancellation import CancellationToken
+from arbiter.cancellation import CancellationToken
 
 
 class _FakeSkillManager:
@@ -40,7 +40,7 @@ class _FakeSkillManager:
 
 
 class FakeAgent:
-    """Minimal ``Agentao`` replacement.
+    """Minimal ``Arbiter`` replacement.
 
     Attributes:
         reply: Return value of ``chat`` on the non-cancelled path.

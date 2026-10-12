@@ -1,10 +1,10 @@
 [project]
-name = "agentao-example-slack-bot"
+name = "arbiter-example-slack-bot"
 version = "0.1.0"
-description = "slack-bolt app: each app_mention runs one Agentao turn, channel-scoped permissions."
+description = "slack-bolt app: each app_mention runs one Arbiter turn, channel-scoped permissions."
 requires-python = ">=3.10"
 dependencies = [
-    "agentao",
+    "arbiter",
     "slack-bolt>=1.18",
 ]
 
@@ -14,7 +14,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-agentao = { path = "../..", editable = true }
+arbiter = { path = "../..", editable = true }
 
 [build-system]
 requires = ["hatchling"]

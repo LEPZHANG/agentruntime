@@ -23,14 +23,14 @@ import json
 
 import pytest
 
-from agentao.acp.protocol import (
+from arbiter.acp.protocol import (
     INTERNAL_ERROR,
     INVALID_PARAMS,
     INVALID_REQUEST,
     METHOD_NOT_FOUND,
     PARSE_ERROR,
 )
-from agentao.acp.server import AcpServer
+from arbiter.acp.server import AcpServer
 
 
 def _run(server: AcpServer, stdin: io.StringIO, stdout: io.StringIO) -> list[dict]:

@@ -18,12 +18,12 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Deliverables
 
-- `agentao/acp_client/process.py`
-- `agentao/acp_client/manager.py`
+- `arbiter/acp_client/process.py`
+- `arbiter/acp_client/manager.py`
 - CLI diagnostics surface：
-  - `agentao/cli/app.py`
-  - `agentao/cli/commands.py`
-  - `agentao/cli/commands_ext.py`
+  - `arbiter/cli/app.py`
+  - `arbiter/cli/commands.py`
+  - `arbiter/cli/commands_ext.py`
 - 诊断相关测试
 
 ## Dependencies
@@ -37,7 +37,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 - v1 至少要有 stderr ring buffer
 - transcript 持久化可定义目录和格式，但不一定要求首版完全实现
 - 建议目录：
-  - `.agentao/acp/`
+  - `.arbiter/acp/`
 - `status` 快照应能读取最近错误摘要
 
 ## Tests

@@ -5,7 +5,7 @@ recommended now.** The effective decision is **Part A** (use `project_instructio
 **Part B** is a retained *minimal* spec, to build **only if** the reopen triggers in
 §A.4 are met. There is no scenario in this document that recommends building the full
 multi-slot profile.
-**Audience:** agentao maintainers, and host integrators embedding agentao inside a
+**Audience:** arbiter maintainers, and host integrators embedding arbiter inside a
 multi-agent collaboration surface.
 **Companion:** `system-prompt-profile.zh.md`.
 **Related:** `metacognitive-boundary.md` (same schema + default + host-override
@@ -33,8 +33,8 @@ A downstream embedder (chahua) presents as a *group chat* but is really **multip
 agents collaborating to complete real tasks under human guidance**. Its agents should
 behave as collaborators — do the slice they own, then yield to the human conductor or
 hand off to a peer — rather than as a single agent that solo-owns a task and runs to
-completion. agentao's default system prompt encodes the latter posture, most sharply in
-one line of `build_operational_guidelines` (`agentao/prompts/sections.py`, Task
+completion. arbiter's default system prompt encodes the latter posture, most sharply in
+one line of `build_operational_guidelines` (`arbiter/prompts/sections.py`, Task
 Completion block): *"Work autonomously until the task is fully resolved before yielding
 back to the user."*
 
@@ -42,14 +42,14 @@ back to the user."*
 
 **Verdict: No.** This is primarily one downstream's need. Three grep-grounded reasons:
 
-1. **agentao already has a first-class host prompt-injection surface:
-   `project_instructions`.** It is a constructor kwarg (`Agentao.__init__`,
+1. **arbiter already has a first-class host prompt-injection surface:
+   `project_instructions`.** It is a constructor kwarg (`Arbiter.__init__`,
    `agent.py:84`) injected at the **top** of the system prompt
    (`SystemPromptBuilder._build_sections`, `builder.py:85-90`, before
    `=== Agent Instructions ===`); a host-supplied non-empty value short-circuits the
-   AGENTAO.md disk read (`agent.py:476-479`). Already used by `agentao run`
+   ARBITER.md disk read (`agent.py:476-479`). Already used by `arbiter run`
    (`cli/run.py:491`) and sub-agents (`agents/tools/_wrapper.py:385`). chahua can inject
-   its collaboration persona there **today, with zero agentao changes**. The
+   its collaboration persona there **today, with zero arbiter changes**. The
    harness-vs-host boundary test predicts exactly this: the valuable kernel already
    exists as a host-contract primitive.
 
@@ -60,7 +60,7 @@ back to the user."*
    (gap ≠ need).
 
 3. **Cost/benefit is badly asymmetric.** A code change adds a permanent public surface
-   and (in the over-built version) would change the default prompt for every agentao
+   and (in the over-built version) would change the default prompt for every arbiter
    user — all to serve one downstream, and we never validated that the cheap path
    fails. The original plan itself said "validate the direction cheaply first."
 
@@ -72,7 +72,7 @@ instruction cannot suppress it, a minimal source change is justified — see Par
 ## A.3 Recommended path (do this now)
 
 chahua puts its collaboration persona into `project_instructions` — via
-`build_from_environment(project_instructions=…)` or its own `AGENTAO.md`. Zero agentao
+`build_from_environment(project_instructions=…)` or its own `ARBITER.md`. Zero arbiter
 change, zero release, zero regression. Example top-of-prompt text:
 
 > You are one participant in a human-guided, multi-agent team. Complete the slice you
@@ -127,7 +127,7 @@ autonomy language, which lives inside the monolithic `build_operational_guidelin
 3. **Constructor threading** — identical to the existing `working_directory` path:
    `working_directory` is a keyword-only kwarg (`agent.py:52,73`) stored on the agent
    and read at build time; hosts pass it through
-   `build_from_environment(working_directory=…)`, which lands in the `Agentao(**kwargs)`
+   `build_from_environment(working_directory=…)`, which lands in the `Arbiter(**kwargs)`
    call at `embedding/factory.py:215-224`. Add
    `prompt_profile: Optional[SystemPromptProfile] = None` the same way (keyword-only,
    stored as `self._prompt_profile`, read by `_build_sections`); hosts supply it via
@@ -173,7 +173,7 @@ autonomy language, which lives inside the monolithic `build_operational_guidelin
 
 ## Appendix A — Current prompt sections (verbatim, reference)
 
-Reproduced from `agentao/prompts/sections.py`, **re-synced 2026-07-25** (see the
+Reproduced from `arbiter/prompts/sections.py`, **re-synced 2026-07-25** (see the
 Revision note in the header), so this record can be reviewed without opening the
 source. `{working_directory}` is the only runtime placeholder. Only the **Task
 Completion** subsection of A.7 is the override target for Part B; everything else is
@@ -191,7 +191,7 @@ and the existing prompt test-suite (49 assertions) passes unchanged.
 ### A.1 `identity` — `sections.py:17-25`
 
 ```text
-You are Agentao, a knowledge-work agent whose default scope spans four equally weighted domains: Research, Data analysis, Project orchestration, and Coding. Coding is one capability of four, not the single axis.
+You are Arbiter, a knowledge-work agent whose default scope spans four equally weighted domains: Research, Data analysis, Project orchestration, and Coding. Coding is one capability of four, not the single axis.
 
 Current Working Directory: {working_directory}
 ```
@@ -354,18 +354,18 @@ Parts A/B references are as of `main`@`e49b0c2` (2026-06-01); `sections.py` line
 numbers were re-synced 2026-07-25.
 
 - Unconditional stable-prefix injection — `SystemPromptBuilder._build_sections`,
-  `agentao/prompts/builder.py:95-103`.
+  `arbiter/prompts/builder.py:95-103`.
 - `project_instructions` injection point — `_build_sections`, `builder.py:85-90`;
-  kwarg `Agentao.__init__`, `agent.py:84`; AGENTAO.md short-circuit, `agent.py:476-479`.
+  kwarg `Arbiter.__init__`, `agent.py:84`; ARBITER.md short-circuit, `agent.py:476-479`.
 - `project_instructions` in use — `cli/run.py:491`, `agents/tools/_wrapper.py:385`.
-- Section text — `agentao/prompts/sections.py` (per-section lines in Appendix A).
+- Section text — `arbiter/prompts/sections.py` (per-section lines in Appendix A).
 - Prompt-text guardrails — `tests/test_system_prompt_sections.py` (stable-prefix marker
   order, four-domain identity, tool-name reality) and `tests/test_reliability_prompt.py`
   (seven rules by phrase + 1–7 numbering). Both pin *whole-prompt* substrings, not
   section membership — which is why the A.7 → Reliability #3 fold needed no test edit.
-- Build entrypoint — `Agentao._build_system_prompt`, `agent.py:982` →
+- Build entrypoint — `Arbiter._build_system_prompt`, `agent.py:982` →
   `SystemPromptBuilder(self).build()`.
-- Constructor-injection precedent — `Agentao.__init__` keyword-only block,
+- Constructor-injection precedent — `Arbiter.__init__` keyword-only block,
   `agent.py:52,73`; host construction `embedding/factory.py:215-224`
   (`kwargs.update(overrides)` at `:222`).
 - Deferred companion decision — `docs/design/metacognitive-boundary.md` (Status:

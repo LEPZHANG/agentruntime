@@ -2,11 +2,11 @@
 
 ## Goal
 
-把插件中的 `agents` 接入 Agentao 的 agent discovery 和 registration 流程，使 Claude-compatible agent markdown 可以作为插件能力被发现和调用。
+把插件中的 `agents` 接入 Arbiter 的 agent discovery 和 registration 流程，使 Claude-compatible agent markdown 可以作为插件能力被发现和调用。
 
 ## Why This Phase Exists
 
-plugin `agents` 与 `skills/commands` 类似，都是相对静态的资源注册问题，但它们直接连接到 Agentao agent runtime，因此需要单独阶段隔离风险。
+plugin `agents` 与 `skills/commands` 类似，都是相对静态的资源注册问题，但它们直接连接到 Arbiter agent runtime，因此需要单独阶段隔离风险。
 
 ## Scope
 

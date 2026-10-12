@@ -147,9 +147,9 @@ See [Appendix B](/en/appendix/b-config-keys) for parsing/redaction details.
 ---
 
 ::: info Where this fits
-The CLI uses `cli.agent.set_provider(api_key, base_url, model)` and `cli.agent.set_model(name)` — both are public methods on the `Agentao` instance. An embedding host can call them too, with the same effect on the same in-memory session. See [Part 2.5 · Runtime LLM Switch](/en/part-2/5-runtime-llm-switch) for the embedded-API equivalents and the threading caveats.
+The CLI uses `cli.agent.set_provider(api_key, base_url, model)` and `cli.agent.set_model(name)` — both are public methods on the `Arbiter` instance. An embedding host can call them too, with the same effect on the same in-memory session. See [Part 2.5 · Runtime LLM Switch](/en/part-2/5-runtime-llm-switch) for the embedded-API equivalents and the threading caveats.
 :::
 
 ::: tip Authoritative help
-Command syntax: `/help` and [`agentao/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/help_text.py). Discovery logic for providers: [`agentao/cli/commands.py:_list_providers_from_env`](https://github.com/jin-bo/agentao/blob/main/agentao/cli/commands.py).
+Command syntax: `/help` and [`arbiter/cli/help_text.py`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/help_text.py). Discovery logic for providers: [`arbiter/cli/commands.py:_list_providers_from_env`](https://github.com/jin-bo/agentao/blob/main/arbiter/cli/commands.py).
 :::

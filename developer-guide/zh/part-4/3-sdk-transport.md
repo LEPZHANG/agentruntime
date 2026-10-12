@@ -5,7 +5,7 @@
 > - 惯用模式：dispatcher、fan-out、用类来组织共享状态
 > - 常见坑：挂死、异常、与 legacy 回调混用
 
-`SdkTransport` 是 Agentao 官方提供的**通用 Transport 实现**——四个回调，覆盖 90% 嵌入场景。
+`SdkTransport` 是 Arbiter 官方提供的**通用 Transport 实现**——四个回调，覆盖 90% 嵌入场景。
 
 ## 构造器
 
@@ -32,7 +32,7 @@ class SdkTransport:
 ## 最简用法
 
 ```python
-from agentao.transport import SdkTransport
+from arbiter.transport import SdkTransport
 
 transport = SdkTransport(
     on_event=lambda ev: print(ev.type.value, ev.data),
@@ -46,7 +46,7 @@ transport = SdkTransport(
 ### 1) `on_event` — 事件分发器
 
 ```python
-from agentao.transport import EventType
+from arbiter.transport import EventType
 
 def on_event(event):
     match event.type:
@@ -136,7 +136,7 @@ transport = SdkTransport(
     ask_user=session.ask_user,
     on_max_iterations=session.on_max_iterations,
 )
-agent = Agentao(transport=transport, working_directory=Path("/tmp/sess-123"))
+agent = Arbiter(transport=transport, working_directory=Path("/tmp/sess-123"))
 ```
 
 ## 多个订阅者：扇出事件流
@@ -168,11 +168,11 @@ transport = SdkTransport(on_event=fanout)
 
 ## 向后兼容的 8 回调 API
 
-Agentao 0.2.10 之前用 8 个独立回调（`confirmation_callback`, `step_callback`, `thinking_callback`, …）。这种写法**仍被接受**，但内部会通过 `build_compat_transport()` 自动转成一个 `SdkTransport`：
+Arbiter 0.2.10 之前用 8 个独立回调（`confirmation_callback`, `step_callback`, `thinking_callback`, …）。这种写法**仍被接受**，但内部会通过 `build_compat_transport()` 自动转成一个 `SdkTransport`：
 
 ```python
 # 老代码（仍能跑）
-agent = Agentao(
+agent = Arbiter(
     confirmation_callback=lambda n, d, a: True,
     llm_text_callback=lambda chunk: print(chunk, end=""),
     step_callback=lambda name, args: print(f"[{name}]"),
@@ -185,7 +185,7 @@ def on_event(ev):
     elif ev.type == EventType.TOOL_START:
         print(f"[{ev.data['tool']}]")
 
-agent = Agentao(transport=SdkTransport(
+agent = Arbiter(transport=SdkTransport(
     on_event=on_event,
     confirm_tool=lambda n, d, a: True,
 ))
@@ -229,7 +229,7 @@ def on_event(ev):
 
 ```python
 # 都传了——legacy 会被忽略
-agent = Agentao(
+agent = Arbiter(
     transport=my_transport,
     confirmation_callback=my_callback,  # 不会被调用！
 )
@@ -240,8 +240,8 @@ agent = Agentao(
 ## 最小 "什么都处理" 模板
 
 ```python
-from agentao import Agentao
-from agentao.transport import SdkTransport, EventType
+from arbiter import Arbiter
+from arbiter.transport import SdkTransport, EventType
 from pathlib import Path
 
 class AgentBridge:
@@ -287,7 +287,7 @@ transport = SdkTransport(
     ask_user=bridge.ask_user,
     on_max_iterations=bridge.on_max_iterations,
 )
-agent = Agentao(transport=transport, working_directory=Path.cwd())
+agent = Arbiter(transport=transport, working_directory=Path.cwd())
 print(agent.chat("hello"))
 agent.close()
 ```

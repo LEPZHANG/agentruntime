@@ -19,12 +19,12 @@ issue 入口：
 
 ## MVP Summary
 
-目标是在 Agentao 中建立一套 project-local ACP client runtime，使当前 CLI 能管理并连接外部 ACP servers。
+目标是在 Arbiter 中建立一套 project-local ACP client runtime，使当前 CLI 能管理并连接外部 ACP servers。
 
 核心边界：
 
 - 配置来源仅限：
-  - `<project-root>/.agentao/acp.json`
+  - `<project-root>/.arbiter/acp.json`
 - 使用方式：
   - 显式 `/acp ...` 命令
   - `/acp send` 可按需自动启动 server
@@ -36,13 +36,13 @@ issue 入口：
   - ACP server 请求用户确认或用户输入时，不抢占当前 CLI 输入框
   - 统一进入 pending interaction
   - 由用户通过显式 `/acp ...` 命令响应
-  - 自由文本输入采用 Agentao ACP extension method: `_agentao.cn/ask_user`
+  - 自由文本输入采用 Arbiter ACP extension method: `_agentao.cn/ask_user`
   - `max_iterations` 不做 ACP extension，ACP 模式下保持保守降级
 - 返回消息展示形式：
   - `<message from="server-name">...</message>`
 - v1 安全边界：
   - 不默认自动给 ACP server 发消息
-  - 不把 ACP 返回自动注入当前 Agentao 对话上下文
+  - 不把 ACP 返回自动注入当前 Arbiter 对话上下文
   - 不引入多 agent 自动编排
 
 ## Document Structure

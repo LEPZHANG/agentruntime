@@ -17,8 +17,8 @@
 ## 环境准备
 
 ```bash
-git clone https://github.com/LEPZHANG/agentruntime.git
-cd agentruntime
+git clone https://github.com/LEPZHANG/arbiter.git
+cd arbiter
 
 uv sync --extra cli --extra web --extra i18n    # 装依赖
 cp .env.example .env                            # 配 OPENAI_* 三个变量

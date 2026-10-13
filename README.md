@@ -33,8 +33,8 @@ Arbiter 的设计前提是**对抗性**的 —— 假设模型会出错、工具
 > ⚠️ 尚未发布到 PyPI，请从源码安装。
 
 ```bash
-git clone https://github.com/LEPZHANG/agentruntime.git
-cd agentruntime
+git clone https://github.com/LEPZHANG/arbiter.git
+cd arbiter
 
 uv sync --extra cli            # 推荐（uv）
 # 或用 pip：

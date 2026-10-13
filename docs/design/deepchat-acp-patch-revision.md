@@ -77,7 +77,7 @@ Appendix for the evidence.
    `session/list_models` are therefore **already non-standard
    extensions** sitting in the bare `session/` namespace — inconsistent
    with `ask_user`, which correctly uses the vendor prefix
-   `_agentao.cn/ask_user`.
+   `_arbiter.cn/ask_user`.
 
 4. **`session/set_mode` with `modeId` *is* the ACP standard.** The spec's
    field is `modeId` (not `mode`), with `availableModes` /
@@ -101,7 +101,7 @@ Appendix for the evidence.
    |---|---|---|
    | `session/set_model` | `AcpSessionSetModelRequest/Response` (`model`/`contextLength`/`maxTokens`) | Non-standard method in the **bare `session/` namespace** — masquerades as standard. |
    | `session/list_models` | `AcpSessionListModelsRequest/Response`, `AcpModelInfo` (`extra="allow"`) | Non-standard method, same namespace problem. |
-   | `_agentao.cn/ask_user` | `AcpAskUserParams`, `AcpAskUserAnswered/Cancelled` | Non-standard but **correctly vendor-prefixed** and advertised in `initialize` — the model citizen. |
+   | `_arbiter.cn/ask_user` | `AcpAskUserParams`, `AcpAskUserAnswered/Cancelled` | Non-standard but **correctly vendor-prefixed** and advertised in `initialize` — the model citizen. |
    | `initialize` response `extensions: [...]` | `AcpInitializeExtension` | **Non-standard top-level field.** ACP advertises extensions through **`_meta`**, not a top-level `extensions` array. |
    | `session/set_mode` `mode` field | `AcpSessionSetModeRequest` (`mode: Literal["read-only","workspace-write","full-access","plan"]`) | **Two deviations:** the ACP field is `modeId` (not `mode`), and the value is wrongly pinned to Arbiter **permission presets**, conflating ACP's "mode" (a UI/behavioural selector) with permission posture. |
 
@@ -124,10 +124,10 @@ Legend: ✅ upstream · 🔧 rework then upstream · 🟠 keep in fork · ❌ dr
 | **A1 — Multimodal image input** (`agent.py`, `runtime/turn.py`, `runtime/chat_loop/_runner.py`, `llm/client.py` logging, `cli/display.py`, `tests/test_logging.py`) | ✅ | Extract as a standalone PR. Image data arrives as standard ACP content blocks, so it is already decoupled from DeepChat. The logging change (summarize multimodal parts instead of dumping base64) ships with it. |
 | **A2 — Structured `ask_user`** (`tools/ask_user.py`, `tools/base.py`, `cli/app.py`) | ✅ | Upstream (Decision #1), but the callback contract must stay **backward-compatible**: `ask_user_callback` is a deprecated 1-arg `Callable[[str], str]` (`agent.py:52`), so adding `options`/`header`/`multiple` naively `TypeError`s embedded hosts passing `lambda q: ...`. Keep the 1-arg form working (variadic / new optional structured callback), host-agnostic shape (not DeepChat option-cards). Add a unit test. |
 | **A3 — `$HOME` path robustness** (`paths.py` + `memory/storage.py`, `skills/manager.py`, `llm/client.py` fallback, `tests/test_memory_store.py`) | ✅ | Small PR. Confirm the fallback when `$HOME` is unset. |
-| **B1 — Secret-wire fix (PR-4, core)** (`acp/session_set_model.py`, `models.py`, `server.py`, `transport.py`, `initialize.py`, `schema.py`, `session_new.py`, `test_acp_set_model.py`) | ✅ done (`#56`) | **Drop** `apiKey`/`baseUrl`/`modelId`/`_meta`. Add `session/set_config_option` (`configId="model"` only; single `category:"model"` option, `provider/model` value) + injectable `provider_resolver` (server-side secret; **handler whitelist + `extra="forbid"` rejects `apiKey`/`baseUrl`/`_meta`**). **Add `_agentao.cn/set_model`** (`{sessionId, model}`, free-form, secret-free; shares the core code path — Decision #4) and **keep the existing `session/set_model` unchanged** as a one-release compatibility alias — its current shape `{sessionId, model?, contextLength?, maxTokens?}` is already `extra="forbid"` and secret-free; PR-4 simply **does not adopt the patch's `modelId`/`apiKey`/`baseUrl`/`_meta` additions** to it (CHANGELOG-deprecate; retires with `list_models` in PR-7). Default catalog = the **single current env** `provider/model` (model from live `agent.llm.model`); richer catalog host-injected. **Keep `session/list_models` as a compatibility endpoint** in this PR. See "Core redesign". |
+| **B1 — Secret-wire fix (PR-4, core)** (`acp/session_set_model.py`, `models.py`, `server.py`, `transport.py`, `initialize.py`, `schema.py`, `session_new.py`, `test_acp_set_model.py`) | ✅ done (`#56`) | **Drop** `apiKey`/`baseUrl`/`modelId`/`_meta`. Add `session/set_config_option` (`configId="model"` only; single `category:"model"` option, `provider/model` value) + injectable `provider_resolver` (server-side secret; **handler whitelist + `extra="forbid"` rejects `apiKey`/`baseUrl`/`_meta`**). **Add `_arbiter.cn/set_model`** (`{sessionId, model}`, free-form, secret-free; shares the core code path — Decision #4) and **keep the existing `session/set_model` unchanged** as a one-release compatibility alias — its current shape `{sessionId, model?, contextLength?, maxTokens?}` is already `extra="forbid"` and secret-free; PR-4 simply **does not adopt the patch's `modelId`/`apiKey`/`baseUrl`/`_meta` additions** to it (CHANGELOG-deprecate; retires with `list_models` in PR-7). Default catalog = the **single current env** `provider/model` (model from live `agent.llm.model`); richer catalog host-injected. **Keep `session/list_models` as a compatibility endpoint** in this PR. See "Core redesign". |
 | **B2 — `session/set_mode` field (PR-5, separate)** (`acp/session_set_mode.py`, `schema.py`, `test_acp_set_mode.py`) | ✅ done (`#57`) | Minimal: rename `mode` → **`modeId`** and **accept unknown values** (always persist; map to a preset only on match) — so DeepChat's `code`/`ask` aren't rejected. **Deferred** (Decision #6 — decoupling is a large refactor): the permission-axis split *and* `availableModes`/`currentModeId` + `current_mode_update`. Not in the model/provider PR. |
 | **B3 — `initialize` `extensions` array → `_meta` (PR-6, low priority)** (`acp/initialize.py`, `acp/schema.py`) | ✅ done (`#58`) | **Decision #5: move under `_meta`** (spec-clean). arbiter's own client doesn't read `extensions`; only the schema snapshot + `test_acp_schema.py` change. Its own small PR; **not** bundled into the secret-wire fix; schedule last. Snapshot bump (`docs/schema/host.acp.v1.json`). |
-| **B4 — Retire the legacy model methods (PR-7, later)** | 🔧 | After a host consumes the standard `configOptions` path: remove **both** compatibility endpoints together — `session/list_models` **and** the `session/set_model` name alias (the canonical `_agentao.cn/set_model` stays). Direction is standard-alignment; staged across releases. |
+| **B4 — Retire the legacy model methods (PR-7, later)** | 🔧 | After a host consumes the standard `configOptions` path: remove **both** compatibility endpoints together — `session/list_models` **and** the `session/set_model` name alias (the canonical `_arbiter.cn/set_model` stays). Direction is standard-alignment; staged across releases. |
 | **C1 — Duplicate ACP transport** (`transport/acp.py`, `transport/acp_server.py`, `transport/__init__.py`, `transport/sdk.py`) | ❌ | Drop the whole group. `arbiter/acp/` is already a complete server package. |
 | **C2 — PyInstaller packaging** (`run.py`, `pyinstaller.spec`, `scripts/build_binaries.sh`, `.github/workflows/build-matrix.yml`, `pyproject.toml`) | 🟠 | Keep in the DeepChat fork. It conflicts with Arbiter's embedded-library positioning (`pip install arbiter`). Upstream only if the project decides to ship binaries — a separate product decision. |
 | **C3 — skill-creator HTML drift** (`skills/skill-creator/assets/eval_review.html`, `eval-viewer/viewer.html`) | ❌ | Unrelated front-end drift (no ACP/provider references). Remove from the patch. |
@@ -277,7 +277,7 @@ Concretely:
 1. **Add** `set_config_option(configId="model")` + advertise
    `configOptions` in `session/new` and `session/load`. This is the only
    new **standard** surface in the core PR; PR-4 also adds **one vendor
-   compatibility method** — `_agentao.cn/set_model` — for free-form model
+   compatibility method** — `_arbiter.cn/set_model` — for free-form model
    entry (below), but no other standard method.
 2. **Keep `session/list_models` as a compatibility endpoint** — it stays
    exactly as it is today (per-session cache + `warning` fallback). **Do
@@ -290,7 +290,7 @@ Concretely:
    secret-bearing additions** (`modelId`/`apiKey`/`baseUrl`/`_meta`). A client
    that was sending those credential fields must re-shape regardless — that is
    the security fix. DeepChat's free-form "type any model" need is served by
-   the new `_agentao.cn/set_model`, whose adapter maps DeepChat's UI `modelId`
+   the new `_arbiter.cn/set_model`, whose adapter maps DeepChat's UI `modelId`
    → the `model` field.
 3. **Return, do not push, in PR-4.** A *successful* `set_config_option`
    switch returns the current `configOptions` state **in its response**.
@@ -302,7 +302,7 @@ Concretely:
 4. **Retire both legacy methods in a later release** — `session/list_models`
    **and** the `session/set_model` alias, together — once a host actually
    consumes the standard `configOptions` path (the canonical
-   `_agentao.cn/set_model` stays). Wire deprecation signal at that point =
+   `_arbiter.cn/set_model` stays). Wire deprecation signal at that point =
    CHANGELOG note + then `-32601 method not found` (neither was advertised in
    `initialize`, so a Python `DeprecationWarning` is invisible to a wire
    client and meaningless).
@@ -310,13 +310,13 @@ Concretely:
 This keeps the standard-alignment goal without turning the DeepChat
 secret-wire fix into a big protocol migration.
 
-### Free-form model entry: `_agentao.cn/set_model` (decided, Decision #4)
+### Free-form model entry: `_arbiter.cn/set_model` (decided, Decision #4)
 
 DeepChat sends a **free-form** model string (in the patch, a `modelId`
 field, any non-empty string, no whitelist; passed straight to
 `agent.set_model()` — verified). A `select`-only `set_config_option`
 **cannot** express that, so the free-form path must survive. The decision
-(Decision #4): add the vendor method **`_agentao.cn/set_model` with the
+(Decision #4): add the vendor method **`_arbiter.cn/set_model` with the
 minimal payload `{sessionId, model}`** — free-form, secret-free (no
 `apiKey`/`baseUrl`/`_meta`; provider unchanged, model-only switch). It
 deliberately reuses the **`model`** field name (matching the core
@@ -324,13 +324,13 @@ deliberately reuses the **`model`** field name (matching the core
 adapter just maps its UI `modelId` → `model`; one field name across all
 three surfaces, no `modelId` alias on the wire. The vendor prefix also
 fixes finding-#7's sin (a non-standard method in the bare `session/`
-namespace), consistent with `_agentao.cn/ask_user`.
+namespace), consistent with `_arbiter.cn/ask_user`.
 
 Two coexisting model-set paths, by design:
 - **`session/set_config_option(model)`** — standard, `select` from the
   advertised catalog (carries `provider/model`; can switch provider via the
   resolver). For spec-following clients.
-- **`_agentao.cn/set_model`** — vendor, `{sessionId, model}` free-form
+- **`_arbiter.cn/set_model`** — vendor, `{sessionId, model}` free-form
   string, model-only (keep provider). For DeepChat's "type any model" UX.
 
 Plus the unchanged **`session/set_model`** (`{sessionId, model?,
@@ -377,7 +377,7 @@ regression guard was already in place before the extraction PRs landed.
    - Reject the patch's `apiKey`/`baseUrl`/`modelId`/`_meta` additions.
    - Add `session/set_config_option` for `configId="model"` only
      (`provider/model` value; bare value keeps current provider).
-   - **Add `_agentao.cn/set_model`** (`{sessionId, model}`, free-form,
+   - **Add `_arbiter.cn/set_model`** (`{sessionId, model}`, free-form,
      secret-free) — the vendor free-form path; shares the core code path.
      **Leave the existing `session/set_model` unchanged** as a one-release
      compatibility alias (`{sessionId, model?, contextLength?, maxTokens?}`,
@@ -401,12 +401,12 @@ regression guard was already in place before the extraction PRs landed.
    design.
 6. **PR-6 — `initialize.extensions` → `_meta`** (B3). ✅ **Done** — merged
    in `#58` (squash `005a77e`). Moved the array under
-   `_meta["_agentao.cn/extensions"]` (vendor-namespaced); dropped the
+   `_meta["_arbiter.cn/extensions"]` (vendor-namespaced); dropped the
    top-level `extensions` field; regen'd the schema snapshot. Low priority.
 7. **PR-7 (later release) — retire the legacy model methods** once a host
    consumes the standard `configOptions` path: remove `session/list_models`
    **and** the `session/set_model` name alias together. The canonical
-   `_agentao.cn/set_model` (PR-4) stays.
+   `_arbiter.cn/set_model` (PR-4) stays.
 8. **Cleanup — `docs/dev-notes`** (D2). Separate housekeeping PR, if the
    deletion is intended at all. (The `acp_client` test restore is **not**
    here — it is the prerequisite above.)
@@ -417,7 +417,7 @@ The items below are **recommendations for the DeepChat / TensorChat fork
 owner**, not work this plan implements. They sit on the fork side of the
 embedded-harness boundary; arbiter `main` only provides the seams they
 consume (the `provider_resolver` / catalog injection points, the
-secret-free wire, and the vendor `_agentao.cn/set_model` method that PR-4
+secret-free wire, and the vendor `_arbiter.cn/set_model` method that PR-4
 ships).
 
 > **This section is non-normative for arbiter `main`.** Do not create
@@ -439,7 +439,7 @@ ships).
   `modelId` → the wire **`model`** field; never put `apiKey` / `baseUrl` /
   `_meta` on the wire (arbiter rejects them). Credentials resolve
   server-side via `provider_resolver`.
-  - Free-form "type any model" → call the vendor `_agentao.cn/set_model`
+  - Free-form "type any model" → call the vendor `_arbiter.cn/set_model`
     (`{sessionId, model}`).
   - Catalog-driven selection → call the standard
     `session/set_config_option` (`configId="model"`, value
@@ -480,15 +480,15 @@ All six were researched with cited evidence (see Appendix). Resolutions:
    `acp_client` does **not** call these wire methods, and the CLI `/model` /
    `/sessions resume` use the **core** `agent.set_model()` /
    `list_available_models()` (`cli/commands/provider.py:87,120`), not the
-   wire methods. PR-4 adds the vendor `_agentao.cn/set_model` (Decision #4);
+   wire methods. PR-4 adds the vendor `_arbiter.cn/set_model` (Decision #4);
    the existing `session/set_model` stays **unchanged** one release as a
    compatibility alias so existing `session/set_model` callers are not broken,
    then retires alongside `list_models`. Retirement is gated only on DeepChat
    migrating to `configOptions`.
-4. **Free-form model entry → YES, via `_agentao.cn/set_model`.** DeepChat
+4. **Free-form model entry → YES, via `_arbiter.cn/set_model`.** DeepChat
    sends a free-form model string (no whitelist; patch passes it straight to
    `agent.set_model()`), which a `select`-only `set_config_option` cannot
-   express. Resolution: add the vendor method `_agentao.cn/set_model`
+   express. Resolution: add the vendor method `_arbiter.cn/set_model`
    (`{sessionId, model}`, secret-free), coexisting with the standard `select`
    path; the **existing** `session/set_model` (`{sessionId, model?,
    contextLength?, maxTokens?}`, already secret-free) stays **unchanged** one
@@ -513,11 +513,11 @@ All six were researched with cited evidence (see Appendix). Resolutions:
 
 - `arbiter/llm/client.py:233` — `def reconfigure(self, api_key, base_url=None, model=None)`.
 - `arbiter/embedding/factory.py:71-77` — `LLM_PROVIDER` + `{PROVIDER}_API_KEY/_BASE_URL/_MODEL`.
-- `arbiter/acp/protocol.py:47-61` — method constants; `_agentao.cn/ask_user` is the only vendor-prefixed one; `set_model`/`list_models` sit in the bare `session/` namespace.
+- `arbiter/acp/protocol.py:47-61` — method constants; `_arbiter.cn/ask_user` is the only vendor-prefixed one; `set_model`/`list_models` sit in the bare `session/` namespace.
 - ACP spec (`agentclientprotocol.com`): no `session/set_model`; model selection via `session/set_config_option` (`{sessionId, configId, value}`), `ConfigOption{id,name,description,category,type,currentValue,options}`, `category ∈ {mode, model, thought_level}` (has `model`, **no `provider`**), `type` only `select`, `value` an opaque agent-defined string; `session/set_mode` field is `modeId` with `availableModes` / `currentModeId`; `initialize` response standard fields are `protocolVersion` / `agentCapabilities` / `agentInfo` / `authMethods` — **no top-level `extensions` array** (extensions go under `_meta`).
 - ACP `session/update` variants include **`config_option_update`** (refreshed `configOptions`) and **`current_mode_update`** (`currentModeId`); `session/new` / `session/load` responses carry initial `configOptions` / `modes` — the standard dynamic-refresh path that supersedes `list_models`.
 - No `providers.json` anywhere in `arbiter/` or `docs/` (grep: 0 hits). `factory.py` is **single-provider**: `LLM_PROVIDER` selects one provider at construction; no multi-provider registry exists.
-- `arbiter/acp/schema.py:87-115` — `AcpInitializeExtension` + top-level `extensions` field on `AcpInitializeResponse`. `arbiter/acp/initialize.py:140-145` — advertises `_agentao.cn/ask_user` in that array.
+- `arbiter/acp/schema.py:87-115` — `AcpInitializeExtension` + top-level `extensions` field on `AcpInitializeResponse`. `arbiter/acp/initialize.py:140-145` — advertises `_arbiter.cn/ask_user` in that array.
 - `arbiter/acp/schema.py:306-320` — `AcpSessionSetModeRequest.mode: Literal["read-only","workspace-write","full-access","plan"]` (non-standard `mode` field, pinned to permission presets).
 - Working tree: `arbiter/acp_client/` and `tests/test_acp_client_*.py` present on `main`; `arbiter/transport/` has no `acp.py` / `acp_server.py`; `arbiter/tools/ask_user.py` `execute(self, question)` is plain-text on `main`.
 - Decision research (3 Explore agents, 2026-05-29):

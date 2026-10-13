@@ -27,7 +27,7 @@ Handshake. MUST be first call.
 | `agentCapabilities` | `object` | See below |
 | `authMethods` | `[]` | Empty in v1 — Arbiter does no ACP-level auth |
 | `agentInfo` | `object` | `{name: "arbiter", title: "Arbiter", version}` |
-| `_meta["_agentao.cn/extensions"]` | `[{method, description}]` | Vendor methods advertised under `_meta` (ACP's standard extension channel); includes `_agentao.cn/ask_user` |
+| `_meta["_arbiter.cn/extensions"]` | `[{method, description}]` | Vendor methods advertised under `_meta` (ACP's standard extension channel); includes `_arbiter.cn/ask_user` |
 
 ### `agentCapabilities` block (v0.2.x)
 
@@ -214,7 +214,7 @@ Switch the model (and optionally the provider) via the ACP-standard config-optio
 ### Resolution & errors
 
 - **`provider/model`**: the agent calls `provider_resolver(provider_id)` → `{api_key, base_url?}`, then swaps provider + model. The **default** resolver accepts only the configured `LLM_PROVIDER` (case-insensitive) and reads `{PREFIX}_API_KEY` / `{PREFIX}_BASE_URL`; any other provider → `-32600` `cannot resolve provider '<id>'`. Inject a richer resolver to support more providers.
-- **bare `model`**: model-only switch (provider unchanged) via the same path as `_agentao.cn/set_model`.
+- **bare `model`**: model-only switch (provider unchanged) via the same path as `_arbiter.cn/set_model`.
 - On resolver failure the server logs only the provider id + exception **type**, never the message (it could embed a key).
 
 ### `ConfigOption` shape (entries in `configOptions`)
@@ -228,7 +228,7 @@ Switch the model (and optionally the provider) via the ACP-standard config-optio
 | `currentValue` | `string?` | `provider/model` of the live model |
 | `options` | `[{value, name?, description?}]` | Catalog choices; `value` is `provider/model`. Default catalog = the single current env model; richer catalog host-injected |
 
-## C.9 `_agentao.cn/set_model` (extension)
+## C.9 `_arbiter.cn/set_model` (extension)
 
 Arbiter-specific free-form model switch — the vendor sibling of `session/set_config_option`'s bare-value path. Secret-free; shares the same core code path.
 
@@ -269,7 +269,7 @@ Set the session's ACP `modeId`. The field is the ACP-standard **`modeId`** (not 
 - A recognized preset **requires** the session to have a `PermissionEngine`, else `-32600` Invalid Request. Unknown modeIds need no engine — they are pure UI state.
 - Per-session: each session owns its own engine, so a preset change on session A never affects session B.
 
-## C.11 `_agentao.cn/ask_user` ⇠ notification (extension)
+## C.11 `_arbiter.cn/ask_user` ⇠ notification (extension)
 
 Arbiter-specific. Server asks the user a free-form question.
 

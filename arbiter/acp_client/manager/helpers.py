@@ -60,8 +60,8 @@ def _extract_display_text(method: str, params: Any) -> str:
     if method == "session/request_permission":
         return _format_permission_text(params)
 
-    # -- _agentao.cn/ask_user ----------------------------------------------
-    if method == "_agentao.cn/ask_user":
+    # -- _arbiter.cn/ask_user ----------------------------------------------
+    if method == "_arbiter.cn/ask_user":
         return _cap_chunk(
             params.get("question") or params.get("message") or "(input requested)"
         )

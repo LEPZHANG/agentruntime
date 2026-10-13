@@ -116,7 +116,7 @@ Client  initialize, session/new,      (not used in v1)
 Server  session/load
         ──────────────────────────── ────────────────────────────
 Server  session/request_permission,   session/update
- →      _agentao.cn/ask_user            (streaming text, tool events, thinking…)
+ →      _arbiter.cn/ask_user            (streaming text, tool events, thinking…)
 Client
 ```
 
@@ -164,9 +164,9 @@ sequenceDiagram
 - **`--)`** = JSON-RPC **notification** (no `id`, no reply allowed)
 :::
 
-## Extension: `_agentao.cn/ask_user`
+## Extension: `_arbiter.cn/ask_user`
 
-The base spec only lets the server **request permission** — it does not let the server ask the user a free-form question. Arbiter advertises a private extension method `_agentao.cn/ask_user` under `_meta["_agentao.cn/extensions"]` (ACP's standard extension channel) to do exactly that. Client options:
+The base spec only lets the server **request permission** — it does not let the server ask the user a free-form question. Arbiter advertises a private extension method `_arbiter.cn/ask_user` under `_meta["_arbiter.cn/extensions"]` (ACP's standard extension channel) to do exactly that. Client options:
 
 - Implement it: prompt the user, return the answer string
 - Don't implement: the agent falls back to `"[ask_user: not available in non-interactive mode]"`

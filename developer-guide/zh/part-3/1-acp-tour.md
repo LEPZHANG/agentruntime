@@ -116,7 +116,7 @@ Client  initialize, session/new,      (v1 未定义)
 Server  session/load
         ─────────────────────────── ────────────────────────────
 Server  session/request_permission,   session/update
- →      _agentao.cn/ask_user           (流式文本、工具事件、思考…)
+ →      _arbiter.cn/ask_user           (流式文本、工具事件、思考…)
 Client
 ```
 
@@ -163,9 +163,9 @@ sequenceDiagram
 - **`--)`** = JSON-RPC **通知**（无 `id`，禁止回复）
 :::
 
-## 扩展：`_agentao.cn/ask_user`
+## 扩展：`_arbiter.cn/ask_user`
 
-协议标准里 Server 只能**请求权限**而不能**向用户追问文本**。Arbiter 通过 `_meta["_agentao.cn/extensions"]`（ACP 标准的扩展通道）宣告了一个私有扩展方法 `_agentao.cn/ask_user`，用来从 Server 向 Client 反问任意问题。Client 可以：
+协议标准里 Server 只能**请求权限**而不能**向用户追问文本**。Arbiter 通过 `_meta["_arbiter.cn/extensions"]`（ACP 标准的扩展通道）宣告了一个私有扩展方法 `_arbiter.cn/ask_user`，用来从 Server 向 Client 反问任意问题。Client 可以：
 
 - 实现它：把问题弹给用户、拿到答复后返回字符串
 - 不实现：Agent 会 fallback 到 `"[ask_user: not available in non-interactive mode]"`

@@ -47,7 +47,7 @@ ACP 是客户端驱动的——server 不能自己开会话——所以 `--resum
 |------|------|------|
 | `session/update` | 通知 | 流式事件：文本 chunk、思考、工具调用状态 |
 | `session/request_permission` | 请求（需 Client 应答） | 请求批准危险工具（写文件、跑 shell 等） |
-| `_agentao.cn/ask_user` | 请求（扩展） | 向用户追问文本 |
+| `_arbiter.cn/ask_user` | 请求（扩展） | 向用户追问文本 |
 
 ## 握手 `initialize`
 
@@ -96,9 +96,9 @@ ACP 是客户端驱动的——server 不能自己开会话——所以 `--resum
       "version": "0.2.14"
     },
     "_meta": {
-      "_agentao.cn/extensions": [
+      "_arbiter.cn/extensions": [
         {
-          "method": "_agentao.cn/ask_user",
+          "method": "_arbiter.cn/ask_user",
           "description": "Request free-form text input from the user."
         }
       ]

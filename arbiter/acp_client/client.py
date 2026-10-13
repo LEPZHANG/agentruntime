@@ -238,7 +238,7 @@ class ACPClient:
 
         if "method" in msg and "id" in msg:
             # Server-initiated request (e.g. session/request_permission,
-            # _agentao.cn/ask_user).  Route to the callback so the manager
+            # _arbiter.cn/ask_user).  Route to the callback so the manager
             # can register a pending interaction and later reply.
             self._handle_server_request(msg)
             return

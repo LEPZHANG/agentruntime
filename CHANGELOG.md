@@ -930,8 +930,8 @@ break; upgrade in place.
   `extensions` array.** The ACP-standard `initialize` response carries only
   `protocolVersion` / `agentCapabilities` / `agentInfo` / `authMethods`;
   extension data belongs under `_meta`. Arbiter now returns its
-  `_agentao.cn/ask_user` advertisement under
-  `_meta["_agentao.cn/extensions"]` (vendor-namespaced so it never collides
+  `_arbiter.cn/ask_user` advertisement under
+  `_meta["_arbiter.cn/extensions"]` (vendor-namespaced so it never collides
   with another extension's `_meta` payload) instead of the non-standard
   top-level `extensions: [...]`. `AcpInitializeResponse` drops the
   `extensions` field for an open `_meta` object (`AcpInitializeMeta`); the
@@ -994,7 +994,7 @@ break; upgrade in place.
   the single current `provider/model`); a successful switch returns the
   refreshed `configOptions` in its **response only** — no
   `config_option_update` notification. Also added the vendor
-  `_agentao.cn/set_model` (`{sessionId, model}`, free-form, secret-free,
+  `_arbiter.cn/set_model` (`{sessionId, model}`, free-form, secret-free,
   model-only) for "type any model" UX a `select` can't express; it shares the
   core `agent.set_model()` path. The existing `session/set_model` and
   `session/list_models` are kept unchanged as one-release compatibility
@@ -1042,7 +1042,7 @@ break; upgrade in place.
   numbered menu and accepts a number, comma-separated numbers (when
   `multiple`), or custom text — re-prompting when `allow_custom` is false
   and the entry isn't one of the options; the ACP transport forwards them on
-  `_agentao.cn/ask_user` (host-agnostic plain-string options, not
+  `_arbiter.cn/ask_user` (host-agnostic plain-string options, not
   option-cards) and the host ACP schema's `AcpAskUserParams` gains the
   matching fields (snapshot `docs/schema/host.acp.v1.json` bumped); the
   replay recorder captures them. The reply stays a single string (a client
@@ -2873,7 +2873,7 @@ of the full PyPI publish workflow.
   - Rich-based `render.py` for CLI output formatting
 - **`/acp` CLI commands**: `list`, `start`, `stop`, `restart`, `send`,
   `cancel`, `status`, `logs`, `approve`, `reject`, `reply`
-- **ACP extension method `_agentao.cn/ask_user`** — advertised in
+- **ACP extension method `_arbiter.cn/ask_user`** — advertised in
   `initialize` response `extensions` array; enables ACP servers to request
   free-form text input from the user. `ACPTransport.ask_user()` implemented
   with full error handling (all failures resolve to a sentinel, never crash

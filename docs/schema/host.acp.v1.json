@@ -60,7 +60,7 @@
     },
     "AcpArbiterSetModelRequest": {
       "additionalProperties": false,
-      "description": "``_agentao.cn/set_model`` request params \u2014 free-form, secret-free.\n\nThe vendor free-form path: ``{sessionId, model}`` only. ``extra=\"forbid\"``\nkeeps it secret-free (no ``apiKey`` / ``baseUrl`` / ``_meta``). Model-only\nswitch \u2014 the provider is unchanged. Reuses the ``model`` field name so a\nDeepChat-style adapter maps its UI ``modelId`` \u2192 ``model``.",
+      "description": "``_arbiter.cn/set_model`` request params \u2014 free-form, secret-free.\n\nThe vendor free-form path: ``{sessionId, model}`` only. ``extra=\"forbid\"``\nkeeps it secret-free (no ``apiKey`` / ``baseUrl`` / ``_meta``). Model-only\nswitch \u2014 the provider is unchanged. Reuses the ``model`` field name so a\nDeepChat-style adapter maps its UI ``modelId`` \u2192 ``model``.",
       "properties": {
         "model": {
           "minLength": 1,
@@ -131,7 +131,7 @@
     },
     "AcpAskUserParams": {
       "additionalProperties": false,
-      "description": "Params the agent sends to the client for ``_agentao.cn/ask_user``.\n\n``question`` is always present. The remaining fields are optional\nstructured hints a client may render as a choice prompt; a client may\nignore them and prompt with plain text. The reply is always a single\n``text`` string (see :class:`AcpAskUserAnswered`) \u2014 for ``multiple``\nselections the client joins them itself.",
+      "description": "Params the agent sends to the client for ``_arbiter.cn/ask_user``.\n\n``question`` is always present. The remaining fields are optional\nstructured hints a client may render as a choice prompt; a client may\nignore them and prompt with plain text. The reply is always a single\n``text`` string (see :class:`AcpAskUserAnswered`) \u2014 for ``multiple``\nselections the client joins them itself.",
       "properties": {
         "allowCustom": {
           "default": true,
@@ -444,7 +444,7 @@
     },
     "AcpInitializeExtension": {
       "additionalProperties": true,
-      "description": "One advertised extension method on the ``initialize`` response.\n\nArbiter advertises ``_agentao.cn/ask_user`` so hosts know they may be\nasked free-form questions over the same JSON-RPC channel. The shape\nis intentionally open (extra=\"allow\") so future extensions can add\nfields without breaking existing schema-following clients.",
+      "description": "One advertised extension method on the ``initialize`` response.\n\nArbiter advertises ``_arbiter.cn/ask_user`` so hosts know they may be\nasked free-form questions over the same JSON-RPC channel. The shape\nis intentionally open (extra=\"allow\") so future extensions can add\nfields without breaking existing schema-following clients.",
       "properties": {
         "description": {
           "anyOf": [
@@ -471,13 +471,13 @@
     },
     "AcpInitializeMeta": {
       "additionalProperties": true,
-      "description": "The ``_meta`` object on the ``initialize`` response.\n\nACP advertises extensions through ``_meta`` rather than a top-level\n``extensions`` array, so ``handle_initialize`` namespaces its extension\nlist under the vendor key ``_agentao.cn/extensions``. The object is open\n(extra=\"allow\") so other extensions can attach their own namespaced\npayloads to the same ``_meta`` without breaking schema-following clients.",
+      "description": "The ``_meta`` object on the ``initialize`` response.\n\nACP advertises extensions through ``_meta`` rather than a top-level\n``extensions`` array, so ``handle_initialize`` namespaces its extension\nlist under the vendor key ``_arbiter.cn/extensions``. The object is open\n(extra=\"allow\") so other extensions can attach their own namespaced\npayloads to the same ``_meta`` without breaking schema-following clients.",
       "properties": {
-        "_agentao.cn/extensions": {
+        "_arbiter.cn/extensions": {
           "items": {
             "$ref": "#/$defs/AcpInitializeExtension"
           },
-          "title": "Agentao.Cn/Extensions",
+          "title": "Arbiter.Cn/Extensions",
           "type": "array"
         }
       },

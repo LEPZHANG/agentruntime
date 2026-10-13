@@ -232,7 +232,7 @@ INTERACTION_SERVER_SCRIPT = textwrap.dedent("""\
                               "_interaction": reply.get("result")})
             elif text == "ask_user":
                 try:
-                    reply = server_request("_agentao.cn/ask_user", {
+                    reply = server_request("_arbiter.cn/ask_user", {
                         "question": "what now?",
                     })
                     respond(rid, {"stopReason": "end_turn",

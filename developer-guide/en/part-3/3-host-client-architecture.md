@@ -74,7 +74,7 @@ def dispatch(msg: dict) -> None:
 The agent sends server→client requests only in two cases today:
 
 - `session/request_permission` — tool approval
-- `_agentao.cn/ask_user` — free-form question (extension)
+- `_arbiter.cn/ask_user` — free-form question (extension)
 
 Every one of these **must** be answered, or the agent blocks forever waiting. Enforce this with a timer.
 

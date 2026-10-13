@@ -88,13 +88,13 @@ class InteractionsMixin:
     _NOTIFICATION_KIND_MAP: Dict[str, MessageKind] = {
         "session/update": MessageKind.RESPONSE,
         "session/request_permission": MessageKind.PERMISSION,
-        "_agentao.cn/ask_user": MessageKind.INPUT,
+        "_arbiter.cn/ask_user": MessageKind.INPUT,
     }
 
     # Methods that represent server-initiated requests needing a response.
     _SERVER_REQUEST_METHODS: set = {
         "session/request_permission",
-        "_agentao.cn/ask_user",
+        "_arbiter.cn/ask_user",
     }
 
     def _route_notification(
@@ -159,7 +159,7 @@ class InteractionsMixin:
         """Handle a server-initiated JSON-RPC request (has both method and id).
 
         These are requests like ``session/request_permission`` or
-        ``_agentao.cn/ask_user`` where the server expects a response.
+        ``_arbiter.cn/ask_user`` where the server expects a response.
 
         Policy:
 
@@ -314,7 +314,7 @@ class InteractionsMixin:
                             request_id,
                             {"outcome": {"outcome": "cancelled"}},
                         )
-            elif method == "_agentao.cn/ask_user":
+            elif method == "_arbiter.cn/ask_user":
                 # accept_all cannot fabricate a user answer.
                 client.send_error_response(
                     request_id,

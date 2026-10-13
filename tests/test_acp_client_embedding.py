@@ -118,7 +118,7 @@ class TestAcpInteractionRequiredError:
     def test_method_only_in_details_not_public_attr(self) -> None:
         err = AcpInteractionRequiredError(
             server="worker",
-            method="_agentao.cn/ask_user",
+            method="_arbiter.cn/ask_user",
             prompt="say hi",
             options=[{"id": "ok", "label": "OK"}],
         )
@@ -127,7 +127,7 @@ class TestAcpInteractionRequiredError:
         assert err.prompt == "say hi"
         assert err.options == [{"id": "ok", "label": "OK"}]
         # method must live in details, not as a public attribute
-        assert err.details["method"] == "_agentao.cn/ask_user"
+        assert err.details["method"] == "_arbiter.cn/ask_user"
         assert not hasattr(err, "method")
 
     def test_options_defaults_to_empty_list(self) -> None:
@@ -296,7 +296,7 @@ class TestNonInteractiveAskUser:
             mgr.start_all()
             with pytest.raises(AcpInteractionRequiredError) as exc_info:
                 mgr.send_prompt("srv", "ask_user", interactive=False, timeout=5)
-            assert exc_info.value.details["method"] == "_agentao.cn/ask_user"
+            assert exc_info.value.details["method"] == "_arbiter.cn/ask_user"
             assert mgr.interactions.pending_count == 0
         finally:
             mgr.stop_all()

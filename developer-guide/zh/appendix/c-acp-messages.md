@@ -27,7 +27,7 @@ Arbiter 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 | `agentCapabilities` | `object` | 见下 |
 | `authMethods` | `[]` | v1 为空——Arbiter 不做 ACP 级认证 |
 | `agentInfo` | `object` | `{name: "arbiter", title: "Arbiter", version}` |
-| `_meta["_agentao.cn/extensions"]` | `[{method, description}]` | 扩展方法，放在 `_meta` 下（ACP 标准的扩展通道）；含 `_agentao.cn/ask_user` |
+| `_meta["_arbiter.cn/extensions"]` | `[{method, description}]` | 扩展方法，放在 `_meta` 下（ACP 标准的扩展通道）；含 `_arbiter.cn/ask_user` |
 
 ### `agentCapabilities` 字段（v0.2.x）
 
@@ -214,7 +214,7 @@ Arbiter 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 ### 解析与错误
 
 - **`provider/model`**：Arbiter 调 `provider_resolver(provider_id)` → `{api_key, base_url?}`，然后整套切换 provider + model。**默认** resolver 只接受配置的 `LLM_PROVIDER`（大小写不敏感），读 `{PREFIX}_API_KEY` / `{PREFIX}_BASE_URL`；其它 provider → `-32600` `cannot resolve provider '<id>'`。要支持更多提供方，注入更丰富的 resolver。
-- **裸 `model`**：只换模型（provider 不变），与 `_agentao.cn/set_model` 走同一条核心路径。
+- **裸 `model`**：只换模型（provider 不变），与 `_arbiter.cn/set_model` 走同一条核心路径。
 - resolver 失败时，服务端只记录 provider id + 异常**类型**，绝不记录消息（可能夹带密钥）。
 
 ### `ConfigOption` 结构（`configOptions` 里的条目）
@@ -228,7 +228,7 @@ Arbiter 的 ACP 服务器/客户端发出的每种消息的字段级速查。端
 | `currentValue` | `string?` | 当前模型的 `provider/model` |
 | `options` | `[{value, name?, description?}]` | 候选项；`value` 是 `provider/model`。默认目录 = 当前环境的单一模型；更丰富的目录由宿主注入 |
 
-## C.9 `_agentao.cn/set_model`（扩展）
+## C.9 `_arbiter.cn/set_model`（扩展）
 
 Arbiter 独有的自由文本换模型——`session/set_config_option` 裸值路径的厂商版兄弟。无密钥；与其共享同一条核心路径。
 
@@ -269,7 +269,7 @@ Arbiter 独有的自由文本换模型——`session/set_config_option` 裸值�
 - 命中预设**要求**会话有 `PermissionEngine`，否则 `-32600` Invalid Request。未知 modeId 不需要引擎——纯 UI 状态。
 - 按会话隔离：每个会话拥有自己的引擎，会话 A 的预设变更绝不影响会话 B。
 
-## C.11 `_agentao.cn/ask_user` ⇠ 通知（扩展）
+## C.11 `_arbiter.cn/ask_user` ⇠ 通知（扩展）
 
 Arbiter 独有，服务器向用户问一个自由文本问题。
 

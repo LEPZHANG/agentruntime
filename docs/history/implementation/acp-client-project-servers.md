@@ -36,7 +36,7 @@ issue 入口：
   - ACP server 请求用户确认或用户输入时，不抢占当前 CLI 输入框
   - 统一进入 pending interaction
   - 由用户通过显式 `/acp ...` 命令响应
-  - 自由文本输入采用 Arbiter ACP extension method: `_agentao.cn/ask_user`
+  - 自由文本输入采用 Arbiter ACP extension method: `_arbiter.cn/ask_user`
   - `max_iterations` 不做 ACP extension，ACP 模式下保持保守降级
 - 返回消息展示形式：
   - `<message from="server-name">...</message>`

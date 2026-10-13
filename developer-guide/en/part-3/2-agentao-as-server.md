@@ -47,7 +47,7 @@ The store is keyed by the client-supplied `cwd`, so the lookup runs at request t
 |--------|------|---------|
 | `session/update` | Notification | Streamed events: text chunks, thinking, tool-call status |
 | `session/request_permission` | Request (needs client response) | Ask to approve a risky tool (file write, shell, etc.) |
-| `_agentao.cn/ask_user` | Request (extension) | Ask the user a free-form question |
+| `_arbiter.cn/ask_user` | Request (extension) | Ask the user a free-form question |
 
 ## Handshake `initialize`
 
@@ -96,9 +96,9 @@ The store is keyed by the client-supplied `cwd`, so the lookup runs at request t
       "version": "0.2.14"
     },
     "_meta": {
-      "_agentao.cn/extensions": [
+      "_arbiter.cn/extensions": [
         {
-          "method": "_agentao.cn/ask_user",
+          "method": "_arbiter.cn/ask_user",
           "description": "Request free-form text input from the user."
         }
       ]

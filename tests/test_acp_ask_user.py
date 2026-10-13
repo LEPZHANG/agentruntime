@@ -1,4 +1,4 @@
-"""Tests for _agentao.cn/ask_user ACP extension method (Issue 11)."""
+"""Tests for _arbiter.cn/ask_user ACP extension method (Issue 11)."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def _make_transport(
 
 class TestProtocolConstants:
     def test_method_name(self) -> None:
-        assert METHOD_ASK_USER == "_agentao.cn/ask_user"
+        assert METHOD_ASK_USER == "_arbiter.cn/ask_user"
 
     def test_sentinel(self) -> None:
         assert ASK_USER_UNAVAILABLE_SENTINEL == "(user unavailable)"
@@ -154,5 +154,5 @@ class TestCapabilityAdvertisement:
         # Extensions are advertised through ``_meta`` (ACP's standard channel),
         # namespaced under the vendor key — not a top-level ``extensions`` array.
         assert "extensions" not in result
-        ext = result["_meta"]["_agentao.cn/extensions"]
+        ext = result["_meta"]["_arbiter.cn/extensions"]
         assert any(e["method"] == METHOD_ASK_USER for e in ext)

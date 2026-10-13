@@ -10,7 +10,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Scope
 
-- 定义 `_agentao.cn/ask_user` method
+- 定义 `_arbiter.cn/ask_user` method
 - 定义 request / response payload
 - 定义 capability / extension advertisement
 - 在 ACP transport 中实现 `ask_user()` 桥接
@@ -30,13 +30,13 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Design Notes
 
-- `_agentao.cn/ask_user` 是 Arbiter 私有 ACP extension method
+- `_arbiter.cn/ask_user` 是 Arbiter 私有 ACP extension method
 - 之所以不使用：
   - `session/ask_user`
   - `arbiter/ask_user`
   - `ext/arbiter/ask_user`
   是因为它们都不符合 ACP 扩展方法的命名约定或容易被误解为标准 method
-- 采用 `_agentao.cn/ask_user` 的原因：
+- 采用 `_arbiter.cn/ask_user` 的原因：
   - 以 `_` 开头，符合 ACP 扩展命名约束
   - 使用已注册域名 `agentao.cn` 作为命名空间，冲突风险低
 
@@ -48,7 +48,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 {
   "jsonrpc": "2.0",
   "id": "srv_123",
-  "method": "_agentao.cn/ask_user",
+  "method": "_arbiter.cn/ask_user",
   "params": {
     "sessionId": "sess_xxx",
     "question": "Please provide branch name"
@@ -77,7 +77,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ### Transport Mapping
 
-- `ACPTransport.ask_user(question)` 调用 `_agentao.cn/ask_user`
+- `ACPTransport.ask_user(question)` 调用 `_arbiter.cn/ask_user`
 - `answered` -> 返回 `text`
 - `cancelled` / error / disconnect / malformed result -> 返回保守 sentinel
 
@@ -93,7 +93,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 具体字段形态可在实现时根据 ACP ext schema 定稿，但原则是：
 
-- Arbiter 必须显式声明支持 `_agentao.cn/ask_user`
+- Arbiter 必须显式声明支持 `_arbiter.cn/ask_user`
 - client 只有在明确支持后，才应尝试完整交互
 
 ### Non-goal
@@ -109,7 +109,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
 
 ## Tests
 
-- `_agentao.cn/ask_user` request 发送正确
+- `_arbiter.cn/ask_user` request 发送正确
 - 正常 `answered` 结果映射为返回文本
 - `cancelled` 结果映射为 sentinel
 - JSON-RPC error 映射为 sentinel

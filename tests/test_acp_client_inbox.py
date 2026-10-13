@@ -479,7 +479,7 @@ class TestChunkCap:
         )
 
         big = "Q" * (_MAX_CHUNK_DISPLAY_CHARS + 42)
-        out = _extract_display_text("_agentao.cn/ask_user", {"question": big})
+        out = _extract_display_text("_arbiter.cn/ask_user", {"question": big})
         assert "truncated 42 chars" in out
 
 

@@ -1,4 +1,4 @@
-"""ACP vendor method ``_agentao.cn/set_model`` — free-form model entry.
+"""ACP vendor method ``_arbiter.cn/set_model`` — free-form model entry.
 
 A ``select``-only ``session/set_config_option`` cannot express a free-form
 "type any model" string, so this vendor method survives for that UX. Payload
@@ -8,8 +8,8 @@ the ``model`` field name (matching ``session/set_model`` and the
 ``set_config_option`` value) so a DeepChat-style adapter maps its UI
 ``modelId`` → ``model`` with no ``modelId`` alias on the wire.
 
-The vendor prefix (``_agentao.cn/``) keeps this off the bare ``session/``
-namespace, consistent with ``_agentao.cn/ask_user``. It shares the core
+The vendor prefix (``_arbiter.cn/``) keeps this off the bare ``session/``
+namespace, consistent with ``_arbiter.cn/ask_user``. It shares the core
 ``agent.set_model()`` code path with the other model-set surfaces — no logic
 fork, so the three entries cannot drift.
 """

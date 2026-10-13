@@ -99,8 +99,8 @@ def test_initialize_request_round_trip():
 
 
 def test_initialize_response_round_trip():
-    """The runtime advertises ``_agentao.cn/ask_user`` through
-    ``_meta._agentao.cn/extensions`` — ACP's standard channel for
+    """The runtime advertises ``_arbiter.cn/ask_user`` through
+    ``_meta._arbiter.cn/extensions`` — ACP's standard channel for
     extension data — not a non-standard top-level ``extensions`` array.
     The schema must accept the ``_meta`` object; pre-fix ``extra="forbid"``
     rejected it and any host validating the response saw every successful
@@ -115,9 +115,9 @@ def test_initialize_response_round_trip():
         "authMethods": [],
         "agentInfo": {"name": "arbiter", "version": "0.3.1.dev0"},
         "_meta": {
-            "_agentao.cn/extensions": [
+            "_arbiter.cn/extensions": [
                 {
-                    "method": "_agentao.cn/ask_user",
+                    "method": "_arbiter.cn/ask_user",
                     "description": "Request free-form text input from the user.",
                 },
             ],
@@ -126,7 +126,7 @@ def test_initialize_response_round_trip():
     assert resp.agentInfo.name == "arbiter"
     assert resp.meta is not None
     assert len(resp.meta.arbiter_extensions) == 1
-    assert resp.meta.arbiter_extensions[0].method == "_agentao.cn/ask_user"
+    assert resp.meta.arbiter_extensions[0].method == "_arbiter.cn/ask_user"
 
 
 def test_initialize_response_rejects_top_level_extensions():
@@ -147,7 +147,7 @@ def test_initialize_response_rejects_top_level_extensions():
             "authMethods": [],
             "agentInfo": {"name": "arbiter", "version": "0.3.1.dev0"},
             "extensions": [
-                {"method": "_agentao.cn/ask_user"},
+                {"method": "_arbiter.cn/ask_user"},
             ],
         })
 
@@ -172,7 +172,7 @@ def test_initialize_response_meta_is_alias_only():
     }
     # The wire alias is accepted.
     ok = AcpInitializeResponse.model_validate(
-        {**base, "_meta": {"_agentao.cn/extensions": []}}
+        {**base, "_meta": {"_arbiter.cn/extensions": []}}
     )
     assert ok.meta is not None
     # The bare field name is not — it is off-spec and the handler never emits it.

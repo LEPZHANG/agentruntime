@@ -74,7 +74,7 @@ def dispatch(msg: dict) -> None:
 今天 agent 只会在两种情况下发出 server→client 请求：
 
 - `session/request_permission` —— 工具审批
-- `_agentao.cn/ask_user` —— 自由问答（扩展）
+- `_arbiter.cn/ask_user` —— 自由问答（扩展）
 
 **每一个**都必须答复，不然 agent 会一直等。用定时器兜底。
 

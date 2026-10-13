@@ -34,7 +34,7 @@ Kanban can already call `ACPManager.from_project(...).send_prompt("claude-code-w
 
 ### Gap 1 — Non-interactive mode (highest priority)
 
-Today, when an ACP server issues `session/request_permission` or `_agentao.cn/ask_user`, `ACPManager._route_server_request` registers a `PendingInteraction` and transitions the server to `WAITING_FOR_USER`. Nothing resolves the interaction unless a CLI (or caller) explicitly invokes `approve_interaction` / `reject_interaction` / `reply_interaction`. A workflow daemon has no user to ask and will stall indefinitely.
+Today, when an ACP server issues `session/request_permission` or `_arbiter.cn/ask_user`, `ACPManager._route_server_request` registers a `PendingInteraction` and transitions the server to `WAITING_FOR_USER`. Nothing resolves the interaction unless a CLI (or caller) explicitly invokes `approve_interaction` / `reject_interaction` / `reply_interaction`. A workflow daemon has no user to ask and will stall indefinitely.
 
 **Proposal:** add a non-interactive policy to `send_prompt` / `prompt_once`:
 
@@ -165,7 +165,7 @@ To keep implementation bounded, v1 should make the following explicit choices:
 
 - Non-interactive policy defaults to **auto-reject**, not auto-abort.
 - `AcpInteractionRequiredError` is a subclass of `AcpClientError` with `code == AcpErrorCode.INTERACTION_REQUIRED`.
-- Error metadata may include the raw method name (`session/request_permission` or `_agentao.cn/ask_user`) for diagnostics, but callers should branch on `code`, not method.
+- Error metadata may include the raw method name (`session/request_permission` or `_arbiter.cn/ask_user`) for diagnostics, but callers should branch on `code`, not method.
 - `prompt_once(ephemeral=True)` closes the client/session it created and also stops the subprocess before returning. This gives daemon callers deterministic cleanup.
 - `send_prompt(..., cwd=...)` uses a fresh connection/session whenever the requested `cwd` differs from the connected session's `cwd`.
 - `arbiter.acp_client` becomes the only semver-stable import surface for embedding. Direct imports from `.client`, `.process`, `.interaction`, `.inbox`, and similar modules remain supported only for internal/CLI code.
@@ -387,7 +387,7 @@ Changes:
 
 - add manager-owned per-turn context for non-interactive calls
 - implement `send_prompt(..., interactive=False)` on top of non-blocking prompt flow
-- auto-reject `session/request_permission` and `_agentao.cn/ask_user` during non-interactive turns
+- auto-reject `session/request_permission` and `_arbiter.cn/ask_user` during non-interactive turns
 - keep CLI interactive behavior unchanged
 - remove state transitions from interaction helpers that incorrectly terminate prompt ownership
 
@@ -431,7 +431,7 @@ Add or update tests in:
 Coverage matrix:
 
 - `send_prompt(interactive=False)` auto-rejects permission requests and raises `AcpInteractionRequiredError`
-- `send_prompt(interactive=False)` auto-rejects `_agentao.cn/ask_user` and raises `AcpInteractionRequiredError`
+- `send_prompt(interactive=False)` auto-rejects `_arbiter.cn/ask_user` and raises `AcpInteractionRequiredError`
 - non-interactive rejection never leaves the handle in observable `WAITING_FOR_USER`
 - non-interactive rejection never reports `READY` before the prompt RPC ends
 - `prompt_once()` stops process/client on success
@@ -455,7 +455,7 @@ Coverage matrix:
 ## Acceptance Criteria
 
 - `ACPManager.prompt_once(name, prompt, interactive=False)` completes one turn end-to-end and performs deterministic cleanup on both success and exception.
-- A permission or `_agentao.cn/ask_user` request during a non-interactive turn raises `AcpClientError` with `code == AcpErrorCode.INTERACTION_REQUIRED`; the server never remains observably stuck in `WAITING_FOR_USER`.
+- A permission or `_arbiter.cn/ask_user` request during a non-interactive turn raises `AcpClientError` with `code == AcpErrorCode.INTERACTION_REQUIRED`; the server never remains observably stuck in `WAITING_FOR_USER`.
 - During non-interactive auto-rejection, the server does not report `READY` until the outstanding `session/prompt` has completed or failed.
 - Every failure path sets an `AcpErrorCode`; a caller can `except AcpClientError as e: match e.code:` without string matching.
 - `send_prompt(..., cwd=...)` applies the passed `cwd` to the turn.
@@ -476,5 +476,5 @@ No parallel ACP client stack, no CLI scraping, and no speculative new facade.
 ## Open Questions
 
 - Should `interactive=False` ever support both policies, or should v1 standardize on **reject** only and defer **abort** until a concrete need appears? A single default keeps the state machine and tests simpler.
-- Is `_agentao.cn/ask_user` stable enough to expose in the public error metadata, or should kanban only see `INTERACTION_REQUIRED` without the method name?
+- Is `_arbiter.cn/ask_user` stable enough to expose in the public error metadata, or should kanban only see `INTERACTION_REQUIRED` without the method name?
 - For `prompt_once(ephemeral=True)`, do we stop the process too, or only close the session/client? Stopping the process is cleaner for daemons but costs ~subprocess startup per task; the answer should be an explicit contract, not an implication of `auto_start`.

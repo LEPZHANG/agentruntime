@@ -46,7 +46,7 @@ lock. Queue work yourself if you need bounded wait-for-lock semantics.
 ## Non-Interactive Mode
 
 A daemon has no user to prompt. Set `interactive=False` so the manager
-auto-rejects `session/request_permission` and `_agentao.cn/ask_user`
+auto-rejects `session/request_permission` and `_arbiter.cn/ask_user`
 instead of transitioning to `WAITING_FOR_USER`.
 
 When a non-interactive turn is interrupted by such a request, the
@@ -162,7 +162,7 @@ for `rpc_code` / `rpc_message`.
 
 `AcpInteractionRequiredError` exposes `server`, `prompt`, and
 `options` as stable public fields. The raw server method
-(`session/request_permission` / `_agentao.cn/ask_user`) is available
+(`session/request_permission` / `_arbiter.cn/ask_user`) is available
 via `exc.details["method"]` for diagnostics only — do not branch on it.
 
 ## Status and Diagnostics

@@ -346,7 +346,7 @@ class TestServerRequestRouting:
         mgr = _make_manager("coder")
         mgr._route_server_request(
             "coder",
-            "_agentao.cn/ask_user",
+            "_arbiter.cn/ask_user",
             {"question": "Branch?"},
             request_id="srv_5",
         )
@@ -428,7 +428,7 @@ class TestNotificationRouting:
         mgr = _make_manager("coder")
         mgr._route_notification(
             "coder",
-            "_agentao.cn/ask_user",
+            "_arbiter.cn/ask_user",
             {"question": "Branch name?"},
         )
         assert mgr.interactions.pending_count == 1

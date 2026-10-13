@@ -87,7 +87,7 @@ class AcpInitializeRequest(BaseModel):
 class AcpInitializeExtension(BaseModel):
     """One advertised extension method on the ``initialize`` response.
 
-    Arbiter advertises ``_agentao.cn/ask_user`` so hosts know they may be
+    Arbiter advertises ``_arbiter.cn/ask_user`` so hosts know they may be
     asked free-form questions over the same JSON-RPC channel. The shape
     is intentionally open (extra="allow") so future extensions can add
     fields without breaking existing schema-following clients.
@@ -104,16 +104,16 @@ class AcpInitializeMeta(BaseModel):
 
     ACP advertises extensions through ``_meta`` rather than a top-level
     ``extensions`` array, so ``handle_initialize`` namespaces its extension
-    list under the vendor key ``_agentao.cn/extensions``. The object is open
+    list under the vendor key ``_arbiter.cn/extensions``. The object is open
     (extra="allow") so other extensions can attach their own namespaced
     payloads to the same ``_meta`` without breaking schema-following clients.
     """
 
     arbiter_extensions: List[AcpInitializeExtension] = Field(
-        default_factory=list, alias="_agentao.cn/extensions"
+        default_factory=list, alias="_arbiter.cn/extensions"
     )
 
-    # Alias-only: the wire key is ``_agentao.cn/extensions``; the Python field
+    # Alias-only: the wire key is ``_arbiter.cn/extensions``; the Python field
     # name is never an accepted input key (no ``populate_by_name``), so the
     # validation surface stays identical to the published JSON Schema.
     model_config = ConfigDict(extra="allow")
@@ -126,8 +126,8 @@ class AcpInitializeResponse(BaseModel):
     agentCapabilities: AcpAgentCapabilities
     authMethods: List[Dict[str, Any]] = Field(default_factory=list)
     agentInfo: AcpAgentInfo
-    # ``handle_initialize`` advertises ``_agentao.cn/ask_user`` (and any future
-    # runtime extensions) through ``_meta._agentao.cn/extensions`` — ACP's
+    # ``handle_initialize`` advertises ``_arbiter.cn/ask_user`` (and any future
+    # runtime extensions) through ``_meta._arbiter.cn/extensions`` — ACP's
     # standard channel for extension data — rather than a non-standard
     # top-level ``extensions`` array. Without this field, schema-following
     # hosts would reject every successful initialize response.
@@ -462,7 +462,7 @@ class AcpSessionSetConfigOptionResponse(BaseModel):
 
 
 class AcpArbiterSetModelRequest(BaseModel):
-    """``_agentao.cn/set_model`` request params — free-form, secret-free.
+    """``_arbiter.cn/set_model`` request params — free-form, secret-free.
 
     The vendor free-form path: ``{sessionId, model}`` only. ``extra="forbid"``
     keeps it secret-free (no ``apiKey`` / ``baseUrl`` / ``_meta``). Model-only
@@ -774,7 +774,7 @@ class AcpRequestPermissionResponse(BaseModel):
 
 
 class AcpAskUserParams(BaseModel):
-    """Params the agent sends to the client for ``_agentao.cn/ask_user``.
+    """Params the agent sends to the client for ``_arbiter.cn/ask_user``.
 
     ``question`` is always present. The remaining fields are optional
     structured hints a client may render as a choice prompt; a client may

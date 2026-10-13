@@ -187,7 +187,7 @@ class InteractionPolicy:
 
     This is the single-dimension policy object that governs how a
     non-interactive turn responds to server-initiated
-    ``session/request_permission`` and ``_agentao.cn/ask_user`` requests.
+    ``session/request_permission`` and ``_arbiter.cn/ask_user`` requests.
 
     - ``mode="reject_all"`` — auto-reject every such request; the turn
       ultimately surfaces as :class:`AcpInteractionRequiredError`.

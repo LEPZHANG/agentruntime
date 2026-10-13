@@ -1,7 +1,7 @@
 """Tests for PR-4 — ACP model/provider switching.
 
 Covers the standard ``session/set_config_option`` (configId="model"), the
-vendor ``_agentao.cn/set_model`` free-form method, the default
+vendor ``_arbiter.cn/set_model`` free-form method, the default
 env-sourced ``provider_resolver``, and the ``configOptions`` advertised in
 ``session/new`` / ``session/load``.
 
@@ -347,7 +347,7 @@ class TestConfigOptions:
 
 
 # ===========================================================================
-# _agentao.cn/set_model — vendor free-form
+# _arbiter.cn/set_model — vendor free-form
 # ===========================================================================
 
 

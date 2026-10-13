@@ -135,8 +135,8 @@ Registered handlers (`arbiter/acp/__main__.py:99-108`):
 | `session/set_config_option` | `session_set_config_option.py` | Standard config path; host `provider_resolver` keeps credentials off-wire |
 | `session/set_mode` | `session_set_mode.py` | `modeId` field; accept-unknown (DeepChat `code`/`ask`) |
 | `session/list_models` ⚠ | `session_list_models.py` | **Arbiter extension — not in ACP v1.** `{models: [...]}` |
-| `_agentao.cn/ask_user` | extension | Underscore-prefixed per ACP, declared in `_meta` |
-| `_agentao.cn/set_model` | `arbiter_set_model.py` | Free-form model setter (DeepChat "type any model" UX) |
+| `_arbiter.cn/ask_user` | extension | Underscore-prefixed per ACP, declared in `_meta` |
+| `_arbiter.cn/set_model` | `arbiter_set_model.py` | Free-form model setter (DeepChat "type any model" UX) |
 
 Outbound (agent → client): `session/update` notifications (rich event mapping,
 `transport.py`) and `session/request_permission` (`_transport_interaction.py:161`).
@@ -174,7 +174,7 @@ Outbound (agent → client): `session/update` notifications (rich event mapping,
 
 **Evidence.** The entire server makes exactly **two** outbound `server.call`
 invocations (`_transport_interaction.py:161,328`): `session/request_permission`
-and `_agentao.cn/ask_user`. There is **no** call to `fs/read_text_file`,
+and `_arbiter.cn/ask_user`. There is **no** call to `fs/read_text_file`,
 `fs/write_text_file`, or any `terminal/*` method anywhere in `arbiter/` (grep:
 no outbound `fs/` or `terminal/` string).
 
@@ -386,7 +386,7 @@ v1). All v1 method membership verified against the official schema on 2026-06-18
 | `session/list`/`delete`/`close`/`resume` | c→a | — | **v1 methods, unimplemented**; demand-gated (G5) |
 | `session/set_model` | c→a | ext | **Arbiter extension, not ACP v1** |
 | `session/list_models` | c→a | ext | **Arbiter extension, not ACP v1** |
-| `_agentao.cn/set_model` | c→a | ext | free-form model setter |
+| `_arbiter.cn/set_model` | c→a | ext | free-form model setter |
 | `session/update` | a→c | I | rich mapping; no `plan`/`diff`/`locations` (G2/G4) |
 | `session/request_permission` | a→c | I | blocking, concurrency-safe |
 | `fs/read_text_file` | a→c | — | **G1** |
@@ -396,7 +396,7 @@ v1). All v1 method membership verified against the official schema on 2026-06-18
 | `terminal/wait_for_exit` | a→c | — | **G1** |
 | `terminal/kill` | a→c | — | **G1** |
 | `terminal/release` | a→c | — | **G1** |
-| `_agentao.cn/ask_user` | a→c | ext | declared in `initialize._meta` |
+| `_arbiter.cn/ask_user` | a→c | ext | declared in `initialize._meta` |
 
 ---
 

@@ -110,8 +110,8 @@ ACP（Agent Client Protocol，agentclientprotocol.com）是 Zed 发起的、位�
 | `session/set_config_option` | `session_set_config_option.py` | 标准 config 路径；host `provider_resolver` 使凭据不上线 |
 | `session/set_mode` | `session_set_mode.py` | `modeId` 字段；accept-unknown（DeepChat 的 `code`/`ask`） |
 | `session/list_models` ⚠ | `session_list_models.py` | **Arbiter 扩展——不在 ACP v1。** `{models: [...]}` |
-| `_agentao.cn/ask_user` | 扩展 | 按 ACP 用下划线前缀，在 `_meta` 声明 |
-| `_agentao.cn/set_model` | `arbiter_set_model.py` | 自由文本模型设定（DeepChat"输入任意模型"UX） |
+| `_arbiter.cn/ask_user` | 扩展 | 按 ACP 用下划线前缀，在 `_meta` 声明 |
+| `_arbiter.cn/set_model` | `arbiter_set_model.py` | 自由文本模型设定（DeepChat"输入任意模型"UX） |
 
 出站（agent → client）：`session/update` notification（事件映射丰富，`transport.py`）与
 `session/request_permission`（`_transport_interaction.py:161`）。
@@ -143,7 +143,7 @@ ACP（Agent Client Protocol，agentclientprotocol.com）是 Zed 发起的、位�
 > 建什么。
 
 **证据。** 整个 server 只有**两处**出站 `server.call`（`_transport_interaction.py:161,328`）：
-`session/request_permission` 与 `_agentao.cn/ask_user`。`arbiter/` 中**没有**任何对
+`session/request_permission` 与 `_arbiter.cn/ask_user`。`arbiter/` 中**没有**任何对
 `fs/read_text_file`、`fs/write_text_file` 或任意 `terminal/*` 方法的调用（grep：无出站
 `fs/` 或 `terminal/` 字符串）。
 
@@ -313,7 +313,7 @@ client 无关 / chat 相关的收益——**G4**（plan/modes/commands）、**G3
 | `session/list`/`delete`/`close`/`resume` | c→a | — | **v1 方法，未实现**；需求门控（G5） |
 | `session/set_model` | c→a | ext | **Arbiter 扩展，不在 ACP v1** |
 | `session/list_models` | c→a | ext | **Arbiter 扩展，不在 ACP v1** |
-| `_agentao.cn/set_model` | c→a | ext | 自由文本模型设定 |
+| `_arbiter.cn/set_model` | c→a | ext | 自由文本模型设定 |
 | `session/update` | a→c | I | 映射丰富；无 `plan`/`diff`/`locations`（G2/G4） |
 | `session/request_permission` | a→c | I | 阻塞式、并发安全 |
 | `fs/read_text_file` | a→c | — | **G1** |
@@ -323,7 +323,7 @@ client 无关 / chat 相关的收益——**G4**（plan/modes/commands）、**G3
 | `terminal/wait_for_exit` | a→c | — | **G1** |
 | `terminal/kill` | a→c | — | **G1** |
 | `terminal/release` | a→c | — | **G1** |
-| `_agentao.cn/ask_user` | a→c | ext | 在 `initialize._meta` 声明 |
+| `_arbiter.cn/ask_user` | a→c | ext | 在 `initialize._meta` 声明 |
 
 ---
 

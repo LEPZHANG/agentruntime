@@ -93,7 +93,7 @@ Deliverables:
 
 - manager-owned per-turn context for non-interactive calls
 - auto-reject handling for `session/request_permission`
-- auto-reject handling for `_agentao.cn/ask_user`
+- auto-reject handling for `_arbiter.cn/ask_user`
 - interaction-required exception raised only after prompt reaches terminal state
 
 Implementation notes:

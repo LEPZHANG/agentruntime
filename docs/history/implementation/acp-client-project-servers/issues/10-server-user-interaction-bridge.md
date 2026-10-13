@@ -53,7 +53,7 @@ Issue index: [ACP Client Project-Local Servers Issues](README.md)
   - 会混淆“本地 Arbiter 在问”与“外部 ACP server 在问”
 - 因此外部请求统一转为 `pending interaction`
 - 其中自由文本输入对应的 ACP extension method 固定为：
-  - `_agentao.cn/ask_user`
+  - `_arbiter.cn/ask_user`
 
 建议区分两类 interaction：
 

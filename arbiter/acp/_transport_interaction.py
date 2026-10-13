@@ -1,7 +1,7 @@
 """Request/response interaction mixin for the ACP transport.
 
 Implements the blocking ``confirm_tool`` (→ ``session/request_permission``)
-and ``ask_user`` (→ ``_agentao.cn/ask_user``) round trips, plus the
+and ``ask_user`` (→ ``_arbiter.cn/ask_user``) round trips, plus the
 ``on_max_iterations`` policy. Mixed into
 :class:`arbiter.acp.transport.ACPTransport`; relies on ``self._server`` /
 ``self._session_id`` provided by the host class.
@@ -293,7 +293,7 @@ class _InteractionMixin:
         multiple: bool = False,
         allow_custom: bool = True,
     ) -> str:
-        """Ask the ACP client for user input via ``_agentao.cn/ask_user``.
+        """Ask the ACP client for user input via ``_arbiter.cn/ask_user``.
 
         Sends the extension method as a JSON-RPC request and blocks until
         the client responds.  All failure modes resolve to the sentinel

@@ -236,13 +236,13 @@ Week 1 pins — but does not extend — the existing
 | `SERVER_NOT_FOUND` | Name not in config | Fix config or call site |
 | `HANDSHAKE_FAIL` | Subprocess came up but `initialize`/`session/new` failed. Auto-reclassified on **non-RPC** `AcpClientError` (original `AcpErrorCode` preserved in `details["underlying_code"]`); `AcpRpcError` raised during handshake keeps its wire `code: int` and is identified by `details["phase"] == "handshake"` instead. | Operator action |
 | `REQUEST_TIMEOUT` | Turn exceeded the per-call `timeout=` | Safe to retry; turn slot is released |
-| `INTERACTION_REQUIRED` | Non-interactive turn received a `session/request_permission` or `_agentao.cn/ask_user` from the server | Embedder's interaction policy was not satisfied; do not retry silently |
+| `INTERACTION_REQUIRED` | Non-interactive turn received a `session/request_permission` or `_arbiter.cn/ask_user` from the server | Embedder's interaction policy was not satisfied; do not retry silently |
 | `TRANSPORT_DISCONNECT` | Process died mid-RPC | Recovery policy defined in §7: active-turn deaths are always allowed at least one rebuild; idle-exit recoveries are capped by `maxRecoverableRestarts`. Operator fallback: `restart_server` / `start_server`. |
 
 ## 6. Interaction policy (Week 3)
 
 Non-interactive turns need one decision point: when the server asks
-for a `session/request_permission` or `_agentao.cn/ask_user`, does
+for a `session/request_permission` or `_arbiter.cn/ask_user`, does
 the runtime auto-reject or auto-approve? Week 3 exposes a minimal
 two-layer model over that decision.
 

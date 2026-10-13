@@ -171,9 +171,9 @@ ACP interactions: 1 pending
 - Input requests that expire are cancelled.
 - Respond promptly when the inline permission or input prompt appears.
 
-## ACP Extension: `_agentao.cn/ask_user`
+## ACP Extension: `_arbiter.cn/ask_user`
 
-Arbiter supports a private ACP extension method `_agentao.cn/ask_user` for requesting free-form text input from the user. This is advertised in the `initialize` response under `_meta["_agentao.cn/extensions"]` (ACP's standard channel for extension data).
+Arbiter supports a private ACP extension method `_arbiter.cn/ask_user` for requesting free-form text input from the user. This is advertised in the `initialize` response under `_meta["_arbiter.cn/extensions"]` (ACP's standard channel for extension data).
 
 ### Request
 
@@ -181,7 +181,7 @@ Arbiter supports a private ACP extension method `_agentao.cn/ask_user` for reque
 {
   "jsonrpc": "2.0",
   "id": "srv_123",
-  "method": "_agentao.cn/ask_user",
+  "method": "_arbiter.cn/ask_user",
   "params": {
     "sessionId": "sess_xxx",
     "question": "Please provide branch name"

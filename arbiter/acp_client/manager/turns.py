@@ -101,7 +101,7 @@ class TurnsMixin:
                 never block waiting for another turn to finish).
             interactive: When ``True`` (default), the CLI interaction
                 pipeline handles ``session/request_permission`` and
-                ``_agentao.cn/ask_user`` via ``WAITING_FOR_USER``.  When
+                ``_arbiter.cn/ask_user`` via ``WAITING_FOR_USER``.  When
                 ``False``, such requests are auto-rejected and the turn
                 ultimately raises :class:`AcpInteractionRequiredError`.
             cwd: Per-call working directory.  Forwarded to
@@ -247,7 +247,7 @@ class TurnsMixin:
         """Run one non-interactive ``session/prompt`` turn.
 
         Auto-rejection of inbound ``session/request_permission`` and
-        ``_agentao.cn/ask_user`` happens in :meth:`_route_server_request`
+        ``_arbiter.cn/ask_user`` happens in :meth:`_route_server_request`
         by consulting the installed :class:`_TurnContext`.
         """
         ctx = _TurnContext(

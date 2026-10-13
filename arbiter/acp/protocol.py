@@ -62,12 +62,12 @@ METHOD_SESSION_UPDATE = "session/update"
 METHOD_REQUEST_PERMISSION = "session/request_permission"
 
 # Arbiter extension methods (private, prefixed with underscore per ACP spec)
-METHOD_ASK_USER = "_agentao.cn/ask_user"
+METHOD_ASK_USER = "_arbiter.cn/ask_user"
 #: Vendor free-form model setter — ``{sessionId, model}``, secret-free,
 #: model-only (keeps the current provider). Coexists with the standard
 #: ``session/set_config_option`` select path; serves DeepChat's "type any
 #: model" UX. Shares the core ``agent.set_model()`` code path.
-METHOD_ARBITER_SET_MODEL = "_agentao.cn/set_model"
+METHOD_ARBITER_SET_MODEL = "_arbiter.cn/set_model"
 
 # Sentinel returned when the user is unavailable for ask_user.
 ASK_USER_UNAVAILABLE_SENTINEL = "(user unavailable)"
